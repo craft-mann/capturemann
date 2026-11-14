@@ -69,6 +69,21 @@ Setup. Make these files in one folder:
 13. **Many images.** Drop 20 mixed PNG and JPEG files. Expected: one sheet, 20 rows, the import
     runs in the background with progress, the library stays usable, Cancel stops the rest and
     keeps what was done.
+14. **CMYK and YCCK JPEG (0.3.4, AC10 to AC12).** Import a CMYK JPEG saved from Photoshop or
+    GIMP with its profile embedded (`cmyk-profile.jpg`), one without a profile (`cmyk-adobe.jpg`,
+    an Adobe file stores inverted values), a YCCK one if you have it, and a CMYK JPEG whose
+    profile you damaged (`cmyk-badicc.jpg`; cut the ICC bytes in a hex editor). Expected: none is
+    refused; each opens at its own size with colours like the original in a colour-managed viewer
+    (a white page is white, black text is black, not inverted); the Import sheet says Converted,
+    and for `cmyk-badicc.jpg` also that the profile was not read. `capturemann import --dry-run`
+    lists the same reasons (`converted`, `profile_not_read`). Compare a patch of red with the same
+    file opened in Preview or Photoshop: within a few units per channel.
+15. **Open with (0.3.4, AC13).** macOS: Finder, right-click a PNG, Open With: CaptureMann is
+    listed (not the default; "Always Open With" is not set by the app). Windows: Explorer, Open
+    with, CaptureMann is listed for `.png`, `.jpg`, `.jpeg` after installing with the Open with
+    component ticked; uninstalling removes the entries. Linux: the file manager's Open With lists
+    CaptureMann for PNG and JPEG. With the app running, opening a picture this way forwards it to
+    the running app's Import sheet (no second window).
 
 Pass criteria: every step as written; no crash; no image added from a refused row; no sideways
 photo; the originals of a refused or cancelled import are untouched. Report in `verification/`
@@ -115,6 +130,8 @@ Copy this block into `verification/IMP-6-<date>-<who>.md` and fill it in.
 | IMP-6.AC6 | | 10 |
 | IMP-6.AC8 | | 11 |
 | IMP-6.AC9 | | 2 |
+| IMP-6.AC10, AC11, AC12 | | 14 |
+| IMP-6.AC13 | | 15 |
 
 ## Problems found
 

@@ -75,6 +75,10 @@ const SHARED_KEYS: &[&str] = &[
     r"HKCU\Software\Classes\.mkv\OpenWithList\cm-desktop.exe",
     r"HKCU\Software\Classes\.m4a\OpenWithList\cm-desktop.exe",
     r"HKCU\Software\Classes\.wav\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.mp3\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.png\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.jpg\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.jpeg\OpenWithList\cm-desktop.exe",
 ];
 
 fn reg(ctx: &mut Ctx, args: &[&str]) -> R<crate::proc::Output> {

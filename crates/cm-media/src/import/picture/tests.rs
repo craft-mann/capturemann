@@ -268,19 +268,6 @@ fn exif_orientation_is_read_in_both_byte_orders_and_ignored_when_invalid() {
 }
 
 #[test]
-fn a_cmyk_jpeg_is_refused_by_name() {
-    let mut jpeg = vec![0xFF, 0xD8, 0xFF, 0xC0, 0, 20, 8, 0, 8, 0, 8, 4];
-    jpeg.extend_from_slice(&[1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 4, 0x11, 0, 0xFF, 0xD9]);
-    let p = parse_jpeg_header(&jpeg).unwrap_err();
-    assert_eq!(p.reason, Reason::UnsupportedFormat);
-    assert_eq!(p.format.as_deref(), Some("jpeg_cmyk"));
-    assert_eq!(
-        p.data(),
-        serde_json::json!({"reason": "unsupported_format", "format": "jpeg_cmyk"})
-    );
-}
-
-#[test]
 fn a_jpeg_without_a_frame_is_unreadable() {
     let cases: [&[u8]; 4] = [
         &[0xFF, 0xD8],
@@ -538,4 +525,459 @@ fn cancel_stops_before_decoding() {
 fn png_chunks_are_listed_in_order() {
     let png = png_header_only(1, 1, 8, 6, &[chunk(b"tEXt", b"k\0v")]);
     assert_eq!(png_chunk_types(&png), ["IHDR", "tEXt", "IDAT", "IEND"]);
+}
+
+// ---- CMYK and YCCK JPEG (IMP-6.AC10 to AC12, 0.3.4) --------------------------------------------
+
+/// Bits written MSB first with the 0xFF stuffing of a JPEG scan.
+#[derive(Default)]
+struct Bits {
+    out: Vec<u8>,
+    acc: u32,
+    n: u32,
+}
+
+impl Bits {
+    fn put(&mut self, v: u32, len: u32) {
+        for i in (0..len).rev() {
+            self.acc = (self.acc << 1) | ((v >> i) & 1);
+            self.n += 1;
+            if self.n == 8 {
+                let b = self.acc as u8;
+                self.out.push(b);
+                if b == 0xFF {
+                    self.out.push(0);
+                }
+                self.acc = 0;
+                self.n = 0;
+            }
+        }
+    }
+    fn finish(mut self) -> Vec<u8> {
+        while self.n != 0 {
+            self.put(1, 1);
+        }
+        self.out
+    }
+}
+
+fn segment(code: u8, body: &[u8]) -> Vec<u8> {
+    let mut v = vec![0xFF, code];
+    v.extend_from_slice(&((body.len() + 2) as u16).to_be_bytes());
+    v.extend_from_slice(body);
+    v
+}
+
+/// A four-component baseline JPEG, `blocks.len()` flat 8x8 blocks side by side: each block is one
+/// DC value per component (no other coefficient), so the decoder returns exactly those values.
+/// `adobe` is the APP14 transform byte, `icc` an embedded profile.
+fn four_component_jpeg(blocks: &[[u8; 4]], adobe: Option<u8>, icc: Option<&[u8]>) -> Vec<u8> {
+    let mut j = vec![0xFF, 0xD8];
+    if let Some(t) = adobe {
+        let mut b = b"Adobe".to_vec();
+        b.extend_from_slice(&[0, 100, 0, 0, 0, 0, t]);
+        j.extend(segment(0xEE, &b));
+    }
+    if let Some(icc) = icc {
+        let mut b = b"ICC_PROFILE\0".to_vec();
+        b.extend_from_slice(&[1, 1]);
+        b.extend_from_slice(icc);
+        j.extend(segment(0xE2, &b));
+    }
+    let mut dqt = vec![0u8];
+    dqt.extend_from_slice(&[8u8; 64]);
+    j.extend(segment(0xDB, &dqt));
+    let mut sof = vec![8u8, 0, 8];
+    sof.extend_from_slice(&((blocks.len() * 8) as u16).to_be_bytes());
+    sof.push(4);
+    for i in 0..4u8 {
+        sof.extend_from_slice(&[i + 1, 0x11, 0]);
+    }
+    j.extend(segment(0xC0, &sof));
+    // DC table: nine codes of four bits (categories 0 to 8); AC table: only end-of-block, code "0".
+    let mut dc = vec![0x00u8];
+    let mut counts = [0u8; 16];
+    counts[3] = 9;
+    dc.extend_from_slice(&counts);
+    dc.extend(0..9u8);
+    j.extend(segment(0xC4, &dc));
+    let mut ac = vec![0x10u8];
+    let mut counts = [0u8; 16];
+    counts[0] = 1;
+    ac.extend_from_slice(&counts);
+    ac.push(0);
+    j.extend(segment(0xC4, &ac));
+    let mut sos = vec![4u8];
+    for i in 0..4u8 {
+        sos.extend_from_slice(&[i + 1, 0x00]);
+    }
+    sos.extend_from_slice(&[0, 63, 0]);
+    j.extend(segment(0xDA, &sos));
+    let mut bits = Bits::default();
+    let mut pred = [0i32; 4];
+    for block in blocks {
+        for (c, v) in block.iter().enumerate() {
+            let level = i32::from(*v) - 128;
+            let diff = level - pred[c];
+            pred[c] = level;
+            let cat = if diff == 0 {
+                0
+            } else {
+                32 - diff.unsigned_abs().leading_zeros()
+            };
+            bits.put(cat, 4);
+            if cat > 0 {
+                let v = if diff > 0 {
+                    diff
+                } else {
+                    diff + (1 << cat) - 1
+                };
+                bits.put(v as u32, cat);
+            }
+            bits.put(0, 1);
+        }
+    }
+    j.extend(bits.finish());
+    j.extend_from_slice(&[0xFF, 0xD9]);
+    j
+}
+
+/// Six reference patches as ink values (0 is no ink): white, black, cyan, magenta, yellow, red.
+const INK: [[u8; 4]; 6] = [
+    [0, 0, 0, 0],
+    [0, 0, 0, 255],
+    [255, 0, 0, 0],
+    [0, 255, 0, 0],
+    [0, 0, 255, 0],
+    [0, 255, 255, 0],
+];
+
+/// The sRGB values those patches must come out as.
+const SRGB: [[u8; 3]; 6] = [
+    [255, 255, 255],
+    [0, 0, 0],
+    [0, 255, 255],
+    [255, 0, 255],
+    [255, 255, 0],
+    [255, 0, 0],
+];
+
+fn inverted(ink: &[[u8; 4]]) -> Vec<[u8; 4]> {
+    ink.iter().map(|p| p.map(|v| 255 - v)).collect()
+}
+
+/// The mean colour of each 8x8 patch of a decoded PNG.
+fn patch_means(png: &[u8]) -> Vec<[f32; 3]> {
+    let img = image::load_from_memory(png).unwrap().to_rgba8();
+    (0..img.width() / 8)
+        .map(|k| {
+            let mut sum = [0f32; 3];
+            for y in 0..8 {
+                for x in 0..8 {
+                    let p = img.get_pixel(k * 8 + x, y);
+                    for c in 0..3 {
+                        sum[c] += f32::from(p[c]);
+                    }
+                }
+            }
+            sum.map(|v| v / 64.0)
+        })
+        .collect()
+}
+
+fn assert_patches(png: &[u8], want: &[[u8; 3]], tolerance: f32) {
+    let got = patch_means(png);
+    assert_eq!(got.len(), want.len());
+    for (i, (g, w)) in got.iter().zip(want).enumerate() {
+        for c in 0..3 {
+            assert!(
+                (g[c] - f32::from(w[c])).abs() <= tolerance,
+                "patch {i} channel {c}: got {} want {}",
+                g[c],
+                w[c]
+            );
+        }
+    }
+}
+
+/// sRGB (0 or 1 per channel, so no transfer curve) to CIE Lab under D50.
+fn lab_of_srgb_corner(rgb: [f32; 3]) -> [f32; 3] {
+    let m = [
+        [0.436_074_7, 0.385_064_9, 0.143_080_4],
+        [0.222_504_5, 0.716_878_6, 0.060_616_9],
+        [0.013_932_2, 0.097_104_5, 0.714_173_3],
+    ];
+    let white = [0.9642f32, 1.0, 0.8249];
+    let xyz: Vec<f32> = (0..3)
+        .map(|r| (m[r][0] * rgb[0] + m[r][1] * rgb[1] + m[r][2] * rgb[2]) / white[r])
+        .collect();
+    let f = |t: f32| {
+        if t > 0.008_856 {
+            t.cbrt()
+        } else {
+            7.787 * t + 16.0 / 116.0
+        }
+    };
+    let (fx, fy, fz) = (f(xyz[0]), f(xyz[1]), f(xyz[2]));
+    [116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz)]
+}
+
+/// A small CMYK ICC profile (version 2.2, a 2-point `mft2` look-up table from CMYK to Lab) that
+/// reproduces the subtractive model on its corners: R = (1-C)(1-K) and so on. `black_l` replaces the
+/// lightness of the all-black corner (K = 1), to prove the profile, not the standard formula, is used.
+fn cmyk_icc(black_l: Option<f32>) -> Vec<u8> {
+    let be32 = |v: u32| v.to_be_bytes().to_vec();
+    let s15 = |v: f32| be32((v * 65536.0).round() as i32 as u32);
+    let mut clut = Vec::new();
+    for c in 0..2 {
+        for m in 0..2 {
+            for y in 0..2 {
+                for k in 0..2 {
+                    let rgb = [
+                        ((1 - c) * (1 - k)) as f32,
+                        ((1 - m) * (1 - k)) as f32,
+                        ((1 - y) * (1 - k)) as f32,
+                    ];
+                    let mut lab = lab_of_srgb_corner(rgb);
+                    if let (Some(l), true) = (black_l, (c, m, y, k) == (0, 0, 0, 1)) {
+                        lab = [l, 0.0, 0.0];
+                    }
+                    // The legacy 16-bit Lab encoding of version 2 profiles.
+                    for v in [
+                        lab[0] * 65280.0 / 100.0,
+                        (lab[1] + 128.0) * 256.0,
+                        (lab[2] + 128.0) * 256.0,
+                    ] {
+                        clut.extend((v.round().clamp(0.0, 65535.0) as u16).to_be_bytes());
+                    }
+                }
+            }
+        }
+    }
+    let mut lut = b"mft2".to_vec();
+    lut.extend_from_slice(&[0, 0, 0, 0, 4, 3, 2, 0]);
+    for v in [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0] {
+        lut.extend(s15(v));
+    }
+    // Input and output tables of two entries each: the identity.
+    lut.extend_from_slice(&[0, 2, 0, 2]);
+    for _ in 0..4 {
+        lut.extend_from_slice(&[0, 0, 0xFF, 0xFF]);
+    }
+    lut.extend(clut);
+    for _ in 0..3 {
+        lut.extend_from_slice(&[0, 0, 0xFF, 0xFF]);
+    }
+    let mut wtpt = b"XYZ \0\0\0\0".to_vec();
+    for v in [0.9642, 1.0, 0.8249] {
+        wtpt.extend(s15(v));
+    }
+    let desc_text = b"cm test cmyk\0";
+    let mut desc = b"desc\0\0\0\0".to_vec();
+    desc.extend(be32(desc_text.len() as u32));
+    desc.extend_from_slice(desc_text);
+    desc.extend_from_slice(&[0; 4 + 4 + 2 + 1 + 67]);
+    let tags: [(&[u8; 4], Vec<u8>); 3] = [(b"desc", desc), (b"wtpt", wtpt), (b"A2B0", lut)];
+    let table_end = 128 + 4 + 12 * tags.len();
+    let mut body = Vec::new();
+    let mut table = be32(tags.len() as u32);
+    for (sig, data) in &tags {
+        table.extend_from_slice(*sig);
+        table.extend(be32((table_end + body.len()) as u32));
+        table.extend(be32(data.len() as u32));
+        body.extend_from_slice(data);
+        while body.len() % 4 != 0 {
+            body.push(0);
+        }
+    }
+    let mut head = vec![0u8; 128];
+    head[8..12].copy_from_slice(&0x0220_0000u32.to_be_bytes());
+    head[12..16].copy_from_slice(b"prtr");
+    head[16..20].copy_from_slice(b"CMYK");
+    head[20..24].copy_from_slice(b"Lab ");
+    head[24..26].copy_from_slice(&2026u16.to_be_bytes());
+    head[26..28].copy_from_slice(&11u16.to_be_bytes());
+    head[28..30].copy_from_slice(&14u16.to_be_bytes());
+    head[36..40].copy_from_slice(b"acsp");
+    head[68..72].copy_from_slice(&0x0000_F6D6u32.to_be_bytes());
+    head[72..76].copy_from_slice(&0x0001_0000u32.to_be_bytes());
+    head[76..80].copy_from_slice(&0x0000_D32Du32.to_be_bytes());
+    let mut icc = head;
+    icc.extend(table);
+    icc.extend(body);
+    let total = icc.len() as u32;
+    icc[0..4].copy_from_slice(&total.to_be_bytes());
+    icc
+}
+
+fn import_cmyk(name: &str, jpeg: &[u8]) -> (ImageInfo, Loaded) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write(&dir, name, jpeg);
+    let info = inspect(&path).unwrap();
+    let l = loaded(&path);
+    (info, l)
+}
+
+#[test]
+fn a_cmyk_jpeg_is_described_not_refused() {
+    let jpg = four_component_jpeg(&inverted(&INK), Some(0), None);
+    let info = parse_jpeg_header(&jpg).unwrap();
+    assert_eq!((info.width, info.height), (48, 8));
+    let c = info.cmyk.unwrap();
+    assert!(c.adobe && !c.ycck);
+    assert_eq!(c.profile, ProfileState::Absent);
+    assert_eq!(
+        classify_image(&info).status,
+        Status::Prepared(vec![PrepareReason::Converted])
+    );
+}
+
+/// IMP-6.AC11: an Adobe (inverted) CMYK file without a profile keeps its colours: the white patch
+/// is white and the black patch is black.
+#[test]
+fn imp6_ac11_an_adobe_cmyk_jpeg_without_a_profile_is_not_inverted() {
+    let jpg = four_component_jpeg(&inverted(&INK), Some(0), None);
+    let (info, l) = import_cmyk("adobe.jpg", &jpg);
+    assert_eq!((l.width, l.height), (48, 8));
+    assert_patches(&l.png, &SRGB, 2.0);
+    assert_eq!(
+        classify_image(&info).status,
+        Status::Prepared(vec![PrepareReason::Converted])
+    );
+}
+
+/// A 4-component file without the Adobe marker is taken as stored (0 is no ink).
+#[test]
+fn a_cmyk_jpeg_without_the_adobe_marker_is_taken_as_stored() {
+    let jpg = four_component_jpeg(&INK, None, None);
+    let (_, l) = import_cmyk("plain.jpg", &jpg);
+    assert_patches(&l.png, &SRGB, 2.0);
+}
+
+/// IMP-6.AC10: with an embedded profile the six patches come out within 4 units per channel of the
+/// reference sRGB values, at the size of the file, as a plain 8-bit PNG.
+#[test]
+fn imp6_ac10_a_cmyk_jpeg_with_a_profile_converts_to_srgb() {
+    let icc = cmyk_icc(None);
+    let jpg = four_component_jpeg(&inverted(&INK), Some(0), Some(&icc));
+    let (info, l) = import_cmyk("profile.jpg", &jpg);
+    assert_eq!(info.cmyk.unwrap().profile, ProfileState::Usable);
+    assert_eq!((l.width, l.height), (48, 8));
+    assert_patches(&l.png, &SRGB, 4.0);
+    assert_eq!(
+        classify_image(&info).status,
+        Status::Prepared(vec![PrepareReason::Converted])
+    );
+}
+
+/// The profile, not the standard formula, decides when it is usable: a profile that maps full black
+/// to mid grey gives a mid grey patch.
+#[test]
+fn a_usable_profile_overrides_the_standard_conversion() {
+    let icc = cmyk_icc(Some(50.0));
+    let jpg = four_component_jpeg(&inverted(&INK), Some(0), Some(&icc));
+    let (_, l) = import_cmyk("grey.jpg", &jpg);
+    let black = patch_means(&l.png)[1];
+    for v in black {
+        assert!((v - 119.0).abs() <= 4.0, "{black:?}");
+    }
+}
+
+/// IMP-6.AC12: a profile that cannot be read gives the standard conversion and the row says so; the
+/// import never ends in `jpeg_cmyk`.
+#[test]
+fn imp6_ac12_an_unreadable_profile_falls_back_and_says_so() {
+    let jpg = four_component_jpeg(
+        &inverted(&INK),
+        Some(0),
+        Some(b"this is not a profile at all"),
+    );
+    let (info, l) = import_cmyk("badicc.jpg", &jpg);
+    assert_eq!(info.cmyk.unwrap().profile, ProfileState::Unreadable);
+    assert_patches(&l.png, &SRGB, 2.0);
+    assert_eq!(
+        classify_image(&info).status,
+        Status::Prepared(vec![
+            PrepareReason::Converted,
+            PrepareReason::ProfileNotRead
+        ])
+    );
+}
+
+/// A profile for another colour model (here: the header says RGB) is "not read" as well.
+#[test]
+fn an_rgb_profile_in_a_cmyk_file_is_not_used() {
+    let mut icc = cmyk_icc(None);
+    icc[16..20].copy_from_slice(b"RGB ");
+    let jpg = four_component_jpeg(&inverted(&INK), Some(0), Some(&icc));
+    let (info, l) = import_cmyk("rgbicc.jpg", &jpg);
+    assert_eq!(info.cmyk.unwrap().profile, ProfileState::Unreadable);
+    assert_patches(&l.png, &SRGB, 2.0);
+}
+
+/// YCCK (Adobe transform 2): the first three components are Y, Cb and Cr of the inverted colours.
+#[test]
+fn a_ycck_jpeg_converts_like_a_cmyk_one() {
+    let ycck: Vec<[u8; 4]> = INK
+        .iter()
+        .map(|ink| {
+            let [r, g, b] = [f32::from(ink[0]), f32::from(ink[1]), f32::from(ink[2])];
+            let clamp = |v: f32| v.round().clamp(0.0, 255.0) as u8;
+            [
+                clamp(0.299 * r + 0.587 * g + 0.114 * b),
+                clamp(128.0 - 0.168_736 * r - 0.331_264 * g + 0.5 * b),
+                clamp(128.0 + 0.5 * r - 0.418_688 * g - 0.081_312 * b),
+                255 - ink[3],
+            ]
+        })
+        .collect();
+    let jpg = four_component_jpeg(&ycck, Some(2), None);
+    let info = parse_jpeg_header(&jpg).unwrap();
+    assert!(info.cmyk.unwrap().ycck);
+    let (_, l) = import_cmyk("ycck.jpg", &jpg);
+    assert_patches(&l.png, &SRGB, 5.0);
+    // And with a profile (YCCK is turned into CMYK first).
+    let icc = cmyk_icc(None);
+    let jpg = four_component_jpeg(&ycck, Some(2), Some(&icc));
+    let (info, l) = import_cmyk("ycck_icc.jpg", &jpg);
+    assert_eq!(info.cmyk.unwrap().profile, ProfileState::Usable);
+    assert_patches(&l.png, &SRGB, 6.0);
+}
+
+/// The EXIF orientation applies to a converted CMYK file too, and the PNG stays plain.
+#[test]
+fn a_cmyk_jpeg_with_orientation_arrives_upright() {
+    let jpg = four_component_jpeg(&inverted(&INK), Some(0), None);
+    let rotated = with_orientation(&jpg, 6, true);
+    let (info, l) = import_cmyk("rot.jpg", &rotated);
+    assert_eq!(info.orientation, 6);
+    assert_eq!((l.width, l.height), (8, 48));
+    assert_eq!(
+        png_chunk_types(&l.png).first().map(String::as_str),
+        Some("IHDR")
+    );
+}
+
+/// Manual check against a real CMYK profile (never run by default): writes the fixture JPEG and
+/// our PNG into `CM_CMYK_OUT` so a colour-managed tool (macOS `sips`) can be compared by hand.
+/// `CM_CMYK_ICC=<profile.icc> CM_CMYK_OUT=<dir> cargo test -p cm-media --lib real_profile -- --ignored`.
+#[test]
+#[ignore]
+fn real_profile_writes_files_for_comparison() {
+    let (Ok(icc), Ok(out)) = (std::env::var("CM_CMYK_ICC"), std::env::var("CM_CMYK_OUT")) else {
+        println!("SKIPPED: set CM_CMYK_ICC and CM_CMYK_OUT");
+        return;
+    };
+    let icc = std::fs::read(icc).unwrap();
+    let mut ink = INK.to_vec();
+    ink.extend([[128, 64, 32, 16], [40, 200, 90, 60], [255, 255, 255, 255]]);
+    let jpg = four_component_jpeg(&inverted(&ink), Some(0), Some(&icc));
+    let dir = std::path::Path::new(&out);
+    std::fs::write(dir.join("real.jpg"), &jpg).unwrap();
+    let (info, l) = import_cmyk("real.jpg", &jpg);
+    println!("profile: {:?}", info.cmyk.unwrap().profile);
+    std::fs::write(dir.join("ours.png"), &l.png).unwrap();
+    for (i, m) in patch_means(&l.png).iter().enumerate() {
+        println!("patch {i}: {m:?}");
+    }
 }

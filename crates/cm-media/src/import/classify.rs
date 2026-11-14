@@ -51,6 +51,9 @@ pub enum PrepareReason {
     Oriented,
     /// An animated PNG: only the first frame is imported (IMP-6).
     FirstFrameOnly,
+    /// A CMYK JPEG whose embedded colour profile could not be used: the standard conversion was
+    /// applied instead (IMP-6.AC12).
+    ProfileNotRead,
 }
 
 impl PrepareReason {
@@ -63,6 +66,7 @@ impl PrepareReason {
             PrepareReason::Converted => "converted",
             PrepareReason::Oriented => "oriented",
             PrepareReason::FirstFrameOnly => "first_frame_only",
+            PrepareReason::ProfileNotRead => "profile_not_read",
         }
     }
 
@@ -76,6 +80,7 @@ impl PrepareReason {
             PrepareReason::Converted => "converted to 8-bit colour",
             PrepareReason::Oriented => "turned upright",
             PrepareReason::FirstFrameOnly => "animated: first frame only",
+            PrepareReason::ProfileNotRead => "profile not read",
         }
     }
 }
