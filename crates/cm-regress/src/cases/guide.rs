@@ -329,6 +329,11 @@ fn real_clicks(ctx: &mut Ctx) -> R {
         "--title",
         "Regress guide",
     ])?;
+    if started.error_reason().as_deref() == Some("no_confirmer") {
+        return skip(
+            "start_guide is a Confirm tool and this headless daemon has no confirmation UI; the real-click run needs the desktop app (tests/manual/GDE.md section 4)",
+        );
+    }
     check!(
         started.ok(),
         "`guide start` failed ({}): {}",
