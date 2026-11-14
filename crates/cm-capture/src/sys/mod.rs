@@ -21,3 +21,5 @@ pub mod win_wgc;
 pub mod win_window;
 pub mod x11_kind;
 pub mod x11_names;
+#[cfg(target_os = "linux")]
+pub mod x11_scroll;

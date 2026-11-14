@@ -6,8 +6,8 @@
 //! * [`run::run_auto`] (CaptureMann scrolls, about 80 % of the area per step, waiting until two
 //!   frames 50 ms apart are the same, 150 ms at most) and [`run::run_hand`] (the user scrolls;
 //!   a frame is taken whenever the content settles).
-//! * [`platform_scroller`]: `CGEventPost` on macOS (needs Accessibility), `SendInput` on Windows
-//!   and XTest on X11 are lab work (spike S1); Wayland cannot inject scrolling at all.
+//! * [`platform_scroller`]: `CGEventPost` on macOS (needs Accessibility), `SendInput` on Windows,
+//!   XTest on X11; Wayland cannot inject scrolling at all.
 
 pub mod fake;
 pub mod hud;
@@ -20,8 +20,8 @@ use std::time::Duration;
 use cm_core::CmError;
 
 pub use crate::sys::long_scroll::{
-    accessibility_trusted, auto_scroll_support, platform_scroller, request_accessibility,
-    AutoScrollSupport,
+    accessibility_trusted, auto_scroll_support, platform_scroller, platform_scroller_at,
+    request_accessibility, AutoScrollSupport,
 };
 pub use run::{run_auto, run_hand, LongShotConfig, LongShotProgress, LongShotResult};
 pub use stitch::{
