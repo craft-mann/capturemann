@@ -359,7 +359,7 @@ pub fn sheet(
                     .gap(px(10.))
                     .text_size(px(type_scale::UI))
                     .text_color(rgba_of(t.warning))
-                    .child(div().flex_1().child(SharedString::from(tr!(
+                    .child(div().flex_1().min_w(px(0.)).child(SharedString::from(tr!(
                         "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs.",
                         n = n
                     ))))
