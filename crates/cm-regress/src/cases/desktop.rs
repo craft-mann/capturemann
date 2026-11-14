@@ -553,6 +553,11 @@ fn hud(ctx: &mut Ctx) -> R {
 /// (a press on a button never drags, so some points do not move it); the case passes when one point
 /// moves the window, and fails when none of them does.
 fn hud_drag(ctx: &mut Ctx) -> R {
+    // A press on the HUD activates it; when it closes at the stop, GPUI's activation callback finds the
+    // window already removed and logs this line (gpui-pre-0.3.9 window.rs:2017, seen on the lab laptop on
+    // Nov 14, 2026). Third-party noise; the HUD does close.
+    ctx.log_allow
+        .push("gpui-pre-0.3.9/src/window.rs:2017: window not found".to_owned());
     ctx.allow_recording_without_dialog()?;
     let app = start_app(ctx, &[])?;
     std::thread::sleep(Duration::from_secs(3));
@@ -576,19 +581,19 @@ fn hud_drag(ctx: &mut Ctx) -> R {
                 w.pid == app_pid
                     && w.visible
                     && w.ex_style & sys::WS_EX_TOPMOST != 0
-                    && w.width() > 50
-                    && w.width() <= 900
-                    && w.height() <= 300
+                    // The HUD is the wide, short window (the full bar is about 1200 x 152 px).
+                    && w.width() >= 300
+                    && w.height() <= 170
             })
-            .min_by_key(|w| w.width() * w.height())
+            .max_by_key(|w| w.width())
     };
     let mut problems = Vec::new();
     match find_hud(app.pid) {
         None => problems.push("no HUD window (small topmost window of the app)".to_owned()),
         Some(hud) => {
             let mut moved = false;
-            'grid: for fy in [55, 75, 90] {
-                for fx in [6, 30, 50, 70, 94] {
+            'grid: for fy in [60, 75, 90] {
+                for fx in [2, 15, 30, 45, 60, 75, 90, 98] {
                     let Some(cur) = sys::enum_windows().into_iter().find(|w| w.hwnd == hud.hwnd)
                     else {
                         problems.push("the HUD window disappeared during the drag".to_owned());
@@ -604,7 +609,8 @@ fn hud_drag(ctx: &mut Ctx) -> R {
                     }
                     let after = sys::enum_windows().into_iter().find(|w| w.hwnd == hud.hwnd);
                     if let Some(a) = after {
-                        if a.rect[0] != cur.rect[0] || a.rect[1] != cur.rect[1] {
+                        // The HUD also changes height when a hover hint opens, so only a sideways move counts.
+                        if (a.rect[0] - cur.rect[0]).abs() >= 40 {
                             ctx.note(format!(
                                 "a drag from ({x},{y}) moved the HUD by ({},{})",
                                 a.rect[0] - cur.rect[0],
@@ -618,7 +624,7 @@ fn hud_drag(ctx: &mut Ctx) -> R {
             }
             if !moved && problems.is_empty() {
                 problems.push(
-                    "no pointer drag on the HUD moved it (15 points tried; REC-5.AC18)".to_owned(),
+                    "no pointer drag on the HUD moved it (24 points tried; REC-5.AC18)".to_owned(),
                 );
             }
         }

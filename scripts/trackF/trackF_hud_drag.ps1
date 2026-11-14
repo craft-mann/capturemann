@@ -20,6 +20,8 @@ public class W{
  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
  [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT p);
  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
+ [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+ public static long Fg(){return GetForegroundWindow().ToInt64();}
  [DllImport("user32.dll")] public static extern void mouse_event(uint f,int dx,int dy,uint d,UIntPtr e);
  [StructLayout(LayoutKind.Sequential)] public struct R{public int l,t,r,b;}
  [StructLayout(LayoutKind.Sequential)] public struct POINT{public int x,y;}
@@ -49,28 +51,48 @@ if($Mode -eq 'control'){
 $app=Start-Process $Desktop -PassThru
 Start-Sleep 8
 $cli="$Inst\capturemann.exe"
-if($Mode -eq 'audio'){ (& $cli record start --audio 2>&1) | Out-String | Write-Output } else { (& $cli record start --countdown 0 --size 720p 2>&1) | Out-String | Write-Output }
+if($Mode -eq 'audio'){ (& $cli record start --audio 2>&1) | Out-String | Write-Output }
+elseif($Mode -eq 'bubble'){
+ $dev=(& $cli devices 2>&1) | Out-String
+ $camId=[regex]::Match($dev,'(?m)^\s+(\S+)\s{2}.*\(default\)').Groups[1].Value
+ "camera id: $camId"
+ (& $cli record start --countdown 0 --size 720p --camera $camId 2>&1) | Out-String | Write-Output
+} else { (& $cli record start --countdown 0 --size 720p 2>&1) | Out-String | Write-Output }
 Start-Sleep 5
 function Rects{ $o=@(); foreach($s in [W]::Find($app.Id)){ $f=$s.Split(','); $o+=[pscustomobject]@{h=[int64]$f[0];l=[int]$f[1];t=[int]$f[2];r=[int]$f[3];b=[int]$f[4];ex=[int]$f[5]} }; return $o }
 $all=Rects
 $all | ForEach-Object { "win $($_.h) at $($_.l),$($_.t) size $($_.r-$_.l)x$($_.b-$_.t) ex=0x$('{0:X}' -f $_.ex)" }
-$huds=@($all | Where-Object { ($_.r-$_.l) -le 900 -and ($_.b-$_.t) -le 300 -and ($_.r-$_.l) -gt 50 } | Sort-Object { ($_.r-$_.l)*($_.b-$_.t) })
+# The HUD is the wide, short window (the full bar is about 1200 x 152 px); the other small windows are toasts and cards.
+# The webcam bubble (-Mode bubble) is the roughly square window of a few hundred px.
+if($Mode -eq 'bubble'){
+ $huds=@($all | Where-Object { ($_.r-$_.l) -le 700 -and ($_.b-$_.t) -le 700 -and ($_.r-$_.l) -ge 150 -and -not (($_.r-$_.l) -eq 682 -and ($_.b-$_.t) -eq 218) } | Sort-Object { -($_.r-$_.l)*($_.b-$_.t) })
+ $fys=@(0.5,0.65,0.8); $fxs=@(0.3,0.5,0.7)
+} else {
+ $huds=@($all | Where-Object { ($_.b-$_.t) -le 170 -and ($_.r-$_.l) -ge 300 -and ($_.r-$_.l) -le 1500 } | Sort-Object { -($_.r-$_.l) })
+ $fys=@(0.6,0.75,0.9); $fxs=@(0.02,0.15,0.3,0.45,0.6,0.75,0.9,0.98)
+}
 if($huds.Count -eq 0){ "NO HUD WINDOW" } else {
  $hud=$huds[0]; $hh=$hud.h
  "HUD window $hh"
  $moved=0; $tried=0; $grabFx=$null; $grabFy=$null; $still=@()
- foreach($fy in 0.55,0.75,0.9){
-  foreach($fx in 0.06,0.3,0.5,0.7,0.94){
+ foreach($fy in $fys){
+  foreach($fx in $fxs){
    $cur=Rects | Where-Object { $_.h -eq $hh } | Select-Object -First 1
    if(-not $cur){ "HUD window gone"; break }
    $x=$cur.l+[int](($cur.r-$cur.l)*$fx); $y=$cur.t+[int](($cur.b-$cur.t)*$fy)
    $hit=[W]::Hit($x,$y)
+   $fg0=[W]::Fg()
    [W]::Drag($x,$y,-90,-50)
+   $fg1=[W]::Fg()
+   if($fg0 -ne $fg1 -or $fg1 -eq $hh){ "  foreground window changed: before $fg0, after $fg1 (HUD is $hh)" }
    $after=Rects | Where-Object { $_.h -eq $hh } | Select-Object -First 1
+   if(-not $after){ "HUD window gone after the drag from ($x,$y): the press ended the recording"; break }
    $dl=$after.l-$cur.l; $dt=$after.t-$cur.t; $tried++
-   if($dl -ne 0 -or $dt -ne 0){ $moved++; if($grabFx -eq $null){ $grabFx=$fx; $grabFy=$fy } } else { $still += "($fx,$fy)" }
+   # A drag moves the window by about (-90,-50); the HUD also changes height by itself when a hover hint opens or closes, so only a sideways move counts.
+   $isDrag = [Math]::Abs($dl) -ge 40
+   if($isDrag){ $moved++; if($grabFx -eq $null){ $grabFx=$fx; $grabFy=$fy } } else { $still += "($fx,$fy)" }
    "drag from ($x,$y) fx=$fx fy=$fy hitHud=$($hit -eq $hh) moved by ($dl,$dt)"
-   if($dl -ne 0 -or $dt -ne 0){ [W]::Drag($x+$dl,$y+$dt,-$dl,-$dt) }
+   if($isDrag){ [W]::Drag($x+$dl,$y+$dt,-$dl,-$dt) }
   }
  }
  "SUMMARY tried=$tried moved=$moved not-moved(buttons or text)=$($still -join ' ')"
