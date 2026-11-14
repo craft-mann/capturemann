@@ -136,19 +136,21 @@ impl LongHud {
     }
 }
 
-fn seg(t: &Theme, label: String, active: bool) -> gpui::Div {
+/// One half of the direction segment: an icon in a 36 x 28 cell, `raised` when it is the
+/// direction of this Long Shot (design S2).
+fn seg(t: &Theme, glyph: &'static str, label: String, active: bool) -> gpui::Stateful<gpui::Div> {
     div()
+        .id(glyph)
+        .role(Role::Image)
+        .w(px(36.))
         .h(px(28.))
-        .px(px(8.))
         .flex()
         .items_center()
+        .justify_center()
         .rounded(px(8.))
-        .text_size(px(type_scale::CAPTION))
-        .when(active, |d| {
-            d.bg(rgba_of(t.raised)).text_color(rgba_of(t.text))
-        })
-        .when(!active, |d| d.text_color(rgba_of(t.text_3)))
-        .child(SharedString::from(label))
+        .aria_label(SharedString::from(label))
+        .when(active, |d| d.bg(rgba_of(t.raised)))
+        .child(icon(glyph, 16., if active { t.text } else { t.text_3 }))
 }
 
 fn hud_button(
@@ -162,18 +164,15 @@ fn hud_button(
         .id(id)
         .role(Role::Button)
         .aria_label(SharedString::from(label.clone()))
-        .h(px(40.))
-        .px(px(10.))
+        .size(px(40.))
         .flex()
         .items_center()
-        .gap(px(6.))
+        .justify_center()
         .rounded(px(10.))
         .cursor_pointer()
         .hover(move |s| s.bg(hover))
-        .text_size(px(type_scale::CAPTION))
-        .text_color(rgba_of(t.text_2))
-        .child(icon(glyph, 16., t.text_2))
-        .child(SharedString::from(label))
+        .tooltip(crate::ui::tooltip::tip(label, Vec::new()))
+        .child(icon(glyph, 18., t.text_2))
         // A press on a button is not the start of a window drag (Windows declares the bar as a
         // drag region; `occlude` keeps it off the button).
         .occlude()
@@ -271,8 +270,13 @@ impl Render for LongHud {
                 div()
                     .flex()
                     .items_center()
-                    .child(seg(&t, tr!("Vertical"), !horizontal))
-                    .child(seg(&t, tr!("Horizontal"), horizontal)),
+                    .p(px(2.))
+                    .gap(px(2.))
+                    .rounded(px(10.))
+                    .border_1()
+                    .border_color(rgba_of(t.line))
+                    .child(seg(&t, "arrow-up-down", tr!("Vertical"), !horizontal))
+                    .child(seg(&t, "arrow-left-right", tr!("Horizontal"), horizontal)),
             )
             .child(
                 hud_button(
@@ -285,10 +289,13 @@ impl Render for LongHud {
             )
             .child(
                 div()
-                    .mono()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .px(px(6.))
                     .text_size(px(type_scale::CAPTION))
                     .text_color(rgba_of(t.text_3))
-                    .px(px(4.))
+                    .child(icon("chevrons-down", 14., t.text_3))
                     .child(SharedString::from(if auto {
                         tr!("Auto")
                     } else {
