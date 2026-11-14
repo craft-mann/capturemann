@@ -163,6 +163,19 @@ pub fn icon_button(
     pressed: bool,
     tooltip_keys: Option<Vec<String>>,
 ) -> Stateful<Div> {
+    icon_button_tinted(t, id, glyph, aria, pressed, tooltip_keys, None)
+}
+
+/// [`icon_button`] with the icon in `tint` instead of the text colour.
+pub fn icon_button_tinted(
+    t: &Theme,
+    id: impl Into<ElementId>,
+    glyph: &'static str,
+    aria: impl Into<SharedString>,
+    pressed: bool,
+    tooltip_keys: Option<Vec<String>>,
+    tint: Option<Color>,
+) -> Stateful<Div> {
     let aria: SharedString = aria.into();
     let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
     let fg = if pressed { t.text } else { t.text_2 };
@@ -192,7 +205,7 @@ pub fn icon_button(
         .when_some(tooltip_keys, |d, keys| {
             d.tooltip(crate::ui::tooltip::tip(aria.clone(), keys))
         })
-        .child(icon(glyph, icon_size::ICON_BUTTON, fg))
+        .child(icon(glyph, icon_size::ICON_BUTTON, tint.unwrap_or(fg)))
 }
 
 /// A solid record-red dot.

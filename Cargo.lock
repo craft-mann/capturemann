@@ -1261,7 +1261,7 @@ dependencies = [
 
 [[package]]
 name = "cm-ai"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "cm-core",
  "cm-cursor",
@@ -1283,7 +1283,7 @@ dependencies = [
 
 [[package]]
 name = "cm-audio"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "block2 0.6.2",
  "cm-core",
@@ -1312,7 +1312,7 @@ dependencies = [
 
 [[package]]
 name = "cm-auth"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1332,7 +1332,7 @@ dependencies = [
 
 [[package]]
 name = "cm-camera"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "block2 0.6.2",
  "cm-core",
@@ -1359,7 +1359,7 @@ dependencies = [
 
 [[package]]
 name = "cm-capture"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "ashpd",
  "async-io",
@@ -1391,7 +1391,7 @@ dependencies = [
 
 [[package]]
 name = "cm-cli"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -1413,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "cm-core"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "cm-platform",
  "hound",
@@ -1428,7 +1428,7 @@ dependencies = [
 
 [[package]]
 name = "cm-cursor"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "cm-core",
  "objc2 0.6.5",
@@ -1445,7 +1445,7 @@ dependencies = [
 
 [[package]]
 name = "cm-daemon"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1481,7 +1481,7 @@ dependencies = [
 
 [[package]]
 name = "cm-desktop"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "arboard",
@@ -1534,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "cm-encode"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "block2 0.6.2",
  "cm-core",
@@ -1555,11 +1555,11 @@ dependencies = [
 
 [[package]]
 name = "cm-i18n"
-version = "0.3.3"
+version = "0.3.4"
 
 [[package]]
 name = "cm-ipc"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "libc",
  "serde_json",
@@ -1569,7 +1569,7 @@ dependencies = [
 
 [[package]]
 name = "cm-jobs"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "cm-core",
@@ -1583,7 +1583,7 @@ dependencies = [
 
 [[package]]
 name = "cm-library"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "cm-core",
  "cm-encode",
@@ -1600,7 +1600,7 @@ dependencies = [
 
 [[package]]
 name = "cm-mcp"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1625,7 +1625,7 @@ dependencies = [
 
 [[package]]
 name = "cm-media"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "cm-audio",
  "cm-core",
@@ -1646,7 +1646,7 @@ dependencies = [
 
 [[package]]
 name = "cm-overlay"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "ab_glyph",
  "arboard",
@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "cm-platform"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "libc",
  "objc2-foundation 0.3.2",
@@ -1684,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "cm-publish"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "cm-core",
@@ -1700,7 +1700,7 @@ dependencies = [
 
 [[package]]
 name = "cm-regress"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "png 0.18.1",
  "serde",
@@ -1710,7 +1710,7 @@ dependencies = [
 
 [[package]]
 name = "cm-render"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "bytemuck",
  "cm-core",
@@ -1729,7 +1729,7 @@ dependencies = [
 
 [[package]]
 name = "cm-storage"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "cm-core",
