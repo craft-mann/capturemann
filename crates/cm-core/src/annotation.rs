@@ -145,6 +145,10 @@ impl<'de> Deserialize<'de> for Color {
 }
 
 /// Serializes whole numbers as JSON integers (`4`, not `4.0`) so the wire shape matches the spec.
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
+}
+
 fn ser_num<S: Serializer>(v: &f64, s: S) -> Result<S::Ok, S::Error> {
     if v.fract() == 0.0 && v.abs() < 9.0e15 {
         s.serialize_i64(*v as i64)
@@ -392,6 +396,9 @@ pub enum OpKind {
         color: Color,
         #[serde(default = "d_width", serialize_with = "ser_num")]
         width: f64,
+        /// Width in px of a soft translucent halo around the ring (the click marker); 0 = none.
+        #[serde(default, skip_serializing_if = "is_zero", serialize_with = "ser_num")]
+        glow: f64,
     },
     Text {
         /// Top-left of the text box (first line).
@@ -924,8 +931,13 @@ impl OpKind {
                     Err("radius must be >= 0".into())
                 }
             }
-            OpKind::Ellipse { rect, width, .. } => {
+            OpKind::Ellipse {
+                rect, width, glow, ..
+            } => {
                 finite_rect(rect)?;
+                if !glow.is_finite() || *glow < 0.0 {
+                    return Err("glow must be >= 0".into());
+                }
                 positive("width", *width)
             }
             OpKind::Text {

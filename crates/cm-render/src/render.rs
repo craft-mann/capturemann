@@ -198,9 +198,29 @@ impl Renderer {
                 }
                 stroke_opt(pm, path, *color, *width, LineCap::Butt);
             }
-            OpKind::Ellipse { rect, color, width } => {
+            OpKind::Ellipse {
+                rect,
+                color,
+                width,
+                glow,
+            } => {
                 let r = norm_rect(&rect.to_array())
                     .and_then(|(x, y, w, h)| Rect::from_xywh(x, y, w, h));
+                if *glow > 0.0 {
+                    let g = (*glow + *width / 2.0) as f32;
+                    if let Some(p) = r.and_then(|r| {
+                        Rect::from_xywh(
+                            r.x() - g,
+                            r.y() - g,
+                            r.width() + 2.0 * g,
+                            r.height() + 2.0 * g,
+                        )
+                    }) {
+                        if let Some(path) = PathBuilder::from_oval(p) {
+                            fill_path(pm, &path, *color, 56);
+                        }
+                    }
+                }
                 stroke_opt(
                     pm,
                     r.and_then(PathBuilder::from_oval),

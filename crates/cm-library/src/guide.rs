@@ -255,7 +255,7 @@ pub fn click_ops(
     scale: f64,
 ) -> Vec<AnnotationOp> {
     let long = f64::from(frame.0.max(frame.1));
-    let size = (long * 0.016).clamp(30.0, 64.0).round();
+    let size = (long * 0.02).clamp(36.0, 72.0).round();
     let r = (size * 1.6).round();
     // The badge's centre on the ring, up and to the left (45 degrees).
     let off = r * std::f64::consts::FRAC_1_SQRT_2;
@@ -266,7 +266,9 @@ pub fn click_ops(
             OpKind::Ellipse {
                 rect: Rc::new(click.0 - r, click.1 - r, r * 2.0, r * 2.0),
                 color: cm_core::annotation::DEFAULT_COLOR,
-                width: 4.0,
+                width: 5.0,
+                // The design's 6 px glow around the 52 px ring, scaled with the ring.
+                glow: (r * 0.23).round(),
             },
         ),
         AnnotationOp::new(

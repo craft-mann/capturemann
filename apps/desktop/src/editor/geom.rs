@@ -772,6 +772,7 @@ pub fn shape_from_drag(
                     rect,
                     color: style.color,
                     width: style.width,
+                    glow: 0.0,
                 },
                 Tool::Highlight => OpKind::Highlight {
                     rect,
@@ -1314,6 +1315,7 @@ mod tests {
             rect: Rc::new(0.0, 0.0, 200.0, 100.0),
             color: Color::BLACK,
             width: 4.0,
+            glow: 0.0,
         };
         assert!(hit(&e, Pt::new(0.0, 50.0), 3.0, &mut tm));
         assert!(hit(&e, Pt::new(100.0, 0.0), 3.0, &mut tm));
