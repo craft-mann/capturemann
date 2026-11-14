@@ -4,9 +4,11 @@
 //! applied). Pure Rust (`krilla`, MIT OR Apache-2.0); the S4 run wrote 10 steps in 65 ms.
 
 use cm_core::CmError;
-use krilla::geom::{Point, Size, Transform};
+use krilla::color::rgb;
+use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
 use krilla::page::PageSettings;
+use krilla::paint::{Fill, Stroke};
 use krilla::text::{Font, TextDirection};
 use krilla::Document;
 
@@ -38,6 +40,8 @@ const MARGIN: f32 = 48.0;
 const TITLE_PT: f32 = 24.0;
 const HEAD_PT: f32 = 16.0;
 const BODY_PT: f32 = 11.0;
+/// Space between a step heading (or its note) and its picture.
+const HEAD_TO_PICTURE: f32 = 6.0;
 /// The tallest a picture is drawn, so two steps fit on most pages.
 const MAX_IMAGE_H: f32 = 330.0;
 
@@ -128,6 +132,7 @@ pub fn pdf(
             push_text(&mut blocks, s.note.trim(), BODY_PT, false, true);
         }
         if let Some(img) = &s.image {
+            blocks.push((HEAD_TO_PICTURE, Block::Gap, true));
             let w = (content_w).min(img.width as f32);
             let ratio = img.height as f32 / img.width.max(1) as f32;
             let (mut dw, mut dh) = (w, w * ratio);
@@ -147,11 +152,18 @@ pub fn pdf(
     let mut i = 0;
     while i < blocks.len() {
         let (h, _, keep) = &blocks[i];
-        let need = if *keep && i + 1 < blocks.len() {
-            h + blocks[i + 1].0
-        } else {
-            *h
-        };
+        // A run of `keep` blocks (heading, note, gap) goes with the block after it (the picture).
+        let mut need = *h;
+        if *keep {
+            let mut j = i + 1;
+            while j < blocks.len() {
+                need += blocks[j].0;
+                if !blocks[j].2 {
+                    break;
+                }
+                j += 1;
+            }
+        }
         if y + need > bottom && y > MARGIN {
             pages.push(Vec::new());
             y = MARGIN;
@@ -193,6 +205,23 @@ pub fn pdf(
                         image,
                         Size::from_wh(*w, *h).ok_or_else(|| err("picture", "size"))?,
                     );
+                    // A hairline frame, so a light screenshot does not melt into the paper.
+                    let mut pb = PathBuilder::new();
+                    pb.push_rect(
+                        Rect::from_xywh(0.0, 0.0, *w, *h).ok_or_else(|| err("frame", "size"))?,
+                    );
+                    if let Some(path) = pb.finish() {
+                        s.set_fill(None);
+                        s.set_stroke(Some(Stroke {
+                            paint: rgb::Color::new(205, 207, 214).into(),
+                            width: 0.75,
+                            ..Stroke::default()
+                        }));
+                        s.draw_path(&path);
+                        // The text that follows is filled and not outlined.
+                        s.set_stroke(None);
+                        s.set_fill(Some(Fill::default()));
+                    }
                     s.pop();
                 }
                 Block::Gap => {}

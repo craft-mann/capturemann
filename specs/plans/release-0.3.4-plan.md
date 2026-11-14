@@ -178,7 +178,7 @@ Unchanged from the Phase 0 text of Nov 13, 2026: the op JSON is frozen, and AC1 
   - It adds a step badge at the click point and a highlight ring around it, as normal ops, so the user can edit them.
   - It writes a draft step title from the text recognized nearest the click, for example `Click "Save"`. With no text near the click, the title is `Click here`.
   - Double-clicks and right-clicks are noted in the title (`Double-click`, `Right-click`).
-- **Step crop:** each step can show the whole target or a **focus crop** around the click (default 1200 × 800 physical px, centred, clamped to the target). Both are stored: the frame is the image, and the crop is a non-destructive `crop` op (ANN-1).
+- **Step crop:** each step can show the whole target or a **focus crop** around the click (default 1200 × 800 logical px, that is 2400 × 1600 physical px on a 2x display, centred, clamped to the target so the click stays inside it; the crop op itself is stored in physical px). Both are stored: the frame is the image, and the crop is a non-destructive `crop` op (ANN-1).
 - **HUD:** step count, Pause, Add note step (a step with no image, for "Type your password"), Undo last step, and Stop. The HUD is excluded from the shots.
 - **Privacy** (problem 8): no keystrokes; Auto-redact runs on each step in the background and marks the steps that have proposals.
 - **Result:** a capture of the new kind `guide`. Its folder holds `guide.json` (the title, intro, and the ordered steps with title, note, image id and click point) and one screenshot per step. Each step image is a full screenshot capture inside the guide, so every editor tool works on it.
@@ -350,7 +350,7 @@ Duration is not a constraint (maintainer, Nov 14, 2026): everything in this plan
 2. **Long Shot limit:** 16,384 px on the long side in 0.3.4, with 30,000 px later? *(Default: yes, after S5.)*
 3. **Accessibility on macOS:** add it as an optional permission row for Auto scroll? *(Default: yes; Hand scroll works without it.)*
 4. **Keys:** Y for Retype, J for Move area, and no default hotkeys for Long Shot or Click Guide (the user sets them)? *(Default: yes. Y and J are not used by any editor tool in 0.3.3.)*
-5. **Click Guide focus crop:** on by default at 1200 × 800? *(Default: on.)*
+5. **Click Guide focus crop:** on by default at 1200 × 800 logical px? *(Default: on.)*
 6. **PDF:** in 0.3.4 only if S4 passes, otherwise 0.3.5? *(Default: yes.)*
 7. **Guide folder:** `cmguide` for the guide's folder extension, and a board stays an ordinary screenshot capture (problem 13)? *(Default: yes.)*
 8. **WebP in Bulk export:** lossless only, or leave WebP out of 0.3.4 (problem 14)? *(Default: lossless if it adds no dependency, else out.)*

@@ -54,7 +54,8 @@ pub const UNDO_DIR: &str = ".undo";
 pub const HISTORY_LIMIT: usize = 50;
 /// Most steps in one guide.
 pub const MAX_STEPS: usize = 500;
-/// Default focus crop, physical px (GDE-1).
+/// Default focus crop, logical px (GDE-1): multiplied by the display scale factor of the step's
+/// click, so a Retina display shows the same part of the screen as a 1x one.
 pub const FOCUS_W: f64 = 1200.0;
 pub const FOCUS_H: f64 = 800.0;
 /// Longest title and note, in chars.
@@ -99,6 +100,18 @@ pub struct ClickPoint {
     pub button: String,
     /// 1, or 2 for a double click.
     pub count: u32,
+    /// Display scale factor of the followed target (physical px per logical px; 1 when the
+    /// guide was recorded before this field existed).
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub scale: f64,
+}
+
+fn one() -> f64 {
+    1.0
+}
+
+fn is_one(v: &f64) -> bool {
+    (*v - 1.0).abs() < f64::EPSILON
 }
 
 /// One step of a guide.
@@ -208,15 +221,22 @@ pub struct GuideBundle {
     doc: GuideDoc,
 }
 
-/// The focus crop of a frame of `w` x `h` around `click`: 1200 x 800 centred, clamped inside the
-/// frame; `None` when the frame is not larger than that (nothing to crop).
-pub fn focus_rect(w: u32, h: u32, click: (f64, f64)) -> Option<Rc> {
+/// The focus crop of a frame of `w` x `h` physical px around `click` (physical px): 1200 x 800
+/// logical px (times `scale`) centred, clamped inside the frame so the click stays in it; `None`
+/// when the frame is not larger than that (nothing to crop).
+pub fn focus_rect(w: u32, h: u32, click: (f64, f64), scale: f64) -> Option<Rc> {
+    let scale = if scale.is_finite() && scale >= 1.0 {
+        scale
+    } else {
+        1.0
+    };
     let (w, h) = (f64::from(w), f64::from(h));
-    if w <= FOCUS_W && h <= FOCUS_H {
+    let (fw, fh) = ((FOCUS_W * scale).round(), (FOCUS_H * scale).round());
+    if w <= fw && h <= fh {
         return None;
     }
-    let cw = FOCUS_W.min(w);
-    let ch = FOCUS_H.min(h);
+    let cw = fw.min(w);
+    let ch = fh.min(h);
     let x = (click.0 - cw / 2.0).clamp(0.0, w - cw).round();
     let y = (click.1 - ch / 2.0).clamp(0.0, h - ch).round();
     Some(Rc::new(x, y, cw, ch))
@@ -230,6 +250,7 @@ pub fn click_ops(
     frame: (u32, u32),
     style: StepStyle,
     crop: bool,
+    scale: f64,
 ) -> Vec<AnnotationOp> {
     let long = f64::from(frame.0.max(frame.1));
     let size = (long * 0.012).clamp(28.0, 56.0).round();
@@ -258,7 +279,7 @@ pub fn click_ops(
         ),
     ];
     if crop {
-        if let Some(rect) = focus_rect(frame.0, frame.1, click) {
+        if let Some(rect) = focus_rect(frame.0, frame.1, click, scale) {
             ops.push(AnnotationOp::new("", OpKind::Crop { rect }));
         }
     }
@@ -614,7 +635,7 @@ impl GuideBundle {
         let mut b = ShotBundle::create(&steps, &id, png, at)?;
         let size = b.manifest().original.size;
         let n = u32::try_from(self.doc.steps.len() + 1).unwrap_or(u32::MAX);
-        let crop = focus_rect(size.width, size.height, (click.x, click.y)).is_some();
+        let crop = focus_rect(size.width, size.height, (click.x, click.y), click.scale).is_some();
         let res = b
             .add_ops(
                 click_ops(
@@ -623,6 +644,7 @@ impl GuideBundle {
                     (size.width, size.height),
                     self.doc.numbering,
                     crop,
+                    click.scale,
                 ),
                 by.clone(),
                 at,
@@ -800,8 +822,11 @@ impl GuideBundle {
             .map(|o| o.id.clone())
             .collect();
         if on {
+            let sc = click.as_ref().map_or(1.0, |c| c.scale);
             let c = click.map_or((0.0, 0.0), |c| (c.x, c.y));
-            if let (true, Some(rect)) = (crops.is_empty(), focus_rect(size.width, size.height, c)) {
+            if let (true, Some(rect)) =
+                (crops.is_empty(), focus_rect(size.width, size.height, c, sc))
+            {
                 b.add_ops(
                     vec![AnnotationOp::new("", OpKind::Crop { rect })],
                     by.clone(),
@@ -1085,8 +1110,8 @@ impl GuideBundle {
             .iter()
             .position(|s| s.id == id)
             .expect("checked");
-        let crop =
-            step.focus_crop && focus_rect(size.width, size.height, (click.x, click.y)).is_some();
+        let crop = step.focus_crop
+            && focus_rect(size.width, size.height, (click.x, click.y), click.scale).is_some();
         let res = b
             .add_ops(
                 click_ops(
@@ -1095,6 +1120,7 @@ impl GuideBundle {
                     (size.width, size.height),
                     self.doc.numbering,
                     crop,
+                    click.scale,
                 ),
                 by.clone(),
                 at,

@@ -559,7 +559,9 @@ fn main() {
                             .data
                             .get("capture_id")
                             .and_then(|v| v.as_str())
-                            .map(str::to_owned);
+                            // A step picture of a Click Guide is `<guide id>/<step id>`: the
+                            // library card that changes is the guide's.
+                            .map(|v| v.split('/').next().unwrap_or(v).to_owned());
                         cx.update(|cx| {
                             cm_desktop::ui::app::capture_changed(&app2, id.as_deref(), cx)
                         });

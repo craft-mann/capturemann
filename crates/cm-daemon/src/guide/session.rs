@@ -107,6 +107,8 @@ struct SinkState {
     exclusions: Arc<Mutex<Vec<[f64; 4]>>>,
     capturer: Arc<Capturer>,
     target: CaptureTarget,
+    /// Display scale factor of the target (physical px per logical px).
+    scale: f64,
     tx: mpsc::Sender<Job>,
     events: EventBus,
     guide_id: String,
@@ -162,6 +164,7 @@ impl SinkState {
                 y: c.y,
                 button: c.button,
                 count: 1,
+                scale: self.scale,
             },
         });
     }
@@ -189,7 +192,7 @@ impl Worker {
             }
             _ => Vec::new(),
         };
-        let title = draft_title(&lines, (click.x, click.y), &click.button, 1);
+        let title = draft_title(&lines, (click.x, click.y), click.scale, &click.button, 1);
         let step =
             self.guide
                 .add_click_step(&png, click.clone(), &title, &self.by, self.clock.now())?;
@@ -217,7 +220,7 @@ impl Worker {
         let Some((lines, click)) = &self.last else {
             return Ok(());
         };
-        let title = draft_title(lines, (click.x, click.y), &click.button, 2);
+        let title = draft_title(lines, (click.x, click.y), click.scale, &click.button, 2);
         if let Some(id) = self.guide.amend_last_click(2, &title)? {
             self.events.publish(
                 "guide.step_updated",
@@ -308,6 +311,23 @@ pub(crate) fn write_guide_poster(dir: &std::path::Path) {
     if let Err(e) = res {
         log::debug!("guide poster not written: {e}");
     }
+}
+
+/// The display scale factor of the followed target (1 when it is not listed).
+fn target_scale(target: &CaptureTarget, targets: &cm_capture::Targets) -> f64 {
+    let s = match target {
+        CaptureTarget::Display { display_id } | CaptureTarget::Region { display_id, .. } => targets
+            .displays
+            .iter()
+            .find(|d| d.id == *display_id)
+            .map(|d| d.scale.get()),
+        CaptureTarget::Window { window_id } => targets
+            .windows
+            .iter()
+            .find(|w| w.id == *window_id)
+            .map(|w| w.scale.get()),
+    };
+    s.filter(|v| v.is_finite() && *v >= 1.0).unwrap_or(1.0)
 }
 
 async fn ask(
@@ -447,6 +467,7 @@ impl Inner {
             exclusions: self.guide.exclusions.clone(),
             capturer,
             target: capture_target,
+            scale: target_scale(&capture_target, &targets),
             tx,
             events: self.events.clone(),
             guide_id: guide_id.clone(),
@@ -547,6 +568,11 @@ impl Inner {
         self.events.publish(
             "guide.stopped",
             json!({ "guide_id": a.guide_id, "by": actor, "step_count": out["step_count"] }),
+        );
+        // The library row changed (steps, size, card picture): views reload it.
+        self.events.publish(
+            events::CAPTURE_REVISED,
+            json!({ "capture_id": a.guide_id, "by": actor }),
         );
         Ok(out)
     }
