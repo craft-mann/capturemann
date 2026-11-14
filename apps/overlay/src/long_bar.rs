@@ -12,6 +12,7 @@
 use cm_i18n::tr;
 
 use crate::canvas::IRect;
+use crate::icons::Icon;
 
 /// Whether Auto scroll can be offered (the desktop app asks the capture crate and passes it as
 /// `--auto-scroll`; the overlay never links an engine crate).
@@ -92,6 +93,16 @@ impl BarMode {
             BarMode::Display => Some("display"),
             BarMode::ClickGuide => Some("guide"),
             BarMode::LongShot => None,
+        }
+    }
+
+    pub fn icon(self) -> Icon {
+        match self {
+            BarMode::Region => Icon::Region,
+            BarMode::Window => Icon::Window,
+            BarMode::Display => Icon::Display,
+            BarMode::LongShot => Icon::LongShot,
+            BarMode::ClickGuide => Icon::ClickGuide,
         }
     }
 
@@ -224,8 +235,13 @@ pub struct Entry {
     /// Drawn dimmed (Auto scroll without Accessibility); a click still explains why.
     pub dimmed: bool,
     pub primary: bool,
-    /// A keycap after the label (Start shows Enter).
+    /// A keycap after the button (Start shows Enter); `keycap_rect` is where it is drawn.
     pub keycap: Option<&'static str>,
+    pub keycap_rect: Option<IRect>,
+    /// The icon drawn before the label (every mode and scroll item has one).
+    pub icon: Option<Icon>,
+    /// Icon only (the direction segment): `label` stays as its accessible name, not drawn.
+    pub icon_only: bool,
     /// A label only, not a button (Wayland's single "Hand scroll").
     pub inert: bool,
 }
@@ -247,6 +263,8 @@ pub struct BarLayout {
     pub bar: IRect,
     pub entries: Vec<Entry>,
     pub dividers: Vec<Divider>,
+    /// The outlined containers of the segmented controls (Auto/Hand scroll, direction).
+    pub segments: Vec<IRect>,
     pub card: Option<Card>,
 }
 
@@ -258,6 +276,8 @@ pub const PAD: f64 = 6.0;
 pub const BUTTON_H: f64 = 40.0;
 pub const LABEL_PX: f64 = 13.0;
 pub const CARD_W: f64 = 330.0;
+/// The icon box before a label (logical px).
+pub const ICON_PX: f64 = 16.0;
 
 fn d(logical: f64, scale: f64) -> i32 {
     (logical * scale).round().max(1.0) as i32
@@ -293,7 +313,9 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
     let btn_pad = d(14.0, scale);
     let div_w = d(1.0, scale);
     let div_gap = d(8.0, scale);
-    let keycap_w = |k: &str| (measure(k, px * 0.92).ceil() as i32) + d(14.0, scale);
+    let icon_sz = d(ICON_PX, scale);
+    let icon_gap = d(8.0, scale);
+    let keycap_side = d(22.0, scale);
 
     // Pass 1: widths of the entries in order, with group breaks.
     struct Proto {
@@ -306,6 +328,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
         keycap: Option<&'static str>,
         inert: bool,
         break_before: bool,
+        icon: Option<Icon>,
+        icon_only: bool,
     }
     let mut protos: Vec<Proto> = Vec::new();
     let mut push = |item: Item,
@@ -315,11 +339,18 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
                     primary: bool,
                     keycap: Option<&'static str>,
                     inert: bool,
-                    break_before: bool| {
-        let mut w = measure(&label, px).ceil() as i32 + 2 * btn_pad;
-        if let Some(k) = keycap {
-            w += d(8.0, scale) + keycap_w(k);
-        }
+                    break_before: bool,
+                    icon: Option<Icon>,
+                    icon_only: bool| {
+        let w = if icon_only {
+            d(36.0, scale)
+        } else {
+            let mut w = measure(&label, px).ceil() as i32 + 2 * btn_pad;
+            if icon.is_some() {
+                w += icon_sz + icon_gap;
+            }
+            w
+        };
         protos.push(Proto {
             item,
             label,
@@ -330,6 +361,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
             keycap,
             inert,
             break_before,
+            icon,
+            icon_only,
         });
     };
     for m in BarMode::ALL.iter() {
@@ -341,6 +374,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
             false,
             None,
             false,
+            false,
+            Some(m.icon()),
             false,
         );
     }
@@ -354,6 +389,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
             None,
             true,
             true,
+            Some(Icon::HandScroll),
+            false,
         ),
         _ => {
             push(
@@ -365,6 +402,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
                 None,
                 false,
                 true,
+                Some(Icon::AutoScroll),
+                false,
             );
             push(
                 Item::Scroll(Scroll::Hand),
@@ -374,6 +413,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
                 false,
                 None,
                 false,
+                false,
+                Some(Icon::HandScroll),
                 false,
             );
         }
@@ -387,6 +428,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
         None,
         false,
         true,
+        Some(Icon::Vertical),
+        true,
     );
     push(
         Item::Dir(Dir::Horizontal),
@@ -397,6 +440,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
         None,
         false,
         false,
+        Some(Icon::Horizontal),
+        true,
     );
     push(
         Item::Start,
@@ -407,6 +452,8 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
         Some("Enter"),
         false,
         true,
+        None,
+        false,
     );
 
     let spacing = |p: &Proto| {
@@ -416,8 +463,15 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
             gap
         }
     };
+    let key_extra = |p: &Proto| {
+        if p.keycap.is_some() {
+            gap + keycap_side
+        } else {
+            0
+        }
+    };
     let total = 2 * pad
-        + protos.iter().map(|p| p.w).sum::<i32>()
+        + protos.iter().map(|p| p.w + key_extra(p)).sum::<i32>()
         + protos.iter().skip(1).map(spacing).sum::<i32>();
     let bar_h = btn_h + 2 * pad;
     let x0 = ((w - total) / 2).max(0);
@@ -439,6 +493,7 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
             }
             x += spacing(&p);
         }
+        let extra = key_extra(&p);
         shifted.push(Entry {
             item: p.item,
             rect: IRect::new(x, bar.y + pad, p.w, btn_h),
@@ -448,8 +503,36 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
             primary: p.primary,
             keycap: p.keycap,
             inert: p.inert,
+            keycap_rect: p.keycap.map(|_| {
+                IRect::new(
+                    x + p.w + gap,
+                    bar.y + pad + (btn_h - keycap_side) / 2,
+                    keycap_side,
+                    keycap_side,
+                )
+            }),
+            icon: p.icon,
+            icon_only: p.icon_only,
         });
-        x += p.w;
+        x += p.w + extra;
+    }
+
+    // The segmented controls: the scroll pair and the direction pair, outlined as one.
+    let seg_grow = d(3.0, scale);
+    let mut segments = Vec::new();
+    for is_group in [
+        (|i: Item| matches!(i, Item::Scroll(_))) as fn(Item) -> bool,
+        |i: Item| matches!(i, Item::Dir(_)),
+    ] {
+        let rs: Vec<IRect> = shifted
+            .iter()
+            .filter(|e| is_group(e.item))
+            .map(|e| e.rect)
+            .collect();
+        // A lone inert "Hand scroll" label (Wayland) has no control around it.
+        if let (Some(a), Some(b), true) = (rs.first(), rs.last(), rs.len() > 1) {
+            segments.push(IRect::new(a.x, a.y, b.x + b.w - a.x, a.h).grow(seg_grow));
+        }
     }
 
     let card = if state.card && state.auto == AutoSupport::NeedsAccessibility {
@@ -465,6 +548,7 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
         bar,
         entries: shifted,
         dividers,
+        segments,
         card,
     }
 }
@@ -508,6 +592,9 @@ fn card_layout(anchor_x: i32, bar: IRect, w: i32, scale: f64, measure: Measure<'
             dimmed: false,
             primary: true,
             keycap: None,
+            keycap_rect: None,
+            icon: None,
+            icon_only: false,
             inert: false,
         },
         Entry {
@@ -518,6 +605,9 @@ fn card_layout(anchor_x: i32, bar: IRect, w: i32, scale: f64, measure: Measure<'
             dimmed: false,
             primary: false,
             keycap: None,
+            keycap_rect: None,
+            icon: None,
+            icon_only: false,
             inert: false,
         },
     ];
@@ -716,6 +806,47 @@ mod tests {
             s.activate(Item::Mode(BarMode::LongShot)),
             BarEffect::Nothing
         );
+    }
+
+    #[test]
+    fn every_mode_and_scroll_entry_has_an_icon_and_direction_is_icon_only() {
+        use crate::icons::Icon;
+        let l = lay(&BarState::new(AutoSupport::Available));
+        for e in &l.entries {
+            match e.item {
+                Item::Start => assert!(e.icon.is_none() && e.keycap_rect.is_some()),
+                Item::Dir(_) => {
+                    assert!(e.icon_only && e.icon.is_some() && !e.label.is_empty());
+                }
+                _ => assert!(e.icon.is_some() && !e.icon_only, "{:?}", e.item),
+            }
+        }
+        let find = |i: Item| l.entries.iter().find(|e| e.item == i).unwrap();
+        assert_eq!(
+            find(Item::Mode(BarMode::LongShot)).icon,
+            Some(Icon::LongShot)
+        );
+        assert_eq!(find(Item::Dir(Dir::Vertical)).icon, Some(Icon::Vertical));
+        // Label plus icon plus gap: wider than the label alone with its padding.
+        let r = find(Item::Mode(BarMode::Region)).rect;
+        assert_eq!(r.w, m("Region", 13.0).ceil() as i32 + 28 + 16 + 8);
+        // The keycap sits after Start, inside the bar, and is not part of the Start hit rect.
+        let st = find(Item::Start);
+        let k = st.keycap_rect.unwrap();
+        assert!(k.x >= st.rect.x + st.rect.w && k.x + k.w <= l.bar.x + l.bar.w);
+        assert_eq!(l.segments.len(), 2);
+    }
+
+    #[test]
+    fn bar_fits_a_narrow_display_with_icons() {
+        for scale in [1.0, 2.0] {
+            let l = layout(&BarState::new(AutoSupport::Available), 1600, 800, scale, &m);
+            assert!(
+                l.bar.x >= 0 && l.bar.x + l.bar.w <= 1600,
+                "{scale}: {:?}",
+                l.bar
+            );
+        }
     }
 
     #[test]

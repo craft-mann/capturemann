@@ -36,6 +36,11 @@ winit = "0.30"
 softbuffer = "0.4"
 # Apache-2.0
 ab_glyph = "0.2"
+# The SVG icons of the bars, rasterised to alpha masks (the versions already in Cargo.lock; no
+# text and no raster-image features). resvg/usvg: MPL-2.0; tiny-skia: BSD-3-Clause.
+resvg = { version = "0.46", default-features = false }
+usvg = { version = "0.46", default-features = false }
+tiny-skia = "0.11"
 # MIT OR Apache-2.0 (text only: no image-data feature)
 arboard.workspace = true
 
