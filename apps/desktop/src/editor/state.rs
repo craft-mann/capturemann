@@ -440,6 +440,10 @@ fn op_name(kind: &OpKind) -> String {
         OpKind::Blur { .. } => tr_ctx!("annotation kind", "blur"),
         OpKind::Pixelate { .. } => tr_ctx!("annotation kind", "pixelate"),
         OpKind::Crop { .. } => tr_ctx!("annotation kind", "crop"),
+        OpKind::Magnify { .. } => tr_ctx!("annotation kind", "zoom lens"),
+        OpKind::Retype { .. } => tr_ctx!("annotation kind", "retype"),
+        OpKind::MoveArea { .. } => tr_ctx!("annotation kind", "move area"),
+        OpKind::Blueprint { .. } => tr_ctx!("annotation kind", "blueprint"),
     }
 }
 

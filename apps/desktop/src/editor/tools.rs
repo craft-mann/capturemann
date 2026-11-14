@@ -163,6 +163,8 @@ impl Tool {
             OpKind::Blur { .. } => Tool::Blur,
             OpKind::Pixelate { .. } => Tool::Pixelate,
             OpKind::Crop { .. } => Tool::Crop,
+            // Track B gives these their tools; until then they select.
+            OpKind::Magnify { .. } | OpKind::Retype { .. } | OpKind::MoveArea { .. } | OpKind::Blueprint { .. } => Tool::Select,
         }
     }
 
