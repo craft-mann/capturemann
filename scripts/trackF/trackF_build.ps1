@@ -6,6 +6,7 @@ $log = 'C:\lab\trackF-build.log'
 "start $(Get-Date)" | Out-File $log
 $env:Path = "$env:USERPROFILE\.cargo\bin;C:\Program Files\CMake\bin;" + $env:Path
 $env:CARGO_TARGET_DIR = 'C:\wt\target'
+$env:LIBCLANG_PATH = 'C:\Program Files\LLVM\bin'
 $env:CARGO_PROFILE_RELEASE_LTO = 'false'
 $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = '16'
 $env:CARGO_PROFILE_RELEASE_DEBUG = '0'
