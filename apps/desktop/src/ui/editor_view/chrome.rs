@@ -85,6 +85,10 @@ impl EditorView {
         let popover = self.shortcuts_open.then(|| self.shortcuts_popover(t, cx));
         let group_menu = self.group_menu.map(|m| self.group_menu_view(t, m, cx));
         let inspector = self.inspector(t, &snap, cx);
+        let busy_sheet = snap
+            .busy_prompt
+            .clone()
+            .map(|p| self.busy_sheet(t, &p, window, cx));
         let warn = snap.warning.clone();
 
         div()
@@ -144,7 +148,8 @@ impl EditorView {
                                     .child(canvas)
                                     .child(pills)
                                     .children(popover)
-                                    .children(group_menu),
+                                    .children(group_menu)
+                                    .children(busy_sheet),
                             )
                             .children(strip),
                     )

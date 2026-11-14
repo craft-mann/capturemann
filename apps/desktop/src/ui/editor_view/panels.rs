@@ -12,19 +12,20 @@ use crate::ui::field_style::{
 use cm_core::annotation::StampKind;
 use cm_core::annotation::{CalloutStyle, SpotMode, SpotShapeKind, StepStyle, MAX_SPOTLIGHT_SHAPES};
 
-/// The "New in 0.3.3" pill in a panel header (info blue). Shown for the whole release; remove
-/// with the palette dot in 0.3.4.
+/// The neutral "New in 0.3.4" pill in a panel header (0.3.4 design decision 2: `raised`
+/// background, 1 px `line`, `text-2`; blue is reserved for agents, so it is not used here).
 pub(super) fn new_pill(t: &Theme) -> Div {
-    let _ = t;
     div()
         .flex_none()
         .px(px(8.))
         .py(px(2.))
         .rounded_full()
-        .bg(gpui::rgba(0x5B8C_FF24))
+        .bg(rgba_of(t.raised))
+        .border_1()
+        .border_color(rgba_of(t.line))
         .text_size(px(11.))
-        .text_color(gpui::rgb(0x8FB0FF))
-        .child(SharedString::from(tr_ctx!("panel badge", "New in 0.3.3")))
+        .text_color(rgba_of(t.text_2))
+        .child(SharedString::from(tr_ctx!("panel badge", "New in 0.3.4")))
 }
 
 /// A blue-tinted note under a panel (the design's info line).
@@ -138,6 +139,12 @@ impl EditorView {
         if let Some(info) = &s.stamp {
             rows.push(self.stamp_picker(t, info));
         }
+        if let Some(info) = &s.retype {
+            rows.extend(self.retype_top(t, info));
+        }
+        if let Some(info) = &s.mv {
+            rows.extend(self.move_top(t, info));
+        }
         let _ = cx;
         rows
     }
@@ -163,6 +170,29 @@ impl EditorView {
         }
         if let Some(info) = &s.steps {
             rows.extend(self.steps_bottom(t, info));
+        }
+        if let Some(info) = &s.lens {
+            rows.extend(self.lens_bottom(t, info));
+        }
+        if let Some(info) = &s.retype {
+            rows.extend(self.retype_bottom(t, info));
+        }
+        if s.mv.is_some() {
+            rows.extend(self.move_bottom(t));
+        }
+        if s.retype.is_none() && s.mv.is_none() && s.lens.is_none() {
+            if let Some(n) = &s.touch_notice {
+                rows.push(
+                    div()
+                        .p(px(10.))
+                        .rounded(px(scale::RADIUS_SM))
+                        .bg(gpui::rgba(0xF5B8_4A14))
+                        .text_size(px(12.))
+                        .text_color(gpui::rgb(0xF5B84A))
+                        .child(SharedString::from(n.clone()))
+                        .into_any_element(),
+                );
+            }
         }
         if s.stamp.is_some() {
             rows.push(
@@ -856,6 +886,6 @@ mod tests {
 
     #[test]
     fn the_new_pill_text_is_translatable() {
-        assert_eq!(tr_ctx!("panel badge", "New in 0.3.3"), "New in 0.3.3");
+        assert_eq!(tr_ctx!("panel badge", "New in 0.3.4"), "New in 0.3.4");
     }
 }

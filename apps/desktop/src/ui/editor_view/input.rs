@@ -46,6 +46,30 @@ impl EditorView {
         let mods = mods_of(k.modifiers);
         let editing = doc.read(cx).state.text.is_some();
         if editing {
+            // Cmd/Ctrl+C, X and A work inside the text box on the canvas (ANN-1.AC10): copy
+            // and cut put the selected plain text on the clipboard.
+            if mods.secondary && !k.modifiers.alt && matches!(k.key.as_str(), "c" | "x" | "a") {
+                match k.key.as_str() {
+                    "c" => {
+                        if let Some(text) = doc.read(cx).state.text_copy() {
+                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(text));
+                        }
+                    }
+                    "x" => {
+                        if let Some(text) = doc.update(cx, |d, cx| d.text_cut(cx)) {
+                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(text));
+                        }
+                    }
+                    _ => {
+                        doc.update(cx, |d, cx| {
+                            d.text_key("a", None, mods, cx);
+                        });
+                    }
+                }
+                cx.stop_propagation();
+                cx.notify();
+                return;
+            }
             if mods.secondary && k.key == "v" {
                 if let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) {
                     doc.update(cx, |d, cx| d.text_paste(&text, cx));

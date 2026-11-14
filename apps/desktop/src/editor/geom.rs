@@ -2,7 +2,8 @@
 //! parameter edits. Pure functions over `cm_core::OpKind` in original-image px.
 
 use cm_core::annotation::{
-    SpotShape, SpotShapeKind, BLUR_STRENGTH_RANGE, MAX_SPOTLIGHT_SHAPES, PIXELATE_BLOCK_RANGE,
+    MagnifyShape, SpotShape, SpotShapeKind, BLUR_STRENGTH_RANGE, MAX_SPOTLIGHT_SHAPES,
+    PIXELATE_BLOCK_RANGE,
 };
 use cm_core::{AnnotationOp, Color, OpKind, Pt, Rc};
 use std::collections::HashMap;
@@ -154,7 +155,18 @@ fn rect_of(kind: &OpKind) -> Option<Rc> {
         | OpKind::Highlight { rect, .. }
         | OpKind::Blur { rect, .. }
         | OpKind::Pixelate { rect, .. }
-        | OpKind::Crop { rect } => Some(rect.normalized()),
+        | OpKind::Crop { rect }
+        | OpKind::Retype { rect, .. } => Some(rect.normalized()),
+        // The Zoom Lens is dragged by its source; the loupe is `loupe_rect`.
+        OpKind::Magnify { source, .. } => Some(source.normalized()),
+        // The area where the contents are now (or were, when they are removed).
+        OpKind::MoveArea { source, to, .. } => {
+            let s = source.normalized();
+            Some(match to {
+                Some(t) => Rc::new(t.x, t.y, s.w, s.h),
+                None => s,
+            })
+        }
         // The box the renderer draws, not the stored minimum (ANN-4.AC5).
         OpKind::Callout { .. } => cm_render::callout_box(kind),
         _ => None,
@@ -169,11 +181,58 @@ fn with_rect(kind: &OpKind, r: Rc) -> OpKind {
         | OpKind::Highlight { rect, .. }
         | OpKind::Blur { rect, .. }
         | OpKind::Pixelate { rect, .. }
-        | OpKind::Crop { rect } => *rect = r,
+        | OpKind::Crop { rect }
+        | OpKind::Retype { rect, .. } => *rect = r,
+        OpKind::Magnify { source, .. } => *source = r,
+        // A moved area keeps its size: only the destination follows.
+        OpKind::MoveArea { to: Some(t), .. } => *t = Pt::new(r.x, r.y),
         OpKind::Callout { rect, .. } => *rect = r,
         _ => {}
     }
     k
+}
+
+/// The loupe of a Zoom Lens: the source scaled by the zoom and centred on `at` (ANN-8).
+pub fn loupe_rect(kind: &OpKind) -> Option<Rc> {
+    match kind {
+        OpKind::Magnify {
+            source, at, zoom, ..
+        } => {
+            let s = source.normalized();
+            let (w, h) = (s.w * zoom, s.h * zoom);
+            Some(Rc::new(at.x - w / 2.0, at.y - h / 2.0, w, h))
+        }
+        _ => None,
+    }
+}
+
+/// Where a new loupe is centred: to the right of the source when it fits in the image, else
+/// below, else to the left, else above, else clamped inside the image (ANN-8 editor).
+pub fn default_loupe_at(source: Rc, zoom: f64, image: (u32, u32)) -> Pt {
+    let s = source.normalized();
+    let (iw, ih) = (f64::from(image.0), f64::from(image.1));
+    let (w, h) = (s.w * zoom, s.h * zoom);
+    let gap = 16.0;
+    let cy = (s.y + s.h / 2.0).clamp(h / 2.0, (ih - h / 2.0).max(h / 2.0));
+    let cx = (s.x + s.w / 2.0).clamp(w / 2.0, (iw - w / 2.0).max(w / 2.0));
+    if s.x + s.w + gap + w <= iw {
+        Pt::new(s.x + s.w + gap + w / 2.0, cy)
+    } else if s.y + s.h + gap + h <= ih {
+        Pt::new(cx, s.y + s.h + gap + h / 2.0)
+    } else if s.x - gap - w >= 0.0 {
+        Pt::new(s.x - gap - w / 2.0, cy)
+    } else if s.y - gap - h >= 0.0 {
+        Pt::new(cx, s.y - gap - h / 2.0)
+    } else {
+        Pt::new(cx, cy)
+    }
+}
+
+/// Whether a Zoom Lens op is inside the schema's limits (zoom 2 to 8, source at least 8 px, a
+/// loupe of at most 16 384 px a side and 32 megapixels): the editor refuses what `annotate`
+/// would refuse (ANN-8.AC5).
+pub fn lens_ok(kind: &OpKind) -> bool {
+    cm_core::annotation::validate_op(0, &AnnotationOp::new("x", kind.clone())).is_ok()
 }
 
 /// Axis-aligned bounds of the drawn shape (stroke width not included), original px.
@@ -273,6 +332,13 @@ pub fn hit(kind: &OpKind, p: Pt, tol: f64, tm: &mut TextMetrics) -> bool {
             ((p.x - at.x).powi(2) + (p.y - at.y).powi(2)).sqrt() <= size / 2.0 + tol
         }
         OpKind::Crop { .. } => false,
+        // A Blueprint has no handle on the canvas: its panel edits it.
+        OpKind::Blueprint { .. } => false,
+        // Either the source or the loupe grabs the lens (the loupe alone moves the loupe).
+        OpKind::Magnify { .. } => {
+            inside(bounds(kind, tm), p, tol)
+                || loupe_rect(kind).is_some_and(|l| inside(l.normalized(), p, tol))
+        }
         OpKind::Spotlight { .. } => hit_hole(kind, p, tol).is_some(),
         OpKind::Callout { tail, .. } => {
             let near_tip = ((p.x - tail.x).powi(2) + (p.y - tail.y).powi(2)).sqrt() <= tol * 1.5;
@@ -373,6 +439,8 @@ pub fn handles(kind: &OpKind, tm: &mut TextMetrics) -> Vec<(Handle, Pt)> {
             let b = bounds(kind, tm);
             vec![(Handle::Scale, Pt::new(b.x + b.w, b.y + b.h))]
         }
+        // A moved area is dragged, not resized; a Blueprint is edited in its panel.
+        OpKind::MoveArea { .. } | OpKind::Blueprint { .. } => Vec::new(),
         OpKind::Callout { tail, .. } => {
             // Four corners on the drawn box and the tail tip (ANN-4, design spec section 6).
             let Some(r) = rect_of(kind) else {
@@ -560,10 +628,22 @@ pub fn default_hole(kind: SpotShapeKind, c: Pt, image: (u32, u32)) -> SpotShape 
     }
 }
 
-/// Moves the op by `(dx, dy)`; for a spotlight only hole `hole` moves.
+/// `translate_op`'s `hole` argument for a Zoom Lens drag that started on the loupe: only the
+/// loupe moves, the source stays.
+pub const LOUPE_PART: usize = 1;
+
+/// Moves the op by `(dx, dy)`; for a spotlight only hole `hole` moves, for a Zoom Lens
+/// `hole == LOUPE_PART` moves only the loupe.
 pub fn translate_op(kind: &OpKind, dx: f64, dy: f64, hole: usize) -> OpKind {
     match kind {
         OpKind::Spotlight { .. } => translate_hole(kind, hole, dx, dy),
+        OpKind::Magnify { at, .. } if hole == LOUPE_PART => {
+            let mut k = kind.clone();
+            if let OpKind::Magnify { at: a, .. } = &mut k {
+                *a = Pt::new(at.x + dx, at.y + dy);
+            }
+            k
+        }
         _ => translate(kind, dx, dy),
     }
 }
@@ -579,6 +659,12 @@ pub fn translate(kind: &OpKind, dx: f64, dy: f64) -> OpKind {
         }
         OpKind::Text { at, .. } | OpKind::Step { at, .. } | OpKind::Stamp { at, .. } => {
             *at = mv(at)
+        }
+        // The lens moves as a whole: the source and the loupe keep their distance.
+        OpKind::Magnify { source, at, .. } => {
+            let s = source.normalized();
+            *source = Rc::new(s.x + dx, s.y + dy, s.w, s.h);
+            *at = mv(at);
         }
         other => {
             if let Some(r) = rect_of(other) {
@@ -727,6 +813,34 @@ pub fn shape_from_drag(
                 dim: style.dim,
                 mode: style.spot_mode,
                 strength: style.strength,
+            })
+        }
+        Tool::Magnify => {
+            let clamp = |p: Pt| {
+                Pt::new(
+                    p.x.clamp(0.0, f64::from(image.0)),
+                    p.y.clamp(0.0, f64::from(image.1)),
+                )
+            };
+            let (a, b) = (clamp(a), clamp(b));
+            // A circle lens takes a square source (ANN-8 editor).
+            let square = shift || style.lens_shape == MagnifyShape::Circle;
+            let b = if square { clamp(square_from(a, b)) } else { b };
+            let source = rect_between(a, b);
+            if source.w < cm_core::annotation::MIN_MAGNIFY_SOURCE
+                || source.h < cm_core::annotation::MIN_MAGNIFY_SOURCE
+            {
+                return None;
+            }
+            Some(OpKind::Magnify {
+                source,
+                at: default_loupe_at(source, style.zoom, image),
+                zoom: style.zoom,
+                shape: style.lens_shape,
+                border: style.color,
+                border_width: style.width,
+                connector: style.connector,
+                badge: style.badge,
             })
         }
         Tool::Callout => {
@@ -922,6 +1036,13 @@ pub fn param_value(kind: &OpKind, p: Param) -> Option<ParamValue> {
         ) => Some(ParamValue::Color(*color)),
         // A callout's colour is its fill (the text colour follows it, see `text_on`).
         (OpKind::Callout { bg, .. }, Param::Color) => Some(ParamValue::Color(*bg)),
+        (OpKind::Magnify { border, .. }, Param::Color) => Some(ParamValue::Color(*border)),
+        (OpKind::Magnify { zoom, .. }, Param::Zoom) => Some(ParamValue::Zoom(*zoom)),
+        (OpKind::Magnify { border_width, .. }, Param::BorderWidth) => {
+            Some(ParamValue::BorderWidth(*border_width))
+        }
+        (OpKind::Retype { color, .. }, Param::Color) => Some(ParamValue::Color(*color)),
+        (OpKind::Retype { size, .. }, Param::TextSize) => Some(ParamValue::TextSize(*size)),
         (OpKind::Callout { size, .. }, Param::TextSize) => Some(ParamValue::TextSize(*size)),
         (OpKind::Callout { radius, .. }, Param::Radius) => Some(ParamValue::Radius(*radius)),
         (OpKind::Spotlight { dim, .. }, Param::Dim) => Some(ParamValue::Dim(*dim)),
@@ -974,6 +1095,13 @@ pub fn with_param(kind: &OpKind, v: ParamValue) -> Option<OpKind> {
             *color = text_on(c);
         }
         (OpKind::Callout { radius, .. }, ParamValue::Radius(r)) => *radius = r.clamp(0.0, 200.0),
+        (OpKind::Magnify { border, .. }, ParamValue::Color(c)) => *border = c,
+        (OpKind::Retype { color, .. }, ParamValue::Color(c)) => *color = c,
+        (OpKind::Retype { size, .. }, ParamValue::TextSize(s)) => *size = s.clamp(6.0, 400.0),
+        (OpKind::Magnify { border_width, .. }, ParamValue::BorderWidth(w)) => {
+            *border_width = w.clamp(0.0, cm_core::annotation::MAX_MAGNIFY_BORDER)
+        }
+        (OpKind::Magnify { zoom, .. }, ParamValue::Zoom(z)) => *zoom = z.clamp(2.0, 8.0),
         (OpKind::Spotlight { dim, .. }, ParamValue::Dim(d)) => *dim = d.clamp(0.0, 1.0),
         (OpKind::Spotlight { strength, .. }, ParamValue::Strength(s)) => {
             *strength = s.clamp(*BLUR_STRENGTH_RANGE.start(), *BLUR_STRENGTH_RANGE.end())
@@ -992,6 +1120,10 @@ pub fn with_param(kind: &OpKind, v: ParamValue) -> Option<OpKind> {
             *block = b.clamp(*PIXELATE_BLOCK_RANGE.start(), *PIXELATE_BLOCK_RANGE.end())
         }
         _ => return None,
+    }
+    // A zoom that would make the loupe too large is refused (ANN-8.AC5).
+    if matches!(k, OpKind::Magnify { .. }) && !lens_ok(&k) {
+        return None;
     }
     Some(k)
 }
