@@ -1774,8 +1774,13 @@ msgstr "Cần một mô hình ở trên"
 msgid "Network"
 msgstr "Mạng"
 
-msgid "New captures are saved to a folder on this computer until it is back. {path} ({reason})"
-msgstr "Bản chụp mới được lưu vào một thư mục trên máy tính này cho đến khi kết nối trở lại. {path} ({reason})"
+#, fuzzy
+msgid "New captures are saved to a folder on this computer until it is back."
+msgstr "Bản chụp mới được lưu vào một thư mục trên máy tính này cho đến khi kết nối trở lại."
+
+#, fuzzy
+msgid "Folder: {path}"
+msgstr "Thư mục: {path}"
 
 msgid "New title"
 msgstr "Tiêu đề mới"
@@ -1956,8 +1961,9 @@ msgstr "Chưa đăng nhập trên {this_computer}."
 msgid "Note"
 msgstr "Ghi chú"
 
-msgid "Nothing can be saved or shown. {path} ({reason})"
-msgstr "Không thể lưu hay hiển thị gì. {path} ({reason})"
+#, fuzzy
+msgid "Nothing can be saved or shown."
+msgstr "Không thể lưu hay hiển thị gì."
 
 msgid "Nothing captured yet"
 msgstr "Chưa chụp gì"

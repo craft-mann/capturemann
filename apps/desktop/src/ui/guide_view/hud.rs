@@ -482,41 +482,120 @@ enum After {
     Pick,
 }
 
+/// What Stop does with its result: which toast to show and where to go. Pure, so the three
+/// outcomes are tested without a daemon (board QA C2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum StopOutcome {
+    /// The guide ended with no steps and was not kept.
+    Discarded,
+    /// The guide is saved: open it, or only pick the next window.
+    Saved(String),
+    /// Another client stopped it first: nothing to say.
+    AlreadyEnded,
+    /// The daemon refused: the message for the error toast.
+    Failed(String),
+    /// The call itself did not complete.
+    Lost,
+}
+
+fn stop_outcome(r: &Result<Result<Value, String>, ()>) -> StopOutcome {
+    match r {
+        Ok(Err(e)) if stop_means_already_ended(e) => StopOutcome::AlreadyEnded,
+        Ok(Ok(v)) if v["discarded"] == true => StopOutcome::Discarded,
+        Ok(Ok(v)) => v["guide_id"]
+            .as_str()
+            .map_or(StopOutcome::AlreadyEnded, |id| {
+                StopOutcome::Saved(id.to_owned())
+            }),
+        Ok(Err(e)) => StopOutcome::Failed(e.clone()),
+        Err(()) => StopOutcome::Lost,
+    }
+}
+
+/// Stop, whoever asked (the bar's button, the countdown's Esc, the window-closed toast): ends
+/// the guide in the daemon, then closes the bar (which refreshes the sidebar tile) and opens the
+/// guide's editor or the window picker. It does not need the bar's window, so a toast button
+/// works when the bar cannot be updated.
+fn stop_flow(app: &Entity<AppModel>, after: After, cx: &mut App) {
+    let backend = app.read(cx).backend.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        close(cx);
+        return;
+    };
+    let app = app.clone();
+    cx.spawn(async move |cx| {
+        let r = backend
+            .rt
+            .spawn(async move { Backend::call(&daemon, "stop_guide", json!({})).await })
+            .await
+            .map_err(|_| ());
+        cx.update(|cx| {
+            close(cx);
+            match stop_outcome(&r) {
+                StopOutcome::Discarded => toast(
+                    &app,
+                    ToastSpec::new(ToastKind::Info, tr!("No steps were taken"))
+                        .body(tr!("The empty guide was not kept.")),
+                    cx,
+                ),
+                StopOutcome::Saved(id) => {
+                    if after == After::Open {
+                        app::navigate(&app, Route::Guide(id), cx);
+                    }
+                }
+                StopOutcome::Failed(e) => toast(
+                    &app,
+                    crate::flows::error_toast(&tr!("The guide did not stop cleanly"), e),
+                    cx,
+                ),
+                StopOutcome::AlreadyEnded | StopOutcome::Lost => {}
+            }
+            if after == After::Pick {
+                pick_window(&app, cx);
+            }
+        });
+    })
+    .detach();
+}
+
 /// Esc during the countdown cancels the guide. Returns whether it did (the Esc key is shared with
 /// the delay pill and Long Shot, which are asked when this says no).
 pub fn cancel_countdown(cx: &mut App) -> bool {
     let Some(h) = cx.try_global::<Holder>().and_then(|h| h.0) else {
         return false;
     };
-    h.update(cx, |this, _, cx| {
-        if this.shown.state != "countdown" {
-            return false;
+    let app = h
+        .update(cx, |this, _, _| {
+            (this.shown.state == "countdown").then(|| this.app.clone())
+        })
+        .ok()
+        .flatten();
+    match app {
+        Some(app) => {
+            stop_flow(&app, After::Open, cx);
+            true
         }
-        this.stop(After::Open, cx);
-        true
-    })
-    .unwrap_or(false)
+        None => false,
+    }
 }
 
 /// The toast's "Pick another window": the guide that lost its window is stopped and kept, and
 /// the window picker opens for a new one.
 pub fn pick_another(app: &Entity<AppModel>, cx: &mut App) {
-    match cx.try_global::<Holder>().and_then(|h| h.0) {
-        Some(h) => {
-            let _ = h.update(cx, |this, _, cx| this.stop(After::Pick, cx));
-        }
-        None => pick_window(app, cx),
+    if is_running(cx) {
+        stop_flow(app, After::Pick, cx);
+    } else {
+        pick_window(app, cx);
     }
 }
 
 /// The toast's "Stop and open guide". When the bar is gone already (Stop was pressed there), the
 /// guide is simply opened.
 pub fn stop_and_open(app: &Entity<AppModel>, guide_id: &str, cx: &mut App) {
-    match cx.try_global::<Holder>().and_then(|h| h.0) {
-        Some(h) => {
-            let _ = h.update(cx, |this, _, cx| this.stop(After::Open, cx));
-        }
-        None => app::navigate(app, Route::Guide(guide_id.to_owned()), cx),
+    if is_running(cx) {
+        stop_flow(app, After::Open, cx);
+    } else {
+        app::navigate(app, Route::Guide(guide_id.to_owned()), cx);
     }
 }
 
@@ -642,46 +721,8 @@ impl GuideHud {
 
     /// Stop: closes the bar and, by `after`, opens the guide or the window picker.
     fn stop(&mut self, after: After, cx: &mut Context<Self>) {
-        let backend = self.app.read(cx).backend.clone();
-        let Some(daemon) = backend.daemon.clone() else {
-            return;
-        };
         let app = self.app.clone();
-        cx.spawn(async move |_, cx| {
-            let r = backend
-                .rt
-                .spawn(async move { Backend::call(&daemon, "stop_guide", json!({})).await })
-                .await;
-            cx.update(|cx| {
-                close(cx);
-                match r {
-                    Ok(Err(e)) if stop_means_already_ended(&e) => {}
-                    Ok(Ok(v)) if v["discarded"] == true => toast(
-                        &app,
-                        ToastSpec::new(ToastKind::Info, tr!("No steps were taken"))
-                            .body(tr!("The empty guide was not kept.")),
-                        cx,
-                    ),
-                    Ok(Ok(v)) => {
-                        if let Some(id) = v["guide_id"].as_str() {
-                            if after == After::Open {
-                                app::navigate(&app, Route::Guide(id.to_owned()), cx);
-                            }
-                        }
-                    }
-                    Ok(Err(e)) => toast(
-                        &app,
-                        crate::flows::error_toast(&tr!("The guide did not stop cleanly"), e),
-                        cx,
-                    ),
-                    Err(_) => {}
-                }
-                if after == After::Pick {
-                    pick_window(&app, cx);
-                }
-            });
-        })
-        .detach();
+        cx.defer(move |cx| stop_flow(&app, after, cx));
     }
 
     fn mode(&self) -> Mode {
@@ -911,6 +952,33 @@ mod tests {
     use super::*;
     use crate::ui::bar_layout::{guide_bar_limit, GUIDE_BAR_H, GUIDE_BAR_MAX_W};
     use cm_i18n::{with_language, Lang};
+
+    /// QA C2: what Stop does with the daemon's answer, for the bar's Stop and for the
+    /// window-closed toast's two buttons alike (they share one flow that does not need the bar's
+    /// window): a saved guide is opened (or the picker follows), an empty one is reported, and
+    /// a guide another client stopped first only closes the bar.
+    #[test]
+    fn c2_stop_outcomes() {
+        assert_eq!(
+            stop_outcome(&Ok(Ok(
+                json!({ "guide_id": "guide_7", "state": "stopped" })
+            ))),
+            StopOutcome::Saved("guide_7".into())
+        );
+        assert_eq!(
+            stop_outcome(&Ok(Ok(json!({ "discarded": true })))),
+            StopOutcome::Discarded
+        );
+        assert_eq!(
+            stop_outcome(&Ok(Err("no Click Guide is recording".into()))),
+            StopOutcome::AlreadyEnded
+        );
+        assert_eq!(
+            stop_outcome(&Ok(Err("disk full".into()))),
+            StopOutcome::Failed("disk full".into())
+        );
+        assert_eq!(stop_outcome(&Err(())), StopOutcome::Lost);
+    }
 
     /// A window guide sends the window's id as the target, not a display (GDE-1).
     #[test]

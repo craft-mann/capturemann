@@ -972,9 +972,23 @@ impl Render for GuideView {
                     .into_any_element()
             }
         };
+        // The viewer is open but does not have the focus yet: take it at the end of this frame.
+        if viewer_should_take_focus(self.viewer, self.viewer_focus.contains_focused(window, cx)) {
+            let handle = self.viewer_focus.clone();
+            window.defer(cx, move |window, cx| window.focus(&handle, cx));
+        }
         div()
             .id("guide-view")
             .role(Role::Main)
+            // Esc closes the viewer even when the focus is still on the picture that opened it
+            // (the overlay is not an ancestor of that picture, so its own handler never sees
+            // the key); QA V-esc.
+            .on_key_down(cx.listener(|this, ev: &gpui::KeyDownEvent, _, cx| {
+                if this.viewer && ev.keystroke.key == "escape" {
+                    this.close_viewer(cx);
+                    cx.stop_propagation();
+                }
+            }))
             .size_full()
             .relative()
             .flex()
@@ -1365,9 +1379,26 @@ fn group_thousands(n: u32) -> String {
     out
 }
 
+/// The viewer is open but its focus handle is not focused yet (the click that opened it set the
+/// focus before the overlay existed, and a press elsewhere may have taken it since): the render
+/// asks for it again, so Esc always reaches the viewer (QA V-esc).
+pub(crate) fn viewer_should_take_focus(open: bool, focused: bool) -> bool {
+    open && !focused
+}
+
+#[cfg(test)]
+mod viewer_focus_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_open_viewer_asks_for_the_focus_until_it_has_it() {
+        assert!(viewer_should_take_focus(true, false));
+        assert!(!viewer_should_take_focus(true, true));
+        assert!(!viewer_should_take_focus(false, false));
+    }
 
     fn ids(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| (*s).to_owned()).collect()

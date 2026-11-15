@@ -1251,10 +1251,10 @@ pub(crate) fn guide_buttons_need_icon(title: &str, count: Option<usize>, row_w: 
         + 16.0
         + 8.0
         + bar_layout::text_w(&tr_ctx!("button", "Import\u{2026}"), type_scale::UI, false, 400)
-        // The key hint beside the label.
+        // The key hint beside the label: the chord the button really shows (QA G-icon).
         + 8.0
         + 14.0
-        + bar_layout::text_w("Ctrl+I", 11.0, true, 400);
+        + bar_layout::text_w(crate::ui::import_cards::import_hint(), 11.0, true, 400);
     let others = title_w + 320.0 + import_w + 3.0 * 16.0;
     bar_layout::window_button_collapses(
         f64::from(row_w) - others,
@@ -2031,25 +2031,18 @@ impl Render for LibraryView {
         } = &self.state.status
         {
             // LIB-2: "Library unavailable - connect <name>".
-            let body = if *fallback_in_use {
-                tr!("New captures are saved to a folder on this computer until it is back. {path} ({reason})", path = path, reason = reason)
-            } else {
-                tr!(
-                    "Nothing can be saved or shown. {path} ({reason})",
-                    path = path,
-                    reason = reason
-                )
-            };
+            let b = crate::settings::unavailable_banner(hint, path, reason, *fallback_in_use);
             banners.push(
                 callout(
                     &t,
                     Tone::Brass,
                     "triangle-alert",
-                    tr!("Library unavailable \u{2014} connect {hint}", hint = hint),
-                    Some(body.into()),
+                    b.title,
+                    Some(b.body.into()),
                     None,
                 )
                 .id("banner-unavailable")
+                .tooltip(tip(b.full_path, Vec::new()))
                 .role(Role::Alert)
                 .into_any_element(),
             );
