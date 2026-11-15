@@ -606,7 +606,9 @@ fn region_mask(w: u32, h: u32, r: Region) -> Option<Mask> {
     Some(mask)
 }
 
-/// Retype (ANN-9): the fill over `rect`, then the new text clipped to `rect`.
+/// Retype (ANN-9): the fill over `rect`, then the new text clipped to `rect`. A stored op whose
+/// text is wider than `rect` is clipped without a warning; the editor widens the box instead
+/// (`fit_retype`), so the text it stores always fits.
 pub(crate) fn apply_retype(
     pm: &mut Pixmap,
     fonts: &mut Fonts,
@@ -689,8 +691,8 @@ pub(crate) fn apply_retype(
     Ok(())
 }
 
-/// The width and height in px the text of a `retype` op needs (Inter), for the panel's "does not
-/// fit" warning (ANN-9). `None` for other ops or text that cannot be laid out.
+/// The width and height in px the text of a `retype` op needs (Inter), so the editor can widen
+/// the box to hold it (ANN-9). `None` for other ops or text that cannot be laid out.
 pub fn retype_text_extent(op: &OpKind) -> Option<(f64, f64)> {
     thread_local! {
         static FONTS: std::cell::RefCell<Option<Fonts>> = const { std::cell::RefCell::new(None) };

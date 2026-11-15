@@ -345,8 +345,12 @@ impl GuideView {
         {
             self.selected = d.steps.first().map(|s| s.id.clone());
         }
-        self.title.update(cx, |t, cx| t.set_text(&d.title, cx));
-        self.intro.update(cx, |t, cx| t.set_text(&d.intro, cx));
+        // `load`, not `set_text`: set_text selects everything (for a rename box), and three fields
+        // showing a selection at once was G5.
+        self.title
+            .update(cx, |t, cx| t.load(&d.title, CaretAt::End, cx));
+        self.intro
+            .update(cx, |t, cx| t.load(&d.intro, CaretAt::End, cx));
         self.load_selected_fields(&d, cx);
         self.load_thumbs(&d, cx);
         self.load = Load::Ready(Box::new(d));
@@ -362,8 +366,10 @@ impl GuideView {
         let (t, n) = sel.map_or((String::new(), String::new()), |s| {
             (s.title.clone(), s.note.clone())
         });
-        self.step_title.update(cx, |f, cx| f.set_text(&t, cx));
-        self.step_note.update(cx, |f, cx| f.set_text(&n, cx));
+        self.step_title
+            .update(cx, |f, cx| f.load(&t, CaretAt::End, cx));
+        self.step_note
+            .update(cx, |f, cx| f.load(&n, CaretAt::End, cx));
     }
 
     fn load_thumbs(&mut self, d: &GuideData, cx: &mut Context<Self>) {
@@ -1165,5 +1171,19 @@ mod tests {
         assert_eq!(reordered(&v, 5, 0), v);
         assert_eq!(reordered(&v, 0, 9), v);
         assert!(reordered(&[], 0, 0).is_empty());
+    }
+
+    /// G5: loading a guide's text into the fields leaves nothing selected (only a rename box starts
+    /// selected), so three fields never show a highlight at once.
+    #[gpui::test]
+    fn loading_fields_selects_nothing(cx: &mut gpui::TestAppContext) {
+        let f = cx.new(|cx| TextField::new("t", "p", cx).without_icon());
+        f.update(cx, |f, cx| f.load("A title", CaretAt::End, cx));
+        assert!(!f.read_with(cx, |f, _| f.has_selection()));
+        f.update(cx, |f, cx| f.set_text("A title", cx));
+        assert!(
+            f.read_with(cx, |f, _| f.has_selection()),
+            "set_text selects"
+        );
     }
 }

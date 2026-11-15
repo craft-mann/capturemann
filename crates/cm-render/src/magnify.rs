@@ -267,9 +267,23 @@ impl Renderer {
             }
         }
 
-        // The loupe, clipped to its shape.
+        // The loupe, clipped to its shape. With a border the clip is the border's CENTRE line, not
+        // its outer edge: both edges are anti-aliased, and clipping at the outer edge let the
+        // magnified picture show through the border's own half-covered edge pixels as a thin
+        // coloured fringe. At the centre line the stroke is solid on both sides of the clip.
+        let inset_ok = bw > 0.0 && lw > bw && lh > bw;
+        let clip_rect = if inset_ok {
+            [lx + bw / 2.0, ly + bw / 2.0, lw - bw, lh - bw]
+        } else {
+            lrect
+        };
+        let clip_radius = if inset_ok {
+            (radius - bw / 2.0).max(0.0)
+        } else {
+            radius
+        };
         if let (Some(path), Some(mut mask)) = (
-            shape_path(*shape, lrect, radius),
+            shape_path(*shape, clip_rect, clip_radius),
             Mask::new(pm.width(), pm.height()),
         ) {
             mask.fill_path(&path, FillRule::Winding, true, Transform::identity());

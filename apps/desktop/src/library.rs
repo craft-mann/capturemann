@@ -633,6 +633,16 @@ impl LibraryState {
         self.generation
     }
 
+    /// The first load of a library has not answered in time: shows `message` as the failure (with
+    /// "Try again") instead of "Loading library..." for ever. Does nothing once the load landed or
+    /// a newer one started. Returns whether it changed the state.
+    pub fn load_timed_out(&mut self, token: u64, message: String) -> bool {
+        if token != self.generation || !matches!(self.status, LibraryStatus::Loading) {
+            return false;
+        }
+        self.finish_load(token, Err(crate::daemon_text::ErrorNote::plain(message)))
+    }
+
     /// Applies a response if it is still the latest. Returns whether it was applied.
     pub fn finish_load(
         &mut self,
@@ -1270,6 +1280,31 @@ mod tests {
 
     fn ids(v: &[CaptureItem]) -> Vec<&str> {
         v.iter().map(|i| i.id.as_str()).collect()
+    }
+
+    /// A first load that never answers ends as a failure, not "Loading library..." for ever; a
+    /// load that did answer (or was replaced) is left alone.
+    #[test]
+    fn a_load_that_never_answers_times_out_into_a_failure() {
+        let mut s = LibraryState::new(LibraryStatus::Loading);
+        let t = s.begin_load();
+        assert!(s.load_timed_out(t, "too slow".into()));
+        assert!(matches!(s.status, LibraryStatus::Failed(_)));
+
+        let mut s = LibraryState::new(LibraryStatus::Loading);
+        let t1 = s.begin_load();
+        let _t2 = s.begin_load();
+        assert!(
+            !s.load_timed_out(t1, "too slow".into()),
+            "a newer load runs"
+        );
+        assert!(matches!(s.status, LibraryStatus::Loading));
+
+        let mut s = LibraryState::new(LibraryStatus::Loading);
+        let t = s.begin_load();
+        assert!(s.finish_load(t, Ok(PageCollector::new(10))));
+        assert!(!s.load_timed_out(t, "too slow".into()));
+        assert!(matches!(s.status, LibraryStatus::Ready));
     }
 
     #[test]

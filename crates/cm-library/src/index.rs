@@ -263,6 +263,7 @@ impl Library {
     /// Opens the library at `root`, which must exist (LIB-2: an unplugged drive is reported as
     /// `not_found` "Library unavailable", never silently recreated).
     pub fn open(root: &Path) -> Result<Self, CmError> {
+        crate::util::check_root_path_len(root)?;
         if !root.is_dir() {
             return Err(CmError::not_found(format!(
                 "Library unavailable: `{}` is not reachable",
@@ -274,6 +275,7 @@ impl Library {
 
     /// Like [`Library::open`] but creates `root` (and parents) first. Use for the first run.
     pub fn open_or_create(root: &Path) -> Result<Self, CmError> {
+        crate::util::check_root_path_len(root)?;
         std::fs::create_dir_all(root).map_err(|e| io_err("cannot create", root, &e))?;
         Self::open_inner(root)
     }

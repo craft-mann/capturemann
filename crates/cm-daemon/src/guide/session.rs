@@ -182,16 +182,20 @@ struct Worker {
     last: Option<(Vec<TextLine>, ClickPoint)>,
 }
 
+/// The text lines of a frame (empty when the recognizer is unavailable or fails).
+fn read_lines(recognizer: &dyn TextRecognizer, frame: Frame) -> Vec<TextLine> {
+    let size = frame.size();
+    match RgbaImage::from_raw(size.width, size.height, frame.into_rgba()) {
+        Some(img) if recognizer.is_available() => recognizer.recognize(&img).unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
 impl Worker {
     fn step(&mut self, frame: Frame, click: ClickPoint) -> Result<(), CmError> {
         let png = frame.to_png()?;
         let size = frame.size();
-        let lines = match RgbaImage::from_raw(size.width, size.height, frame.into_rgba()) {
-            Some(img) if self.recognizer.is_available() => {
-                self.recognizer.recognize(&img).unwrap_or_default()
-            }
-            _ => Vec::new(),
-        };
+        let lines = read_lines(self.recognizer.as_ref(), frame);
         let title = draft_title(&lines, (click.x, click.y), click.scale, &click.button, 1);
         let step =
             self.guide
@@ -664,6 +668,7 @@ impl Inner {
         let dir = self.guide_dir(&id)?;
         let (by, now) = (actor.clone(), self.clock.now());
         let capturer = self.capturer.clone();
+        let recognizer = self.recognizer.clone();
         let (library, events, gid) = (self.library.clone(), self.events.clone(), id.clone());
         let v = blocking(move || {
             let mut g = GuideBundle::open(&dir)?;
@@ -693,7 +698,17 @@ impl Inner {
                     let cap = capturer
                         .capture(CaptureRequest::new(target.to_capture_target()), None)?
                         .ok_or_else(|| CmError::invalid_input("capture was cancelled"))?;
-                    g.retake_step(s, &cap.frame.to_png()?, &by, now)?;
+                    let png = cap.frame.to_png()?;
+                    let size = cap.frame.size();
+                    let lines = read_lines(recognizer.as_ref(), cap.frame);
+                    // R1: Auto-redact runs again on the new frame; the flag is not just cleared.
+                    let proposals = !suggest_redactions(
+                        &lines,
+                        (size.width, size.height),
+                        &SuggestOptions::default(),
+                    )
+                    .is_empty();
+                    g.retake_step(s, &png, proposals, &by, now)?;
                 }
             }
             write_guide_poster(&dir);

@@ -3272,6 +3272,10 @@ msgstr "Không thể mở thư viện nên không có nơi lưu bản chụp."
 msgid "The library couldn’t be opened, so there is nowhere to save recordings."
 msgstr "Không thể mở thư viện nên không có nơi lưu bản ghi."
 
+#, fuzzy
+msgid "The library did not answer. Check that its folder is reachable and its path is not too long, then try again."
+msgstr "Thư viện không phản hồi. Hãy kiểm tra thư mục có truy cập được không và đường dẫn có quá dài không, rồi thử lại."
+
 msgid "The library is not available"
 msgstr "Thư viện không khả dụng"
 
@@ -10935,6 +10939,10 @@ msgstr "Bước {n}"
 
 msgid "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs."
 msgstr "Bước {n} vẫn có vùng đề xuất che. Nếu vẫn xuất, các vùng này sẽ không được làm mờ."
+
+#, fuzzy
+msgid "Steps {list} still have redaction proposals. Exporting anyway writes them without those blurs."
+msgstr "Các bước {list} vẫn có vùng đề xuất che. Nếu vẫn xuất, các vùng này sẽ không được làm mờ."
 
 msgid "Stop"
 msgstr "Dừng"

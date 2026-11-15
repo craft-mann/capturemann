@@ -50,6 +50,8 @@ const HEADLINE: f32 = 30.;
 /// Thumbnail aspect (board: 16:10).
 const THUMB_ASPECT: f32 = 10. / 16.;
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(150);
+/// How long the first load of the library may take before it is reported as failed.
+const LOAD_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Whether the Rename dialog may go ahead: the name is not empty (blank counts as empty) and is
 /// not the title the capture already has.
@@ -259,6 +261,36 @@ impl LibraryView {
         let kind = self.state.filter.daemon_kind();
         let status = self.state.remote.map(|r| r.daemon_status());
         let rt = backend.rt.clone();
+        // The first load must not leave "Loading library..." up for ever (a library folder the
+        // system cannot read from, such as a path past its length limit, once did): after
+        // LOAD_TIMEOUT it becomes a failure with Try again, and a toast says why.
+        if matches!(self.state.status, LibraryStatus::Loading) {
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(LOAD_TIMEOUT).await;
+                this.update(cx, |this, cx| {
+                    let msg = tr!(
+                        "The library did not answer. Check that its folder is reachable and its path is not too long, then try again."
+                    );
+                    if this.state.load_timed_out(token, msg.clone()) {
+                        let app = this.app.clone();
+                        cx.defer(move |cx| {
+                            crate::ui::app::push_toast(
+                                &app,
+                                crate::toast::ToastSpec::new(
+                                    crate::toast::ToastKind::Error,
+                                    tr!("Couldn\u{2019}t load the library"),
+                                )
+                                .body(msg),
+                                cx,
+                            )
+                        });
+                        cx.notify();
+                    }
+                })
+                .ok();
+            })
+            .detach();
+        }
         cx.spawn(async move |this, cx| {
             let res = rt
                 .spawn(async move { Backend::list_library(&daemon, &query, kind, status).await })

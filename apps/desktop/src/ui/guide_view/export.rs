@@ -203,14 +203,44 @@ fn option_row(t: &Theme, id: &'static str, label: String, on: bool) -> gpui::Sta
         .cursor_pointer()
         .text_size(px(type_scale::UI))
         .child(
+            // On: a filled box with a tick; off: an empty outline (G4: the fill alone was easy to misread).
             div()
                 .size(px(16.))
+                .flex()
+                .items_center()
+                .justify_center()
                 .rounded(px(4.))
                 .border_1()
-                .border_color(rgba_of(t.text_3))
-                .when(on, |d| d.bg(rgba_of(t.text))),
+                .border_color(rgba_of(if on { t.text } else { t.text_3 }))
+                .when(on, |d| {
+                    d.bg(rgba_of(t.text))
+                        .child(crate::ui::components::icon("check", 12., t.ground))
+                }),
         )
         .child(SharedString::from(label))
+}
+
+/// The sheet's warning about steps that still have redaction proposals (GDE-1.AC4): it names every
+/// such step (G3), not only the first. `numbers` are 1-based step numbers.
+pub(crate) fn review_warning(numbers: &[usize]) -> String {
+    match numbers {
+        [] => String::new(),
+        [n] => tr!(
+            "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs.",
+            n = n
+        ),
+        many => {
+            let list = many
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            tr!(
+                "Steps {list} still have redaction proposals. Exporting anyway writes them without those blurs.",
+                list = list
+            )
+        }
+    }
 }
 
 /// The sheet, drawn over the guide editor.
@@ -359,10 +389,14 @@ pub fn sheet(
                     .gap(px(10.))
                     .text_size(px(type_scale::UI))
                     .text_color(rgba_of(t.warning))
-                    .child(div().flex_1().min_w(px(0.)).child(SharedString::from(tr!(
-                        "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs.",
-                        n = n
-                    ))))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .child(SharedString::from(review_warning(
+                                &review.iter().map(|(n, _)| *n).collect::<Vec<_>>(),
+                            ))),
+                    )
                     .child(
                         button(t, "guide-review", tr!("Review step {n}", n = n), ButtonKind::Ghost)
                             .on_click(cx.listener(move |this: &mut GuideView, _, _, cx| {
@@ -410,4 +444,19 @@ pub fn sheet(
         .bg(rgba_of(t.modal_scrim))
         .child(card)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// G3: the warning names every step with proposals, not only the first.
+    #[test]
+    fn the_warning_names_every_step_with_proposals() {
+        assert_eq!(review_warning(&[]), "");
+        let one = review_warning(&[3]);
+        assert!(one.starts_with("Step 3 still has"), "{one}");
+        let many = review_warning(&[1, 2, 5]);
+        assert!(many.starts_with("Steps 1, 2, 5 still have"), "{many}");
+    }
 }

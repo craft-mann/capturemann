@@ -504,6 +504,11 @@ impl TextField {
         self.multi.as_ref().is_some_and(|m| m.in_place)
     }
 
+    /// Whether some text is selected.
+    pub fn has_selection(&self) -> bool {
+        self.buffer.selection().is_some()
+    }
+
     /// The caret's byte offset.
     pub fn cursor_byte(&self) -> usize {
         self.buffer.cursor()

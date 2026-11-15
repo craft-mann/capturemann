@@ -1095,10 +1095,13 @@ impl GuideBundle {
 
     /// Replaces a step's picture with a fresh frame. The badge, ring and crop are made again
     /// from the click point, so earlier edits of the old picture are not carried over.
+    /// `has_proposals` says whether Auto-redact found something on the NEW frame (R1: the flag is
+    /// recomputed from the new picture, not cleared).
     pub fn retake_step(
         &mut self,
         id: &str,
         png: &[u8],
+        has_proposals: bool,
         by: &Actor,
         at: OffsetDateTime,
     ) -> Result<(), CmError> {
@@ -1149,7 +1152,7 @@ impl GuideBundle {
                 .expect("checked");
             s.image = name;
             s.focus_crop = crop;
-            s.has_proposals = false;
+            s.has_proposals = has_proposals;
             Ok(())
         })
     }

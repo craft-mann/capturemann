@@ -56,8 +56,25 @@ function Get-Pinned([string]$name, [string]$url, [string]$sha, [long]$bytes) {
     Write-Host "Downloading $url"
     $part = "$f.part"
     Remove-Item -Force -ErrorAction SilentlyContinue $part
-    try { Invoke-WebRequest -Uri $url -OutFile $part -UseBasicParsing -MaximumRetryCount 3 -RetryIntervalSec 5 }
-    catch { Remove-Item -Force -ErrorAction SilentlyContinue $part; Fail "download failed: $url ($_)" }
+    # Windows PowerShell 5.1 has no -MaximumRetryCount/-RetryIntervalSec (PowerShell 6+ only), may default to old TLS,
+    # and is very slow with the progress bar on: retry by hand, allow TLS 1.2, silence progress.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $savedProgress = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    $lastError = $null
+    foreach ($attempt in 1..3) {
+      try {
+        Invoke-WebRequest -Uri $url -OutFile $part -UseBasicParsing
+        $lastError = $null
+        break
+      } catch {
+        $lastError = $_
+        Remove-Item -Force -ErrorAction SilentlyContinue $part
+        if ($attempt -lt 3) { Start-Sleep -Seconds 5 }
+      }
+    }
+    $ProgressPreference = $savedProgress
+    if ($lastError) { Fail "download failed: $url ($lastError)" }
     if (-not (Test-Pin $part $sha $bytes)) { Remove-Item -Force $part; Fail "$name does not match the pinned SHA-256/size; deleted" }
     Move-Item $part $f
   }

@@ -253,6 +253,48 @@ fn ann8_ac5_limits() {
     .unwrap();
 }
 
+/// ANN-8: no fringe on the loupe's edge. Blue content, a red border on white: every pixel from the
+/// border's centre line outward is a mix of red and white only (green equals blue), so none of
+/// the magnified picture shows through the border's anti-aliased outer edge.
+#[test]
+fn ann8_circle_edge_has_no_colour_fringe() {
+    let base = RgbaImage::from_pixel(300, 300, Rgba([0, 0, 255, 255]));
+    // Put the white around the loupe: the lens sits on a white area of a larger picture.
+    let mut img = RgbaImage::from_pixel(600, 400, Rgba([255, 255, 255, 255]));
+    imageops::overlay(&mut img, &base, 0, 0);
+    for shape in ["circle", "rounded"] {
+        let j = format!(
+            r##"[{{"id":"lens","op":"magnify","source":[10,10,60,60],"at":[450,200],"zoom":3,"shape":"{shape}","border":"#FF0000","border_width":4,"connector":false,"badge":false}}]"##
+        );
+        let out = render_annotations(&img, &ops(&j)).unwrap();
+        // Loupe rect: 180x180 centred on (450, 200).
+        let (cx, cy, r) = (450.0_f64, 200.0_f64, 90.0_f64);
+        let mut checked = 0;
+        for y in 0..400u32 {
+            for x in 300..600u32 {
+                let (dx, dy) = (f64::from(x) + 0.5 - cx, f64::from(y) + 0.5 - cy);
+                let outside_centre_line = if shape == "circle" {
+                    dx.hypot(dy) >= r - 2.0 + 1.0 && dx.hypot(dy) <= r + 3.0
+                } else {
+                    // Straight sides of the rounded rect only (away from the corner radius).
+                    dx.abs().max(dy.abs()) >= r - 2.0 + 1.0
+                        && dx.abs().max(dy.abs()) <= r + 3.0
+                        && dx.abs().min(dy.abs()) < r - 20.0
+                };
+                if outside_centre_line {
+                    let p = out.get_pixel(x, y).0;
+                    assert!(
+                        (i32::from(p[1]) - i32::from(p[2])).abs() <= 1,
+                        "{shape} fringe at ({x},{y}): {p:?}"
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 200, "{shape}: only {checked} pixels checked");
+    }
+}
+
 /// ANN-8.AC6: a loupe partly outside the image is clipped; a source partly outside is clamped.
 #[test]
 fn ann8_ac6_clipping_and_clamping() {
@@ -427,6 +469,28 @@ fn ann9_ac1_retype_on_a_flat_dialog() {
     // `weight` 400 is not written; the JSON round-trips.
     let o = ops(&json("x"));
     assert!(serde_json::to_value(&o).unwrap()[0].get("weight").is_none());
+}
+
+/// ANN-9: a STORED retype whose text is wider than its `rect` is clipped to the rect, silently
+/// (no error, no warning): the editor widens the box before it stores the op, so only a client
+/// that sends a too-narrow rect meets this.
+#[test]
+fn ann9_a_stored_op_wider_than_its_rect_is_clipped_to_it() {
+    let bg = RgbaImage::from_pixel(300, 80, Rgba([255, 255, 255, 255]));
+    let j = r##"[{"op":"retype","rect":[20,20,40,30],"fill":{"kind":"solid","colors":["#FFFFFF"]},"text":"A much longer text than the box","size":22,"color":"#000000"}]"##;
+    let out = render_annotations(&bg, &ops(j)).unwrap();
+    let mut ink_inside = false;
+    for y in 0..80 {
+        for x in 0..300 {
+            let inside = (20..60).contains(&x) && (20..50).contains(&y);
+            if inside {
+                ink_inside |= out.get_pixel(x, y).0[0] < 128;
+            } else {
+                assert_eq!(out.get_pixel(x, y), bg.get_pixel(x, y), "({x},{y})");
+            }
+        }
+    }
+    assert!(ink_inside, "the text is drawn inside the rect");
 }
 
 /// ANN-9.AC5 and ANN-1.AC6: the JSON an agent sends renders the same as the structs.

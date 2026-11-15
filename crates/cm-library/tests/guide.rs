@@ -136,8 +136,13 @@ fn duplicate_note_retake_and_reopen() {
         .insert_note_step(Some(&a), "Type your password", "", &Actor::User, T0)
         .unwrap();
     assert!(g.step(&note).unwrap().is_note());
-    g.retake_step(&copy, &png(120, 80, 99), &Actor::User, T0)
+    g.retake_step(&copy, &png(120, 80, 99), true, &Actor::User, T0)
         .unwrap();
+    // R1: the flag follows the new frame, in both directions.
+    assert!(g.step(&copy).unwrap().has_proposals);
+    g.retake_step(&copy, &png(120, 80, 98), false, &Actor::User, T0)
+        .unwrap();
+    assert!(!g.step(&copy).unwrap().has_proposals);
     assert_eq!(steps_dirs(&g), 3);
     let again = GuideBundle::open(g.dir()).unwrap();
     assert_eq!(again.steps().len(), 4);
