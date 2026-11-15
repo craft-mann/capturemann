@@ -4371,9 +4371,6 @@ msgstr "{title}, {tool}: {tier}, đã khoá"
 msgid "{title}. {body}"
 msgstr "{title}. {body}"
 
-msgid "{title}. {details}. Opens Agents and CLI"
-msgstr "{title}. {details}. Mở Tác nhân & CLI"
-
 msgid "{title}. {text}"
 msgstr "{title}. {text}"
 
