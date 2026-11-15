@@ -160,7 +160,7 @@ fn cap_6_page_shorter_than_the_area_is_one_frame() {
     assert_eq!(r.end, EndReason::NothingScrolled);
     assert_eq!(r.image.frames, 1);
     assert_eq!(r.image.frame, page.frame_at(0));
-    assert_eq!(view.scrolls(), 2);
+    assert_eq!(view.scrolls(), 4, "the step and three retries");
 }
 
 /// CAP-6.AC5 (engine part): hand scrolling, at an uneven pace with mid-scroll frames that are
@@ -765,7 +765,7 @@ fn a_scroll_that_moves_nothing_is_not_the_end_of_the_content() {
     .unwrap();
     assert_eq!(r.end, EndReason::NothingScrolled);
     assert_eq!(r.image.frames, 1);
-    assert_eq!(sc.0, 2, "one retry");
+    assert_eq!(sc.0, 4, "the step and three retries");
     assert!(r.end.note().is_some());
 }
 
@@ -1145,4 +1145,141 @@ fn cap_6_hand_scroll_rebases_on_a_first_frame_that_joins_nothing() {
     .unwrap();
     assert_eq!(r.end, EndReason::StoppedByUser);
     assert_eq!(r.image.frame, page.expected_range(200, 800 + 970));
+}
+
+/// LS-seam (QA macOS pass 3, Nov 15, 2026): the window's rounded corners at the bottom of every
+/// frame left grey notches at the outer edges at every seam. The lines of the next frame replace
+/// the corner lines of the previous one; the first frame's top and the last frame's bottom stay
+/// as captured.
+#[test]
+fn ls_seam_window_corners_leave_no_notch_at_the_seams() {
+    let (rows, w) = (20u32, 3u32);
+    let page = SyntheticPage::new(300, 5 * 300, 300).with_corner_notch(rows, w);
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    let want = page.expected();
+    assert_eq!(r.image.frame.height(), want.height());
+    assert!(r.image.frames >= 6);
+    let width = r.image.frame.width();
+    for y in 0..want.height() {
+        let edge = [0, 1, width - 2, width - 1];
+        let first_top = y < rows;
+        let last_bottom = y + rows >= want.height();
+        for x in edge {
+            if first_top || last_bottom {
+                continue;
+            }
+            assert_eq!(
+                r.image.frame.pixel(x, y),
+                want.pixel(x, y),
+                "notch at {x},{y}"
+            );
+        }
+    }
+    // The first frame's top and the last frame's bottom are untouched: still the corners.
+    assert_eq!(r.image.frame.pixel(0, 0), Some([128, 128, 128, 255]));
+    assert_eq!(
+        r.image.frame.pixel(width - 1, want.height() - 1),
+        Some([128, 128, 128, 255])
+    );
+}
+
+/// LS-flaky (a), QA macOS pass 3: a page of identical paragraphs gave `no_overlap` because the
+/// wheel moved a little more than asked and the expected step was not close enough to one of the
+/// equally good shifts. The shift that is alone near the expected step is the join.
+#[test]
+fn ls_flaky_repeated_paragraphs_join_by_the_expected_step() {
+    // The page ends on a step (108, then 240 each), as the last short scroll of identical
+    // paragraphs has no clear shift to be found.
+    let page = SyntheticPage::new(40, 408 + 4 * 240, 300).with_period(70);
+    let view = page.clone().view().with_gain(1.2);
+    let (mut src, mut sc) = (view.clone(), view.clone());
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}
+
+/// ... and two shifts equally near the expected step are still refused: no guess.
+#[test]
+fn ls_flaky_repeated_paragraphs_still_refused_when_the_step_names_two() {
+    let page = SyntheticPage::new(40, 2000, 300).with_period(70);
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&page.frame_at(0), None);
+    // Asked 65, 100 happened: 30, 100 and 170 match and 30 and 100 are as far from 65 (35)
+    // as each other, so none stands out: refused.
+    assert_eq!(
+        s.push(&page.frame_at(100), Some(65)),
+        PushOutcome::NoOverlap
+    );
+}
+
+/// LS-flaky (b): a scroller whose wheel only works at another point of the area (the first
+/// point is covered by another window): the run asks for the next point and goes on.
+#[test]
+fn ls_flaky_first_step_is_retried_at_another_point() {
+    struct Points {
+        view: fake::PageView,
+        at: usize,
+        asked: Vec<usize>,
+    }
+    impl Scroller for Points {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.asked.push(self.at);
+            if self.at == 0 {
+                return Ok(());
+            }
+            self.view.scroll(d, amount_px)
+        }
+        fn next_point(&mut self) -> bool {
+            self.at += 1;
+            true
+        }
+    }
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let mut src = view.clone();
+    let mut sc = Points {
+        view,
+        at: 0,
+        asked: Vec::new(),
+    };
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+    assert_eq!(&sc.asked[..3], &[0, 0, 1]);
+}
+
+/// LS-flaky (c): a fresh window ignores the first two wheel events; the third (the same point,
+/// after a wait, then another point) scrolls. Nothing scrolled is only for a window that never
+/// does.
+#[test]
+fn ls_flaky_fresh_window_that_ignores_two_steps() {
+    struct Late(fake::PageView, u32);
+    impl Scroller for Late {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.1 += 1;
+            if self.1 <= 2 {
+                return Ok(());
+            }
+            self.0.scroll(d, amount_px)
+        }
+    }
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let mut src = view.clone();
+    let mut sc = Late(view, 0);
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+
+    // A window that never scrolls still ends with nothing scrolled.
+    let mut src = page.view();
+    struct Never;
+    impl Scroller for Never {
+        fn scroll(&mut self, _: Direction, _: u32) -> Result<(), CmError> {
+            Ok(())
+        }
+    }
+    let r = auto_with(&mut src, &mut Never);
+    assert_eq!(r.end, EndReason::NothingScrolled);
 }

@@ -533,17 +533,31 @@ fn find_join_with(
         (_, Some(h)) => {
             // Several equally good overlaps (repeating or blank content): the expected step may
             // choose, but only when it names one candidate clearly.
+            // The expected step names one candidate clearly (the nearest is within a twentieth of
+            // the content and the next one is further than that from it) ...
             let mut by_dist: Vec<(usize, usize)> =
                 candidates.iter().map(|&s| (s.abs_diff(h), s)).collect();
             by_dist.sort_unstable();
             let (d0, s0) = by_dist[0];
             let tol = (cw / 20).max(2);
-            if d0 > tol || by_dist[1].0 <= d0 + tol {
-                return Err(NoJoin::NoOverlap(
-                    "several shifts match and the expected step names none of them".into(),
-                ));
+            if d0 <= tol && by_dist[1].0 > d0 + tol {
+                s0
+            } else {
+                // ... or the wheel moved more or less than asked (a real one up to a few times
+                // what is meant): the window around the expected step is a quarter of it, and
+                // exactly one candidate inside it is the join. None, or two that cannot be told
+                // apart, is refused.
+                let wide = tol.max(h / 4);
+                let mut near = candidates.iter().filter(|&&s| s.abs_diff(h) <= wide);
+                match (near.next(), near.next()) {
+                    (Some(&s0), None) => s0,
+                    _ => {
+                        return Err(NoJoin::NoOverlap(
+                            "several shifts match and the expected step names none of them".into(),
+                        ))
+                    }
+                }
             }
-            s0
         }
     };
     Ok(Join {
@@ -552,6 +566,38 @@ fn find_join_with(
         header,
         footer,
     })
+}
+
+/// The most lines of a frame's end that are looked at for corners and shadow.
+const MAX_CORNER_DEPTH: usize = 96;
+/// Lines that are the same again in a row end the corner.
+const CORNER_END_RUN: usize = 3;
+
+/// How many lines at the end of the content of `prev` look different from the same content in
+/// `lines` (the next frame, `join.shift` lines on): the window's rounded corners and shadow are
+/// drawn over what scrolls at the edge of the capture, so the bottom lines of every frame have
+/// pixels of the window instead of the page. They are not the page; the next frame's lines are
+/// used in their place. The first frame's top and the last frame's bottom are never asked about,
+/// so those stay as captured. Counted from the end of the content upwards, until three lines in
+/// a row are the same.
+fn corner_depth(prev: &Lines, lines: &Lines, join: &Join) -> usize {
+    let n = prev.count;
+    let overlap = n - join.header - join.footer - join.shift;
+    let max = (overlap / 2).min(MAX_CORNER_DEPTH);
+    let (mut depth, mut same) = (0, 0);
+    for d in 0..max {
+        let p = n - join.footer - 1 - d;
+        if prev.near(p, lines, p - join.shift) {
+            same += 1;
+            if same >= CORNER_END_RUN {
+                break;
+            }
+        } else {
+            same = 0;
+            depth = d + 1;
+        }
+    }
+    depth
 }
 
 /// The widths of the strips at the start and the end of every line that hold columns which
@@ -905,6 +951,14 @@ impl Stitcher {
         // The new content is the bottom `shift` lines of this frame's content area.
         let from = join.header + cw - join.shift;
         // The last `guard` lines of the content were not compared: this frame's lines replace them.
+        // So do the lines above them that this frame shows differently (the window's rounded
+        // corners and shadow at the bottom of the previous frame: grey notches at every seam).
+        let guard = join
+            .guard
+            .max(corner_depth(prev, lines, &join))
+            .min(cw - join.shift)
+            .min(self.content.len() / line_len);
+        let join = Join { guard, ..join };
         let keep = self.content.len() - join.guard * line_len;
         if total <= room {
             self.content.truncate(keep);

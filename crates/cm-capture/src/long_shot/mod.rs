@@ -42,6 +42,12 @@ pub trait FrameSource {
 /// content moves forward (down or to the right) by about that much.
 pub trait Scroller {
     fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError>;
+
+    /// Moves to another point of the area for the following scrolls (the first scroll moved
+    /// nothing: the wheel may have gone to another window). `false` when there is none.
+    fn next_point(&mut self) -> bool {
+        false
+    }
 }
 
 /// Waiting, so tests run without real time.

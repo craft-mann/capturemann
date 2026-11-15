@@ -48,6 +48,12 @@ pub struct SyntheticPage {
     /// Content rows at each end of the viewport that differ in every frame (a window's rounded
     /// corners and edge line drawn over what scrolls under them).
     pub corner_rows: u32,
+    /// `(rows, width)`: a window's rounded corners: at the top and the bottom `rows` rows of the
+    /// viewport the outer `width` px on each side are grey (the same in every frame, as the
+    /// window is), whatever scrolls under them. For pages without bands.
+    pub corner_notch: Option<(u32, u32)>,
+    /// Content rows repeat every this many rows (a page of identical paragraphs).
+    pub period: Option<u32>,
 }
 
 impl SyntheticPage {
@@ -66,7 +72,19 @@ impl SyntheticPage {
             header_clock: 0,
             blink: None,
             corner_rows: 0,
+            corner_notch: None,
+            period: None,
         }
+    }
+
+    pub fn with_corner_notch(mut self, rows: u32, width: u32) -> Self {
+        self.corner_notch = Some((rows, width));
+        self
+    }
+
+    pub fn with_period(mut self, period: u32) -> Self {
+        self.period = Some(period);
+        self
     }
 
     pub fn with_corner_rows(mut self, rows: u32) -> Self {
@@ -128,7 +146,7 @@ impl SyntheticPage {
                 Kind::Content => {
                     // The row index in the first four pixels; a mix of both after that, so every
                     // row differs and no two rows share a prefix of change.
-                    let i = index;
+                    let i = self.period.map_or(index, |p| index % p.max(1));
                     match x {
                         0 => [
                             (i & 255) as u8,
@@ -232,6 +250,15 @@ impl SyntheticPage {
                     *p = [(pos & 255) as u8, (i & 255) as u8, 7, 255];
                 }
             }
+            if let Some((rows, w)) = self.corner_notch {
+                if i < rows || i + rows >= view {
+                    let n = line.len();
+                    for k in 0..(w as usize).min(n) {
+                        line[k] = [128, 128, 128, 255];
+                        line[n - 1 - k] = [128, 128, 128, 255];
+                    }
+                }
+            }
             lines.push(line);
         }
         for i in 0..self.footer {
@@ -287,6 +314,7 @@ impl SyntheticPage {
             scrolls: 0,
             smooth: Vec::new(),
             pending: None,
+            gain: 1.0,
         })))
     }
 }
@@ -307,6 +335,8 @@ struct State {
     smooth: Vec<f64>,
     /// (start, target, next entry of `smooth`) of the scroll in flight.
     pending: Option<(u32, u32, usize)>,
+    /// What the wheel moves per px asked (a real one differs from what was meant).
+    gain: f64,
 }
 
 /// One viewport onto a [`SyntheticPage`]; clone it to use it as both source and scroller.
@@ -316,6 +346,12 @@ pub struct PageView(Rc<RefCell<State>>);
 impl PageView {
     pub fn scrolls(&self) -> u32 {
         self.0.borrow().scrolls
+    }
+
+    /// A wheel that moves `gain` times the distance asked.
+    pub fn with_gain(self, gain: f64) -> Self {
+        self.0.borrow_mut().gain = gain;
+        self
     }
 
     /// A smooth-scrolling app on the first scroll: the next grabs show `shares` of the distance,
@@ -346,7 +382,7 @@ impl Scroller for PageView {
             return Err(CmError::invalid_input("scrolling the other way"));
         }
         s.scrolls += 1;
-        let mut pos = s.pos + amount_px;
+        let mut pos = s.pos + (f64::from(amount_px) * s.gain).round() as u32;
         if let Some((at, skip)) = s.page.jump {
             if !s.jumped && pos >= at {
                 s.jumped = true;

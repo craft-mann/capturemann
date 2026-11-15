@@ -210,26 +210,26 @@ impl CaptureLongParams {
     }
 }
 
-/// The centre of the area in global physical px: where the pointer goes so that the wheel
-/// reaches the area. `None` when the target cannot be found (the scroll then goes wherever the
-/// pointer is).
-fn area_centre(capturer: &Capturer, target: cm_capture::CaptureTarget) -> Option<(i32, i32)> {
+/// The area in global physical px. `None` when the target cannot be found (the scroll then goes
+/// wherever the pointer is).
+fn area_rect(capturer: &Capturer, target: cm_capture::CaptureTarget) -> Option<PhysicalRect> {
     use cm_capture::{CaptureTarget, RegionRect};
     let targets = capturer.list_targets().ok()?;
-    let centre = |r: PhysicalRect, ox: i32, oy: i32| {
-        (
-            ox + r.origin.x + (r.size.width / 2) as i32,
-            oy + r.origin.y + (r.size.height / 2) as i32,
-        )
+    let moved = |r: PhysicalRect, ox: i32, oy: i32| PhysicalRect {
+        origin: PhysicalPoint {
+            x: ox + r.origin.x,
+            y: oy + r.origin.y,
+        },
+        size: r.size,
     };
     match target {
         CaptureTarget::Display { display_id } => {
             let d = targets.displays.iter().find(|d| d.id == display_id)?;
-            Some(centre(d.bounds, 0, 0))
+            Some(moved(d.bounds, 0, 0))
         }
         CaptureTarget::Window { window_id } => {
             let w = targets.windows.iter().find(|w| w.id == window_id)?;
-            Some(centre(w.bounds, 0, 0))
+            Some(moved(w.bounds, 0, 0))
         }
         CaptureTarget::Region { display_id, rect } => {
             let d = targets.displays.iter().find(|d| d.id == display_id)?;
@@ -249,7 +249,71 @@ fn area_centre(capturer: &Capturer, target: cm_capture::CaptureTarget) -> Option
                     }
                 }
             };
-            Some(centre(r, d.bounds.origin.x, d.bounds.origin.y))
+            Some(moved(r, d.bounds.origin.x, d.bounds.origin.y))
+        }
+    }
+}
+
+/// Points of the area where the pointer is put for the wheel, in the order they are tried: the
+/// centre, then the four quarter points. A wheel event goes to the window under the pointer, so
+/// the points that one of this app's own windows covers (`own`, global physical px) come last: a
+/// CLI or agent run starts with the app's window often on top of the target's centre
+/// (QA macOS pass 3, Nov 15, 2026: `nothing_scrolled`). All of them stay in the list, so an area
+/// that is covered everywhere is still tried.
+pub(crate) fn scroll_points(area: PhysicalRect, own: &[PhysicalRect]) -> Vec<(i32, i32)> {
+    let (w, h) = (area.size.width as i32, area.size.height as i32);
+    let at = |fx: i32, fy: i32| (area.origin.x + w * fx / 4, area.origin.y + h * fy / 4);
+    let all = [at(2, 2), at(1, 1), at(3, 1), at(1, 3), at(3, 3)];
+    let covered = |&(x, y): &(i32, i32)| {
+        own.iter().any(|r| {
+            x >= r.origin.x
+                && x < r.origin.x + r.size.width as i32
+                && y >= r.origin.y
+                && y < r.origin.y + r.size.height as i32
+        })
+    };
+    let (mut free, taken): (Vec<_>, Vec<_>) = all.into_iter().partition(|p| !covered(p));
+    free.extend(taken);
+    free
+}
+
+/// A scroller that keeps a list of points of the area: it starts at the first and moves to the
+/// next one when the run asks for another point (the first step moved nothing).
+struct MultiPointScroller {
+    system: Arc<dyn LongShotSystem>,
+    points: Vec<(i32, i32)>,
+    at: usize,
+    current: Box<dyn Scroller + Send>,
+}
+
+impl MultiPointScroller {
+    fn new(system: Arc<dyn LongShotSystem>, points: Vec<(i32, i32)>) -> Result<Self, CmError> {
+        let current = system.scroller(points.first().copied())?;
+        Ok(MultiPointScroller {
+            system,
+            points,
+            at: 0,
+            current,
+        })
+    }
+}
+
+impl Scroller for MultiPointScroller {
+    fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.current.scroll(direction, amount_px)
+    }
+
+    fn next_point(&mut self) -> bool {
+        if self.at + 1 >= self.points.len() {
+            return false;
+        }
+        match self.system.scroller(Some(self.points[self.at + 1])) {
+            Ok(s) => {
+                self.at += 1;
+                self.current = s;
+                true
+            }
+            Err(_) => false,
         }
     }
 }
@@ -530,11 +594,16 @@ impl Inner {
                 };
                 let result = match scroll {
                     ScrollMode::Auto => {
-                        let anchor = area_centre(&capturer_for_anchor, target);
-                        let mut scroller = system.scroller(anchor)?;
+                        let points = match area_rect(&capturer_for_anchor, target) {
+                            Some(area) => {
+                                scroll_points(area, &capturer_for_anchor.own_window_rects())
+                            }
+                            None => Vec::new(),
+                        };
+                        let mut scroller = MultiPointScroller::new(system.clone(), points)?;
                         long_shot::run_auto_ex(
                             frames.as_mut(),
-                            scroller.as_mut(),
+                            &mut scroller,
                             &mut ThreadSleeper,
                             cfg,
                             &mut stop,
@@ -603,5 +672,119 @@ impl Inner {
             out["long_shot"] = serde_json::to_value(&m).unwrap_or(Value::Null);
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod point_tests {
+    use super::*;
+
+    fn rect(x: i32, y: i32, w: u32, h: u32) -> PhysicalRect {
+        PhysicalRect {
+            origin: PhysicalPoint { x, y },
+            size: PhysicalSize {
+                width: w,
+                height: h,
+            },
+        }
+    }
+
+    /// No window of ours on the area: the centre first, then the quarter points.
+    #[test]
+    fn ls_flaky_the_centre_is_first_when_nothing_covers_it() {
+        let p = scroll_points(rect(100, 200, 800, 400), &[]);
+        assert_eq!(p[0], (500, 400));
+        assert_eq!(p.len(), 5);
+        assert!(p.contains(&(300, 300)) && p.contains(&(700, 500)));
+    }
+
+    /// LS-flaky (b): the app's own window covers the centre; the wheel must not go there.
+    #[test]
+    fn ls_flaky_a_point_under_our_own_window_is_not_first() {
+        let area = rect(0, 0, 1000, 800);
+        let own = [rect(300, 200, 400, 400)];
+        let p = scroll_points(area, &own);
+        assert_eq!(p.len(), 5);
+        assert_ne!(p[0], (500, 400));
+        let covered = |&(x, y): &(i32, i32)| (300..700).contains(&x) && (200..600).contains(&y);
+        assert!(!covered(&p[0]));
+        // The covered centre is kept, as a last resort.
+        assert!(p.contains(&(500, 400)));
+        assert!(covered(p.last().unwrap()));
+    }
+
+    /// Covered everywhere: all points stay, the centre first.
+    #[test]
+    fn ls_flaky_an_area_covered_everywhere_keeps_every_point() {
+        let area = rect(0, 0, 1000, 800);
+        let p = scroll_points(area, &[rect(-10, -10, 2000, 2000)]);
+        assert_eq!(p.len(), 5);
+        assert_eq!(p[0], (500, 400));
+    }
+
+    type Log = Arc<Mutex<Vec<Option<(i32, i32)>>>>;
+
+    struct Anchored {
+        at: Option<(i32, i32)>,
+        log: Log,
+    }
+
+    impl Scroller for Anchored {
+        fn scroll(&mut self, _: Direction, _: u32) -> Result<(), CmError> {
+            self.log.lock().unwrap().push(self.at);
+            Ok(())
+        }
+    }
+
+    struct Sys(Log);
+
+    impl LongShotSystem for Sys {
+        fn frames(
+            &self,
+            _: Arc<Capturer>,
+            _: cm_capture::CaptureTarget,
+        ) -> Box<dyn FrameSource + Send> {
+            unreachable!("frames are not taken in this test")
+        }
+        fn scroller(
+            &self,
+            anchor: Option<(i32, i32)>,
+        ) -> Result<Box<dyn Scroller + Send>, CmError> {
+            Ok(Box::new(Anchored {
+                at: anchor,
+                log: self.0.clone(),
+            }))
+        }
+        fn auto_scroll(&self) -> AutoScrollSupport {
+            AutoScrollSupport::Available
+        }
+    }
+
+    /// The scroller starts at the first point and moves on when asked, until the list is used up.
+    #[test]
+    fn ls_flaky_the_scroller_moves_to_the_next_point_when_asked() {
+        let log = Log::default();
+        let points = vec![(1, 1), (2, 2), (3, 3)];
+        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), points).unwrap();
+        s.scroll(Direction::Vertical, 10).unwrap();
+        assert!(s.next_point());
+        s.scroll(Direction::Vertical, 10).unwrap();
+        assert!(s.next_point());
+        assert!(!s.next_point());
+        s.scroll(Direction::Vertical, 10).unwrap();
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec![Some((1, 1)), Some((2, 2)), Some((3, 3))]
+        );
+    }
+
+    /// No target found: no point, the scroller is made without an anchor as before.
+    #[test]
+    fn ls_flaky_no_points_means_no_anchor_and_no_next_point() {
+        let log = Log::default();
+        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), Vec::new()).unwrap();
+        s.scroll(Direction::Vertical, 10).unwrap();
+        assert!(!s.next_point());
+        assert_eq!(*log.lock().unwrap(), vec![None]);
     }
 }
