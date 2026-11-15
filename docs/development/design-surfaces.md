@@ -33,7 +33,7 @@ Canonical: `design/tokens/tokens.json`. Implementers use the token names below, 
 | `success`, `warning` | Status pills and chips | `warning` also carries error states. |
 
 - **Light theme.** Primary button is `ink` with white text and an 8 px `rec` dot before the label; agent blue shifts to `light.agent`; `rec` is unchanged.
-- **Annotation palette** (content colors drawn inside screenshots and videos, not UI colors): `#FF3B3B` red (default), `#FF8A00`, `#FFD60A`, `#2FD158`, `#2E8BFF`, `#B15CFF`, `#111111`, `#FFFFFF`. Step badges default to red with white numerals; text defaults to white with a 2 px black outline. The kit is silent here; this list stands. These are content, so the "red is reserved" rule does not apply to them.
+- **Annotation palette** (content colors drawn inside screenshots and videos, not UI colors): `#FF3B3B` red (default), `#FF8A00`, `#FFD60A`, `#2FD158`, `#2E8BFF`, `#B15CFF`, `#111111`, `#FFFFFF`. Step badges default to red with white numerals; new text starts with Auto (0.3.4, D10, ANN-1.AC8): #111111 or #FFFFFF by the picture under it, with a 2 px outline in the other colour only on a busy picture. The kit is silent here; this list stands. These are content, so the "red is reserved" rule does not apply to them.
 - Contrast: body text at least 4.5:1. Use the token, not a lighter gray.
 
 ## 3. Typography

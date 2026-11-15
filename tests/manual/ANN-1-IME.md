@@ -16,7 +16,7 @@ recording is needed: open any existing screenshot (or take one of a made-up wind
 ## Steps
 
 1. Open a screenshot in the editor, press T (Text tool), click on the image. Expected: a caret; the
-   panel shows size 24 and a white colour. (AC8)
+   panel shows size 24, Auto selected and a colour that reads on the picture (dark on a light one, white on a dark one). (AC8)
 2. Switch to Vietnamese Telex. Type, one key at a time: `T` `i` `e` `e` `n` `g` `s` Space `V` `i` `e`
    `e` `t` `j` Space `c` `o` `s` Space `d` `a` `a` `u` `s`. Expected while typing: the letters being
    composed are underlined or marked; after the last key: `Tiếng Việt có dấu`. No doubled letters
@@ -34,8 +34,11 @@ recording is needed: open any existing screenshot (or take one of a made-up wind
    accent visible, no empty boxes.
 9. Change the colour of one existing text and the size to 40: only that text changes. Reopen an
    older screenshot that already has text: it keeps its colour, size and outline. (AC8)
-10. Place a text on a white screenshot: it is white on white and cannot be seen unless the colour is
-    changed. Expected and accepted: there is no automatic outline (maintainer decision, Nov 6, 2026).
+10. Place a text on a white screenshot: it is #111111 (the swatch shows AUTO and the line says "picked
+    from the picture (light)"). On a dark screenshot it is #FFFFFF. On a busy photograph it gets a 2 px
+    outline in the other colour. Pick orange, place a second text: it is orange and none of Auto, Light
+    and Dark is selected; click Auto, place another: the colour is picked from the picture again.
+    Reopen the file: the swatch shows the stored colour without the AUTO tag.
 
 Pass: steps 2, 5 and 8 show the exact phrase. Report any doubled or raw letter with the input source
 name and the operating system.

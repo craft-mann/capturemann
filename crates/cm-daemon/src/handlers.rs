@@ -49,6 +49,63 @@ pub(crate) fn render_png(bundle: &ShotBundle) -> Result<Vec<u8>, CmError> {
     cm_render::encode_png(&out)
 }
 
+/// Gives every text op of `p` that came without a `color` the Auto colour of the picture under
+/// its box (ANN-1.AC8): the document image with the base edits applied and no other annotation.
+/// Returns what was stored, one entry per such op: `{ index, color, outline }`.
+fn apply_auto_text(bundle: &ShotBundle, p: &mut AnnotateParams) -> Result<Vec<Value>, CmError> {
+    use cm_core::annotation::OpKind;
+    if p.auto_text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let original = image::open(bundle.original_path())
+        .map_err(|e| CmError::internal(format!("cannot read original.png: {e}")))?
+        .to_rgba8();
+    // The base edits that will be in place: the stored ones (unless replaced), then the new ones.
+    let mut base: Vec<_> = if p.replace {
+        Vec::new()
+    } else {
+        bundle
+            .ops()
+            .iter()
+            .filter(|o| o.kind.is_base_edit())
+            .cloned()
+            .collect()
+    };
+    base.extend(p.ops.iter().filter(|o| o.kind.is_base_edit()).cloned());
+    let picture = if base.is_empty() {
+        original
+    } else {
+        cm_render::render_annotations(&original, &base)?
+    };
+    let mut out = Vec::new();
+    for slot in &p.auto_text {
+        let Some(op) = p.ops.get_mut(slot.index) else {
+            continue;
+        };
+        if let OpKind::Text {
+            at,
+            size,
+            color,
+            outline,
+            ..
+        } = &mut op.kind
+        {
+            let a = cm_render::auto_text_style(&picture, (at.x, at.y), *size);
+            *color = a.color;
+            if !slot.outline_given {
+                *outline = a.outline;
+            }
+            out.push(json!({
+                "index": slot.index,
+                "color": color.to_hex(),
+                "outline": outline.map(|c| c.to_hex()),
+                "outline_width": outline.map(|_| cm_render::auto_text::OUTLINE_WIDTH),
+            }));
+        }
+    }
+    Ok(out)
+}
+
 fn read_file(p: &std::path::Path) -> Result<Vec<u8>, CmError> {
     std::fs::read(p).map_err(|e| {
         let msg = format!("cannot read `{}`: {e}", p.display());
@@ -399,10 +456,15 @@ impl Inner {
         let (library, now, by) = (self.library.clone(), self.clock.now(), actor.clone());
         let clipboard = self.clipboard.clone();
         let id = p.capture_id.clone();
+        let capture_id = p.capture_id.clone();
         let copy = p.copy_to_clipboard;
         let return_image = p.return_image;
-        let (rev, png, copied, warnings) = blocking(move || {
+        let (rev, png, copied, warnings, auto_text) = blocking(move || {
             let mut bundle = lock_library(&library).open_screenshot(&id)?;
+            let mut p = p;
+            // ANN-1.AC8: a text op with no `color` gets Auto's colour (and outline) from the
+            // picture under it, stored in the op now; the answer reports what was stored.
+            let auto_text = apply_auto_text(&bundle, &mut p)?;
             // One batch, one revision; validation happens before anything changes.
             let rev = if p.ops.is_empty() && p.replace {
                 // "Revert to original": clear every op as one undo step (ANN-3).
@@ -431,19 +493,20 @@ impl Inner {
                         false
                     }
                 };
-            Ok((rev, png, copied, warnings))
+            Ok((rev, png, copied, warnings, auto_text))
         })
         .await?;
         self.events.publish(
             events::CAPTURE_REVISED,
-            json!({ "capture_id": p.capture_id, "revision": rev.rev, "by": rev.by }),
+            json!({ "capture_id": capture_id, "revision": rev.rev, "by": rev.by }),
         );
         Ok(json!({
-            "capture_id": p.capture_id,
+            "capture_id": capture_id,
             "revision": rev.rev,
             "by": rev.by,
             "copied_to_clipboard": copied,
             "warnings": warnings,
+            "auto_text": auto_text,
             "image": return_image.then(|| image_json(&png)),
         }))
     }

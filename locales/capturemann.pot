@@ -579,6 +579,21 @@ msgstr ""
 msgid "Auto-redact suggestions"
 msgstr ""
 
+msgid "Auto: busy picture, outline added"
+msgstr ""
+
+msgid "Auto: pick the text colour from the picture"
+msgstr ""
+
+msgid "Auto: picked from the picture (dark)"
+msgstr ""
+
+msgid "Auto: picked from the picture (light)"
+msgstr ""
+
+msgid "Auto: picked from the picture when text is placed"
+msgstr ""
+
 msgid "Automatic transcription"
 msgstr ""
 
@@ -1618,6 +1633,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "Dark"
+msgstr ""
+
+msgid "Dark text (#111111)"
 msgstr ""
 
 msgid "Decoded from the recording with FFmpeg"
@@ -2814,6 +2832,9 @@ msgstr ""
 msgid "Light grey"
 msgstr ""
 
+msgid "Light text (#FFFFFF)"
+msgstr ""
+
 #. the line that is selected or under the playhead, and how many lines there are; short, in the panel header.
 msgid "Line {i} of {n}"
 msgstr ""
@@ -3885,6 +3906,9 @@ msgid "Out (O)"
 msgstr ""
 
 msgid "Outer margin"
+msgstr ""
+
+msgid "Outline on: {width} px · {color}"
 msgstr ""
 
 msgid "Output"
@@ -6985,6 +7009,9 @@ msgstr ""
 msgid "Your desktop’s screen-sharing service (xdg-desktop-portal) is missing."
 msgstr ""
 
+msgid "Your last colour (Text tool)"
+msgstr ""
+
 msgid "Your name in transcripts"
 msgstr ""
 
@@ -9039,6 +9066,10 @@ msgctxt "colour"
 msgid "Yellow"
 msgstr ""
 
+msgctxt "colour tag"
+msgid "AUTO"
+msgstr ""
+
 msgctxt "countdown"
 msgid "None"
 msgstr ""
@@ -10869,6 +10900,18 @@ msgstr ""
 
 msgctxt "text alignment"
 msgid "Right"
+msgstr ""
+
+msgctxt "text colour mode"
+msgid "Auto"
+msgstr ""
+
+msgctxt "text colour mode"
+msgid "Dark"
+msgstr ""
+
+msgctxt "text colour mode"
+msgid "Light"
 msgstr ""
 
 msgctxt "text model"

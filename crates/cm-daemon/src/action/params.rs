@@ -215,7 +215,18 @@ pub struct AnnotateParams {
     /// Return the rendered PNG (base64) in the result; default true. The editor passes `false`:
     /// it already shows the image and would only decode and drop it.
     pub return_image: bool,
+    /// Text ops sent with no `color` (ANN-1.AC8): the daemon picks their colour from the picture
+    /// when the ops are created. Empty for every other client.
+    pub auto_text: Vec<AutoTextSlot>,
     pub request_id: Option<String>,
+}
+
+/// A text op of an `annotate` call that carried no `color` (index into `ops`).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AutoTextSlot {
+    pub index: usize,
+    /// The op carried its own `outline` (a colour or `null`): Auto leaves it alone.
+    pub outline_given: bool,
 }
 
 /// `rename_capture { capture_id, title, request_id? }`: sets the title and renames the bundle

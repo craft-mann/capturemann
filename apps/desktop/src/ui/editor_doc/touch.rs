@@ -17,6 +17,9 @@ impl EditorDoc {
         if let Some(req) = self.state.take_measure_request() {
             self.run_measure(req, cx);
         }
+        if let Some(req) = self.state.take_auto_request() {
+            self.run_auto_text(req, cx);
+        }
         if self.state.lines_wanted() {
             self.fetch_lines(cx);
         }
@@ -55,6 +58,55 @@ impl EditorDoc {
             .ok();
         })
         .detach();
+    }
+
+    /// Samples the picture under a new text once (ANN-1.AC8, design request D10). Without base
+    /// edits it reads the loaded picture at once, so the colour is in place before the first
+    /// frame of the text box; with them it renders them first, in a background task.
+    fn run_auto_text(
+        &mut self,
+        req: crate::editor::state::text_auto::AutoRequest,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(base) = self.base.clone() else {
+            return;
+        };
+        let ops = self.state.measure_base();
+        if ops.is_empty() {
+            if let Ok(a) = touchup::auto_text(&base, &ops, req.at, req.size) {
+                self.state.auto_text_measured(req.seq, a);
+                self.sync_preview(cx);
+            }
+            return;
+        }
+        cx.spawn(async move |this, cx| {
+            let seq = req.seq;
+            let res = cx
+                .background_executor()
+                .spawn(async move { touchup::auto_text(&base, &ops, req.at, req.size) })
+                .await;
+            this.update(cx, |d, cx| {
+                if d.closing {
+                    return;
+                }
+                if let Ok(a) = res {
+                    d.state.auto_text_measured(seq, a);
+                    d.sync_preview(cx);
+                    cx.notify();
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// The Auto button of the Text panel.
+    pub fn choose_text_auto(&mut self, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        self.state.choose_auto();
+        self.after_input(Vec::new(), cx);
     }
 
     /// Asks the daemon for the recognized text lines (`suggest_blueprint`, read-only). Until the

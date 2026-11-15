@@ -398,6 +398,9 @@ pub struct ToolStyle {
     /// Retype: font weight and alignment of the new text (ANN-9).
     pub weight: u16,
     pub align: TextAlign,
+    /// Text tool only (ANN-1.AC8): the colour of a new text is picked from the picture (Auto).
+    /// Picking a colour by hand turns it off until the user chooses Auto again.
+    pub auto_color: bool,
 }
 
 impl ToolStyle {
@@ -424,6 +427,7 @@ impl ToolStyle {
             badge: true,
             weight: 400,
             align: TextAlign::Left,
+            auto_color: false,
         };
         match tool {
             Tool::Magnify => ToolStyle {
@@ -442,6 +446,7 @@ impl ToolStyle {
             },
             Tool::Text => ToolStyle {
                 color: Color::WHITE,
+                auto_color: true,
                 ..base
             },
             Tool::Highlight => ToolStyle {
@@ -520,6 +525,17 @@ impl Styles {
     pub fn apply(&mut self, tool: Tool, v: ParamValue) {
         if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == tool) {
             s.apply(v);
+            // A colour picked by hand is the Text tool's remembered colour; Auto is off.
+            if tool == Tool::Text && matches!(v, ParamValue::Color(_)) {
+                s.auto_color = false;
+            }
+        }
+    }
+
+    /// Auto on (a new text picks its colour from the picture) or off, for the Text tool.
+    pub fn set_text_auto(&mut self, on: bool) {
+        if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Text) {
+            s.auto_color = on;
         }
     }
 
@@ -638,6 +654,7 @@ impl Styles {
                     },
                     "connector": s.connector,
                     "badge": s.badge,
+                    "auto": s.auto_color,
                     "weight": s.weight,
                     "align": match s.align {
                         TextAlign::Left => "left",
@@ -688,6 +705,11 @@ impl Styles {
             }
             if let Some(w) = num("dim", 0.0, 1.0) {
                 s.dim = w;
+            }
+            if *t == Tool::Text {
+                if let Some(b) = o.get("auto").and_then(Value::as_bool) {
+                    s.auto_color = b;
+                }
             }
             match o.get("stamp_word").and_then(Value::as_str) {
                 Some("before") => s.stamp_word = StampWord::Before,

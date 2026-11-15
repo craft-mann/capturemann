@@ -67,10 +67,18 @@ impl EditorView {
 
     /// One annotation-palette swatch. The palette colors are content colors (what gets drawn
     /// on the image), not UI colors.
-    fn swatch(&self, t: &Theme, i: usize, name: String, c: OpColor, on: bool) -> AnyElement {
+    fn swatch(
+        &self,
+        t: &Theme,
+        i: usize,
+        name: String,
+        c: OpColor,
+        (on, auto_tag): (bool, bool),
+    ) -> AnyElement {
         let hover = rgba_of(t.raised);
         div()
             .id(ElementId::from(("swatch", i)))
+            .relative()
             .role(Role::Button)
             .aria_label(name)
             .aria_toggled(toggled(on))
@@ -98,6 +106,67 @@ impl EditorView {
                     .border_color(rgba_of(t.line))
                     .bg(gpui_rgb(c)),
             )
+            .when(auto_tag, |d| {
+                // The colour came from the picture (editor state only, never stored).
+                d.child(
+                    div()
+                        .absolute()
+                        .bottom(px(0.))
+                        .left_0()
+                        .right_0()
+                        .flex()
+                        .justify_center()
+                        .child(
+                            div()
+                                .px(px(3.))
+                                .rounded(px(3.))
+                                .bg(rgba_of(t.text))
+                                .text_color(rgba_of(t.surface))
+                                .text_size(px(8.))
+                                .mono()
+                                .child(tr_ctx!("colour tag", "AUTO")),
+                        ),
+                )
+            })
+            .into_any_element()
+    }
+
+    /// Auto, Light and Dark above the Text palette (ANN-1.AC8). Light and Dark are one-click
+    /// colours; none is on while the user's own colour is in use.
+    fn text_auto_control(
+        &self,
+        t: &Theme,
+        info: &crate::editor::state::text_auto::TextAutoInfo,
+    ) -> AnyElement {
+        use crate::editor::state::text_auto::AutoMode;
+        use cm_render::auto_text::{AUTO_DARK, AUTO_LIGHT};
+        div()
+            .flex()
+            .gap(px(6.))
+            .child(self.seg_button(
+                t,
+                ElementId::from("text-auto"),
+                tr_ctx!("text colour mode", "Auto"),
+                tr!("Auto: pick the text colour from the picture"),
+                info.mode == AutoMode::Auto,
+                self.doc_action(|d, cx| d.choose_text_auto(cx)),
+            ))
+            .child(self.seg_button(
+                t,
+                ElementId::from("text-light"),
+                tr_ctx!("text colour mode", "Light"),
+                tr!("Light text (#FFFFFF)"),
+                info.mode == AutoMode::Light,
+                self.set_param_action(ParamValue::Color(AUTO_LIGHT)),
+            ))
+            .child(self.seg_button(
+                t,
+                ElementId::from("text-dark"),
+                tr_ctx!("text colour mode", "Dark"),
+                tr!("Dark text (#111111)"),
+                info.mode == AutoMode::Dark,
+                self.set_param_action(ParamValue::Color(AUTO_DARK)),
+            ))
             .into_any_element()
     }
 
@@ -199,6 +268,7 @@ impl EditorView {
         color_label: &str,
         tool: Tool,
         retype_pick: bool,
+        auto: Option<&crate::editor::state::text_auto::TextAutoInfo>,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         let body: AnyElement = match (p, cur) {
@@ -208,17 +278,46 @@ impl EditorView {
                 // is picked nothing is selected.
                 let retype = tool == Tool::Retype;
                 let custom = retype && retype_pick && !PALETTE.iter().any(|(_, p)| *p == c);
-                div()
+                let tag = auto.is_some_and(|a| a.tag);
+                let row = div()
                     .flex()
                     .gap(px(2.))
                     .when(custom, |d| {
-                        d.child(self.swatch(t, 100, tr!("Measured colour"), c, true))
+                        d.child(self.swatch(t, 100, tr!("Measured colour"), c, (true, false)))
                     })
                     .children(PALETTE.iter().enumerate().map(|(i, (name, col))| {
                         let on = (!retype || retype_pick) && *col == c;
-                        self.swatch(t, i, palette_name(name), *col, on)
-                    }))
-                    .into_any_element()
+                        self.swatch(t, i, palette_name(name), *col, (on, on && tag))
+                    }));
+                match auto {
+                    Some(a) => div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(8.))
+                        .child(self.text_auto_control(t, a))
+                        .child(row)
+                        .child(
+                            div()
+                                .text_size(px(12.))
+                                .text_color(rgba_of(t.text_3))
+                                .child(SharedString::from(a.line.clone())),
+                        )
+                        .when_some(a.outline, |d, o| {
+                            d.child(
+                                div()
+                                    .text_size(px(12.))
+                                    .text_color(rgba_of(t.text_3))
+                                    .child(SharedString::from(tr!(
+                                        "Outline on: {width} px · {color}",
+                                        width =
+                                            format!("{:.0}", cm_render::auto_text::OUTLINE_WIDTH),
+                                        color = o.to_hex()
+                                    ))),
+                            )
+                        })
+                        .into_any_element(),
+                    None => row.into_any_element(),
+                }
             }
             (Param::TextSize, ParamValue::TextSize(v)) if tool == Tool::Retype => {
                 // A retype's size is measured from the box (any whole px), so it is a
@@ -410,7 +509,16 @@ impl EditorView {
             .params
             .iter()
             .filter_map(|(p, v)| {
-                self.param_group(t, *p, *v, &color_label, s.inspector_tool, retype_pick, cx)
+                self.param_group(
+                    t,
+                    *p,
+                    *v,
+                    &color_label,
+                    s.inspector_tool,
+                    retype_pick,
+                    s.text_auto.as_ref(),
+                    cx,
+                )
             })
             .collect();
         let top = self.panel_top(t, s, cx);

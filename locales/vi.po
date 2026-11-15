@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, 13 of Nov 10, 2026: the AI page options for lines to leave out, 1 of Nov 10, 2026: preparing the sound in the editor, and 17 of Nov 15, 2026: the Click Guide of a window and picture viewer drafts from the design boards S16, S17, S19); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, 13 of Nov 10, 2026: the AI page options for lines to leave out, 1 of Nov 10, 2026: preparing the sound in the editor, 17 of Nov 15, 2026: the Click Guide of a window and picture viewer drafts from the design boards S16, S17, S19, and 13 of Nov 15, 2026: the Text colour Auto of board S21); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -11740,3 +11740,59 @@ msgstr "Chỉ các lượt nhấp trong cửa sổ này mới thành bước. Nh
 #, fuzzy
 msgid "CaptureMann could not open its agent endpoint, so agents can’t reach it. Open Agents & CLI for details."
 msgstr "CaptureMann không mở được điểm kết nối cho tác nhân nên tác nhân không kết nối được. Mở Tác nhân & CLI để xem chi tiết."
+
+#, fuzzy
+msgid "Auto: busy picture, outline added"
+msgstr "Tự động: ảnh nhiều chi tiết, đã thêm viền chữ"
+
+#, fuzzy
+msgid "Auto: pick the text colour from the picture"
+msgstr "Tự động: chọn màu chữ theo ảnh"
+
+#, fuzzy
+msgid "Auto: picked from the picture (dark)"
+msgstr "Tự động: chọn theo ảnh (ảnh tối)"
+
+#, fuzzy
+msgid "Auto: picked from the picture (light)"
+msgstr "Tự động: chọn theo ảnh (ảnh sáng)"
+
+#, fuzzy
+msgid "Auto: picked from the picture when text is placed"
+msgstr "Tự động: chọn theo ảnh khi đặt chữ"
+
+#, fuzzy
+msgid "Dark text (#111111)"
+msgstr "Chữ tối (#111111)"
+
+#, fuzzy
+msgid "Light text (#FFFFFF)"
+msgstr "Chữ sáng (#FFFFFF)"
+
+#, fuzzy
+msgid "Outline on: {width} px · {color}"
+msgstr "Có viền chữ: {width} px · {color}"
+
+#, fuzzy
+msgid "Your last colour (Text tool)"
+msgstr "Màu bạn chọn lần trước (công cụ Chữ)"
+
+#, fuzzy
+msgctxt "colour tag"
+msgid "AUTO"
+msgstr "TỰ ĐỘNG"
+
+#, fuzzy
+msgctxt "text colour mode"
+msgid "Auto"
+msgstr "Tự động"
+
+#, fuzzy
+msgctxt "text colour mode"
+msgid "Dark"
+msgstr "Tối"
+
+#, fuzzy
+msgctxt "text colour mode"
+msgid "Light"
+msgstr "Sáng"

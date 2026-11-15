@@ -330,9 +330,28 @@ impl Action {
                 if ops.is_empty() && !replace {
                     return Err(CmError::invalid_field("ops", "must not be empty"));
                 }
+                let auto_text = f
+                    .obj
+                    .get("ops")
+                    .and_then(Value::as_array)
+                    .map(|a| {
+                        a.iter()
+                            .enumerate()
+                            .filter(|(_, o)| {
+                                o.get("op").and_then(Value::as_str) == Some("text")
+                                    && o.get("color").is_none()
+                            })
+                            .map(|(index, o)| AutoTextSlot {
+                                index,
+                                outline_given: o.get("outline").is_some(),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 Action::Annotate(AnnotateParams {
                     capture_id: f.str_req("capture_id")?,
                     ops,
+                    auto_text,
                     replace,
                     copy_to_clipboard: f.bool_or("copy_to_clipboard", false)?,
                     return_image: f.bool_or("return_image", true)?,

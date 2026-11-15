@@ -20,6 +20,7 @@ use super::palette::Faces;
 use super::tools::{Param, ParamValue, StampWord, Styles, Tool, ToolStyle};
 use super::touchup;
 
+pub mod text_auto;
 pub mod touch;
 pub use touch::{BlueprintInfo, LensInfo, MoveInfo, RetypeInfo, Touch};
 
@@ -654,6 +655,8 @@ pub struct EditorState {
     pub last_text_input: Option<std::time::Instant>,
     /// Retype, Move area, Blueprint and the Zoom Lens notice (0.3.4).
     pub touch: Touch,
+    /// The Auto colour of a new Text annotation (ANN-1.AC8).
+    pub text_auto: text_auto::TextAuto,
 }
 
 /// The lowercase name of an annotation kind in the screen-reader summary ("rect 1 of 2").
@@ -710,6 +713,7 @@ impl EditorState {
             text_drag: false,
             last_text_input: None,
             touch: Touch::new(),
+            text_auto: text_auto::TextAuto::default(),
         }
     }
 
@@ -1453,17 +1457,20 @@ impl EditorState {
             cursor: 0,
             size: s.size,
             color: s.color,
-            // New text has no automatic outline or shadow (ANN-1.AC8): the user changes the
-            // colour if the screenshot is light.
+            // With Auto on the colour and outline are replaced by the sample (ANN-1.AC8), which
+            // the document takes right after this click; until then, and with Auto off, the
+            // remembered colour and no outline.
             outline: None,
             bg: None,
             marked: None,
             sel_all: false,
             anchor: None,
         });
+        self.auto_on_new_text(p, s.size);
     }
 
     fn begin_text_edit(&mut self, i: usize) {
+        self.text_auto.pick = None;
         match self.ops[i].kind.clone() {
             OpKind::Text {
                 at,
@@ -1579,6 +1586,7 @@ impl EditorState {
     pub fn finish_text(&mut self) -> Option<Edit> {
         let t = self.text.take()?;
         self.text_drag = false;
+        self.text_auto.pick = None;
         if let TextTarget::Retype { original, .. } = &t.target {
             let original = original.clone();
             return self.finish_retype(&t, original);
@@ -2385,6 +2393,9 @@ impl EditorState {
                 ParamValue::Color(c) => t.color = c,
                 ParamValue::TextSize(s) => t.size = s.clamp(8.0, 400.0),
                 _ => return None,
+            }
+            if matches!(v, ParamValue::Color(_)) {
+                self.auto_dropped_by_user();
             }
             self.styles.apply(Tool::Text, v);
             self.styles_dirty = true;

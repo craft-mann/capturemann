@@ -295,6 +295,8 @@ struct Snap {
     /// The Zoom Lens, Retype, Move area and Blueprint panels (0.3.4).
     lens: Option<crate::editor::state::touch::LensInfo>,
     retype: Option<crate::editor::state::touch::RetypeInfo>,
+    /// The Auto / Light / Dark control of the Text panel (ANN-1.AC8).
+    text_auto: Option<crate::editor::state::text_auto::TextAutoInfo>,
     mv: Option<crate::editor::state::touch::MoveInfo>,
     blueprint: Option<crate::editor::state::touch::BlueprintInfo>,
     /// "This area has an image or a control in it, so the fill may show" is open.
@@ -358,6 +360,7 @@ impl Snap {
             spot: st.spot_info(),
             lens: st.lens_info(),
             retype: st.retype_info(),
+            text_auto: st.text_auto_info(),
             mv: st.move_info(),
             blueprint: st.blueprint_info(),
             busy_prompt: st.touch.busy_prompt.clone(),

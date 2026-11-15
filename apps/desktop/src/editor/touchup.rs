@@ -131,6 +131,22 @@ pub fn measure(
     })
 }
 
+/// The Auto colour of a new text (ANN-1.AC8): samples `original` with the base edits `base`
+/// applied and no annotation. Without base edits it reads the picture as it is; with them it
+/// renders them first, so call it off the UI thread then.
+pub fn auto_text(
+    original: &RgbaImage,
+    base: &[AnnotationOp],
+    at: Pt,
+    size: f64,
+) -> Result<cm_render::AutoText, String> {
+    if base.is_empty() {
+        return Ok(cm_render::auto_text_style(original, (at.x, at.y), size));
+    }
+    let picture = cm_render::render_annotations(original, base).map_err(|e| e.to_string())?;
+    Ok(cm_render::auto_text_style(&picture, (at.x, at.y), size))
+}
+
 /// What a measurement is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MeasureFor {

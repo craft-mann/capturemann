@@ -107,6 +107,8 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
 - Not seen on screen: tested with pure models and width tests only.
 
 ## D10. Default colour of new Text annotations (screenshot editor, Text tool, key T)
+**Designed (board S21, Nov 15, 2026) and built:** the Auto default (`cm_render::auto_text_style`; #111111 or #FFFFFF by the mean luminance of the picture under the box, switch point 0.19; a 2 px outline in the other colour when fewer than 90 % of the sampled pixels reach 4.5:1), the Auto / Light / Dark control with the AUTO tag and the source line, `annotate` with no `color` (answers `auto_text`), ANN-1.AC8. Differences from the board: the Text panel had no Outline or Shadow controls to keep, so it shows a read-only "Outline 2 px · #111111" line when Auto turned one on; an explicit `color` sent to `annotate` without `outline` keeps the schema's old black outline default (Auto adds none).
+
 - Today: a Text annotation placed from the Text tool starts white, 24 px, with no outline and no shadow
   (a deliberate 0.2.9 choice). On a light screenshot (a document, a web page, a dialog) the text is
   invisible until the user opens the panel and changes the colour. Black would fail the same way on a

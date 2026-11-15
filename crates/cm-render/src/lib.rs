@@ -18,6 +18,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 mod annot;
+pub mod auto_text;
 pub mod compose;
 pub mod compose_board;
 pub mod compose_bulk;
@@ -29,6 +30,7 @@ mod render;
 mod text;
 pub mod touchup;
 
+pub use auto_text::{auto_text_style, AutoText};
 pub use compose::{ClickMark, ClickStyle, Compositor, CursorLayer, CursorSprite, MAX_CLICKS};
 pub use ops::{
     parse_ops, parse_ops_str, validate_op, AnnotationOp, Color, OpKind, Pt, Rc,
