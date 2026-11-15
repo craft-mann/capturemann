@@ -145,6 +145,14 @@ impl McpStatus {
                     "CaptureMann has no library, so agents can\u{2019}t reach it. Open Agents & CLI for details."
                 )],
             },
+            McpState::Offline(reason @ (OfflineReason::SocketFolder | OfflineReason::EndpointFailed)) => {
+                StatusTip {
+                    line: tr!("MCP offline \u{b7} {reason}", reason = reason.text()),
+                    detail: vec![tr!(
+                        "CaptureMann could not open its agent endpoint, so agents can\u{2019}t reach it. Open Agents & CLI for details."
+                    )],
+                }
+            }
             McpState::Offline(OfflineReason::NoEndpoint) => StatusTip {
                 line: tr!("MCP offline \u{b7} {reason}", reason = OfflineReason::NoEndpoint.text()),
                 detail: vec![tr!(
@@ -321,7 +329,7 @@ mod tests {
         assert_eq!(ready.aria_status(), "MCP ready");
         assert_eq!(ready.tip().line, "MCP ready \u{b7} stdio and socket");
 
-        let socket = derive(true, true, Some("in use"), &[]);
+        let socket = derive(true, true, Some(IpcFailure::AlreadyServed), &[]);
         assert_eq!(socket.mark(), StatusMark::Bang);
         assert_eq!(socket.aria_status(), "another app owns the socket");
         assert_eq!(socket.tip().line, "Another app owns the socket");

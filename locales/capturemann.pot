@@ -843,6 +843,9 @@ msgstr ""
 msgid "CaptureMann collects no usage data and sends no analytics or crash reports."
 msgstr ""
 
+msgid "CaptureMann could not open its agent endpoint, so agents can’t reach it. Open Agents & CLI for details."
+msgstr ""
+
 msgid "CaptureMann couldn’t open the camera. Try again, or pick another camera."
 msgstr ""
 

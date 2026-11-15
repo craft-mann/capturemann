@@ -11730,3 +11730,7 @@ msgstr "Theo dõi một cửa sổ"
 msgctxt "window picker for a Click Guide"
 msgid "Only clicks inside this window become steps. Clicks anywhere else are ignored."
 msgstr "Chỉ các lượt nhấp trong cửa sổ này mới thành bước. Nhấp ở nơi khác sẽ bị bỏ qua."
+
+#, fuzzy
+msgid "CaptureMann could not open its agent endpoint, so agents can’t reach it. Open Agents & CLI for details."
+msgstr "CaptureMann không mở được điểm kết nối cho tác nhân nên tác nhân không kết nối được. Mở Tác nhân & CLI để xem chi tiết."

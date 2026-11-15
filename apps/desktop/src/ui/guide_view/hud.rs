@@ -359,7 +359,7 @@ fn start_on(app: &Entity<AppModel>, window: Option<(u32, String)>, cx: &mut App)
     crate::surfaces::opened(crate::surfaces::Surface::GuideHud, h);
     cx.set_global(Holder(Some(h)));
     notify_studio(cx); // the sidebar tile shows the run
-    // Esc cancels the countdown (the bar takes no focus, so Esc is a global key until it ends).
+                       // Esc cancels the countdown (the bar takes no focus, so Esc is a global key until it ends).
     crate::ui::delay_pill::grab_escape(cx);
     // Clicks on the bar are not steps (the bar's own rectangle, in the OS's global space).
     // (Windows reports clicks in physical px: the rectangle is converted with the display's scale.)
