@@ -18,6 +18,11 @@ const MIN_MOVED_PER_ASKED: f64 = 0.5;
 /// fading out, a scroller that is not ready. A first frame that is not what stays on screen
 /// refuses every join after it (Windows, Nov 15, 2026: one frame, `no_overlap`).
 const FIRST_FRAME_WARMUP: std::time::Duration = std::time::Duration::from_millis(250);
+/// When the first scroll moved nothing, the step is sent again this many times (the first after
+/// [`FIRST_SCROLL_RETRY_WAIT`] at the same point, the others at the scroller's next point)
+/// before the run ends with `nothing_scrolled`.
+const FIRST_SCROLL_RETRIES: u32 = 3;
+const FIRST_SCROLL_RETRY_WAIT: std::time::Duration = std::time::Duration::from_millis(200);
 /// A first pair that does not join is looked at again this many times (waiting longer each
 /// time) before the run ends with `no_overlap`.
 const FIRST_PAIR_RETRIES: u32 = 2;
@@ -80,6 +85,11 @@ fn progress(s: &Stitcher) -> LongShotProgress {
     }
 }
 
+/// The shift expected from asking for `step`, given what a step has moved so far.
+fn expected(step: u32, gain: f64) -> u32 {
+    ((f64::from(step) * gain).round() as u32).max(1)
+}
+
 fn extent(f: &Frame, d: Direction) -> u32 {
     match d {
         Direction::Vertical => f.height(),
@@ -133,13 +143,16 @@ pub fn run_auto_ex(
     let size = f64::from(extent(&first.frame, cfg.direction));
     let mut last_ok = first.frame.clone();
     let mut step = ((size * cfg.first_step_fraction) as u32).max(1);
+    // Pixels the content moved per pixel asked, once a join has taught it (1 before): the
+    // expected shift of a step, which breaks ties between equally good overlaps.
+    let mut gain = 1.0f64;
     let end = loop {
         if stop() {
             break EndReason::StoppedByUser;
         }
         scroller.scroll(cfg.direction, step)?;
         let mut next = wait_settled(src, sleeper, cfg.settle)?;
-        let mut outcome = stitcher.push(&next.frame, Some(step));
+        let mut outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         // The first pair that does not join: the screen may still be changing for another
         // reason than the scroll (a window coming to the front, a dialog fading out). Looked at
         // again, waiting longer each time, before the run is given up.
@@ -151,7 +164,7 @@ pub fn run_auto_ex(
             retry += 1;
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
             next = wait_settled(src, sleeper, cfg.settle)?;
-            outcome = stitcher.push(&next.frame, Some(step));
+            outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         }
         // An unchanged frame is the end of the content only when something has scrolled before.
         // A wheel event can arrive late (a browser's smooth scrolling starts after the settle
@@ -163,15 +176,26 @@ pub fn run_auto_ex(
             }
             sleeper.sleep(LATE_SCROLL_WAIT);
             next = wait_settled(src, sleeper, cfg.settle)?;
-            outcome = stitcher.push(&next.frame, Some(step));
+            outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         }
         if outcome == PushOutcome::NoChange && stitcher.frames() == 1 {
-            // The first scroll moved nothing: scroll once more (the scroller puts its pointer
-            // back on the area first) before giving up.
-            scroller.scroll(cfg.direction, step)?;
-            sleeper.sleep(LATE_SCROLL_WAIT);
-            next = wait_settled(src, sleeper, cfg.settle)?;
-            outcome = stitcher.push(&next.frame, Some(step));
+            // The first scroll moved nothing. A fresh window can ignore the wheel for a moment
+            // (the first retry waits and scrolls at the same point), and a wheel that went to
+            // another window (this app's own, on top of the area) needs another point (the
+            // later retries ask the scroller for one) before nothing scrolled is believed.
+            for attempt in 0..FIRST_SCROLL_RETRIES {
+                sleeper.sleep(FIRST_SCROLL_RETRY_WAIT);
+                if attempt > 0 {
+                    scroller.next_point();
+                }
+                scroller.scroll(cfg.direction, step)?;
+                sleeper.sleep(LATE_SCROLL_WAIT);
+                next = wait_settled(src, sleeper, cfg.settle)?;
+                outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+                if outcome != PushOutcome::NoChange {
+                    break;
+                }
+            }
             if outcome == PushOutcome::NoChange {
                 break EndReason::NothingScrolled;
             }
@@ -193,7 +217,7 @@ pub fn run_auto_ex(
                     tail += 1;
                     sleeper.sleep(LATE_SCROLL_WAIT);
                     let more = wait_settled(src, sleeper, cfg.settle)?;
-                    match stitcher.push(&more.frame, Some(step)) {
+                    match stitcher.push(&more.frame, Some(expected(step, gain))) {
                         PushOutcome::Added { new_len: n } => {
                             new_len += n;
                             last_ok = more.frame.clone();
@@ -218,6 +242,7 @@ pub fn run_auto_ex(
                 // and per display scale): learned from each join, so the next request lands on
                 // about 80 %.
                 let moved_per_asked = (f64::from(new_len) / f64::from(step)).clamp(0.25, 4.0);
+                gain = moved_per_asked;
                 // 80 % of what actually scrolls: the area without the fixed bands.
                 let (h, f) = stitcher.bands();
                 let content = (size - f64::from(h) - f64::from(f)).max(1.0);

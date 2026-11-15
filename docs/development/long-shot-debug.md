@@ -41,4 +41,16 @@ input); a dump from the real window is still the better proof, so keep sending t
 | First Auto run ended after one frame | not reproduced; a first frame taken while the screen still changes refuses every join. First frame taken again after 250 ms, first pair retried twice | `cap_6_auto_first_frame_taken_while_the_screen_still_changes`, `cap_6_auto_first_pair_is_retried_before_no_overlap`, `cap_6_auto_scroller_that_ignores_the_first_step` |
 | Esc does not stop a run (a CLI run has no HUD) | Esc was not a global key during a run | `cap_6_esc_stops_a_run_that_has_no_request_id_and_keeps_the_frames`, `cap_6_long_shot_state_stop_ends_the_run_and_keeps_the_image` (daemon); `esc_follows_the_daemons_long_shot_events` (desktop) |
 
+## macOS QA pass 3 findings (Nov 15, 2026)
+
+Synthetic-frame tests only (`ls_*` in `crates/cm-capture/src/long_shot/tests.rs`, `point_tests` in
+`crates/cm-daemon/src/long_shot_ops.rs`).
+
+| Finding | Cause found offline | Test |
+| --- | --- | --- |
+| LS-seam: grey window-corner notches at the outer edges of every seam | the bottom lines of each frame hold the window's rounded corners and shadow, deeper than the 8 uncompared lines (`GUARD`) the next frame replaces. The lines at the end of the previous frame that differ from the same content in the next frame (up to 96, until three equal lines in a row; `corner_depth`) are now replaced too. The first frame's top and the last frame's bottom are never asked about | `ls_seam_window_corners_leave_no_notch_at_the_seams` |
+| LS-flaky (a): `no_overlap` on a page of identical paragraphs | several shifts match; the expected step was the asked step, but a wheel moves more or less than asked, so no candidate was near it. The expected shift is now the step times the distance learned from earlier joins, and when that still names none within a twentieth of the content, the one candidate alone within a quarter of the step is taken. Two candidates in that window, or none, still refuse (never a guess). A last short scroll at the end of such a page has no clear shift and still refuses | `ls_flaky_repeated_paragraphs_join_by_the_expected_step`, `ls_flaky_repeated_paragraphs_still_refused_when_the_step_names_two` |
+| LS-flaky (b): `nothing_scrolled` for CLI and agent runs while the app's own window covers the target's centre | the pointer was put on the centre and the wheel went to our window. The daemon now lists the app's own windows (`Capturer::own_window_rects`) and orders the points centre, then the quarter points, with the covered ones last. When the first step moves nothing the run asks the scroller for the next point (`Scroller::next_point`) and sends the step again | `ls_flaky_a_point_under_our_own_window_is_not_first`, `ls_flaky_the_scroller_moves_to_the_next_point_when_asked`, `ls_flaky_first_step_is_retried_at_another_point` |
+| LS-flaky (c): `nothing_scrolled` for a fresh Chrome window | not reproduced. 0.3.4 already sent one more step after 450 ms of looking. Now three more steps (the first after 200 ms at the same point, the others at the next points) before the run says nothing scrolled | `ls_flaky_fresh_window_that_ignores_two_steps` |
+
 None of these has a report on a real screen after the fix, so none is called verified.

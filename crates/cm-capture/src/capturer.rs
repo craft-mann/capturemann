@@ -270,6 +270,23 @@ impl Capturer {
         Ok(Targets { displays, windows })
     }
 
+    /// The rectangles (global physical px) of this process's own visible windows, front to back
+    /// (empty when the windows cannot be listed): what may cover a point of a capture target.
+    pub fn own_window_rects(&self) -> Vec<cm_core::PhysicalRect> {
+        let Some(pid) = self.own_pid else {
+            return Vec::new();
+        };
+        self.backend
+            .windows()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|w| {
+                w.pid == pid && !w.minimized && w.bounds.size.width > 0 && w.bounds.size.height > 0
+            })
+            .map(|w| w.bounds)
+            .collect()
+    }
+
     /// First window (front to back) whose title contains `needle`, case-insensitively
     /// (CLI `--window "<title substring>"`). `not_found` if none.
     pub fn find_window(&self, needle: &str) -> Result<WindowInfo, CmError> {
