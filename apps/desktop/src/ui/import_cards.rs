@@ -12,14 +12,19 @@ use crate::ui::components::{button_with_icon, icon, shrink_text, ButtonKind};
 use crate::ui::import_actions as act;
 use crate::ui::paint::{rgba_of, TextExt};
 
-/// "Import…" with the chord, in the library header (board I1).
-pub fn header_button(t: &Theme, app: &Entity<AppModel>) -> AnyElement {
-    let app = app.clone();
-    let key = if crate::shortcuts::Platform::current() == crate::shortcuts::Platform::Mac {
+/// The chord shown beside "Import…".
+pub fn import_hint() -> &'static str {
+    if crate::shortcuts::Platform::current() == crate::shortcuts::Platform::Mac {
         "\u{2318}I"
     } else {
         "Ctrl+I"
-    };
+    }
+}
+
+/// "Import…" with the chord, in the library header (board I1).
+pub fn header_button(t: &Theme, app: &Entity<AppModel>) -> AnyElement {
+    let app = app.clone();
+    let key = import_hint();
     div()
         .id("library-import")
         .role(Role::Button)

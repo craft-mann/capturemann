@@ -5,7 +5,7 @@
 
 use super::panels::{info_note, new_pill};
 use super::*;
-use crate::editor::state::touch::{BlueprintInfo, LensInfo, MoveInfo, RetypeInfo};
+use crate::editor::state::touch::{BlueprintInfo, FieldClick, LensInfo, MoveInfo, RetypeInfo};
 use crate::editor::tools::WEIGHTS;
 use crate::editor::touchup::BusyPrompt;
 use cm_core::annotation::{BlueprintColor, BlueprintStyle, FillKind, MagnifyShape, TextAlign};
@@ -224,12 +224,20 @@ impl EditorView {
                     .bg(rgba_of(t.field))
                     .text_size(px(type_scale::UI))
                     .text_color(rgba_of(if info.text.is_empty() { t.mist } else { t.text }))
-                    // A click on the field edits the text, as the callout's does (QA E4).
-                    .when(info.has_op && !info.editing, |d| {
+                    // A click on the field edits the text, as the callout's does, and always
+                    // gives the canvas the focus back: typed characters reach the text only
+                    // through the canvas's input handler, and a press on this plain box moves
+                    // the focus to the editor root (QA E4).
+                    .when(info.field_click() != FieldClick::Nothing, |d| {
                         let hover = rgba_of(t.raised);
+                        let edit = info.field_click() == FieldClick::Edit;
                         d.cursor_text()
                             .hover(move |s| s.bg(hover))
-                            .on_click(self.doc_action(|d, cx| d.edit_selected_text(cx)))
+                            .on_click(self.doc_action(move |d, cx| {
+                                if edit {
+                                    d.edit_selected_text(cx)
+                                }
+                            }))
                     })
                     .child(SharedString::from(shown)),
             ),

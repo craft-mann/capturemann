@@ -178,6 +178,32 @@ pub struct RetypeInfo {
     pub note: Option<String>,
 }
 
+/// What a click on the Retype panel's Text field does (QA E4). The field is a plain box, not an
+/// input: typing always goes through the canvas's input handler, which needs the canvas focused,
+/// and a press on any non-input element moves the focus to the editor root. So every click on the
+/// field must hand the focus back to the canvas while a text is open.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldClick {
+    /// A stored retype is selected: open it for typing (and give the canvas the focus).
+    Edit,
+    /// The text is open already: only give the canvas the focus back.
+    Refocus,
+    /// Nothing to type into yet.
+    Nothing,
+}
+
+impl RetypeInfo {
+    pub fn field_click(&self) -> FieldClick {
+        if self.editing {
+            FieldClick::Refocus
+        } else if self.has_op {
+            FieldClick::Edit
+        } else {
+            FieldClick::Nothing
+        }
+    }
+}
+
 /// What the Move area panel shows (see [`EditorState::move_info`]).
 #[derive(Debug, Clone, PartialEq)]
 pub struct MoveInfo {
@@ -1522,6 +1548,38 @@ mod tests {
         assert_eq!(fill.colors[0], Color::rgb(0xF0, 0xF0, 0xF0));
         assert_eq!(*weight, 400);
         assert!(s.selected.is_some());
+    }
+
+    /// QA E4: a click on the panel's Text field (a plain box) must give typing back to the
+    /// canvas whether the text is open (focus only) or a stored retype is selected (open it).
+    #[test]
+    fn e4_the_panel_field_click_leads_to_typing() {
+        let mut s = st();
+        retype_ready(&mut s, vec![line(100.0, 100.0, 60.0, "Save")]);
+        drag(&mut s, (110.0, 108.0), (110.0, 108.0));
+        let req = s.take_measure_request().unwrap();
+        s.touch_measured(req, Ok(measured(false)));
+        // Open on the canvas, nothing stored yet: the click only refocuses.
+        let info = s.retype_info().unwrap();
+        assert!(info.editing && !info.has_op);
+        assert_eq!(info.field_click(), FieldClick::Refocus);
+        type_text(&mut s, "Save all");
+        assert_eq!(s.retype_info().unwrap().text, "Save all");
+        s.finish_text().unwrap();
+        // Stored and selected: the click opens it, and typing then changes the panel text.
+        let info = s.retype_info().unwrap();
+        assert!(!info.editing && info.has_op);
+        assert_eq!(info.field_click(), FieldClick::Edit);
+        s.edit_selected_text();
+        let info = s.retype_info().unwrap();
+        assert!(info.editing);
+        assert_eq!(info.field_click(), FieldClick::Refocus);
+        type_text(&mut s, "Keep");
+        assert_eq!(s.retype_info().unwrap().text, "Keep");
+        // The tool's settings with nothing selected: nothing to type into.
+        s.finish_text();
+        s.selected = None;
+        assert_eq!(s.retype_info().unwrap().field_click(), FieldClick::Nothing);
     }
 
     /// ANN-9: a retype goes after the earlier base edits and before everything else.

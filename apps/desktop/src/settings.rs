@@ -237,6 +237,69 @@ pub fn unavailable_hint(path: &Path) -> String {
     path.display().to_string()
 }
 
+/// `s` cut in the middle to at most `max` characters, with an ellipsis where the middle was
+/// (a long folder path keeps its start and its last folders).
+pub fn shorten_middle(s: &str, max: usize) -> String {
+    let n = s.chars().count();
+    if n <= max || max < 8 {
+        return s.to_owned();
+    }
+    let keep = max - 1;
+    let tail = keep * 2 / 3;
+    let head = keep - tail;
+    let start: String = s.chars().take(head).collect();
+    let end: String = s.chars().skip(n - tail).collect();
+    format!("{start}\u{2026}{end}")
+}
+
+/// The longest folder path the "Library unavailable" banner prints before shortening it.
+const BANNER_PATH_MAX: usize = 64;
+
+/// What the "Library unavailable" banner says (QA P-path): the cause first, the folder once and
+/// shortened in the middle, the full path kept for a tooltip. `connect <hint>` stays in the title
+/// only when the hint is a short drive or folder name; a long path is no use there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnavailableBanner {
+    pub title: String,
+    pub body: String,
+    /// The full path, for the tooltip.
+    pub full_path: String,
+}
+
+pub fn unavailable_banner(
+    hint: &str,
+    path: &str,
+    reason: &str,
+    fallback_in_use: bool,
+) -> UnavailableBanner {
+    use cm_i18n::tr;
+    let title = if hint.chars().count() <= 40 {
+        tr!("Library unavailable \u{2014} connect {hint}", hint = hint)
+    } else {
+        tr!("Library unavailable")
+    };
+    let consequence = if fallback_in_use {
+        tr!("New captures are saved to a folder on this computer until it is back.")
+    } else {
+        tr!("Nothing can be saved or shown.")
+    };
+    let folder = tr!(
+        "Folder: {path}",
+        path = shorten_middle(path, BANNER_PATH_MAX)
+    );
+    let reason = reason.trim().trim_end_matches('.');
+    let body = if reason.is_empty() {
+        format!("{consequence} {folder}")
+    } else {
+        format!("{reason}. {consequence} {folder}")
+    };
+    UnavailableBanner {
+        title,
+        body,
+        full_path: path.to_owned(),
+    }
+}
+
 /// How many `settings.broken-*.json` backups are kept.
 pub const KEEP_BROKEN: usize = 5;
 /// The second copy of the client policies, beside `settings.json`.
@@ -619,6 +682,38 @@ mod tests {
             unavailable_hint(&p("/home/a/Videos/CaptureMann")),
             "/home/a/Videos/CaptureMann"
         );
+    }
+
+    /// QA P-path: a 1115-character path prints once, shortened, after the cause; the title does
+    /// not repeat it; the full path is kept for the tooltip.
+    #[test]
+    fn p_path_the_banner_puts_the_cause_first_and_the_path_once() {
+        let long = format!("/Users/a/{}/Library", "x".repeat(1100));
+        let reason =
+            "The library folder's path is too long (1115 characters): choose a shorter path";
+        let hint = unavailable_hint(&p(&long));
+        cm_i18n::with_language(cm_i18n::Lang::En, || {
+            let b = unavailable_banner(&hint, &long, reason, false);
+            assert_eq!(b.title, "Library unavailable");
+            assert!(b.body.starts_with("The library folder's path is too long"));
+            assert_eq!(b.body.matches("/Users/a/").count(), 1);
+            assert!(b.body.chars().count() < 260, "{}", b.body.chars().count());
+            assert!(b.body.ends_with("/Library"), "the last folder stays");
+            assert_eq!(b.full_path, long);
+            // A drive keeps the "connect" title and the path stays whole when it is short.
+            let b = unavailable_banner("Big Drive", "/Volumes/Big Drive/Caps", "not mounted", true);
+            assert_eq!(b.title, "Library unavailable \u{2014} connect Big Drive");
+            assert!(b.body.starts_with("not mounted. New captures are saved"));
+            assert!(b.body.ends_with("Folder: /Volumes/Big Drive/Caps"));
+        });
+    }
+
+    #[test]
+    fn shorten_middle_keeps_both_ends() {
+        assert_eq!(shorten_middle("short", 10), "short");
+        let s = shorten_middle("abcdefghijklmnopqrstuvwxyz", 11);
+        assert_eq!(s.chars().count(), 11);
+        assert!(s.starts_with("abc") && s.ends_with("xyz") && s.contains('\u{2026}'));
     }
 
     #[test]

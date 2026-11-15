@@ -2306,6 +2306,9 @@ msgstr ""
 msgid "Folder: the {n} copied files of {path} in {place} (files you added there stay)"
 msgstr ""
 
+msgid "Folder: {path}"
+msgstr ""
+
 msgid "Folders can't be imported yet: open the folder and select the files inside."
 msgstr ""
 
@@ -3287,7 +3290,7 @@ msgstr ""
 msgid "New board"
 msgstr ""
 
-msgid "New captures are saved to a folder on this computer until it is back. {path} ({reason})"
+msgid "New captures are saved to a folder on this computer until it is back."
 msgstr ""
 
 msgid "New files are written; the originals are never changed. Annotations and redactions are drawn into every file."
@@ -3623,7 +3626,7 @@ msgstr ""
 msgid "Notes only — CaptureMann doesn’t score candidates. Using AI to assess candidates is regulated in some places."
 msgstr ""
 
-msgid "Nothing can be saved or shown. {path} ({reason})"
+msgid "Nothing can be saved or shown."
 msgstr ""
 
 msgid "Nothing captured yet"
