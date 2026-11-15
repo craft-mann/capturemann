@@ -1,0 +1,30 @@
+# QA 0.3.4 library, install, HUD, Vietnamese on Windows, pass 6 (PARTIAL)
+
+- **Date:** 2026-11-15. **Who:** Claude (QA agent). **Machine:** ThinkPad T490, Windows 11, 1920x1080 at 150 %. **Build:** installed main `0bcac6a3` (`capturemann 0.3.4`). Same method as the Click Guide report of this pass. Fixtures: three screen recordings of a small test window made with `capturemann record start --window ... --max-duration 5` (no microphone, no camera; `make_fixture` could not be used: the shipped FFmpeg has no `lavfi`), two of them given a fake YouTube publish record in `manifest.json` (`publishes`: platform, account_id, account, remote_id, url, title, privacy, privacy_requested, status, warnings, at; one with a warning and `privacy` private against `public` requested), the library restarted.
+
+| # | Case | Result | Evidence |
+| --- | --- | --- | --- |
+| 1 | Header buttons only on the Click Guides page | PASS | `Click Guide of a window...` (icon) and `New Click Guide` exist only there; All captures, Recordings, Audio, Screenshots show `Import files` alone |
+| 2 | Sidebar items | PASS | `All captures`, `Recordings, n`, `Audio, n`, `Screenshots, n`, `Click Guides, n`; **no Published item**; tiles `Long Shot` and `Click Guide` in the capture group |
+| 3 | Chips per page | PASS | All captures: Imported, Uploaded, Published, Needs attention, Boards, Click Guides; Recordings: Imported, Uploaded, Published, Needs attention; Audio: Imported, Uploaded; Screenshots: Imported, Uploaded, Boards; Click Guides: none (sort only) |
+| 4 | Recordings `Published` and `Needs attention` with a fake publish record | PASS | counts `Published, 2` and `Needs attention, 1` (the record with a warning); each chip filters to the right cards; the sort changes to `Date published, descending`; the cards are taller (376 against 344 px). The accessible card names do not say "published" (proposal) |
+| 5 | Hover-select | PASS | every card has a `Select` checkbox in the tree; real clicks on two give the `Selection` toolbar (`Make a board`, `Export selected...`, `Delete`, `Clear selection`) |
+| 6 | Make a board sheet | PASS | `Board of 2 screenshots`: layouts `Pair`, `Grid`, `Strip`, `Free`; order buttons; `Side by side` / `Stacked`; BEFORE and AFTER labels, gap, margin, background swatches, shadow, captions, `Board title`, `Cancel`, `Finish board`. Preview shows the two images with the labels |
+| 7 | Export selected sheet | PASS | `Export 2 screenshots`: `Keep size`, `Longest side`, `Width`, `Height`, `Percent`; `PNG`, `JPEG`, `WebP (lossless)`; `None`, `Text`, `Image` (watermark); `Blueprint`; file name pattern with `{name} {date} {n} {w} {h}`; `Choose...`, `Cancel`, `Export 2 images` |
+| 8 | Esc closes a sheet | NOT RUN | `SendKeys` goes to the foreground window, which was not the app |
+| 9 | Open With (the app started with an image path while running) | PASS, slow | `cm-desktop.exe C:\...\file.png`: still one process; nothing changed 5 s later, the `Import 1 file` sheet (title field, `Remove the originals after importing`, `Add files`, `Cancel`, `Import 1 file`) was open when I looked again about 10 minutes later. Real Explorer double click not driven |
+| 10 | Uninstall and reinstall | PASS | `uninstall.exe /S` exit 0: install folder gone, uninstall entry gone, `Applications\cm-desktop.exe` key gone, Start Menu folder gone, user data (`%APPDATA%\CaptureMann`) kept. Silent setup exit 0: `capturemann 0.3.4`, 12 files, `cm-desktop.exe` SHA-256 identical to before, uninstall entry 0.3.4, Open With key and Start Menu entries back, no process running |
+| 11 | B2: recording HUD drag | PASS | a CLI-started window recording; the HUD (1183x152 px window, toolbar `Recording controls` with `Stop recording`, timer, `Pause recording`, microphone, webcam, `Restart recording`, `Discard recording`, status `Started by agent capturemann-cli`, `Collapse recording controls`) moved with real drags from empty toolbar space: (369,843) -> (119,543) for (-250,-300), then -> (419,643) for (+300,+100). A drag that began in the transparent margin above the toolbar did nothing. `Collapse` shrinks it (not measured) |
+| 12 | B3: webcam bubble drag | NOT RUN | no camera |
+| 13 | The long library path | PASS with a note | `CAPTUREMANN_LIBRARY` of 338 characters: the app starts on `...\CaptureMann\Fallback Library` (log: "library at ~\AppData\Roaming\CaptureMann\Fallback Library") and shows an empty `All captures` page with an unnamed text block under the title; the message text is not exposed to UI Automation, so its wording was not read. The fallback folder was removed afterwards |
+| 14 | Vietnamese UI, new surfaces | PARTIAL | Settings language radio `English` / `Tieng Viet`. Sidebar `Chup dai` (Long Shot), `Huong dan` (Click Guide tile), `Huong dan nhap, 8` (page), cards `Huong dan theo thao tac`, header button `Huong dan theo thao tac moi`, `Ghi huong dan trong cua so...`; chips `Da nhap`, `Da tai len`, `Bang anh`; selection bar `Tao bang anh`, `Xuat muc da chon...`, `Xoa`, `Bo chon`; board sheet fully Vietnamese except the accessible name **`Board title`** (English). The confirmation of an agent-started guide has the Vietnamese title `Cho phep hanh dong nay?` but the body "Start a Click Guide: ..." and the button **`Start guide` in English**; its toast `Do tac nhan bat dau qua MCP` is Vietnamese. The Click Guide bar and editor in Vietnamese were **not** reached: a modal board sheet was open when I tried the tile (my fault), and the English tile worked after closing it. (Diacritics are dropped in this table.) |
+| 15 | Vietnamese naming | NOTE | the same feature is `Huong dan` (tile), `Huong dan nhap` (page and sidebar), `Huong dan theo thao tac` (card kind) and `Huong dan theo thao tac moi` (button, 382 px wide): four names for Click Guide |
+
+## Notes
+
+- The screenshots of the app with the Long Shot results look right (a 1082x5894 px capture, thumbnails with the rows).
+- No data of the maintainer was touched: private library and config under `C:\lab\p6` (removed at the end). `%APPDATA%\CaptureMann` was not changed (the Fallback Library folder made by case 13 was removed).
+
+## Verdict
+
+PARTIAL
