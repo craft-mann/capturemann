@@ -1072,8 +1072,11 @@ impl Daemon {
                     spec.name
                 )));
             }
+            // The user's own setting asks (the sentence says so), or the call always asks (an
+            // agent's Auto Long Shot): the dialog must not blame a setting the user did not make.
+            let by_policy = self.inner.effective_tier(&spec) == Tier::Confirm;
             let (summary, details, params) =
-                crate::tool_policy::ask_first_dialog(name, &spec, &action.details());
+                crate::tool_policy::ask_first_dialog(name, &spec, &action.details(), by_policy);
             let outcome = self
                 .inner
                 .gate
@@ -1310,7 +1313,12 @@ impl Daemon {
                     target,
                     title,
                     countdown_s,
-                } => inner.start_guide(actor, target, title, countdown_s).await,
+                } => {
+                    let started = inner.start_guide(actor, target, title, countdown_s).await?;
+                    // A guide holds 500 steps: the watcher stops it, saved, when it is full.
+                    inner.watch_guide_limit(actor, &started);
+                    Ok(started)
+                }
                 crate::guide::GuideOp::Stop { guide_id } => inner.stop_guide(actor, guide_id).await,
                 crate::guide::GuideOp::Get { guide_id } => inner.get_guide(guide_id).await,
                 crate::guide::GuideOp::Set(a) => inner.set_guide(actor, *a).await,

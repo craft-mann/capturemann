@@ -253,6 +253,11 @@ impl Action {
 
     /// The input as shown in the dialog's details (`request_id` left out).
     pub fn details(&self) -> Value {
+        if let Action::Guide(p) = self {
+            if let Some(rows) = crate::guide::confirm_details(p) {
+                return rows;
+            }
+        }
         let mut v = serde_json::to_value(self)
             .ok()
             .and_then(|mut v| v.get_mut("params").map(Value::take))

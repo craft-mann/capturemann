@@ -233,13 +233,25 @@ pub fn summarize_params(details: &Value) -> (Vec<(String, String)>, usize) {
 /// `(summary, details, params)` of the generic confirmation of a tightened tool. `details` is
 /// the English label/value rows (the parameter summary), `params` the typed data the app words
 /// the dialog from: `{ tool, title, client, lines: [{key, value}], omitted }`.
-pub fn ask_first_dialog(client: &str, spec: &ActionSpec, input: &Value) -> (String, Value, Value) {
+///
+/// `by_policy` is true when the user set the tool to Ask first (the sentence says so); false when
+/// the call is confirmed for another reason (an agent's Auto Long Shot moves the user's screen,
+/// so it always asks), and the sentence must not blame a setting the user did not make
+/// (QA macOS pass 6, LS-10).
+pub fn ask_first_dialog(
+    client: &str,
+    spec: &ActionSpec,
+    input: &Value,
+    by_policy: bool,
+) -> (String, Value, Value) {
     let (lines, omitted) = summarize_params(input);
     let title = english_title(spec.name);
-    let summary = format!(
-        "{client} wants to run `{}` ({title}). You set this tool to Ask first.",
-        spec.name
-    );
+    let why = if by_policy {
+        "You set this tool to Ask first."
+    } else {
+        "This action always asks you first."
+    };
+    let summary = format!("{client} wants to run `{}` ({title}). {why}", spec.name);
     let details: Map<String, Value> = lines
         .iter()
         .map(|(k, v)| (k.clone(), Value::String(v.clone())))
@@ -250,6 +262,7 @@ pub fn ask_first_dialog(client: &str, spec: &ActionSpec, input: &Value) -> (Stri
         "client": client,
         "lines": lines.iter().map(|(k, v)| json!({ "key": k, "value": v })).collect::<Vec<_>>(),
         "omitted": omitted,
+        "reason": if by_policy { "policy" } else { "always" },
     });
     (summary, Value::Object(details), params)
 }
@@ -468,8 +481,19 @@ mod tests {
             "claude-desktop",
             &s,
             &json!({"target": {"display_id": 1}, "x": 2}),
+            true,
         );
         assert!(summary.contains("claude-desktop") && summary.contains("capture_screenshot"));
+        assert!(summary.contains("You set this tool to Ask first"));
+        assert_eq!(params["reason"], "policy");
+        // LS-10: a call that always asks (Auto Long Shot by an agent) does not blame a setting.
+        let (always, _, always_params) = ask_first_dialog("claude-desktop", &s, &json!({}), false);
+        assert!(
+            always.contains("This action always asks you first."),
+            "{always}"
+        );
+        assert!(!always.contains("You set"), "{always}");
+        assert_eq!(always_params["reason"], "always");
         assert_eq!(details["target"], "{...}");
         assert_eq!(params["tool"], "capture_screenshot");
         assert_eq!(params["client"], "claude-desktop");

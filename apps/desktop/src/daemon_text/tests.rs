@@ -648,6 +648,22 @@ fn agt_2_ac11_the_ask_first_sentence_names_the_agent_and_the_tool() {
     });
 }
 
+/// LS-10: a call that always asks (an agent's Auto Long Shot) does not say the user set the tool
+/// to Ask first.
+#[test]
+fn ls_10_an_always_asking_call_does_not_blame_a_setting() {
+    let mut p = ask_first_params("capture_screenshot", "Capture screenshot");
+    p["reason"] = json!("always");
+    let s = confirm_summary("tool_ask_first", &p, ASK_FIRST_ENGLISH);
+    assert_eq!(
+        s,
+        "Claude Desktop is asking to run \u{201C}Take screenshots\u{201D}. This action always asks you first."
+    );
+    assert!(!s.contains("You set"), "{s}");
+    p["reason"] = json!("policy");
+    assert!(confirm_summary("tool_ask_first", &p, ASK_FIRST_ENGLISH).contains("You set this tool"));
+}
+
 #[test]
 fn agt_2_ac11_the_ask_first_sentence_is_vietnamese() {
     let p = ask_first_params("capture_screenshot", "Capture screenshot");
@@ -863,4 +879,47 @@ fn exp5_the_typical_size_is_worded_in_each_language() {
             "ước tính: thường khoảng 14 MB, tối đa 69 MB"
         );
     });
+}
+
+/// VI-1 (QA macOS pass 6): the Click Guide start dialog was half English in the Vietnamese UI:
+/// its title and button fell to the generic ones (the tool's key as the button), its sentence
+/// and rows were the daemon's English. Every word comes from the catalogue now.
+#[test]
+fn vi_1_the_click_guide_start_dialog_is_worded_from_the_catalogue() {
+    use cm_daemon::action::ScreenshotTarget;
+    use cm_daemon::guide::{confirm_details, confirm_params, summary, GuideOp, GuideParams};
+    let params = GuideParams {
+        op: GuideOp::Start {
+            target: ScreenshotTarget::Display { display_id: 1 },
+            title: Some("Set up".into()),
+            countdown_s: 3.0,
+        },
+        request_id: None,
+    };
+    let english = summary(&params);
+    let details = confirm_details(&params).unwrap();
+    let typed = confirm_params(&params);
+    assert_eq!(details["target"], "display 1");
+    assert_eq!(details["countdown"], "3 s");
+    let rows = |kind: &str| confirm_rows(kind, &details, &typed);
+    with_language(Lang::Vi, || {
+        let s = confirm_summary("start_guide", &typed, &english);
+        assert!(s.starts_with("Bắt đầu Hướng dẫn theo thao tác"), "{s}");
+        let rows = rows("start_guide");
+        let all = format!("{rows:?}");
+        for english_word in ["Records", "Target", "Countdown", "mouse clicks only"] {
+            assert!(!all.contains(english_word), "{english_word} in {all}");
+        }
+        assert!(
+            all.contains("Màn hình 1") || all.contains("màn hình 1"),
+            "{all}"
+        );
+    });
+    // In English the rows read as the daemon's.
+    let rows = rows("start_guide");
+    assert!(rows.contains(&(
+        "Records".to_owned(),
+        "Mouse clicks only; keystrokes are never recorded".to_owned()
+    )));
+    assert!(rows.contains(&("Target".to_owned(), "display 1".to_owned())));
 }

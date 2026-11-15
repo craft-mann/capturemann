@@ -105,3 +105,22 @@ page is the proof still to be made.
 A window moved without a resize is seen only where the target is a window and the listing gives its bounds
 (`area_rect`); a move that the capture follows (the frames stay whole) and that joins is not an error and does not
 end the run.
+
+## macOS QA pass 6: Auto scroll ended after 2 to 8 frames on every page (LS-9, Nov 15, 2026)
+
+The pass-6 dumps (`/tmp/cmq6`) no longer exist, so none of the three reasons below could be re-read from the
+frames; they are read from the code and reproduced with synthetic frames. No real screen was used, so none of
+these is called verified: a real run of the five fixtures (side, rside, both, plain, ctl) with
+`CM_LONG_SHOT_DEBUG_DIR` set is the proof still to be made.
+
+| Reason in the report | Cause in the code | Fix | Test |
+| --- | --- | --- | --- |
+| (a) the last frame and the refused frame are pixel-identical, yet `no_overlap` | **Confirmed in `run.rs`**: after a pair that did not join, the run scrolls back by half a step and looks again; a frame equal to the last one taken (the scroll back landed exactly on it, or the wheel did nothing) was turned into `NoOverlap` on purpose ("back where the last frame was taken is not the end"), and the run ended after two such tries. The refused frame was then identical to the last one. Why the first forward step overshot cannot be seen without the dump | When the scroll back lands on the last frame, its position is known again: the step is sent again **halved**, up to four times (each failed forward try is scrolled back by its own distance), and the distance a join teaches counts from that position. Only a ladder that finds nothing ends `no_overlap` | `ls_9_a_scroll_back_onto_the_last_frame_is_tried_again_with_a_smaller_step` (a wheel that moves 3 times what is asked from the second scroll on; fails with `SMALLER_STEPS = 0`) |
+| (b) no shift matches (closest 1448, 20 to 54 of 60 lines differ) | Not confirmable. A closest shift of 1448 lines on a 1720-line frame means an overlap of about 270 lines at best: the wheel moved the page by about a frame, more than the learned step, and the half-step scroll back could not reach an overlap. The same ladder as (a) is the answer where the scroll back lands on a known frame; a frame taken during a smooth scroll is covered by the settle change below | the ladder above; `settle_frame` | as above, `ls_9_a_frame_that_settles_late_is_waited_for` |
+| (c) a fixed band "changed" (header 204): the overlay scrollbar over the fixed 14 px edge strip | **Confirmed in `stitch.rs`**: the macOS overlay scrollbar shows only while the page scrolls. If the first pair has no thumb, the edge trim chosen is none (`trim = (0, 0)`), and a later pair with the thumb over the outermost columns differs in every row it covers, in the content (no shift matches) and in the fixed bands ("a fixed band changed") alike. The plain control (`ctl`) is the same without a band: any thumb that was not in the first pair refuses the join | When a pair does not join and the trim is none (or only static side columns), the pair is tried again with the outermost columns (16 on the left, 32 on the right) left out of the comparison, and the image from then on is composed from **whole frames** (`FullSides`, as for a fixed sidebar), so no content is lost and the thumb only shows where it was. The mask also covers the bands' equality | `ls_9_a_scrollbar_thumb_that_shows_after_the_first_pair_does_not_end_the_run` (header 0 and 60, thumb 12 and 26 px; fails without the retry) |
+| machine under load (load 5 to 7) | `wait_settled` gives up after 150 ms and the unsettled frame was compared anyway | Auto scroll waits again (three more times, 150 ms apart) when a frame is still changing at the limit (`settle_frame`); Hand scroll is unchanged | `ls_9_a_frame_that_settles_late_is_waited_for` |
+
+What could not be confirmed: which of (a), (b) or (c) hit the plain control page; whether 32 px covers every overlay
+scrollbar of macOS at 2x (the thumb with its margin was 14 to 28 px in the report); whether a step halved four times
+is enough when a wheel moves the page by more than ten frames.
+

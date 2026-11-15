@@ -627,6 +627,20 @@ impl GuideView {
         }
     }
 
+    /// Drops the decoded pictures (the selected step's and every thumbnail) when the editor is
+    /// left: a guide of 500 steps would otherwise keep them for as long as the app runs (CG-10).
+    /// The next visit reloads them. Returns whether anything was held.
+    pub(crate) fn release_pictures(&mut self) -> bool {
+        if self.picture.is_none() && self.thumbs.is_empty() {
+            return false;
+        }
+        self.picture = None;
+        self.thumbs = Vec::new();
+        // The same guide opened again reloads (see `set_guide`).
+        self.away = true;
+        true
+    }
+
     pub(crate) fn picture_for(&self, step_id: &str) -> Option<Arc<RenderImage>> {
         self.thumbs
             .iter()

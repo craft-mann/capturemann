@@ -581,6 +581,12 @@ fn main() {
                         cx.update(|cx| cm_desktop::ui::long_shot::on_event(&app2, &ev.name, &ev.data, cx));
                     } else if ev.name.starts_with("recording.") || ev.name.starts_with("camera.") {
                         cx.update(|cx| cm_desktop::ui::recording::on_event(&app2, &ev, cx));
+                    } else if ev.name.starts_with("guide.") {
+                        // Click Guide: the 450-step notice, the 500-step stop, a click that
+                        // was not saved, and the bar closing when the guide ended (CG-9).
+                        cx.update(|cx| {
+                            cm_desktop::ui::guide_view::hud::on_event(&app2, &ev.name, &ev.data, cx)
+                        });
                     }
                     // M5: model downloads, transcripts and the job events of both.
                     if ev.name.starts_with("model.")

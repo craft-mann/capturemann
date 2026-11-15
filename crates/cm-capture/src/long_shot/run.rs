@@ -3,7 +3,7 @@
 use cm_core::CmError;
 
 use super::stitch::{Direction, EndReason, Limits, PushOutcome, Stitched, Stitcher};
-use super::{wait_settled, FrameSource, Scroller, Settle, Sleeper};
+use super::{settle_frame, wait_settled, FrameSource, Scroller, Settle, Sleeper};
 use crate::Frame;
 
 /// How often, and after what wait, an unchanged frame after a scroll is looked at again.
@@ -32,6 +32,8 @@ const FIRST_PAIR_RETRIES: u32 = 2;
 /// run ends with `no_overlap`.
 const NO_OVERLAP_RETRIES: u32 = 2;
 const BACK_SHARE: f64 = 0.5;
+/// After a scroll back that lands on the last frame taken, the step is halved this many times.
+const SMALLER_STEPS: u32 = 4;
 
 /// Settings of one Long Shot.
 #[derive(Debug, Clone, Copy)]
@@ -156,9 +158,9 @@ pub fn run_auto_ex(
     on_stitch: &mut dyn FnMut(&Stitcher),
 ) -> Result<LongShotResult, CmError> {
     let mut stitcher = Stitcher::new(cfg.direction, cfg.limits);
-    wait_settled(src, sleeper, cfg.settle)?;
+    settle_frame(src, sleeper, cfg.settle)?;
     sleeper.sleep(FIRST_FRAME_WARMUP);
-    let first = wait_settled(src, sleeper, cfg.settle)?;
+    let first = settle_frame(src, sleeper, cfg.settle)?;
     stitcher.push(&first.frame, None);
     {
         on_progress(progress(&stitcher));
@@ -176,7 +178,7 @@ pub fn run_auto_ex(
             break EndReason::StoppedByUser;
         }
         scroller.scroll(cfg.direction, step)?;
-        let mut next = wait_settled(src, sleeper, cfg.settle)?;
+        let mut next = settle_frame(src, sleeper, cfg.settle)?;
         let mut outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         // The first pair that does not join: the screen may still be changing for another
         // reason than the scroll (a window coming to the front, a dialog fading out). Looked at
@@ -189,37 +191,70 @@ pub fn run_auto_ex(
         {
             retry += 1;
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
-            next = wait_settled(src, sleeper, cfg.settle)?;
+            next = settle_frame(src, sleeper, cfg.settle)?;
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         }
         // A later pair that does not join: scroll back by half a step and look again before the
         // run is given up (the scroller moved more than asked, or the overlap that is left is
         // too alike to tell where it is). What the retries scroll back is not part of the
         // distance the join teaches, which is counted from `asked`.
+        //
+        // When the scroll back lands exactly on the last frame taken (an identical frame: QA
+        // macOS pass 6, LS-9, the refused and the last frame were pixel-identical) the position
+        // is known again, and the content moved further than a step can safely ask: the step is
+        // sent again halved, up to `SMALLER_STEPS` times, and the distance it teaches counts from
+        // that position.
         let mut asked = step;
         let mut back_total = 0u32;
         let mut retry = 0;
+        let mut smaller = 0u32;
+        let mut fwd = step;
+        let mut at_last = false;
+        // What the next scroll back asks: half a step, or what the last forward try moved.
+        let mut back_amt = ((f64::from(step) * BACK_SHARE) as u32).max(1);
         while outcome == PushOutcome::NoOverlap
             && stitcher.frames() > 1
-            && retry < NO_OVERLAP_RETRIES
+            && retry < NO_OVERLAP_RETRIES + 2 * SMALLER_STEPS
             && !stop()
             && !window_changed(src, &stitcher, &next.frame)
         {
             retry += 1;
-            let back = ((f64::from(step) * BACK_SHARE) as u32).max(1);
-            if !scroller.scroll_back(cfg.direction, back)? {
+            if at_last {
+                if smaller >= SMALLER_STEPS {
+                    break;
+                }
+                smaller += 1;
+                fwd = (fwd / 2).max(1);
+                scroller.scroll(cfg.direction, fwd)?;
+                back_total = 0;
+                asked = fwd;
+                back_amt = fwd;
+                at_last = false;
+                sleeper.sleep(LATE_SCROLL_WAIT);
+                next = settle_frame(src, sleeper, cfg.settle)?;
+                outcome = stitcher.push(&next.frame, Some(expected(fwd, gain)));
+                continue;
+            }
+            // Two scroll backs of half a step each, then (after a smaller step that failed) one
+            // of the size of that step.
+            if smaller == 0 && retry > NO_OVERLAP_RETRIES {
                 break;
             }
-            back_total += back;
+            if !scroller.scroll_back(cfg.direction, back_amt)? {
+                break;
+            }
+            back_total += back_amt;
             asked = step.saturating_sub(back_total).max(1);
             sleeper.sleep(LATE_SCROLL_WAIT);
-            next = wait_settled(src, sleeper, cfg.settle)?;
+            next = settle_frame(src, sleeper, cfg.settle)?;
             // No expected shift: how far the scroll-back moved is no better known than how far
             // the step did, and a wrong prior would pick one of several alike overlaps.
             outcome = stitcher.push(&next.frame, None);
-            // Back where the last frame was taken is not the end of the content.
+            // Back where the last frame was taken is not the end of the content: the position
+            // is known again, and the step is tried smaller.
             if outcome == PushOutcome::NoChange {
                 outcome = PushOutcome::NoOverlap;
+                at_last = true;
             }
         }
         // An unchanged frame is the end of the content only when something has scrolled before.
@@ -231,7 +266,7 @@ pub fn run_auto_ex(
                 break;
             }
             sleeper.sleep(LATE_SCROLL_WAIT);
-            next = wait_settled(src, sleeper, cfg.settle)?;
+            next = settle_frame(src, sleeper, cfg.settle)?;
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         }
         if outcome == PushOutcome::NoChange && stitcher.frames() == 1 {
@@ -246,7 +281,7 @@ pub fn run_auto_ex(
                 }
                 scroller.scroll(cfg.direction, step)?;
                 sleeper.sleep(LATE_SCROLL_WAIT);
-                next = wait_settled(src, sleeper, cfg.settle)?;
+                next = settle_frame(src, sleeper, cfg.settle)?;
                 outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
                 if outcome != PushOutcome::NoChange {
                     break;
@@ -272,7 +307,7 @@ pub fn run_auto_ex(
                 {
                     tail += 1;
                     sleeper.sleep(LATE_SCROLL_WAIT);
-                    let more = wait_settled(src, sleeper, cfg.settle)?;
+                    let more = settle_frame(src, sleeper, cfg.settle)?;
                     match stitcher.push(&more.frame, Some(expected(asked, gain))) {
                         PushOutcome::Added { new_len: n } => {
                             new_len += n;

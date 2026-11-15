@@ -20,10 +20,11 @@ use std::time::Duration;
 
 use cm_capture::{CaptureRequest, CaptureTarget, Capturer, Frame};
 use cm_core::{Actor, CmError};
-use cm_library::guide::{ClickPoint, GuideBundle};
+use cm_library::guide::{ClickPoint, GuideBundle, MAX_STEPS};
 use cm_render::ocr::{TextLine, TextRecognizer};
 use image::RgbaImage;
 use serde_json::{json, Value};
+use tokio::sync::Notify;
 
 use super::clicks::{GuideClicks, LocalClick};
 use super::titles::draft_title;
@@ -44,6 +45,12 @@ const REPLY_TIMEOUT: Duration = Duration::from_secs(60);
 /// the guide pauses (a window that is being moved between spaces can vanish for one poll).
 const WINDOW_POLL: Duration = Duration::from_millis(500);
 const WINDOW_MISSES: u32 = 2;
+/// Frames waiting for the worker (a click's whole-display picture is 6 to 25 MB, and the worker
+/// reads its text and writes the files): a click while this many wait is not saved, instead of
+/// the queue growing without bound (QA macOS pass 6, CG-10: 0.85 GB to 3.8 GB over 500 steps).
+pub const MAX_PENDING_FRAMES: usize = 8;
+/// `guide.near_limit` is published when this many steps are left before [`MAX_STEPS`].
+pub const NEAR_LIMIT_LEFT: usize = 50;
 
 type Reply = mpsc::SyncSender<Result<Value, CmError>>;
 
@@ -67,10 +74,14 @@ struct Active {
     cancelled: Arc<AtomicBool>,
     listening: Arc<AtomicBool>,
     tx: mpsc::Sender<Job>,
+    pending: Arc<AtomicUsize>,
     join: Option<JoinHandle<()>>,
     steps: Arc<AtomicUsize>,
     /// The followed window is gone (S16): the guide paused itself and cannot resume.
     window_closed: Arc<AtomicBool>,
+    /// Woken by the worker when the guide holds [`MAX_STEPS`] (the guide is then stopped, its
+    /// steps kept) and by a stop (so the watcher that waits on it ends).
+    limit: Arc<Notify>,
 }
 
 /// The one running Click Guide, the click source and the HUD exclusion rectangles.
@@ -116,6 +127,8 @@ struct SinkState {
     /// Display scale factor of the target (physical px per logical px).
     scale: f64,
     tx: mpsc::Sender<Job>,
+    /// Frames sent to the worker and not yet taken by it (see [`MAX_PENDING_FRAMES`]).
+    pending: Arc<AtomicUsize>,
     events: EventBus,
     guide_id: String,
     /// `(host_ns, x, y, button)` of the newest step's click, and whether it is a double already.
@@ -147,6 +160,16 @@ impl SinkState {
                 return;
             }
         }
+        // The worker is behind (a slow text read, a slow disk): the click is not saved, and the
+        // person is told, instead of the queue holding every frame.
+        if self.pending.load(Ordering::SeqCst) >= MAX_PENDING_FRAMES {
+            self.events.publish(
+                "guide.error",
+                json!({ "guide_id": self.guide_id, "code": "busy",
+                        "message": "CaptureMann is still saving the earlier clicks" }),
+            );
+            return;
+        }
         // The frame is taken now, on mouse-down: the step shows what was clicked, not the result.
         let frame = match self
             .capturer
@@ -163,6 +186,7 @@ impl SinkState {
             }
         };
         self.last = Some((c.host_ns, c.x, c.y, c.button.clone(), false));
+        self.pending.fetch_add(1, Ordering::SeqCst);
         let _ = self.tx.send(Job::Step {
             frame,
             click: ClickPoint {
@@ -186,6 +210,13 @@ struct Worker {
     guide_id: String,
     /// The text lines and click of the newest step (a double click rewrites its title).
     last: Option<(Vec<TextLine>, ClickPoint)>,
+    /// Frames waiting in the channel (see [`MAX_PENDING_FRAMES`]).
+    pending: Arc<AtomicUsize>,
+    /// Shared with the click filter: set when the guide is full, so no click is a step any more.
+    paused: Arc<AtomicBool>,
+    limit: Arc<Notify>,
+    /// [`MAX_STEPS`] was reached: the steps still in the queue are dropped, the guide is stopped.
+    full: bool,
 }
 
 /// The text lines of a frame (empty when the recognizer is unavailable or fails).
@@ -212,7 +243,29 @@ impl Worker {
             json!({ "guide_id": self.guide_id, "step_id": step.id, "count": n,
                     "title": step.title }),
         );
+        self.check_limit();
         Ok(())
+    }
+
+    /// After a step or a note was added: the 450th step says 50 are left, the 500th fills the
+    /// guide, which is stopped (saved, every step kept) by the watcher that waits on `limit`.
+    fn check_limit(&mut self) {
+        let total = self.guide.steps().len();
+        if total >= MAX_STEPS && !self.full {
+            self.full = true;
+            self.paused.store(true, Ordering::SeqCst);
+            self.events.publish(
+                "guide.limit_reached",
+                json!({ "guide_id": self.guide_id, "step_count": total, "max": MAX_STEPS }),
+            );
+            self.limit.notify_one();
+        } else if total + NEAR_LIMIT_LEFT == MAX_STEPS {
+            self.events.publish(
+                "guide.near_limit",
+                json!({ "guide_id": self.guide_id, "step_count": total,
+                        "remaining": NEAR_LIMIT_LEFT, "max": MAX_STEPS }),
+            );
+        }
     }
 
     fn double(&mut self) -> Result<(), CmError> {
@@ -233,6 +286,11 @@ impl Worker {
         for job in rx {
             match job {
                 Job::Step { frame, click } => {
+                    self.pending.fetch_sub(1, Ordering::SeqCst);
+                    // The guide is full: what is still queued is dropped (and freed) unread.
+                    if self.full {
+                        continue;
+                    }
                     if let Err(e) = self.step(frame, click) {
                         self.events.publish(
                             "guide.error",
@@ -250,6 +308,7 @@ impl Worker {
                         .map(|s| json!({ "step_id": s.id }));
                     if r.is_ok() {
                         self.steps.fetch_add(1, Ordering::SeqCst);
+                        self.check_limit();
                     }
                     let _ = reply.send(r);
                 }
@@ -461,6 +520,9 @@ impl Inner {
             };
             let (tx, rx) = mpsc::channel();
             let steps = Arc::new(AtomicUsize::new(0));
+            let paused = Arc::new(AtomicBool::new(false));
+            let pending = Arc::new(AtomicUsize::new(0));
+            let limit = Arc::new(Notify::new());
             let worker = Worker {
                 guide,
                 recognizer: self.recognizer.clone(),
@@ -470,18 +532,24 @@ impl Inner {
                 steps: steps.clone(),
                 guide_id: id.clone(),
                 last: None,
+                pending: pending.clone(),
+                paused: paused.clone(),
+                limit: limit.clone(),
+                full: false,
             };
             let join = std::thread::spawn(move || worker.run(rx));
             *slot = Some(Active {
                 guide_id: id.clone(),
                 dir: dir.clone(),
-                paused: Arc::new(AtomicBool::new(false)),
+                paused,
                 cancelled: Arc::new(AtomicBool::new(false)),
                 listening: Arc::new(AtomicBool::new(false)),
                 tx,
+                pending,
                 join: Some(join),
                 steps,
                 window_closed: Arc::new(AtomicBool::new(false)),
+                limit,
             });
             (id, dir)
         };
@@ -523,10 +591,11 @@ impl Inner {
                     a.listening.clone(),
                     a.window_closed.clone(),
                     a.steps.clone(),
+                    a.pending.clone(),
                 )
             })
         };
-        let Some((paused, tx, listening, window_closed, steps)) = started else {
+        let Some((paused, tx, listening, window_closed, steps, pending)) = started else {
             return Ok(json!({ "guide_id": guide_id, "state": "cancelled", "step_count": 0 }));
         };
         let watch = match capture_target {
@@ -549,6 +618,7 @@ impl Inner {
             target: capture_target,
             scale: target_scale(&capture_target, &targets),
             tx,
+            pending,
             events: self.events.clone(),
             guide_id: guide_id.clone(),
             last: None,
@@ -573,11 +643,44 @@ impl Inner {
         Ok(json!({ "guide_id": guide_id, "state": "recording", "step_count": 0 }))
     }
 
+    /// Waits for the guide `actor` just started to fill up (the worker wakes `limit` at
+    /// [`MAX_STEPS`]) and then stops it as `stop_guide` does: saved, every step kept. A stop
+    /// of any other kind wakes it too and it ends at once. Called with the reply of
+    /// `start_guide`.
+    pub(crate) fn watch_guide_limit(self: &Arc<Self>, actor: &Actor, started: &Value) {
+        if started["state"] != "recording" {
+            return;
+        }
+        let Some(id) = started["guide_id"].as_str().map(str::to_owned) else {
+            return;
+        };
+        let Some((limit, cancelled)) = self
+            .guide
+            .lock()
+            .as_ref()
+            .filter(|a| a.guide_id == id)
+            .map(|a| (a.limit.clone(), a.cancelled.clone()))
+        else {
+            return;
+        };
+        let (weak, actor) = (Arc::downgrade(self), actor.clone());
+        tokio::spawn(async move {
+            limit.notified().await;
+            if cancelled.load(Ordering::SeqCst) {
+                return;
+            }
+            if let Some(inner) = weak.upgrade() {
+                let _ = inner.stop_guide(&actor, Some(id)).await;
+            }
+        });
+    }
+
     /// Stops the worker and removes the guide folder (a failed start, or no step was taken).
     async fn discard_active_guide(&self) {
         let a = self.guide.lock().take();
         let Some(mut a) = a else { return };
         a.cancelled.store(true, Ordering::SeqCst);
+        a.limit.notify_one();
         self.guide.clicks.stop();
         let (rtx, rrx) = mpsc::sync_channel(1);
         let _ = a.tx.send(Job::Stop(rtx));
@@ -622,6 +725,7 @@ impl Inner {
             return Err(CmError::invalid_input("no Click Guide is recording").into());
         };
         a.cancelled.store(true, Ordering::SeqCst);
+        a.limit.notify_one();
         // No click reaches the sink after this returns.
         self.guide.clicks.stop();
         let (rtx, rrx) = mpsc::sync_channel(1);

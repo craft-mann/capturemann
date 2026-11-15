@@ -133,5 +133,30 @@ pub fn wait_settled(
     }
 }
 
+/// How many more times a frame that has not settled is waited for in a run that scrolls by
+/// itself, each time after [`SETTLE_RETRY_WAIT`].
+const SETTLE_RETRIES: u32 = 3;
+const SETTLE_RETRY_WAIT: Duration = Duration::from_millis(150);
+
+/// [`wait_settled`], and again (a few times, after a longer wait) when the limit passed first:
+/// a machine under load (load average 5 to 7 in QA macOS pass 6) or a browser's smooth scrolling
+/// can take longer than 150 ms, and a frame taken in the middle of the animation is not a failed
+/// join. The last frame is returned when it never settles (a video, a spinner).
+pub fn settle_frame(
+    src: &mut dyn FrameSource,
+    sleeper: &mut dyn Sleeper,
+    settle: Settle,
+) -> Result<Settled, CmError> {
+    let mut s = wait_settled(src, sleeper, settle)?;
+    for _ in 0..SETTLE_RETRIES {
+        if s.settled {
+            break;
+        }
+        sleeper.sleep(SETTLE_RETRY_WAIT);
+        s = wait_settled(src, sleeper, settle)?;
+    }
+    Ok(s)
+}
+
 #[cfg(test)]
 mod tests;

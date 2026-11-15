@@ -575,6 +575,9 @@ pub fn confirm_summary(kind: &str, params: &Value, english: &str) -> String {
         "download_model" => model_summary(params, true),
         "remove_model" => model_summary(params, false),
         "tool_ask_first" => ask_first_summary(params),
+        "start_guide" => Some(tr!(
+            "Start a Click Guide: CaptureMann will take a screenshot of each mouse click (clicks only; keystrokes are never recorded)"
+        )),
         _ => None,
     };
     built.unwrap_or_else(|| english.to_owned())
@@ -596,6 +599,14 @@ pub fn ask_first_tool_title(params: &Value) -> Option<String> {
 fn ask_first_summary(p: &Value) -> Option<String> {
     let title = ask_first_tool_title(p)?;
     let agent = crate::confirm::display_client_name(text(p, "client")?);
+    // A call that always asks (an agent's Auto Long Shot) is not the user's setting (LS-10).
+    if text(p, "reason") == Some("always") {
+        return Some(tr!(
+            "{agent} is asking to run \u{201C}{title}\u{201D}. This action always asks you first.",
+            agent = agent,
+            title = title
+        ));
+    }
     Some(tr!(
         "{agent} is asking to run \u{201C}{title}\u{201D}. You set this tool to Ask first in Settings \u{2192} Agents & CLI.",
         agent = agent,
@@ -666,6 +677,7 @@ pub fn row_label(key: &str) -> String {
     }
     match key {
         "tool" => tr!("Tool"),
+        "records" => tr!("Records"),
         "target" => tr!("Target"),
         "output" => tr!("Output"),
         "screen" => tr!("Screen"),
@@ -729,6 +741,7 @@ fn row_value(kind: &str, key: &str, p: &Value) -> Option<String> {
             "this_cannot_be_undone" => Some(tr!("The take is deleted and cannot be recovered")),
             _ => None,
         },
+        "start_guide" => guide_row(key, p),
         "publish_video" => publish_row(key, p),
         "delete_capture" => delete_row(key, p),
         "move_library" => move_library_row(key, p),
@@ -738,6 +751,29 @@ fn row_value(kind: &str, key: &str, p: &Value) -> Option<String> {
         },
         _ => None,
     }
+}
+
+// -- start_guide --
+
+/// The rows of the Click Guide start dialog, worded from the typed parameters.
+fn guide_row(key: &str, p: &Value) -> Option<String> {
+    match key {
+        "target" => {
+            let t = p.get("target")?;
+            if let Some(id) = num(t, "window_id") {
+                Some(tr!("window {id}", id = id))
+            } else {
+                Some(tr!("display {id}", id = num(t, "display_id")?))
+            }
+        }
+        "countdown" => Some(format!("{} s", num_f(p, "countdown_s")?.round() as u64)),
+        "records" => Some(tr!("Mouse clicks only; keystrokes are never recorded")),
+        _ => None,
+    }
+}
+
+fn num_f(v: &Value, k: &str) -> Option<f64> {
+    v.get(k).and_then(Value::as_f64)
 }
 
 // -- start_recording, restart_recording, run_fps_selftest --

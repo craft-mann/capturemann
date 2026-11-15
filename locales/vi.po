@@ -11843,3 +11843,51 @@ msgstr "Cửa sổ đã bị di chuyển hoặc đổi kích thước. Mọi th�
 #, fuzzy
 msgid "The window was moved or resized. Everything up to there is kept: {n} frames, {size}."
 msgstr "Cửa sổ đã bị di chuyển hoặc đổi kích thước. Mọi thứ đến đó đều được giữ lại: {n} khung hình, {size}."
+
+#, fuzzy
+msgid "A click was not saved: {reason}"
+msgstr "Một lần nhấp chưa được lưu: {reason}"
+
+#, fuzzy
+msgid "CaptureMann is still saving the earlier clicks"
+msgstr "CaptureMann vẫn đang lưu các lần nhấp trước đó"
+
+#, fuzzy
+msgid "Mouse clicks only; keystrokes are never recorded"
+msgstr "Chỉ ghi các lần nhấp chuột; không bao giờ ghi phím bấm"
+
+#, fuzzy
+msgid "Records"
+msgstr "Ghi lại"
+
+#, fuzzy
+msgid "Start a Click Guide: CaptureMann will take a screenshot of each mouse click (clicks only; keystrokes are never recorded)"
+msgstr "Bắt đầu Hướng dẫn theo thao tác: CaptureMann sẽ chụp ảnh màn hình sau mỗi lần nhấp chuột (chỉ ghi các lần nhấp; không bao giờ ghi phím bấm)"
+
+#, fuzzy
+msgid "Start a Click Guide?"
+msgstr "Bắt đầu Hướng dẫn theo thao tác?"
+
+#, fuzzy
+msgid "Start a new guide to keep going."
+msgstr "Hãy bắt đầu một hướng dẫn mới để tiếp tục."
+
+#, fuzzy
+msgid "Start guide"
+msgstr "Bắt đầu hướng dẫn"
+
+#, fuzzy
+msgid "Stop and start a new guide to keep going."
+msgstr "Hãy dừng và bắt đầu một hướng dẫn mới để tiếp tục."
+
+#, fuzzy
+msgid "The guide reached {max} steps and was saved."
+msgstr "Hướng dẫn đã đạt {max} bước và đã được lưu."
+
+#, fuzzy
+msgid "{agent} is asking to run “{title}”. This action always asks you first."
+msgstr "{agent} muốn chạy “{title}”. Thao tác này luôn hỏi bạn trước."
+
+#, fuzzy
+msgid "{n} steps left"
+msgstr "Còn {n} bước"
