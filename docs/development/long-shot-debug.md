@@ -68,3 +68,16 @@ Synthetic-frame tests only (`cap_6_*` in `crates/cm-capture/src/long_shot/tests.
 | 5 (unresolved): Chrome horizontal Long Shot with a region ended after one frame in one run | not reproduced. The region geometry is right: the offset is applied once (the crop inside the display, the scroll points inside the global area) and the scale once (a logical rect scaled once, a physical rect never), checked on a display that is not at (0, 0) at scale 2. The one-frame end looks like the whole-window case (a toolbar or a tab strip inside the region, cut now as static strips) or like the first-frame warm-up; a dump from the real run (`CM_LONG_SHOT_DEBUG_DIR`) would tell | `ls_region_offset_and_scale_are_applied_once` (`cm-daemon`) |
 
 Known limit of the join: when a wheel overshoots so far that fewer than about 12 lines overlap, and the lines are alike, the pair cannot be told from a wrong match; the retry scrolls back by half a step, which usually brings a clear overlap, but two notches too many on a 250-line area still gave a wrong join in two of the 36 synthetic cases tried.
+
+## Missing left side of a vertical capture (maintainer, macOS, Nov 15, 2026)
+
+Two Chrome captures (`Screenshot 2026-11-15 13.22` 2120x9930, 9 frames, `reached_end`; `13.25` 2446x4437,
+`no_overlap`) had the left 150 to 300 physical px of the window missing and the right edge complete.
+
+| Finding | Cause found offline | Test |
+| --- | --- | --- |
+| Left strip of the window missing (an address bar that starts mid-URL, a dashboard without its sidebar) | not the picker or the capture target: a Window target is captured whole by `Capturer::capture` and the overlay's area only places the HUD. `Stitcher::apply_trim` cuts columns that do not change between the first two frames (`static_strips`, added on Nov 15 for the horizontal toolbar) when the plain join and the edge trim (at most 48 px left, 64 px right) fail. For a vertical capture those columns are a fixed sidebar or a page's margin, which is content, and the cut was never put back. The first frame's pixels of the cut columns are now kept (`KeptSides`) and added at both sides at the finish; below the first frame's last content row they repeat its last row. A horizontal capture still drops its static rows (a browser's toolbar) | `cap_6_vertical_static_sidebar_is_kept_not_cut` |
+
+Not reproduced on a real screen (the two folders were read only; the frames were not dumped, `CM_LONG_SHOT_DEBUG_DIR`
+writes refused pairs only). A frame is cut only when the first pair did not join as it was, so a page that still
+shows the cut should be sent with its debug dump.

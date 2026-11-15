@@ -893,6 +893,69 @@ fn cap_6_horizontal_whole_window_with_a_static_toolbar_joins() {
     }
 }
 
+/// macOS, Chrome, Nov 15, 2026 (the maintainer's two captures): the left 150 to 300 px of the
+/// window were missing, the right edge complete. A strip of columns that stay put while the page
+/// scrolls (a dashboard's sidebar, the white margin of a page) kept the rows from joining, so the
+/// static columns were cut from the frames to join them and then never put back. The image is as
+/// wide as the frames, the sidebar is the first frame's, and the page beside it is every row once.
+#[test]
+fn cap_6_vertical_static_sidebar_is_kept_not_cut() {
+    for (left, right) in [(100u32, 0u32), (0, 90), (100, 90)] {
+        let side = (left, right);
+        let page = SyntheticPage::new(240, 1500, 300);
+        let view = page.clone().view();
+        let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut src = Overlaid {
+            view: view.clone(),
+            pos: pos.clone(),
+            over: |_, w, h, data: &mut [u8]| {
+                for y in 0..h {
+                    for x in (0..left).chain(w - right..w) {
+                        let v = (x * 7 + y * 13) ^ (x >> 2);
+                        let i = ((y * w + x) * 4) as usize;
+                        data[i..i + 4].copy_from_slice(&[v as u8, (v >> 3) as u8, 90, 255]);
+                    }
+                }
+            },
+        };
+        let mut sc = Tracking { view, pos };
+        let r = run_auto(
+            &mut src,
+            &mut sc,
+            &mut NoSleep::default(),
+            cfg(Direction::Vertical),
+            &mut || false,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(r.end, EndReason::ReachedEnd, "{side:?}");
+        let want = page.expected();
+        let got = &r.image.frame;
+        assert_eq!(got.width(), 240, "{side:?}: every column of the window");
+        assert_eq!(got.height(), want.height(), "{side:?}");
+        for y in 0..got.height() {
+            for x in 0..240 {
+                if x < left || x >= 240 - right {
+                    // The first frame's pixels, repeated below its last row.
+                    let yy = y.min(299);
+                    let v = (x * 7 + yy * 13) ^ (x >> 2);
+                    assert_eq!(
+                        got.pixel(x, y),
+                        Some([v as u8, (v >> 3) as u8, 90, 255]),
+                        "{side:?} side at {x},{y}"
+                    );
+                } else {
+                    assert_eq!(
+                        got.pixel(x, y),
+                        want.pixel(x, y),
+                        "{side:?} page at {x},{y}"
+                    );
+                }
+            }
+        }
+    }
+}
+
 /// A terminal's numbered lines (Windows Terminal, Nov 15, 2026: 200 lines, stopped at line 86):
 /// text that differs from line to line in a few pixels, and a cell that changes in every frame
 /// (the cursor, a spinner) in the middle of the lines, so the exact look finds nothing and the
