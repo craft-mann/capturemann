@@ -330,6 +330,11 @@ impl Render for Studio {
         if !matches!(route, Route::RecordingEditor(_)) && self.rec_editor.read(cx).is_open() {
             self.rec_editor.update(cx, |e, cx| e.close(cx));
         }
+        if !matches!(route, Route::Guide(_)) {
+            self.guide.update(cx, |g, _| {
+                g.release_pictures();
+            });
+        }
         if !matches!(route, Route::Publish(_)) && self.publish.read(cx).is_open() {
             self.publish.update(cx, |p, cx| p.close(cx));
         }

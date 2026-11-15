@@ -1796,3 +1796,126 @@ fn ls_flaky_fresh_window_that_ignores_two_steps() {
     let r = auto_with(&mut src, &mut Never);
     assert_eq!(r.end, EndReason::NothingScrolled);
 }
+
+// ---- QA macOS pass 6, LS-9: Auto scroll ended after 2 to 8 frames on every page ----
+
+/// The macOS overlay scrollbar shows only while the page scrolls, so the first pair may have none
+/// and a later pair a thumb over the outermost columns, in the fixed header and in the content.
+/// The edge strip the first pair chose (none) was wrong, every join was refused ("a fixed band
+/// changed", "no shift matches") and the run ended `no_overlap` after a few frames.
+#[test]
+fn ls_9_a_scrollbar_thumb_that_shows_after_the_first_pair_does_not_end_the_run() {
+    for (band, thumb_w) in [(0u32, 12u32), (60, 12), (60, 26)] {
+        let (w, h) = (300u32, 300u32);
+        let page = SyntheticPage::new(w, 1500, h).with_bands(band, 0);
+        let view = page.clone().view();
+        let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut src = Overlaid {
+            view: view.clone(),
+            pos: pos.clone(),
+            over: move |p: u32, w: u32, h: u32, d: &mut [u8]| {
+                // After the first pair: a thumb 100 rows tall that moves with the page, over the
+                // rows of the header too, in a colour that differs in every frame.
+                if p < 150 {
+                    return;
+                }
+                let top = (p / 8).min(h - 100);
+                for y in top..top + 100 {
+                    for x in w - 4 - thumb_w..w - 4 {
+                        let i = ((y * w + x) * 4) as usize;
+                        d[i..i + 4].copy_from_slice(&[(p & 255) as u8, 9, 9, 255]);
+                    }
+                }
+            },
+        };
+        let mut sc = Tracking { view, pos };
+        let r = run_auto(
+            &mut src,
+            &mut sc,
+            &mut NoSleep::default(),
+            cfg(Direction::Vertical),
+            &mut || false,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(r.end, EndReason::ReachedEnd, "band {band}, thumb {thumb_w}");
+        assert_rows_match(
+            &r.image.frame,
+            &page.expected(),
+            &format!("band {band}, thumb {thumb_w}"),
+        );
+    }
+}
+
+/// A wheel that moves 3 times what is asked from the second scroll on (it did not at the first),
+/// back and forth alike: the step that was learned is too long, and the scroll back lands exactly
+/// on the last frame taken. That is a known position, not the end: the step is tried smaller.
+/// (Until Nov 15, 2026 such an identical frame was called `no_overlap` and the run ended.)
+#[test]
+fn ls_9_a_scroll_back_onto_the_last_frame_is_tried_again_with_a_smaller_step() {
+    struct Wild {
+        page: SyntheticPage,
+        pos: u32,
+        scrolls: u32,
+    }
+    #[derive(Clone)]
+    struct WildView(std::rc::Rc<std::cell::RefCell<Wild>>);
+    impl FrameSource for WildView {
+        fn grab(&mut self) -> Result<Frame, CmError> {
+            let w = self.0.borrow();
+            Ok(w.page.frame_at(w.pos))
+        }
+    }
+    impl Scroller for WildView {
+        fn scroll(&mut self, _: Direction, amount_px: u32) -> Result<(), CmError> {
+            let mut w = self.0.borrow_mut();
+            w.scrolls += 1;
+            let gain = if w.scrolls == 1 { 1 } else { 3 };
+            w.pos = (w.pos + amount_px * gain).min(w.page.content_len - w.page.view);
+            Ok(())
+        }
+        fn scroll_back(&mut self, _: Direction, amount_px: u32) -> Result<bool, CmError> {
+            let mut w = self.0.borrow_mut();
+            w.pos = w.pos.saturating_sub(amount_px * 3);
+            Ok(true)
+        }
+    }
+    let page = SyntheticPage::new(40, 1500, 300);
+    let v = WildView(std::rc::Rc::new(std::cell::RefCell::new(Wild {
+        page: page.clone(),
+        pos: 0,
+        scrolls: 0,
+    })));
+    let (mut src, mut sc) = (v.clone(), v);
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}
+
+/// A frame that is still changing when the settle limit passes (a loaded machine, a browser's
+/// smooth scroll) is waited for again before it is compared.
+#[test]
+fn ls_9_a_frame_that_settles_late_is_waited_for() {
+    struct Slow(u32);
+    impl FrameSource for Slow {
+        fn grab(&mut self) -> Result<Frame, CmError> {
+            self.0 += 1;
+            let v = self.0.min(9) as u8;
+            Frame::new(2, 2, vec![v; 16])
+        }
+    }
+    let mut sleeper = NoSleep::default();
+    let early = wait_settled(&mut Slow(0), &mut sleeper, Settle::default()).unwrap();
+    assert!(!early.settled, "the plain wait gives up at its limit");
+    let late = settle_frame(&mut Slow(0), &mut sleeper, Settle::default()).unwrap();
+    assert!(late.settled);
+    assert_eq!(late.frame.pixel(0, 0), Some([9, 9, 9, 9]));
+}

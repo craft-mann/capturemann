@@ -1115,6 +1115,15 @@ fn published_card(
             (true, false) => when,
             (true, true) => String::new(),
         };
+        let long_pill = crate::published::privacy_pill_is_long(r);
+        let pill = || {
+            crate::ui::kit::pill(
+                t,
+                crate::published::privacy_tone(r),
+                Some(crate::published::privacy_icon(&r.privacy)),
+                crate::published::privacy_line(r),
+            )
+        };
         let state = crate::published::state_line(r, now);
         let state_color = match state.kind {
             crate::published::StatusKind::Warning => t.warning,
@@ -1191,13 +1200,9 @@ fn published_card(
                                     .child(SharedString::from(who))
                             })),
                     )
-                    .child(crate::ui::kit::pill(
-                        t,
-                        crate::published::privacy_tone(r),
-                        Some(crate::published::privacy_icon(&r.privacy)),
-                        crate::published::privacy_line(r),
-                    )),
+                    .children((!long_pill).then(pill)),
             )
+            .children(long_pill.then(|| div().flex().child(pill())))
             .child(
                 div()
                     .flex()
@@ -1241,7 +1246,7 @@ fn published_card(
                         }),
                     ),
             )
-            .child(
+            .children(crate::published::shows_state_line(r).then(|| {
                 div()
                     .flex()
                     .items_center()
@@ -1249,9 +1254,9 @@ fn published_card(
                     .text_size(px(11.5))
                     .text_color(rgba_of(state_color))
                     .child(div().flex_none().flex().items_center().child(lead))
-                    .child(SharedString::from(state.text)),
-            )
-            .children(r.warnings.iter().map(|w| {
+                    .child(SharedString::from(state.text))
+            }))
+            .children(crate::published::distinct_warnings(r).into_iter().map(|w| {
                 crate::ui::kit::callout(
                     t,
                     Tone::Brass,

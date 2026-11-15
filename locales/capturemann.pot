@@ -73,6 +73,9 @@ msgstr ""
 msgid "A circle with your face on the recording."
 msgstr ""
 
+msgid "A click was not saved: {reason}"
+msgstr ""
+
 msgid "A client name can’t contain control characters."
 msgstr ""
 
@@ -877,6 +880,9 @@ msgid "CaptureMann is already running"
 msgstr ""
 
 msgid "CaptureMann is not serving an agent endpoint, so agents can’t reach it. Open Agents & CLI for details."
+msgstr ""
+
+msgid "CaptureMann is still saving the earlier clicks"
 msgstr ""
 
 msgid "CaptureMann isn't allowed to read these files. Allow it in System Settings, Privacy & Security, Files and Folders."
@@ -3195,6 +3201,9 @@ msgstr ""
 msgid "Most accurate, slow. Best for accents and noisy audio."
 msgstr ""
 
+msgid "Mouse clicks only; keystrokes are never recorded"
+msgstr ""
+
 msgid "Move (Alt resizes)"
 msgstr ""
 
@@ -4563,6 +4572,9 @@ msgstr ""
 msgid "Recordings stay at 30 fps on {this_computer}."
 msgstr ""
 
+msgid "Records"
+msgstr ""
+
 #. FACT: owner review required (what the permission is for)
 msgid "Records your voice when you turn the microphone on."
 msgstr ""
@@ -5321,10 +5333,19 @@ msgstr ""
 msgid "Start a Click Guide"
 msgstr ""
 
+msgid "Start a Click Guide: CaptureMann will take a screenshot of each mouse click (clicks only; keystrokes are never recorded)"
+msgstr ""
+
+msgid "Start a Click Guide?"
+msgstr ""
+
 msgid "Start a guide"
 msgstr ""
 
 msgid "Start a new empty library at {to}; the captures in {from} stay where they are"
+msgstr ""
+
+msgid "Start a new guide to keep going."
 msgstr ""
 
 msgid "Start a new library"
@@ -5340,6 +5361,9 @@ msgid "Start at one less"
 msgstr ""
 
 msgid "Start at one more"
+msgstr ""
+
+msgid "Start guide"
 msgstr ""
 
 msgid "Start in 5 s"
@@ -5454,6 +5478,9 @@ msgid "Stop and keep"
 msgstr ""
 
 msgid "Stop and open guide"
+msgstr ""
+
+msgid "Stop and start a new guide to keep going."
 msgstr ""
 
 msgid "Stop excluding {id}"
@@ -5877,6 +5904,9 @@ msgid "The glossary is full. Remove an entry to add another."
 msgstr ""
 
 msgid "The guide did not stop cleanly"
+msgstr ""
+
+msgid "The guide reached {max} steps and was saved."
 msgstr ""
 
 msgid "The guide was not copied"
@@ -7434,6 +7464,9 @@ msgstr ""
 msgid "{account} · {when}"
 msgstr ""
 
+msgid "{agent} is asking to run “{title}”. This action always asks you first."
+msgstr ""
+
 msgid "{agent} is asking to run “{title}”. You set this tool to Ask first in Settings → Agents & CLI."
 msgstr ""
 
@@ -7880,6 +7913,9 @@ msgid "{n} step"
 msgid_plural "{n} steps"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "{n} steps left"
+msgstr ""
 
 msgid "{n} steps written to {path}"
 msgstr ""

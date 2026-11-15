@@ -316,6 +316,30 @@ pub enum StatusKind {
     Plain,
 }
 
+/// Whether the details card shows the status line of a record: a locked privacy with a warning
+/// of the platform is said once, by the warning's own box (QA macOS pass 6, PUB-1: "YouTube kept
+/// it private" and "YouTube kept this video private." both showed).
+pub fn shows_state_line(r: &PublishRecord) -> bool {
+    !(r.state == PublishState::PrivacyLocked && !r.warnings.is_empty())
+}
+
+/// The warnings of a record, each once, in order.
+pub fn distinct_warnings(r: &PublishRecord) -> Vec<&String> {
+    let mut seen: Vec<&String> = Vec::new();
+    for w in &r.warnings {
+        if !seen.contains(&w) {
+            seen.push(w);
+        }
+    }
+    seen
+}
+
+/// A privacy line this long ("Private (you asked for Public)") does not fit in the header row
+/// beside the platform and the account: the card puts it on a row of its own.
+pub fn privacy_pill_is_long(r: &PublishRecord) -> bool {
+    privacy_line(r).chars().count() > 14
+}
+
 /// The one status line under a published card: the first warning of the platform (a refusal such
 /// as "captions not added") if there is one, else [`state_line`].
 pub fn status_line(r: &PublishRecord, now: OffsetDateTime) -> StatusLine {
@@ -568,6 +592,39 @@ mod tests {
 
     /// S22: "Needs attention" is a publish with a warning (or a locked privacy), or an upload of
     /// the capture waiting for a sign-in; a capture that was never published never is.
+    /// PUB-1 (QA macOS pass 6): a locked privacy with the platform's warning says it once, a
+    /// repeated warning shows once, and the long privacy pill goes on a row of its own.
+    #[test]
+    fn pub_1_a_warned_record_says_it_once_and_the_long_pill_has_its_own_row() {
+        let mut v = pub_rec(
+            "c",
+            "2026-10-23T15:41:00Z",
+            "privacy_locked",
+            "private",
+            "public",
+        );
+        v["warnings"] = json!([
+            "YouTube kept this video private.",
+            "YouTube kept this video private."
+        ]);
+        let locked = PublishRecord::from_json(&v).unwrap();
+        assert!(!shows_state_line(&locked), "the warning's box says it");
+        assert_eq!(distinct_warnings(&locked).len(), 1);
+        assert!(privacy_pill_is_long(&locked), "{}", privacy_line(&locked));
+        // A locked privacy with no warning keeps its status line; a short pill stays in the header.
+        let bare = PublishRecord::from_json(&pub_rec(
+            "d",
+            "2026-10-23T15:41:00Z",
+            "privacy_locked",
+            "private",
+            "public",
+        ))
+        .unwrap();
+        assert!(shows_state_line(&bare));
+        let ok = rec("a", "2026-10-23T15:41:00Z", "processed");
+        assert!(shows_state_line(&ok) && !privacy_pill_is_long(&ok));
+    }
+
     #[test]
     fn needs_attention_means_a_warning_a_locked_privacy_or_a_waiting_upload() {
         let ok = rec("a", "2026-10-23T15:41:00Z", "processed");

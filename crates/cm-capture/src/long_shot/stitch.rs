@@ -813,6 +813,12 @@ fn static_strips(a: &Lines, b: &Lines) -> (usize, usize) {
 /// frames (a blinking caret, a loading spinner in the toolbar).
 const STATIC_SHARE: f64 = 0.02;
 
+/// The columns at each end of a vertical capture that are left out of the comparison when a pair
+/// does not join and an overlay scrollbar may be drawn over them (macOS: a thumb that fades in
+/// and out over the page's edge and over a fixed edge strip, 14 to 28 physical px at 2x).
+const OVERLAY_EDGE_LEFT: usize = 16;
+const OVERLAY_EDGE_RIGHT: usize = 32;
+
 /// The outermost columns (per side) that are looked at for the window's rounded corners when the
 /// static columns of a vertical capture are not part of the join (see [`FullSides`]).
 const SIDE_CORNER_COLS: usize = 96;
@@ -1009,6 +1015,26 @@ impl Stitcher {
         let mut full = self.full.take();
         let pair = full.as_ref().zip(whole.as_ref());
         let outcome = self.join(&prev, &lines, size, hint, pair);
+        // A join that fails after the first pair: an overlay scrollbar that was not there in the
+        // first pair (or that was narrower) draws a thumb over the outermost columns, which then
+        // differ in every line it covers, in the content and in the fixed bands alike (QA macOS
+        // pass 6, LS-9: "a fixed band changed", "no shift matches"). The outermost columns are
+        // left out of the comparison and the image is composed from whole frames, as for static
+        // side columns.
+        if outcome == PushOutcome::NoOverlap {
+            if let Some((o, l, r, n)) =
+                self.join_masked(&prev, &lines, full.as_ref(), whole.as_ref(), size, hint)
+            {
+                self.trim = Some((l, r));
+                self.full = Some(FullSides {
+                    l,
+                    r,
+                    prev: whole.unwrap_or_else(|| lines.clone()),
+                });
+                self.prev = Some(n);
+                return o;
+            }
+        }
         let added = matches!(outcome, PushOutcome::Added { .. });
         if let (Some(f), Some(w)) = (full.as_mut(), whole) {
             if added {
@@ -1019,6 +1045,51 @@ impl Stitcher {
         // The newest accepted frame is the one the next frame is matched against.
         self.prev = Some(if added { lines } else { prev });
         outcome
+    }
+
+    /// [`Stitcher::push`]'s second look at a pair that did not join: with at least
+    /// [`OVERLAY_EDGE_LEFT`] and [`OVERLAY_EDGE_RIGHT`] columns at the two ends left out of the
+    /// comparison. Only for a vertical capture whose frames are whole (no trim yet, or a mask of
+    /// static side columns that can be widened). Returns the outcome (when the pair joined) with
+    /// the new mask and the compared lines of both frames.
+    fn join_masked(
+        &mut self,
+        prev: &Lines,
+        lines: &Lines,
+        full: Option<&FullSides>,
+        whole: Option<&Lines>,
+        size: (u32, u32),
+        hint: Option<u32>,
+    ) -> Option<(PushOutcome, usize, usize, Lines)> {
+        let cross = lines.line_len / 4;
+        if self.dir != Direction::Vertical || self.limit_hit || self.size != Some(size) {
+            return None;
+        }
+        let (l0, r0, whole_prev, whole_next) = match (full, whole) {
+            (Some(f), Some(w)) => (f.l, f.r, f.prev.clone(), w.clone()),
+            _ if self.trim == Some((0, 0)) => (0, 0, prev.clone(), lines.clone()),
+            _ => return None,
+        };
+        if whole_prev.line_len != whole_next.line_len || cross < 4 * (OVERLAY_EDGE_LEFT + 16) {
+            return None;
+        }
+        let (l, r) = (l0.max(OVERLAY_EDGE_LEFT), r0.max(OVERLAY_EDGE_RIGHT));
+        if (l, r) == (l0, r0) {
+            return None;
+        }
+        let pc = whole_prev.cropped(l, cross - r);
+        let nc = whole_next.cropped(l, cross - r);
+        let fs = FullSides {
+            l,
+            r,
+            prev: whole_prev,
+        };
+        let o = self.join(&pc, &nc, size, hint, Some((&fs, &whole_next)));
+        matches!(
+            o,
+            PushOutcome::Added { .. } | PushOutcome::LimitReached { .. }
+        )
+        .then_some((o, l, r, nc))
     }
 
     /// Cuts the edge strips from both frames' lines: with the trim chosen so far, or (the first

@@ -266,6 +266,128 @@ fn toast(app: &Entity<AppModel>, spec: ToastSpec, cx: &mut App) {
     app::push_toast(app, spec, cx);
 }
 
+/// A daemon event about a Click Guide that this app shows or acts on (CG-9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum GuideEvent {
+    /// 50 steps are left before the guide holds 500.
+    NearLimit {
+        remaining: u64,
+    },
+    /// The guide holds `max` steps and the daemon stops it, saved.
+    LimitReached {
+        guide_id: String,
+        max: u64,
+    },
+    /// A click was not saved.
+    Error {
+        reason: String,
+    },
+    /// The guide ended, whoever stopped it.
+    Stopped {
+        guide_id: String,
+    },
+    Other,
+}
+
+fn classify_event(name: &str, data: &Value) -> GuideEvent {
+    let text = |k: &str| data[k].as_str().unwrap_or_default().to_owned();
+    match name {
+        "guide.near_limit" => GuideEvent::NearLimit {
+            remaining: data["remaining"].as_u64().unwrap_or(50),
+        },
+        "guide.limit_reached" => GuideEvent::LimitReached {
+            guide_id: text("guide_id"),
+            max: data["max"].as_u64().unwrap_or(500),
+        },
+        "guide.error" => GuideEvent::Error {
+            reason: if data["code"] == "busy" {
+                tr!("CaptureMann is still saving the earlier clicks")
+            } else {
+                text("message")
+            },
+        },
+        "guide.stopped" => GuideEvent::Stopped {
+            guide_id: text("guide_id"),
+        },
+        _ => GuideEvent::Other,
+    }
+}
+
+/// The error toast is shown at most once in this time: a run of failed clicks is one message.
+const ERROR_TOAST_EVERY: Duration = Duration::from_secs(10);
+
+/// Whether an error toast is due now; remembers the time when it is.
+fn error_toast_due(last: &mut Option<Instant>, now: Instant) -> bool {
+    if last.is_some_and(|t| now.saturating_duration_since(t) < ERROR_TOAST_EVERY) {
+        return false;
+    }
+    *last = Some(now);
+    true
+}
+
+static LAST_ERROR_TOAST: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+
+/// Whether the bar, which follows `followed` (`None` before the guide's id is known), closes for
+/// the end of guide `ended`.
+fn bar_closes_for(followed: Option<&str>, ended: &str) -> bool {
+    followed.is_none_or(|f| f == ended)
+}
+
+/// A `guide.*` event of the daemon (any client's guide): the 450-step notice, the 500-step stop,
+/// a click that was not saved, and the end of the guide (the bar closes whoever stopped it).
+pub fn on_event(app: &Entity<AppModel>, name: &str, data: &Value, cx: &mut App) {
+    match classify_event(name, data) {
+        GuideEvent::NearLimit { remaining } => toast(
+            app,
+            ToastSpec::new(ToastKind::Warning, tr!("{n} steps left", n = remaining))
+                .body(tr!("Stop and start a new guide to keep going.")),
+            cx,
+        ),
+        GuideEvent::LimitReached { guide_id, max } => {
+            let mut spec = ToastSpec::new(
+                ToastKind::Warning,
+                tr!("The guide reached {max} steps and was saved.", max = max),
+            )
+            .body(tr!("Start a new guide to keep going."));
+            if !guide_id.is_empty() {
+                spec = spec.button(tr!("Open"), ToastAction::GuideStopOpen(guide_id));
+            }
+            toast(app, spec, cx);
+        }
+        GuideEvent::Error { reason } => {
+            let due = {
+                let mut last = LAST_ERROR_TOAST
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                error_toast_due(&mut last, Instant::now())
+            };
+            if due && !reason.is_empty() {
+                toast(
+                    app,
+                    ToastSpec::new(
+                        ToastKind::Warning,
+                        tr!("A click was not saved: {reason}", reason = reason),
+                    ),
+                    cx,
+                );
+            }
+        }
+        GuideEvent::Stopped { guide_id } => {
+            let Some(hud) = cx.try_global::<Holder>().and_then(|h| h.0) else {
+                return;
+            };
+            let followed = hud
+                .update(cx, |this, _, _| this.shown.guide_id.clone())
+                .ok()
+                .flatten();
+            if bar_closes_for(followed.as_deref(), &guide_id) {
+                close(cx);
+            }
+        }
+        GuideEvent::Other => {}
+    }
+}
+
 /// "New Click Guide": follows the display under the pointer, shows the bar and starts the guide
 /// (a 3 s countdown first). Nothing is recorded until the countdown ends; Stop during it cancels.
 pub fn start(app: &Entity<AppModel>, cx: &mut App) {
@@ -1161,5 +1283,71 @@ mod ended_tests {
             "invalid_input: no Click Guide is recording"
         ));
         assert!(!stop_means_already_ended("disk full"));
+    }
+}
+
+#[cfg(test)]
+mod cap_tests {
+    use super::*;
+
+    /// CG-9: the daemon's three guide events that the bar's owner must show are told apart, and
+    /// the others are not.
+    #[test]
+    fn cg_9_the_guide_events_are_classified() {
+        assert_eq!(
+            classify_event("guide.near_limit", &json!({ "remaining": 50 })),
+            GuideEvent::NearLimit { remaining: 50 }
+        );
+        assert_eq!(
+            classify_event(
+                "guide.limit_reached",
+                &json!({ "guide_id": "guide_3", "max": 500 })
+            ),
+            GuideEvent::LimitReached {
+                guide_id: "guide_3".into(),
+                max: 500
+            }
+        );
+        assert_eq!(
+            classify_event("guide.error", &json!({ "message": "disk full" })),
+            GuideEvent::Error {
+                reason: "disk full".into()
+            }
+        );
+        assert!(matches!(
+            classify_event("guide.error", &json!({ "code": "busy", "message": "x" })),
+            GuideEvent::Error { reason } if reason != "x"
+        ));
+        assert_eq!(
+            classify_event("guide.stopped", &json!({ "guide_id": "guide_3" })),
+            GuideEvent::Stopped {
+                guide_id: "guide_3".into()
+            }
+        );
+        assert_eq!(
+            classify_event("guide.step_added", &json!({})),
+            GuideEvent::Other
+        );
+    }
+
+    /// CG-9: an error toast comes at most once in 10 s.
+    #[test]
+    fn cg_9_an_error_toast_is_shown_at_most_once_in_ten_seconds() {
+        let t0 = Instant::now();
+        let mut last = None;
+        assert!(error_toast_due(&mut last, t0));
+        assert!(!error_toast_due(&mut last, t0 + Duration::from_secs(3)));
+        assert!(!error_toast_due(&mut last, t0 + Duration::from_secs(9)));
+        assert!(error_toast_due(&mut last, t0 + Duration::from_secs(11)));
+        assert!(!error_toast_due(&mut last, t0 + Duration::from_secs(12)));
+    }
+
+    /// CG-9: the bar closes for the end of the guide it follows, and for any guide before it
+    /// knows its own id (the countdown), but not for another guide's end.
+    #[test]
+    fn cg_9_the_bar_closes_when_its_guide_stopped_for_any_reason() {
+        assert!(bar_closes_for(Some("guide_1"), "guide_1"));
+        assert!(bar_closes_for(None, "guide_1"));
+        assert!(!bar_closes_for(Some("guide_2"), "guide_1"));
     }
 }

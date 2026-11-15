@@ -642,3 +642,138 @@ async fn gde_1_a_closed_window_pauses_the_guide_and_keeps_its_steps() {
     let done = c.call("stop_guide", json!({"guide_id": id})).await;
     assert_eq!(ok(&done)["step_count"], 1);
 }
+
+// ---- QA macOS pass 6: CG-9 (the 500-step cap) and CG-10 (memory over a long guide) ----
+
+fn event_names(c: &Client, name: &str) -> Vec<Value> {
+    c.events
+        .iter()
+        .filter(|e| e["event"] == name)
+        .cloned()
+        .collect()
+}
+
+/// Waits until the guide has `n` recorded steps.
+async fn wait_steps(c: &mut Client, id: &str, n: usize) -> Value {
+    for _ in 0..600 {
+        let g = c.call("get_guide", json!({"guide_id": id})).await;
+        let v = ok(&g).clone();
+        if v["recorded_steps"].as_u64().unwrap_or(0) as usize >= n || v["state"] == "stopped" {
+            return v;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    panic!("the guide did not reach {n} steps");
+}
+
+/// GDE-1 (CG-9): 450 steps say 50 are left; the 500th fills the guide, which the daemon stops
+/// itself (saved, every step kept) after telling the clients; later clicks are not steps.
+#[tokio::test]
+async fn cg_9_the_500_step_cap_warns_at_450_then_stops_the_guide_and_keeps_every_step() {
+    let r = rig(ScriptedClicks::new(), false, Decision::Approve);
+    let mut c = Client::connect(&r.daemon, "agent");
+    let sub = c
+        .call("events.subscribe", json!({"topics": ["guide.*"]}))
+        .await;
+    ok(&sub);
+    let id = start(&mut c).await;
+    let mut n = 0;
+    while n < 500 {
+        for _ in 0..4 {
+            let (x, y) = on_button(n % 5);
+            r.clicks.click(x, y);
+            n += 1;
+        }
+        wait_steps(&mut c, &id, n).await;
+    }
+    // The watcher stops the guide: the state turns to `stopped` by itself.
+    let mut last = Value::Null;
+    for _ in 0..200 {
+        last = ok(&c.call("get_guide", json!({"guide_id": id})).await).clone();
+        if last["state"] == "stopped" {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert_eq!(last["state"], "stopped", "{last}");
+    assert_eq!(last["step_count"], 500);
+    // Nothing is listening any more.
+    assert!(!r.clicks.is_listening());
+    let near = event_names(&c, "guide.near_limit");
+    assert_eq!(near.len(), 1, "{:?}", c.events);
+    assert_eq!(near[0]["data"]["remaining"], 50);
+    assert_eq!(near[0]["data"]["step_count"], 450);
+    let full = event_names(&c, "guide.limit_reached");
+    assert_eq!(full.len(), 1);
+    assert_eq!(full[0]["data"]["step_count"], 500);
+    // `guide.stopped` follows the state by a moment.
+    for _ in 0..100 {
+        if !event_names(&c, "guide.stopped").is_empty() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        let _ = c.call("get_guide", json!({"guide_id": id})).await;
+    }
+    assert_eq!(event_names(&c, "guide.stopped").len(), 1);
+    // The guide is gone from the recorder: a stop now is refused, nothing is lost.
+    let again = c.call("stop_guide", json!({"guide_id": id})).await;
+    assert_eq!(code(&again), "invalid_input");
+}
+
+/// CG-10: a worker that is slow (a text read that takes long, a busy disk) does not make the
+/// click filter queue every picture: past `MAX_PENDING_FRAMES` a click is dropped and the person
+/// is told with `guide.error`.
+#[tokio::test]
+async fn cg_10_a_slow_worker_does_not_queue_every_frame() {
+    struct Gate(Arc<std::sync::atomic::AtomicBool>);
+    impl TextRecognizer for Gate {
+        fn name(&self) -> &'static str {
+            "gate"
+        }
+        fn is_available(&self) -> bool {
+            true
+        }
+        fn recognize(&self, _: &RgbaImage) -> Result<Vec<TextLine>, CmError> {
+            while !self.0.load(std::sync::atomic::Ordering::SeqCst) {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            Ok(Vec::new())
+        }
+    }
+    let open = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let (b, _dir) = builder(desktop());
+    let clicks = ScriptedClicks::new();
+    let daemon = b
+        .guide_clicks(clicks.clone())
+        .text_recognizer(Gate(open.clone()))
+        .confirmer(Arc::new(FixedConfirmer::new(Decision::Approve)))
+        .build();
+    let mut c = Client::connect(&daemon, "agent");
+    let sub = c
+        .call("events.subscribe", json!({"topics": ["guide.*"]}))
+        .await;
+    ok(&sub);
+    let id = start(&mut c).await;
+    for i in 0..40 {
+        clicks.click(20.0 + f64::from(i), 28.0);
+        // The first frame is taken by the worker at once; let it get there.
+        if i == 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+    open.store(true, std::sync::atomic::Ordering::SeqCst);
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    let steps = ok(&done)["step_count"].as_u64().unwrap();
+    // One in the worker's hands and at most the bound waiting.
+    assert!(
+        (2..=1 + cm_daemon::guide::session::MAX_PENDING_FRAMES as u64).contains(&steps),
+        "{steps} steps"
+    );
+    let dropped = event_names(&c, "guide.error");
+    assert!(
+        dropped.len() as u64 >= 40 - steps,
+        "{} errors for {steps} steps",
+        dropped.len()
+    );
+    assert_eq!(dropped[0]["data"]["code"], "busy");
+}

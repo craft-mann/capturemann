@@ -157,6 +157,9 @@ impl DialogModel {
             // typed parameters below.
             _ if ask_first => (tr!("Allow this action?"), tr_ctx!("button", "Allow"), false),
             "start_recording" => (tr!("Start recording?"), tr!("Start recording"), false),
+            // GDE-4: the start of a Click Guide, worded here (it was the generic title and
+            // the tool's key as the button, English in every language: QA VI-1).
+            "start_guide" => (tr!("Start a Click Guide?"), tr!("Start guide"), false),
             "publish_video" => {
                 let label = r
                     .details
@@ -718,7 +721,7 @@ mod tests {
         let spec = *cm_daemon::spec_for("rename_capture").unwrap();
         let input = json!({"capture_id": "shot_1", "title": "x".repeat(300), "request_id": "r"});
         let (summary, details, params) =
-            cm_daemon::tool_policy::ask_first_dialog("claude-desktop", &spec, &input);
+            cm_daemon::tool_policy::ask_first_dialog("claude-desktop", &spec, &input, true);
         let r = ConfirmationRequest {
             id: "conf_9".into(),
             client: "claude-desktop".into(),

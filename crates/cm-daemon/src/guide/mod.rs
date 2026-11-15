@@ -425,6 +425,35 @@ pub fn summary(p: &GuideParams) -> String {
     }
 }
 
+/// The rows of the start dialog (`start_guide`): flat English text a client words itself from
+/// [`confirm_params`] (the raw serialized parameters are nested JSON, not rows).
+pub fn confirm_details(p: &GuideParams) -> Option<Value> {
+    let GuideOp::Start {
+        target,
+        title,
+        countdown_s,
+    } = &p.op
+    else {
+        return None;
+    };
+    let target = match target {
+        ScreenshotTarget::Display { display_id } => format!("display {display_id}"),
+        ScreenshotTarget::Window { window_id } => format!("window {window_id}"),
+        ScreenshotTarget::Region { display_id, .. } => format!("area of display {display_id}"),
+    };
+    let mut rows = serde_json::Map::new();
+    rows.insert("target".into(), json!(target));
+    if let Some(t) = title.as_deref().filter(|t| !t.trim().is_empty()) {
+        rows.insert("title".into(), json!(t));
+    }
+    rows.insert(
+        "countdown".into(),
+        json!(format!("{} s", countdown_s.round())),
+    );
+    rows.insert("records".into(), json!("mouse clicks only"));
+    Some(Value::Object(rows))
+}
+
 pub fn confirm_params(p: &GuideParams) -> Value {
     match &p.op {
         GuideOp::Start {
