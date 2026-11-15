@@ -54,3 +54,16 @@ Synthetic-frame tests only (`ls_*` in `crates/cm-capture/src/long_shot/tests.rs`
 | LS-flaky (c): `nothing_scrolled` for a fresh Chrome window | not reproduced. 0.3.4 already sent one more step after 450 ms of looking. Now three more steps (the first after 200 ms at the same point, the others at the next points) before the run says nothing scrolled | `ls_flaky_fresh_window_that_ignores_two_steps` |
 
 None of these has a report on a real screen after the fix, so none is called verified.
+
+## Missing left side of a vertical capture (maintainer, macOS, Nov 15, 2026)
+
+Two Chrome captures (`Screenshot 2026-11-15 13.22` 2120x9930, 9 frames, `reached_end`; `13.25` 2446x4437,
+`no_overlap`) had the left 150 to 300 physical px of the window missing and the right edge complete.
+
+| Finding | Cause found offline | Test |
+| --- | --- | --- |
+| Left strip of the window missing (an address bar that starts mid-URL, a dashboard without its sidebar) | not the picker or the capture target: a Window target is captured whole by `Capturer::capture` and the overlay's area only places the HUD. `Stitcher::apply_trim` cuts columns that do not change between the first two frames (`static_strips`, added on Nov 15 for the horizontal toolbar) when the plain join and the edge trim (at most 48 px left, 64 px right) fail. For a vertical capture those columns are a fixed sidebar or a page's margin, which is content, and the cut was never put back. The first frame's pixels of the cut columns are now kept (`KeptSides`) and added at both sides at the finish; below the first frame's last content row they repeat its last row. A horizontal capture still drops its static rows (a browser's toolbar) | `cap_6_vertical_static_sidebar_is_kept_not_cut` |
+
+Not reproduced on a real screen (the two folders were read only; the frames were not dumped, `CM_LONG_SHOT_DEBUG_DIR`
+writes refused pairs only). A frame is cut only when the first pair did not join as it was, so a page that still
+shows the cut should be sent with its debug dump.

@@ -711,6 +711,64 @@ fn static_strips(a: &Lines, b: &Lines) -> (usize, usize) {
 /// frames (a blinking caret, a loading spinner in the toolbar).
 const STATIC_SHARE: f64 = 0.02;
 
+/// The columns cut from the sides of a vertical capture so that its frames could join, with the
+/// first frame's pixels in them. At the finish every row of the image gets the first frame's
+/// row of them (the header rows as they were, the footer rows as the first frame had them); the
+/// rows below the first frame's content repeat its last content row, which is what a margin or
+/// a sidebar's background is.
+struct KeptSides {
+    l: usize,
+    r: usize,
+    /// Rows of the first frame.
+    rows: usize,
+    left: Vec<u8>,
+    right: Vec<u8>,
+}
+
+impl KeptSides {
+    fn new(first: &Lines, l: usize, r: usize) -> KeptSides {
+        let cross = first.line_len / 4;
+        let (mut left, mut right) = (Vec::new(), Vec::new());
+        for i in 0..first.count {
+            left.extend_from_slice(&first.line(i)[..l * 4]);
+            right.extend_from_slice(&first.line(i)[(cross - r) * 4..]);
+        }
+        KeptSides {
+            l,
+            r,
+            rows: first.count,
+            left,
+            right,
+        }
+    }
+
+    fn width(&self) -> usize {
+        self.l + self.r
+    }
+
+    /// `lines` (rows of `line_len` bytes, `header` rows first and `footer` rows last) with the
+    /// kept columns added at both sides. Returns the new width in px and the data.
+    fn widen(&self, lines: &[u8], line_len: usize, header: usize, footer: usize) -> (u32, Vec<u8>) {
+        let count = lines.len() / line_len;
+        let (lb, rb) = (self.l * 4, self.r * 4);
+        let mut out = Vec::with_capacity(count * (line_len + lb + rb));
+        for i in 0..count {
+            // The first frame's row for output row `i`.
+            let src = if i < header || self.rows <= header + footer {
+                i.min(self.rows - 1)
+            } else if i >= count - footer {
+                self.rows - (count - i)
+            } else {
+                (i).min(self.rows - footer - 1)
+            };
+            out.extend_from_slice(&self.left[src * lb..(src + 1) * lb]);
+            out.extend_from_slice(&lines[i * line_len..(i + 1) * line_len]);
+            out.extend_from_slice(&self.right[src * rb..(src + 1) * rb]);
+        }
+        (((line_len + lb + rb) / 4) as u32, out)
+    }
+}
+
 /// Collects frames and builds the long image.
 pub struct Stitcher {
     dir: Direction,
@@ -722,6 +780,10 @@ pub struct Stitcher {
     /// Pixels cut from the start and the end of every line, once the first pair of frames has
     /// joined.
     trim: Option<(usize, usize)>,
+    /// A vertical capture whose first pair needed static columns cut at its sides (a fixed
+    /// sidebar, a page's margin): the first frame's pixels of the cut columns, put back at the
+    /// finish (see [`KeptSides`]).
+    kept: Option<KeptSides>,
     header: Vec<u8>,
     content: Vec<u8>,
     footer: Vec<u8>,
@@ -742,6 +804,7 @@ impl Stitcher {
             size: None,
             bands: None,
             trim: None,
+            kept: None,
             header: Vec::new(),
             content: Vec::new(),
             footer: Vec::new(),
@@ -887,6 +950,12 @@ impl Stitcher {
             return (prev, lines);
         };
         self.trim = Some((l, r));
+        // Columns cut only so that the frames could join are content of a vertical capture
+        // (a sidebar that stays, the white margin of a page: Chrome, macOS, Nov 15, 2026, the
+        // left 150 to 300 px of two captures were missing). They are put back at the finish.
+        if self.dir == Direction::Vertical {
+            self.kept = Some(KeptSides::new(&prev, l, r));
+        }
         (prev.cropped(l, cross - r), lines.cropped(l, cross - r))
     }
 
@@ -947,7 +1016,7 @@ impl Stitcher {
         let cw = n - join.header - join.footer;
         let have = join.header + self.content.len() / line_len;
         let total = have + join.shift + join.footer;
-        let room = self.room(line_len / 4);
+        let room = self.room(line_len / 4 + self.kept.as_ref().map_or(0, KeptSides::width));
         // The new content is the bottom `shift` lines of this frame's content area.
         let from = join.header + cw - join.shift;
         // The last `guard` lines of the content were not compared: this frame's lines replace them.
@@ -1058,7 +1127,13 @@ impl Stitcher {
         };
         let count = lines.len() / line_len;
         let frame = match self.dir {
-            Direction::Vertical => Frame::new(cross, count as u32, lines)?,
+            Direction::Vertical => match &self.kept {
+                Some(k) => {
+                    let (wide, data) = k.widen(&lines, line_len, header_len, footer_len);
+                    Frame::new(wide, count as u32, data)?
+                }
+                None => Frame::new(cross, count as u32, lines)?,
+            },
             Direction::Horizontal => {
                 // Lines are columns of `h` pixels: transpose back.
                 let hh = cross as usize;
