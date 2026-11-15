@@ -576,7 +576,7 @@ fn main() {
                         // The CLI or an agent stored a setting: the cached view follows.
                         cx.update(|cx| cm_desktop::ui::app::sync_from_settings(&app2, cx));
                     } else if ev.name.starts_with("capture.long_shot.") {
-                        cx.update(|cx| cm_desktop::ui::long_shot::on_event(&ev.name, cx));
+                        cx.update(|cx| cm_desktop::ui::long_shot::on_event(&app2, &ev.name, &ev.data, cx));
                     } else if ev.name.starts_with("recording.") || ev.name.starts_with("camera.") {
                         cx.update(|cx| cm_desktop::ui::recording::on_event(&app2, &ev, cx));
                     }

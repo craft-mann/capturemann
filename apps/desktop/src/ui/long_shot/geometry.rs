@@ -6,8 +6,9 @@ use cm_core::long_shot_hud::{place_hud, place_preview, HudPlacement, PreviewPlac
 use crate::recording::geometry::{area_points, Rect};
 use crate::recording::monitors::EngineDisplay;
 
-/// The HUD's width, points: Stop, the counter, the direction label, Pause and the mode label.
-pub const HUD_W: f64 = 480.0;
+/// The widest the HUD gets, points (S20: 640, and the display minus 48; `bar::plan` decides the
+/// width of the window from what it shows).
+pub const HUD_W: f64 = super::bar::BAR_MAX;
 
 /// What to open.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -49,10 +50,10 @@ pub fn area_in_points(global_px: [i64; 4], scale: f64) -> Rect {
     area_points(global_px, scale)
 }
 
-/// The HUD and preview for `area` on `display` (both global points; `display` should be the part
-/// a window may use, without the menu bar).
-pub fn layout(display: &Rect, area: &Rect) -> Layout {
-    let HudPlacement { rect, .. } = place_hud(h(display), h(area), HUD_W);
+/// The HUD (`hud_w` wide) and preview for `area` on `display` (both global points; `display`
+/// should be the part a window may use, without the menu bar).
+pub fn layout(display: &Rect, area: &Rect, hud_w: f64) -> Layout {
+    let HudPlacement { rect, .. } = place_hud(h(display), h(area), hud_w);
     let (preview, preview_button) = match place_preview(h(display), h(area)) {
         PreviewPlace::Right(p) | PreviewPlace::Left(p) => (Some(r(p)), false),
         PreviewPlace::Button => (None, true),
@@ -125,7 +126,7 @@ mod tests {
     #[test]
     fn s2b_the_hud_goes_above_and_the_preview_to_the_right() {
         let area = Rect::new(300.0, 120.0, 600.0, 560.0);
-        let l = layout(&D, &area);
+        let l = layout(&D, &area, HUD_W);
         assert_eq!(l.hud.y, 120.0 - 12.0 - 56.0);
         assert_eq!(l.hud.x + l.hud.w / 2.0, 600.0);
         assert_eq!(l.hud.w, HUD_W);
@@ -138,11 +139,11 @@ mod tests {
     /// bottom; a full-display area has no room for the preview and gets the Preview button.
     #[test]
     fn s2b_top_edge_full_height_and_full_display() {
-        let l = layout(&D, &Rect::new(300.0, 10.0, 600.0, 500.0));
+        let l = layout(&D, &Rect::new(300.0, 10.0, 600.0, 500.0), HUD_W);
         assert_eq!(l.hud.y, 10.0 + 500.0 + 12.0);
-        let l = layout(&D, &Rect::new(300.0, 0.0, 800.0, 900.0));
+        let l = layout(&D, &Rect::new(300.0, 0.0, 800.0, 900.0), HUD_W);
         assert_eq!(l.hud.y, 900.0 - 16.0 - 56.0);
-        let l = layout(&D, &D);
+        let l = layout(&D, &D, HUD_W);
         assert_eq!(l.hud.y, 900.0 - 16.0 - 56.0);
         assert!(l.preview.is_none() && l.preview_button);
     }

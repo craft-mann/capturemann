@@ -326,6 +326,8 @@ async fn cap_6_esc_stops_a_run_that_has_no_request_id_and_keeps_the_frames() {
             .unwrap();
         if ev.name == "capture.long_shot.started" {
             assert!(ev.data["request_id"].is_null());
+            assert_eq!(ev.data["scroll"], "auto");
+            assert_eq!(ev.data["direction"], "vertical");
             break;
         }
     }
@@ -366,4 +368,41 @@ async fn cap_6_long_shot_state_stop_ends_the_run_and_keeps_the_image() {
     let out = run.await.unwrap().unwrap();
     assert_eq!(out["long_shot"]["end"], "stopped_by_user");
     assert!(out["capture_id"].as_str().is_some());
+}
+
+/// S18: the started event says who started the run, how and where, so the app can show a small
+/// passive HUD for a Long Shot it did not start. The area is in the display's own physical px.
+#[tokio::test]
+async fn cap_6_started_event_says_who_how_and_where_for_the_passive_hud() {
+    let page = SyntheticPage::new(24, 800, 300).with_bands(20, 20);
+    let (d, _confirmer, _dir) = daemon(Scripted::new(page), Decision::Approve);
+    let mut events = d.subscribe();
+    let out = call(
+        &d,
+        agent(),
+        json!({"mode": "long", "target": {"window_id": 10}, "scroll": "auto", "request_id": "mcp-7"}),
+    )
+    .await
+    .unwrap();
+    assert!(out["capture_id"].as_str().is_some());
+    let mut started = None;
+    let mut progress = Vec::new();
+    while let Ok(ev) = events.try_recv() {
+        match ev.name.as_str() {
+            "capture.long_shot.started" => started = Some(ev.data),
+            "capture.long_shot.progress" => progress.push(ev.data),
+            _ => {}
+        }
+    }
+    let s = started.expect("the started event");
+    assert_eq!(s["request_id"], "mcp-7");
+    assert_eq!(s["client"], "claude");
+    assert_eq!(s["scroll"], "auto");
+    assert_eq!(s["display_id"], 1);
+    assert_eq!(s["area"], json!([20, 10, 100, 80]));
+    assert_eq!(s["scale"], 2.0);
+    // The progress event carries the join flag; a run that ends at the end of the page has no
+    // failed join.
+    assert!(!progress.is_empty());
+    assert!(progress.iter().all(|p| p["join_ok"] == true));
 }

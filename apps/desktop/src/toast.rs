@@ -67,6 +67,10 @@ pub enum ToastAction {
     SuggestReport(String),
     /// `upload { file }` of a file made from a capture (the exported audio): capture id, path.
     UploadFile(String, String),
+    /// Ends the running Long Shot and keeps the frames taken (S18: "Stop and keep").
+    StopLongShot,
+    /// Starts Long Shot again to pick Hand scroll (S18: after Auto scroll stopped on a jump).
+    TryHandScroll,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,6 +129,8 @@ impl ToastAction {
             ToastAction::CancelJob(_) | ToastAction::CancelImport(_) => "x",
             ToastAction::UploadFile(..) => "cloud-upload",
             ToastAction::SuggestReport(_) => "file-text",
+            ToastAction::StopLongShot => "cm-stop",
+            ToastAction::TryHandScroll => "hand",
         }
     }
 }

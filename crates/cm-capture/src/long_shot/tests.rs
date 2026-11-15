@@ -309,6 +309,48 @@ fn cap_6_hand_scroll_back_to_the_last_frame_clears_the_note() {
     assert_eq!(r.image.frame, page.expected_range(0, 400));
 }
 
+/// S18: the progress callback tells the HUD when the newest settled frame did not line up (so it
+/// can say "Scroll back up a little") and again when a frame lines up or the person is back at the
+/// last good frame. The count never changes on that notice.
+#[test]
+fn cap_6_hand_scroll_reports_when_a_frame_did_not_line_up_and_when_it_does_again() {
+    let page = SyntheticPage::new(40, 3000, 300).with_bands(30, 0);
+    let script = vec![
+        0, 0, 0, 100, 100, 100, // joins
+        1500, 1500, 1500, // too far: left out
+        100, 100, 100, // back at the last good frame
+        1500, 1500, 1500, // left out again
+        200, 200, 200, // joins
+    ];
+    let mut src = HandScript::new(page, script);
+    let mut seen: Vec<(u32, bool)> = Vec::new();
+    let mut n = 0;
+    run_hand(
+        &mut src,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || {
+            n += 1;
+            n > 40
+        },
+        &mut |p| seen.push((p.frames, p.last_join_ok)),
+    )
+    .unwrap();
+    // The same notice twice in a row says nothing new.
+    seen.dedup();
+    assert_eq!(
+        seen,
+        vec![
+            (1, true),
+            (2, true),
+            (2, false),
+            (2, true),
+            (2, false),
+            (3, true)
+        ]
+    );
+}
+
 /// Checks the image against the page on two columns the clock and the cursor never touch: the
 /// column that carries the row number and one in the middle. Every row once and in order.
 fn assert_rows_match(got: &Frame, want: &Frame, what: &str) {
