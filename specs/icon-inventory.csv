@@ -3,7 +3,6 @@ A,Studio window and Settings,Sidebar (Studio window),Brand,"logo mark + ""Captur
 A,Studio window and Settings,Sidebar (Studio window),Brand,"""v0.1""",badge,version tag,static,none,ui/studio.rs:469
 A,Studio window and Settings,Sidebar (Studio window),Nav,"""Recordings""",sidebar item (Role::Tab),go to Recordings library,"active, inactive, hover, focus ring",none,ui/studio.rs:216; nav.rs:40
 A,Studio window and Settings,Sidebar (Studio window),Nav,"""Screenshots""",sidebar item,go to Screenshots library (also for screenshot editor),same,none,nav.rs:41
-A,Studio window and Settings,Sidebar (Studio window),Nav,"""Published""",sidebar item,go to Published page,same,none,nav.rs:42
 A,Studio window and Settings,Sidebar (Studio window),Nav,"""AI & Agents""",sidebar item,go to AI page (AI and Agents & CLI are its two tabs; also active on Agents route),same,none,nav.rs:43
 A,Studio window and Settings,Sidebar (Studio window),Nav,"""Settings""",sidebar item,go to Settings (also active on Destinations and Permissions routes),same,none,nav.rs:44
 A,Studio window and Settings,Sidebar (Studio window),Nav,"count after Recordings / Screenshots / Published (number, e.g. ""138"")",status label,"real library count; hidden while unknown (None); none for AI & Agents, Settings",shown or hidden,none,ui/studio.rs:258; nav.rs:76
@@ -107,16 +106,6 @@ A,Studio window and Settings,"Transcript section on the details page (ai_view::t
 A,Studio window and Settings,"Transcript section on the details page (ai_view::transcript_section, ids prefixed `rec-`)",Caption switches (present),"""Show captions in the preview"" / ""Drawn on the video in the editor."" + switch",toggle,caption.enabled,"on, off",none,ui/ai_view.rs:618
 A,Studio window and Settings,"Transcript section on the details page (ai_view::transcript_section, ids prefixed `rec-`)",Caption switches (present),"""Include in exported video"" / ""Burned into new exports unless you turn it off when exporting."" + switch",toggle,caption burn-in default,"on, off",none,ui/ai_view.rs:636
 A,Studio window and Settings,"Transcript section on the details page (ai_view::transcript_section, ids prefixed `rec-`)",Transcript,transcribe error text (warning),status label,job error,conditional,none,ui/ai_view.rs:~310
-A,Studio window and Settings,Published page,Page,"""Loading…"" / load error text",status label,load state,"loading, failed",none,ui/published_view.rs:~222
-A,Studio window and Settings,Published page,Empty state,"tile with send icon, ""Nothing published yet"", ""Open a recording and press Publish to send it to YouTube. Your published videos are listed here with their links.""",status label,no action button,conditional,`send` 24 px,ui/published_view.rs:261; published.rs:199
-A,Studio window and Settings,Published page,List,"section label ""Newest first""",other,heading,static,none,ui/published_view.rs:285
-A,Studio window and Settings,Published page,Row,"capture title + ""{Platform} · {account} · {date}"" (Role::Link)",link button,open recording details (recording) or editor (screenshot),"hover none, focus ring",none,ui/published_view.rs:121
-A,Studio window and Settings,Published page,Row,"privacy pill: ""Private"" / ""Unlisted"" / ""Public"" / ""Unknown"", or ""{reported} (you asked for {asked})""",pill (status_pill),"privacy the platform reports; dot is warning when privacy locked, else mist","normal, privacy locked",none (CSS dot),ui/published_view.rs:181; published.rs:233
-A,Studio window and Settings,Published page,Row,"""Open""",button (small_button),open link in browser,hover,none,ui/published_view.rs:183
-A,Studio window and Settings,Published page,Row,"""Copy link""",button (small_button),copy link,hover,none,ui/published_view.rs:191
-A,Studio window and Settings,Published page,Row,URL line (mono),status label,the link,static,none,ui/published_view.rs:~200
-A,Studio window and Settings,Published page,Row,"status text: ""Processed"" / ""{Platform} kept it {privacy}"" / ""Published""",status label,publish state,"published (also a processing record or an unknown status), processed, privacy locked",none,published.rs:243
-A,Studio window and Settings,Published page,Row,"warnings (warning text, one per warning)",status label,platform warnings,conditional,none,ui/published_view.rs:~212
 A,Studio window and Settings,"AI page (sidebar ""AI & Agents"", tab ""AI"")",Tabs,"""AI""",segment (ai_agents_tabs),AI page,active,none,ui/settings/widgets.rs:~280
 A,Studio window and Settings,"AI page (sidebar ""AI & Agents"", tab ""AI"")",Tabs,"""Agents & CLI""",segment,go to Agents page,inactive,none,ui/settings/widgets.rs:~281
 A,Studio window and Settings,"AI page (sidebar ""AI & Agents"", tab ""AI"")",Header,"""AI"" / ""Transcripts and captions, made on this Mac.""",other,"title, subtitle",static,none,ui/ai_view.rs:~200
@@ -755,7 +744,6 @@ C,Floating and system surfaces,15. Studio window chrome and sidebar (system/wind
 C,Floating and system surfaces,15. Studio window chrome and sidebar (system/window-level pieces),Sidebar brand,"logo 22 px + ""CaptureMann"" + badge ""v0.1""",other,Brand header,n/a,logo (brand/mark),D/ui/studio.rs:~456
 C,Floating and system surfaces,15. Studio window chrome and sidebar (system/window-level pieces),Sidebar nav,"""Recordings"" (+ count)",tab,Recordings grid,active / inactive / hover / focus,none (text only),D/nav.rs:38
 C,Floating and system surfaces,15. Studio window chrome and sidebar (system/window-level pieces),Sidebar nav,"""Screenshots"" (+ count)",tab,Screenshots grid,same,none,D/nav.rs:39
-C,Floating and system surfaces,15. Studio window chrome and sidebar (system/window-level pieces),Sidebar nav,"""Published"" (+ count)",tab,Published list,same,none,D/nav.rs:40
 C,Floating and system surfaces,15. Studio window chrome and sidebar (system/window-level pieces),Sidebar nav,"""AI & Agents""",tab,AI page,same,none,D/nav.rs:41
 C,Floating and system surfaces,15. Studio window chrome and sidebar (system/window-level pieces),Sidebar nav,"""Settings""",tab,"Settings (also covers Destinations, Permissions)",same,none,D/nav.rs:42
 C,Floating and system surfaces,15. Studio window chrome and sidebar (system/window-level pieces),MCP card,"""MCP ready"" / ""MCP offline"" with agent-blue dot (grey when offline) + two mono lines (""Last call: {tool}"" / ""from {client}"", or the offline reason)",status label / indicator,Agent connection state,ready / offline,dot,"D/ui/studio.rs:~262, D/agent_status.rs:34"

@@ -1,20 +1,21 @@
-//! The Published page and the share links of uploads, as display-free logic (PUB-2, STO-4):
-//! parsing the `publishes` and `uploads` records of `list_library` items, one row per publish
-//! newest first, plain-words labels, empty-state text, and which upload link "Copy link" copies.
-//! The window code (`ui::published_view`) only draws what is decided here.
+//! Publish records and the share links of uploads, as display-free logic (PUB-2, STO-4): parsing
+//! the `publishes` and `uploads` records of `list_library` items, plain-words labels, the status
+//! line of a card on the Recordings page with the Published filter on (S22), the Published card
+//! of the details page, and which upload link "Copy link" copies. The Published page is gone
+//! (0.3.4): its list is that filter. The window code only draws what is decided here.
 
 use cm_i18n::{tr, tr_ctx};
 use serde_json::Value;
 use time::OffsetDateTime;
 
-use crate::library::{CaptureItem, Kind};
-
 /// What the platform says about a published video.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PublishState {
-    /// Uploaded. Also what a `processing` record or a status this version does not know shows:
-    /// the app never asks the platform again, so it does not claim the video is still processing.
+    /// Uploaded: also a status this version does not know.
     Published,
+    /// Recorded as `processing` when the video was sent. The app never asks the platform again,
+    /// so [`status_line`] says "is processing" only while the record is young.
+    Processing,
     Processed,
     /// The platform kept the video private although another privacy was asked for.
     PrivacyLocked,
@@ -51,6 +52,7 @@ impl PublishRecord {
             privacy_requested: text("privacy_requested"),
             state: match v.get("status").and_then(Value::as_str) {
                 Some("processed") => PublishState::Processed,
+                Some("processing") => PublishState::Processing,
                 Some("privacy_locked") => PublishState::PrivacyLocked,
                 _ => PublishState::Published,
             },
@@ -154,56 +156,8 @@ pub fn upload_line(u: &UploadRecord, when: &str) -> String {
     parts.join(" \u{00B7} ")
 }
 
-// ---- the Published page ------------------------------------------------------------------------
-
-/// One published video: a row of the Published page.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PublishedRow {
-    pub capture_id: String,
-    /// The recording's title (the video's title on the platform can differ).
-    pub capture_title: String,
-    pub kind: Kind,
-    pub record: PublishRecord,
-}
-
-/// Every publish of every capture, newest first (records without a time last). Ties keep a
-/// stable order by capture id and video id.
-pub fn rows(items: &[CaptureItem]) -> Vec<PublishedRow> {
-    let mut out: Vec<PublishedRow> = items
-        .iter()
-        .flat_map(|i| {
-            i.publishes.iter().map(|r| PublishedRow {
-                capture_id: i.id.clone(),
-                capture_title: i.title.clone(),
-                kind: i.kind,
-                record: r.clone(),
-            })
-        })
-        .collect();
-    out.sort_by(|a, b| {
-        b.record
-            .at
-            .cmp(&a.record.at)
-            .then_with(|| a.capture_id.cmp(&b.capture_id))
-            .then_with(|| a.record.remote_id.cmp(&b.record.remote_id))
-    });
-    out
-}
-
-/// The sidebar number: how many videos are published.
-pub fn count(items: &[CaptureItem]) -> usize {
-    items.iter().map(|i| i.publishes.len()).sum()
-}
-
-/// The empty page: a title and how to publish.
-pub fn empty_text() -> (String, String) {
-    (
-        tr!("Nothing published yet"),
-        tr!(
-            "Open a recording and press Publish to send it to YouTube. Your published videos are listed here with their links."
-        ),
-    )
-}
+/// How long after sending a `processing` record still reads "is processing".
+pub const PROCESSING_WINDOW: time::Duration = time::Duration::hours(24);
 
 /// "YouTube" for `youtube`; an unknown platform shows its name with a capital.
 pub fn platform_label(platform: &str) -> String {
@@ -266,7 +220,7 @@ pub fn status_text(r: &PublishRecord) -> String {
             platform = p,
             privacy = privacy_in_sentence(&r.privacy)
         ),
-        PublishState::Published => tr!("Published"),
+        PublishState::Published | PublishState::Processing => tr!("Published"),
     }
 }
 
@@ -295,7 +249,9 @@ pub fn privacy_tone(r: &PublishRecord) -> crate::ui::kit::Tone {
 pub fn status_icon(state: PublishState) -> (&'static str, crate::ui::kit::Tone) {
     use crate::ui::kit::Tone;
     match state {
-        PublishState::Published | PublishState::Processed => ("circle-check", Tone::Success),
+        PublishState::Published | PublishState::Processing | PublishState::Processed => {
+            ("circle-check", Tone::Success)
+        }
         PublishState::PrivacyLocked => ("triangle-alert", Tone::Brass),
     }
 }
@@ -318,26 +274,137 @@ pub fn platform_account(r: &PublishRecord) -> String {
     }
 }
 
-/// Screen-reader label of a row: everything it shows in one sentence.
-pub fn accessible_label(row: &PublishedRow, when: &str) -> String {
-    if when.is_empty() {
-        tr!(
-            "{title}, {platform}, {privacy}, {status}",
-            title = row.capture_title,
-            platform = platform_account(&row.record),
-            privacy = privacy_line(&row.record),
-            status = status_text(&row.record)
-        )
+/// The pill on a published card's thumbnail: "YouTube \u{b7} Unlisted" (S22).
+pub fn platform_pill(r: &PublishRecord) -> String {
+    tr!(
+        "{platform} \u{00B7} {privacy}",
+        platform = platform_label(&r.platform),
+        privacy = privacy_label(&r.privacy)
+    )
+}
+
+/// The meta line of a published card: "Published Today 15:41 \u{b7} 11.9 MB" (the time and the
+/// size only when known). `when` is the formatted publish time, `size` the formatted size.
+pub fn published_meta(when: &str, size: &str) -> String {
+    let head = if when.is_empty() {
+        tr!("Published")
     } else {
-        tr!(
-            "{title}, {platform}, {privacy}, {status}, {when}",
-            title = row.capture_title,
-            platform = platform_account(&row.record),
-            privacy = privacy_line(&row.record),
-            status = status_text(&row.record),
-            when = when
-        )
+        tr!("Published {when}", when = when)
+    };
+    if size.is_empty() {
+        head
+    } else {
+        format!("{head} \u{00B7} {size}")
     }
+}
+
+/// What the status line of a published card shows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusLine {
+    pub text: String,
+    pub kind: StatusKind,
+}
+
+/// The look of a status line (S22): a warning is brass with a triangle, "processing" a ring,
+/// "live" a green dot; all other text is the quiet grey.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatusKind {
+    Warning,
+    Processing,
+    Live,
+    /// Published, with nothing more known (an older `processing` record, an unknown status).
+    Plain,
+}
+
+/// The one status line under a published card: the first warning of the platform (a refusal such
+/// as "captions not added") if there is one, else [`state_line`].
+pub fn status_line(r: &PublishRecord, now: OffsetDateTime) -> StatusLine {
+    match r.warnings.first() {
+        Some(w) if r.state != PublishState::PrivacyLocked => StatusLine {
+            text: w.clone(),
+            kind: StatusKind::Warning,
+        },
+        _ => state_line(r, now),
+    }
+}
+
+/// What the platform says about the video, without its warnings: a locked privacy, "is
+/// processing" while a `processing` record is young, "Live on" once processed, else plain
+/// "Published on". `now` is passed in so it is testable.
+pub fn state_line(r: &PublishRecord, now: OffsetDateTime) -> StatusLine {
+    let p = platform_label(&r.platform);
+    match r.state {
+        PublishState::PrivacyLocked => StatusLine {
+            text: status_text(r),
+            kind: StatusKind::Warning,
+        },
+        PublishState::Processed => StatusLine {
+            text: tr!("Live on {platform}", platform = p),
+            kind: StatusKind::Live,
+        },
+        PublishState::Processing
+            if r.at
+                .is_some_and(|a| now >= a && now - a < PROCESSING_WINDOW) =>
+        {
+            StatusLine {
+                text: tr!("{platform} is processing", platform = p),
+                kind: StatusKind::Processing,
+            }
+        }
+        _ => StatusLine {
+            text: tr!("Published on {platform}", platform = p),
+            kind: StatusKind::Plain,
+        },
+    }
+}
+
+/// The distinct platforms of a recording's publishes, in the order they were first used.
+pub fn platforms(publishes: &[PublishRecord]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for r in publishes {
+        let name = platform_label(&r.platform);
+        if !out.contains(&name) {
+            out.push(name);
+        }
+    }
+    out
+}
+
+/// "1 \u{b7} YouTube": the Published tile of the details page (the number of platforms and
+/// their names); `None` when the recording was never published.
+pub fn platforms_summary(publishes: &[PublishRecord]) -> Option<String> {
+    let names = platforms(publishes);
+    (!names.is_empty()).then(|| format!("{} \u{00B7} {}", names.len(), names.join(", ")))
+}
+
+/// "youtube.com/watch?v=abc": a link without its scheme and "www.", as the Published card
+/// shows it.
+pub fn short_link(url: &str) -> String {
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .unwrap_or(url);
+    rest.strip_prefix("www.").unwrap_or(rest).to_owned()
+}
+
+/// The record a card is about: the newest publish (a record without a time sorts oldest; the
+/// later one in the list wins a tie).
+pub fn latest(publishes: &[PublishRecord]) -> Option<&PublishRecord> {
+    publishes
+        .iter()
+        .enumerate()
+        .max_by_key(|(i, r)| (r.at, *i))
+        .map(|(_, r)| r)
+}
+
+/// Whether a capture's publishes need a look (the "Needs attention" chip, S22): a publish with a
+/// warning or a locked privacy, or an upload of the capture waiting for a sign-in.
+pub fn needs_attention(publishes: &[PublishRecord], upload_waiting: bool) -> bool {
+    !publishes.is_empty()
+        && (upload_waiting
+            || publishes
+                .iter()
+                .any(|r| !r.warnings.is_empty() || r.state == PublishState::PrivacyLocked))
 }
 
 #[cfg(test)]
@@ -345,6 +412,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::library::CaptureItem;
 
     fn pub_rec(id: &str, at: &str, status: &str, privacy: &str, asked: &str) -> Value {
         json!({ "platform": "youtube", "account_id": "a1", "account": "My channel",
@@ -368,96 +436,6 @@ mod tests {
     }
 
     #[test]
-    fn rows_are_newest_first_across_captures() {
-        let items = vec![
-            item(
-                "a",
-                "Lesson 1",
-                vec![pub_rec(
-                    "v1",
-                    "2026-10-21T10:00:00Z",
-                    "processed",
-                    "public",
-                    "public",
-                )],
-                vec![],
-            ),
-            item(
-                "b",
-                "Lesson 2",
-                vec![
-                    pub_rec(
-                        "v2",
-                        "2026-10-23T10:00:00Z",
-                        "processing",
-                        "private",
-                        "private",
-                    ),
-                    pub_rec(
-                        "v3",
-                        "2026-10-22T10:00:00Z",
-                        "processed",
-                        "public",
-                        "public",
-                    ),
-                ],
-                vec![],
-            ),
-            item("c", "Never published", vec![], vec![]),
-        ];
-        let r = rows(&items);
-        let ids: Vec<&str> = r.iter().map(|r| r.record.remote_id.as_str()).collect();
-        assert_eq!(ids, ["v2", "v3", "v1"]);
-        assert_eq!(r[0].capture_id, "b");
-        assert_eq!(r[0].capture_title, "Lesson 2");
-        assert_eq!(count(&items), 3);
-    }
-
-    #[test]
-    fn an_empty_library_has_no_rows_and_a_zero_count() {
-        assert!(rows(&[]).is_empty());
-        assert_eq!(count(&[]), 0);
-        let (title, body) = empty_text();
-        assert_eq!(title, "Nothing published yet");
-        assert!(body.contains("Publish"));
-        // Only the platforms the app offers are named.
-        for other in ["TikTok", "Facebook"] {
-            assert!(!body.contains(other));
-        }
-    }
-
-    #[test]
-    fn a_record_without_a_time_sorts_last_and_ties_are_stable() {
-        let items = vec![item(
-            "a",
-            "A",
-            vec![
-                json!({ "platform": "youtube", "remote_id": "old", "url": "https://youtu.be/old" }),
-                pub_rec(
-                    "same2",
-                    "2026-10-21T10:00:00Z",
-                    "processed",
-                    "public",
-                    "public",
-                ),
-                pub_rec(
-                    "same1",
-                    "2026-10-21T10:00:00Z",
-                    "processed",
-                    "public",
-                    "public",
-                ),
-            ],
-            vec![],
-        )];
-        let ids: Vec<String> = rows(&items)
-            .into_iter()
-            .map(|r| r.record.remote_id)
-            .collect();
-        assert_eq!(ids, ["same1", "same2", "old"]);
-    }
-
-    #[test]
     fn a_record_with_no_link_is_skipped() {
         let i = item(
             "a",
@@ -466,6 +444,149 @@ mod tests {
             vec![],
         );
         assert!(i.publishes.is_empty());
+    }
+
+    fn rec(id: &str, at: &str, status: &str) -> PublishRecord {
+        PublishRecord::from_json(&pub_rec(id, at, status, "unlisted", "unlisted")).unwrap()
+    }
+
+    fn at(s: &str) -> OffsetDateTime {
+        OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339).unwrap()
+    }
+
+    #[test]
+    fn the_newest_publish_is_the_one_a_card_is_about() {
+        let old = rec("old", "2026-10-21T10:00:00Z", "processed");
+        let new = rec("new", "2026-10-23T10:00:00Z", "processed");
+        let none = PublishRecord::from_json(
+            &json!({ "platform": "youtube", "remote_id": "t", "url": "https://youtu.be/t" }),
+        )
+        .unwrap();
+        assert_eq!(latest(&[]), None);
+        assert_eq!(
+            latest(&[old.clone(), new.clone(), none.clone()])
+                .unwrap()
+                .remote_id,
+            "new"
+        );
+        // A record without a time is the oldest; the later of two equal ones wins.
+        assert_eq!(
+            latest(&[none.clone(), old.clone()]).unwrap().remote_id,
+            "old"
+        );
+        let same = rec("same", "2026-10-21T10:00:00Z", "processed");
+        assert_eq!(latest(&[old, same]).unwrap().remote_id, "same");
+    }
+
+    /// S22: the pill on the thumbnail, the meta line and the status line of a published card.
+    #[test]
+    fn a_published_card_says_platform_visibility_time_size_and_status() {
+        let r = rec("v", "2026-10-23T15:41:00Z", "processed");
+        assert_eq!(platform_pill(&r), "YouTube \u{00B7} Unlisted");
+        assert_eq!(
+            published_meta("Today 15:41", "11.9 MB"),
+            "Published Today 15:41 \u{00B7} 11.9 MB"
+        );
+        assert_eq!(published_meta("", "11.9 MB"), "Published \u{00B7} 11.9 MB");
+        assert_eq!(published_meta("Nov 12", ""), "Published Nov 12");
+        let now = at("2026-10-23T16:00:00Z");
+        assert_eq!(
+            status_line(&r, now),
+            StatusLine {
+                text: "Live on YouTube".into(),
+                kind: StatusKind::Live
+            }
+        );
+        // Processing reads as processing while young, then as published (never refreshed).
+        let p = rec("v", "2026-10-23T15:41:00Z", "processing");
+        assert_eq!(status_line(&p, now).text, "YouTube is processing");
+        assert_eq!(status_line(&p, now).kind, StatusKind::Processing);
+        let later = at("2026-10-25T16:00:00Z");
+        assert_eq!(status_line(&p, later).text, "Published on YouTube");
+        assert_eq!(status_line(&p, later).kind, StatusKind::Plain);
+        // A record dated in the future (clock skew) is not "processing" either.
+        assert_eq!(
+            status_line(&p, at("2026-10-23T10:00:00Z")).kind,
+            StatusKind::Plain
+        );
+    }
+
+    #[test]
+    fn a_warning_or_a_locked_privacy_takes_the_status_line() {
+        let now = at("2026-10-23T16:00:00Z");
+        let mut v = pub_rec(
+            "v",
+            "2026-10-23T15:41:00Z",
+            "processed",
+            "unlisted",
+            "unlisted",
+        );
+        v["warnings"] = json!(["Captions not added", "The thumbnail was refused."]);
+        let w = PublishRecord::from_json(&v).unwrap();
+        assert_eq!(
+            status_line(&w, now),
+            StatusLine {
+                text: "Captions not added".into(),
+                kind: StatusKind::Warning
+            }
+        );
+        let locked = PublishRecord::from_json(&pub_rec(
+            "v",
+            "2026-10-23T15:41:00Z",
+            "privacy_locked",
+            "private",
+            "public",
+        ))
+        .unwrap();
+        assert_eq!(status_line(&locked, now).text, "YouTube kept it private");
+        assert_eq!(status_line(&locked, now).kind, StatusKind::Warning);
+        // The details card lists the warnings itself: its line is the state alone.
+        assert_eq!(state_line(&w, now).text, "Live on YouTube");
+    }
+
+    #[test]
+    fn the_published_tile_and_the_short_link() {
+        let a = rec("a", "2026-10-21T10:00:00Z", "processed");
+        let b = rec("b", "2026-10-23T10:00:00Z", "processed");
+        assert_eq!(platforms_summary(&[]), None);
+        assert_eq!(
+            platforms_summary(std::slice::from_ref(&a)).as_deref(),
+            Some("1 \u{00B7} YouTube")
+        );
+        // Two videos on one platform are one platform.
+        assert_eq!(
+            platforms_summary(&[a, b]).as_deref(),
+            Some("1 \u{00B7} YouTube")
+        );
+        assert_eq!(
+            short_link("https://www.youtube.com/watch?v=x"),
+            "youtube.com/watch?v=x"
+        );
+        assert_eq!(short_link("https://youtu.be/x"), "youtu.be/x");
+        assert_eq!(short_link("youtu.be/x"), "youtu.be/x");
+    }
+
+    /// S22: "Needs attention" is a publish with a warning (or a locked privacy), or an upload of
+    /// the capture waiting for a sign-in; a capture that was never published never is.
+    #[test]
+    fn needs_attention_means_a_warning_a_locked_privacy_or_a_waiting_upload() {
+        let ok = rec("a", "2026-10-23T15:41:00Z", "processed");
+        let mut v = pub_rec("b", "2026-10-23T15:41:00Z", "processed", "public", "public");
+        v["warnings"] = json!(["Captions not added"]);
+        let warned = PublishRecord::from_json(&v).unwrap();
+        let locked = PublishRecord::from_json(&pub_rec(
+            "c",
+            "2026-10-23T15:41:00Z",
+            "privacy_locked",
+            "private",
+            "public",
+        ))
+        .unwrap();
+        assert!(!needs_attention(&[], true), "never published");
+        assert!(!needs_attention(std::slice::from_ref(&ok), false));
+        assert!(needs_attention(std::slice::from_ref(&ok), true));
+        assert!(needs_attention(&[ok.clone(), warned], false));
+        assert!(needs_attention(&[locked], false));
     }
 
     #[test]
@@ -526,27 +647,6 @@ mod tests {
             ("triangle-alert", Tone::Brass)
         );
         assert_eq!(status_icon(PublishState::Processed).0, "circle-check");
-    }
-
-    #[test]
-    fn the_accessible_label_has_everything_on_the_row() {
-        let i = item(
-            "a",
-            "Lesson",
-            vec![pub_rec(
-                "v",
-                "2026-10-21T10:00:00Z",
-                "processed",
-                "public",
-                "public",
-            )],
-            vec![],
-        );
-        let l = accessible_label(&rows(&[i])[0], "Oct 21, 2026");
-        assert_eq!(
-            l,
-            "Lesson, YouTube \u{00B7} My channel, Public, Processed, Oct 21, 2026"
-        );
     }
 
     /// STO-4.AC3: the link "Copy link" copies is the newest link of the video, else of the
@@ -633,7 +733,8 @@ mod tests {
                 assert!(open_label(&r).contains("YouTube"));
             });
         }
-        let (title, _) = with_language(Lang::EnXa, empty_text);
-        assert_ne!(title, "Nothing published yet");
+        let now = OffsetDateTime::now_utc();
+        let live = with_language(Lang::EnXa, || status_line(&r, now).text);
+        assert_ne!(live, "YouTube kept it private");
     }
 }

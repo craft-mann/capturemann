@@ -32,7 +32,6 @@ pub mod pages;
 pub mod paint;
 pub mod permissions_view;
 pub mod publish_sheet;
-pub mod published_view;
 pub mod recording;
 pub mod recording_editor;
 pub mod report_offer;

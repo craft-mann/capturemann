@@ -40,8 +40,11 @@ Settings (Destinations and Publishing). Upload A's export to Drive and its origi
 (Upload to...), and publish A to YouTube as Private. Upload only B's export to Drive. Leave C alone.
 
 8. **Chips and counts.** Open the library. Expected: the chips read All, Recordings, Screenshots, Uploaded 2,
-   Published 1 (counts of the whole library). Click Uploaded: only A and B stay. Click Published: only A.
-   Click Published again: it turns off. Click All: every chip filter is off and all captures show.
+   Published 1 (counts of the whole library), and on Recordings also Needs attention. Click Uploaded: only A and B stay.
+   Click Published: only A, the title reads "Recordings 1 of 3 · published", the sort bar says "Date published" and
+   A's card shows "YouTube · Private" on the thumbnail, "Published <time> · <size>" and a status line. The sidebar has
+   no Published item. Click Published again: it turns off. Click All: every chip filter is off and all captures show.
+   Start the app with `--page published`: Recordings opens with Published on.
 9. **Chips combine.** Click Uploaded, then Recordings: only recordings that are uploaded. Type part of A's
    title in the search box: only A (or nothing if the text does not match). Clear the search. A chip with no
    match (for example Published after deleting A's video record, or on a library with no uploads) shows

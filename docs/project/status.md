@@ -116,6 +116,7 @@ Specs final and defaults accepted Nov 14, 2026; plan `specs/plans/release-0.3.4-
 | Touch-up: Retype, Move area (ANN-9, ANN-10) | base-edit ops with a measured fill | tested with fakes and golden images (`cm-render` `touchup_034`); fill quality measured on real macOS and Windows screens, PARTIAL report `verification/S2-fill-quality-0.3.4-2026-11-14-claude.md` (a busy-fill warning fires on an icon or control in the box, not on a busy photo: wording changed; the erased box is padded by 1 px) |
 | Zoom Lens (ANN-8, op `magnify`) | loupe op | tested with fakes and golden images; not seen by eye on Windows or Linux |
 | Blueprint (ANN-11) | bars over text, kept lines | tested with fakes and golden images; fill quality as the S2 report above |
+| Published page removed (S22, S23; decision Nov 15, 2026) | the Published sidebar item and page are gone; Recordings has the Published and Needs attention chips, "Date published" sort, published cards and menu; the details page has a Published card; `--page published` opens Recordings with Published on | tested with fakes (`library.rs`, `published.rs`, `nav.rs` unit tests); not seen on a screen yet |
 | Boards (BRD-1) | board compose | tested with fakes; no hardware report |
 | Bulk export (BLK-1) | bulk compose | tested with fakes; no hardware report |
 | CMYK JPEG conversion | import | tested with fakes; no report |

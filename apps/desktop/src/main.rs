@@ -192,6 +192,7 @@ fn main() {
     // `--page permissions` is the setup screen, `--page settings-permissions` the Settings page.
     let demo_permissions = value_of("--demo-permissions");
     let demo_permissions_window = flag("--demo-permissions-window");
+    let page_is_published = value_of("--page").as_deref() == Some("published");
     let page_is_permissions = value_of("--page").as_deref() == Some("settings-permissions");
     let start_route = value_of("--page").and_then(|v| match v.as_str() {
         "permissions" => Some(Route::Permissions),
@@ -201,7 +202,8 @@ fn main() {
         "guides" => Some(Route::Guides),
         "screenshots" => Some(Route::Screenshots),
         "library" | "all" => Some(Route::Library),
-        "published" => Some(Route::Published),
+        // The Published page is gone (0.3.4): the old name opens Recordings with Published on.
+        "published" => Some(Route::Recordings),
         "destinations" => Some(Route::Destinations),
         "agents" => Some(Route::Agents),
         "ai" => Some(Route::Ai),
@@ -569,7 +571,7 @@ fn main() {
                     } else if ev.name == "publish.done"
                         || (ev.name == "job.done" && ev.data["type"] == "upload")
                     {
-                        // A publish or an upload record was added to a manifest: the Published
+                        // A publish or an upload record was added to a manifest: the Recordings
                         // page, the details page and the library's Copy link reload.
                         cx.update(|cx| cm_desktop::ui::app::capture_changed(&app2, None, cx));
                     } else if ev.name == cm_daemon::events::SETTINGS_CHANGED {
@@ -670,6 +672,9 @@ fn main() {
         // The recording demos skip it.
         let show_setup =
             demo_plan.is_none() && app::prepare_permissions(&model, demo_permissions_window, cx);
+        if page_is_published {
+            model.update(cx, |m, _| m.show_published = true);
+        }
         let explicit = start_route
             .clone()
             .or_else(|| open_capture.clone().map(app::Route::Editor));

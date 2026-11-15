@@ -22,8 +22,13 @@ pub enum Kind {
 pub enum CardAction {
     Open,
     Reveal,
-    /// Only for captures with an upload that has a share link (STO-4.AC3).
+    /// Only for captures with an upload that has a share link (STO-4.AC3). "Copy file link" when
+    /// the capture is also published (S22).
     CopyLink,
+    /// Only for a capture with a publish record: opens the video on its platform (S22).
+    OpenPublished,
+    /// Only for a capture with a publish record: copies the video's link (S22).
+    CopyPublishedLink,
     /// Only for a screenshot, and only where this computer has a text recognizer (ANN-5).
     CopyText,
     Rename,
@@ -44,6 +49,15 @@ impl CardAction {
         if crate::published::share_link_of(&item.uploads).is_some() {
             v.insert(2, CardAction::CopyLink);
         }
+        if item.latest_publish().is_some() {
+            // S22: Open, Open on YouTube, Copy YouTube link, then the file's own items.
+            v.insert(1, CardAction::OpenPublished);
+            v.insert(2, CardAction::CopyPublishedLink);
+            if let Some(at) = v.iter().position(|a| *a == CardAction::CopyLink) {
+                v.remove(at);
+                v.insert(3, CardAction::CopyLink);
+            }
+        }
         if item.kind == Kind::Screenshot && !item.broken && crate::editor::copytext::available() {
             let at = v
                 .iter()
@@ -58,6 +72,14 @@ impl CardAction {
         match self {
             CardAction::Open => tr_ctx!("card menu", "Open"),
             CardAction::CopyLink => tr!("Copy link"),
+            CardAction::OpenPublished => tr!(
+                "Open on {platform}",
+                platform = crate::published::platform_label("youtube")
+            ),
+            CardAction::CopyPublishedLink => tr!(
+                "Copy {platform} link",
+                platform = crate::published::platform_label("youtube")
+            ),
             CardAction::CopyText => tr!("Copy text"),
             CardAction::Reveal => {
                 crate::platform_text::term(platform, crate::platform_text::Term::RevealLabel)
@@ -67,10 +89,31 @@ impl CardAction {
         }
     }
 
+    /// The label on one card's menu: the publish entries name the platform of the capture's
+    /// newest publish, and "Copy link" reads "Copy file link" next to "Copy YouTube link" (S22).
+    pub fn label_for(
+        self,
+        os: crate::platform_text::Platform,
+        item: Option<&CaptureItem>,
+    ) -> String {
+        let record = item.and_then(CaptureItem::latest_publish);
+        match (self, record) {
+            (CardAction::OpenPublished, Some(r)) => crate::published::open_label(r),
+            (CardAction::CopyPublishedLink, Some(r)) => tr!(
+                "Copy {platform} link",
+                platform = crate::published::platform_label(&r.platform)
+            ),
+            (CardAction::CopyLink, Some(_)) => tr!("Copy file link"),
+            _ => self.label(os),
+        }
+    }
+
     /// A stable element id part (never translated).
     pub fn key(self, mac: bool) -> &'static str {
         match self {
             CardAction::Open => "Open",
+            CardAction::OpenPublished => "Open published",
+            CardAction::CopyPublishedLink => "Copy published link",
             CardAction::CopyLink => "Copy link",
             CardAction::CopyText => "Copy text",
             CardAction::Reveal if mac => "Reveal in Finder",
@@ -85,6 +128,8 @@ impl CardAction {
         match self {
             CardAction::Open => "external-link",
             CardAction::CopyLink => "link",
+            CardAction::OpenPublished => "external-link",
+            CardAction::CopyPublishedLink => "link",
             CardAction::CopyText => "scan-text",
             CardAction::Reveal => "folder-open",
             CardAction::Rename => "pencil",
@@ -113,16 +158,14 @@ impl Kind {
     }
 }
 
-/// The sidebar's per-kind totals of a list of the whole library (`published` is not this
-/// list's to know and is carried over).
-pub fn kind_counts(items: &[CaptureItem], published: Option<usize>) -> crate::nav::NavCounts {
+/// The sidebar's per-kind totals of a list of the whole library.
+pub fn kind_counts(items: &[CaptureItem]) -> crate::nav::NavCounts {
     let n = |k: Kind| items.iter().filter(|i| i.kind == k).count();
     crate::nav::NavCounts {
         screenshots: Some(n(Kind::Screenshot)),
         recordings: Some(n(Kind::Recording)),
         audio: Some(n(Kind::Audio)),
         guides: Some(n(Kind::Guide)),
-        published,
     }
 }
 
@@ -190,6 +233,17 @@ impl CaptureItem {
                 .map(str::to_owned),
             board: v.get("board").and_then(Value::as_str).map(str::to_owned),
         })
+    }
+
+    /// The newest publish (S22): what a published card shows.
+    pub fn latest_publish(&self) -> Option<&PublishRecord> {
+        crate::published::latest(&self.publishes)
+    }
+
+    /// When the newest publish happened (the "Date published" order); `None` if never published
+    /// or the record has no time.
+    pub fn published_at(&self) -> Option<OffsetDateTime> {
+        self.latest_publish().and_then(|r| r.at)
     }
 
     /// Screen-reader label (NFR-13): everything the card shows, in one sentence.
@@ -308,6 +362,8 @@ pub enum Chip {
     Imported,
     Uploaded,
     Published,
+    /// Publishes with a warning, or an upload waiting for a sign-in (S22); filtered on this side.
+    NeedsAttention,
     /// Boards (BRD-1): screenshots made with "Make a board"; filtered on this side.
     Boards,
     /// Click Guides (S11): only guides, on "All captures" (applied to the loaded page).
@@ -315,10 +371,11 @@ pub enum Chip {
 }
 
 impl Chip {
-    pub const ALL: [Chip; 5] = [
+    pub const ALL: [Chip; 6] = [
         Chip::Imported,
         Chip::Uploaded,
         Chip::Published,
+        Chip::NeedsAttention,
         Chip::Boards,
         Chip::Guides,
     ];
@@ -328,6 +385,7 @@ impl Chip {
             Chip::Imported => tr_ctx!("filter chip", "Imported"),
             Chip::Uploaded => tr_ctx!("filter chip", "Uploaded"),
             Chip::Published => tr_ctx!("filter chip", "Published"),
+            Chip::NeedsAttention => tr_ctx!("filter chip", "Needs attention"),
             Chip::Boards => tr_ctx!("filter chip", "Boards"),
             Chip::Guides => tr_ctx!("filter chip", "Click Guides"),
         }
@@ -338,7 +396,9 @@ impl Chip {
     pub fn applies_to(self, page: Filter) -> bool {
         match self {
             Chip::Imported | Chip::Uploaded => page != Filter::Guides,
-            Chip::Published => matches!(page, Filter::All | Filter::Recordings),
+            Chip::Published | Chip::NeedsAttention => {
+                matches!(page, Filter::All | Filter::Recordings)
+            }
             Chip::Boards => matches!(page, Filter::All | Filter::Screenshots),
             Chip::Guides => page == Filter::All,
         }
@@ -350,6 +410,7 @@ impl Chip {
             Chip::Imported => "Imported",
             Chip::Uploaded => "Uploaded",
             Chip::Published => "Published",
+            Chip::NeedsAttention => "NeedsAttention",
             Chip::Boards => "Boards",
             Chip::Guides => "Guides",
         }
@@ -361,6 +422,8 @@ impl Chip {
             Chip::Imported => "cm-import",
             Chip::Uploaded => "cloud-upload",
             Chip::Published => "send",
+            // The board draws this chip without an icon.
+            Chip::NeedsAttention => "",
             Chip::Boards => "layout-panel-left",
             Chip::Guides => "mouse-pointer-click",
         }
@@ -371,6 +434,9 @@ impl Chip {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortKey {
     Date,
+    /// When the newest video was published: stands in for Date while the Published chip is on
+    /// (S22).
+    DatePublished,
     Title,
     Duration,
     Size,
@@ -395,9 +461,25 @@ impl SortKey {
             .collect()
     }
 
+    /// The orders the segmented control shows: with the Published filter on, "Date published"
+    /// takes the place of "Date" (S22).
+    pub fn offered_in(page: Filter, published: bool) -> Vec<SortKey> {
+        SortKey::offered(page)
+            .into_iter()
+            .map(|k| {
+                if published && k == SortKey::Date {
+                    SortKey::DatePublished
+                } else {
+                    k
+                }
+            })
+            .collect()
+    }
+
     pub fn label(self) -> String {
         match self {
             SortKey::Date => tr_ctx!("sort key", "Date"),
+            SortKey::DatePublished => tr_ctx!("sort key", "Date published"),
             SortKey::Title => tr_ctx!("sort key", "Title"),
             SortKey::Duration => tr_ctx!("sort key", "Duration"),
             SortKey::Size => tr_ctx!("sort key", "Size"),
@@ -408,6 +490,7 @@ impl SortKey {
     pub fn key(self) -> &'static str {
         match self {
             SortKey::Date => "Date",
+            SortKey::DatePublished => "DatePublished",
             SortKey::Title => "Title",
             SortKey::Duration => "Duration",
             SortKey::Size => "Size",
@@ -417,7 +500,7 @@ impl SortKey {
     /// The leading icon of the sort segment.
     pub fn glyph(self) -> &'static str {
         match self {
-            SortKey::Date => "calendar",
+            SortKey::Date | SortKey::DatePublished => "calendar",
             SortKey::Title => "arrow-down-a-z",
             SortKey::Duration => "clock",
             SortKey::Size => "hard-drive",
@@ -434,6 +517,7 @@ pub fn sort_items(items: &mut [CaptureItem], key: SortKey, descending: bool) {
     items.sort_by(|a, b| {
         let ord = match key {
             SortKey::Date => a.created.cmp(&b.created),
+            SortKey::DatePublished => a.published_at().cmp(&b.published_at()),
             SortKey::Title => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
             SortKey::Duration => a.duration_ticks.cmp(&b.duration_ticks),
             SortKey::Size => a.size_bytes.cmp(&b.size_bytes),
@@ -483,6 +567,14 @@ pub struct LibraryState {
     pub boards_only: bool,
     /// The "Click Guides" chip: only guides (applied to the loaded page).
     pub guides_only: bool,
+    /// The "Needs attention" chip: only captures whose publishes need a look (applied to the
+    /// loaded page, S22).
+    pub attention_only: bool,
+    /// Captures whose upload or publish waits for a sign-in (B1), set by the view.
+    waiting: std::collections::HashSet<String>,
+    /// The captures of the page that have a publish, with whether a publish has a warning: the
+    /// base of the "Needs attention" count, from the last load without a chip or query.
+    published_ids: Option<Vec<(String, bool)>>,
     /// How many captures of the page are uploaded and published, from the last load without a
     /// chip or query (the chips show them).
     pub remote_counts: Option<(usize, usize)>,
@@ -505,6 +597,9 @@ impl LibraryState {
             imported_only: false,
             boards_only: false,
             guides_only: false,
+            attention_only: false,
+            waiting: std::collections::HashSet::new(),
+            published_ids: None,
             remote_counts: None,
             sort: SortKey::Date,
             descending: true,
@@ -526,6 +621,7 @@ impl LibraryState {
             Chip::Imported => self.imported_only,
             Chip::Boards => self.boards_only,
             Chip::Guides => self.guides_only,
+            Chip::NeedsAttention => self.attention_only,
             Chip::Uploaded => self.remote == Some(RemoteFilter::Uploaded),
             Chip::Published => self.remote == Some(RemoteFilter::Published),
         }
@@ -543,7 +639,12 @@ impl LibraryState {
     /// never keeps hiding captures.
     pub fn drop_inapplicable_chips(&mut self) {
         let page = self.filter;
-        if !SortKey::offered(page).contains(&self.sort) {
+        let base_sort = if self.sort == SortKey::DatePublished {
+            SortKey::Date
+        } else {
+            self.sort
+        };
+        if !SortKey::offered(page).contains(&base_sort) {
             self.sort = SortKey::Date;
             self.descending = SortKey::Date.default_descending();
         }
@@ -556,6 +657,9 @@ impl LibraryState {
         if !Chip::Guides.applies_to(page) {
             self.guides_only = false;
         }
+        if !Chip::NeedsAttention.applies_to(page) {
+            self.attention_only = false;
+        }
         let drop_remote = match self.remote {
             Some(RemoteFilter::Uploaded) => !Chip::Uploaded.applies_to(page),
             Some(RemoteFilter::Published) => !Chip::Published.applies_to(page),
@@ -564,6 +668,97 @@ impl LibraryState {
         if drop_remote {
             self.remote = None;
         }
+        self.sync_sort_key();
+    }
+
+    /// Whether the page shows published videos: the Published or the Needs attention chip is on.
+    /// Cards then show the platform, the publish time and the status of the newest publish.
+    pub fn published_mode(&self) -> bool {
+        self.remote == Some(RemoteFilter::Published) || self.attention_only
+    }
+
+    /// "Date published" replaces "Date" while the page shows published videos, and back (S22).
+    fn sync_sort_key(&mut self) {
+        let want = if self.published_mode() {
+            SortKey::DatePublished
+        } else {
+            SortKey::Date
+        };
+        let from = if self.published_mode() {
+            SortKey::Date
+        } else {
+            SortKey::DatePublished
+        };
+        if self.sort == from {
+            self.sort = want;
+            let selected_id = self.selected_item().map(|i| i.id.clone());
+            sort_items(&mut self.items, self.sort, self.descending);
+            self.selected = selected_id.and_then(|id| self.items.iter().position(|i| i.id == id));
+        }
+    }
+
+    /// The sort segments the page shows.
+    pub fn offered_sorts(&self) -> Vec<SortKey> {
+        SortKey::offered_in(self.filter, self.published_mode())
+    }
+
+    /// Records which captures wait for a sign-in; returns whether it changed.
+    pub fn set_waiting<'a>(&mut self, ids: impl IntoIterator<Item = &'a String>) -> bool {
+        let new: std::collections::HashSet<String> = ids.into_iter().cloned().collect();
+        let changed = new != self.waiting;
+        self.waiting = new;
+        changed
+    }
+
+    /// Whether this capture's publishes need a look (S22).
+    pub fn item_needs_attention(&self, item: &CaptureItem) -> bool {
+        crate::published::needs_attention(&item.publishes, self.waiting.contains(&item.id))
+    }
+
+    /// The loaded captures the page shows: the client-side chips (Imported, Boards, Click
+    /// Guides, Needs attention) applied to what the daemon returned.
+    pub fn visible_items(&self) -> Vec<CaptureItem> {
+        self.items
+            .iter()
+            .filter(|i| !self.imported_only || i.imported_from.is_some())
+            .filter(|i| !self.boards_only || i.board.is_some())
+            .filter(|i| !self.guides_only || i.kind == Kind::Guide)
+            .filter(|i| !self.attention_only || self.item_needs_attention(i))
+            .cloned()
+            .collect()
+    }
+
+    /// The words after the title while a published filter is on (S22): "6 of 61 \u{b7} published".
+    /// `None` when no such filter is on, the list is not loaded or the total is unknown (no
+    /// placeholder).
+    pub fn count_note(&self, total: Option<usize>) -> Option<String> {
+        if !self.published_mode() || !matches!(self.status, LibraryStatus::Ready) {
+            return None;
+        }
+        let (shown, total) = (self.visible_items().len(), total?);
+        Some(if self.attention_only {
+            tr!(
+                "{shown} of {total} \u{00B7} needs attention",
+                shown = shown,
+                total = total
+            )
+        } else {
+            tr!(
+                "{shown} of {total} \u{00B7} published",
+                shown = shown,
+                total = total
+            )
+        })
+    }
+
+    /// The published filter, as an old deep link asks for it: Recordings page, Published on, no
+    /// other remote chip (S22).
+    pub fn show_published(&mut self) {
+        self.filter = Filter::Recordings;
+        self.drop_inapplicable_chips();
+        self.remote = Some(RemoteFilter::Published);
+        self.selected = None;
+        self.sync_sort_key();
     }
 
     /// A click on a chip: it toggles, and turning one on turns the other off. Returns whether the
@@ -585,6 +780,12 @@ impl LibraryState {
                 self.selected = None;
                 return false;
             }
+            Chip::NeedsAttention => {
+                self.attention_only = !self.attention_only;
+                self.selected = None;
+                self.sync_sort_key();
+                return false;
+            }
             Chip::Uploaded => RemoteFilter::Uploaded,
             Chip::Published => RemoteFilter::Published,
         };
@@ -593,6 +794,7 @@ impl LibraryState {
         } else {
             Some(want)
         };
+        self.sync_sort_key();
         true
     }
 
@@ -613,9 +815,17 @@ impl LibraryState {
         if chip == Chip::Guides {
             return Some(self.items.iter().filter(|i| i.kind == Kind::Guide).count());
         }
+        if chip == Chip::NeedsAttention {
+            self.remote_counts?;
+            return self.published_ids.as_ref().map(|v| {
+                v.iter()
+                    .filter(|(id, warned)| *warned || self.waiting.contains(id))
+                    .count()
+            });
+        }
         let (up, publ) = self.remote_counts?;
         match chip {
-            Chip::Imported | Chip::Boards | Chip::Guides => None,
+            Chip::Imported | Chip::Boards | Chip::Guides | Chip::NeedsAttention => None,
             Chip::Uploaded => Some(up),
             Chip::Published => Some(publ),
         }
@@ -632,6 +842,21 @@ impl LibraryState {
                     .filter(|i| !i.publishes.is_empty())
                     .count(),
             ));
+            self.published_ids = Some(
+                self.items
+                    .iter()
+                    .filter(|i| !i.publishes.is_empty())
+                    .map(|i| {
+                        (
+                            i.id.clone(),
+                            i.publishes.iter().any(|r| {
+                                !r.warnings.is_empty()
+                                    || r.state == crate::published::PublishState::PrivacyLocked
+                            }),
+                        )
+                    })
+                    .collect(),
+            );
         }
     }
 
@@ -985,6 +1210,7 @@ mod tests {
                 Chip::Imported,
                 Chip::Uploaded,
                 Chip::Published,
+                Chip::NeedsAttention,
                 Chip::Boards,
                 Chip::Guides
             ]
@@ -1018,7 +1244,12 @@ mod tests {
         assert_eq!(on(Filter::All), Chip::ALL.to_vec());
         assert_eq!(
             on(Filter::Recordings),
-            [Chip::Imported, Chip::Uploaded, Chip::Published]
+            [
+                Chip::Imported,
+                Chip::Uploaded,
+                Chip::Published,
+                Chip::NeedsAttention
+            ]
         );
         assert_eq!(
             on(Filter::Screenshots),
@@ -1030,9 +1261,10 @@ mod tests {
         s.boards_only = true;
         s.guides_only = true;
         s.remote = Some(RemoteFilter::Published);
+        s.attention_only = true;
         s.filter = Filter::Audio;
         s.drop_inapplicable_chips();
-        assert!(!s.boards_only && !s.guides_only && s.remote.is_none());
+        assert!(!s.boards_only && !s.guides_only && s.remote.is_none() && !s.attention_only);
     }
 
     /// LIB-1: the chips show how many captures are uploaded and published, counted from an
@@ -1135,6 +1367,184 @@ mod tests {
         }
     }
 
+    fn published_item(
+        id: &str,
+        published_at: &str,
+        warning: Option<&str>,
+        size: u64,
+    ) -> CaptureItem {
+        let mut v = rec(id, id, "recording", "2026-10-20T09:30:00Z", Some(1), size);
+        v["publishes"] = json!([{ "platform": "youtube", "account": "Chan", "remote_id": id,
+            "url": format!("https://youtu.be/{id}"), "privacy": "unlisted",
+            "privacy_requested": "unlisted", "status": "processed",
+            "warnings": warning.into_iter().collect::<Vec<_>>(), "at": published_at }]);
+        CaptureItem::from_json(&v).unwrap()
+    }
+
+    /// S22: with Published on the sort control says "Date published" in place of "Date" (a flat
+    /// grid), orders by the newest publish, and goes back when the chip goes off.
+    #[test]
+    fn s22_date_published_sort_follows_the_published_chip() {
+        let mut s = LibraryState::new(LibraryStatus::Ready);
+        s.filter = Filter::Recordings;
+        let labels = |s: &LibraryState| -> Vec<String> {
+            s.offered_sorts().iter().map(|k| k.label()).collect()
+        };
+        assert_eq!(labels(&s), ["Date", "Title", "Duration", "Size"]);
+        assert!(s.group_by_day());
+        s.click_chip(Chip::Published);
+        assert_eq!(labels(&s), ["Date published", "Title", "Duration", "Size"]);
+        assert_eq!(s.sort, SortKey::DatePublished);
+        assert!(!s.group_by_day(), "no day headers under Date published");
+        // Newest publish first; created dates play no part.
+        let mut items = vec![
+            published_item("a", "2026-10-21T10:00:00Z", None, 1),
+            published_item("b", "2026-10-23T10:00:00Z", None, 1),
+            published_item("c", "2026-10-22T10:00:00Z", None, 1),
+        ];
+        sort_items(&mut items, SortKey::DatePublished, true);
+        let ids: Vec<&str> = items.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, ["b", "c", "a"]);
+        // A chosen Title order is kept; only Date and Date published swap.
+        s.set_sort(SortKey::Title);
+        s.click_chip(Chip::Published);
+        assert_eq!(s.sort, SortKey::Title);
+        s.click_chip(Chip::Published);
+        s.set_sort(SortKey::DatePublished);
+        s.click_chip(Chip::Published);
+        assert_eq!(s.sort, SortKey::Date, "back to Date with the chip off");
+        // Needs attention is a published view too.
+        s.click_chip(Chip::NeedsAttention);
+        assert_eq!(s.sort, SortKey::DatePublished);
+        // The old deep link: Recordings, Published on.
+        let mut d = LibraryState::new(LibraryStatus::Ready);
+        d.show_published();
+        assert_eq!(d.filter, Filter::Recordings);
+        assert_eq!(d.remote, Some(RemoteFilter::Published));
+        assert_eq!(d.sort, SortKey::DatePublished);
+        assert!(d.chip_active(Chip::Published));
+        // Leaving for a page without the chip drops it and the sort.
+        d.filter = Filter::Audio;
+        d.drop_inapplicable_chips();
+        assert_eq!((d.remote, d.sort), (None, SortKey::Date));
+    }
+
+    /// S22: "Needs attention" counts publishes with a warning and uploads waiting for a sign-in,
+    /// is hidden while unknown, filters the loaded page, and the title reads "2 of 61 \u{b7} ...".
+    #[test]
+    fn s22_needs_attention_chip_counts_and_filters() {
+        let mut s = LibraryState::new(LibraryStatus::Ready);
+        s.filter = Filter::Recordings;
+        assert_eq!(
+            s.chip_count(Chip::NeedsAttention),
+            None,
+            "unknown until loaded"
+        );
+        let t = s.begin_load();
+        s.finish_load(
+            t,
+            Ok(PageCollector {
+                skipped: 0,
+                cap: 500,
+                items: vec![
+                    published_item("ok", "2026-10-23T10:00:00Z", None, 5),
+                    published_item(
+                        "warned",
+                        "2026-10-22T10:00:00Z",
+                        Some("Captions not added"),
+                        5,
+                    ),
+                    published_item("waiting", "2026-10-21T10:00:00Z", None, 5),
+                    CaptureItem::from_json(&rec(
+                        "never",
+                        "never",
+                        "recording",
+                        "2026-10-20T09:30:00Z",
+                        Some(1),
+                        5,
+                    ))
+                    .unwrap(),
+                ],
+                truncated: false,
+            }),
+        );
+        s.update_remote_counts();
+        assert_eq!(s.chip_count(Chip::Published), Some(3));
+        assert_eq!(s.chip_count(Chip::NeedsAttention), Some(1));
+        let ids = ["waiting".to_owned(), "never".to_owned()];
+        assert!(s.set_waiting(ids.iter()));
+        assert!(!s.set_waiting(ids.iter()), "unchanged");
+        // A capture that was never published never needs attention, waiting or not.
+        assert_eq!(s.chip_count(Chip::NeedsAttention), Some(2));
+        // Off: every loaded capture shows; on: the two.
+        assert_eq!(s.visible_items().len(), 4);
+        assert!(!s.click_chip(Chip::NeedsAttention), "filtered on this side");
+        let shown: Vec<String> = s.visible_items().into_iter().map(|i| i.id).collect();
+        assert_eq!(shown, ["warned", "waiting"]);
+        assert!(s.published_mode());
+        assert_eq!(
+            s.count_note(Some(61)).as_deref(),
+            Some("2 of 61 \u{00B7} needs attention")
+        );
+        s.click_chip(Chip::NeedsAttention);
+        // The Published chip: the daemon filters, the title says so.
+        s.click_chip(Chip::Published);
+        assert_eq!(
+            s.count_note(Some(61)).as_deref(),
+            Some("4 of 61 \u{00B7} published")
+        );
+        assert_eq!(s.count_note(None), None, "no made-up total");
+        s.click_chip(Chip::Published);
+        assert_eq!(s.count_note(Some(61)), None, "no filter, no note");
+    }
+
+    /// S22: the menu of a published recording: Open, Open on YouTube, Copy YouTube link, then the
+    /// file's own items (Copy file link when an upload has one), Rename, Delete.
+    #[test]
+    fn s22_published_menu_entries() {
+        let mut it = published_item("p", "2026-10-23T10:00:00Z", None, 5);
+        let labels = |it: &CaptureItem| -> Vec<String> {
+            CardAction::for_item(it)
+                .iter()
+                .map(|a| a.label_for(Platform::Mac, Some(it)))
+                .collect()
+        };
+        assert_eq!(
+            labels(&it),
+            [
+                "Open",
+                "Open on YouTube",
+                "Copy YouTube link",
+                "Reveal in Finder",
+                "Rename\u{2026}",
+                "Delete\u{2026}"
+            ]
+        );
+        it.uploads = parse_uploads(Some(&json!([{ "destination": "Drive", "what": "export",
+            "share_link": "https://d/1" }])));
+        assert_eq!(
+            labels(&it),
+            [
+                "Open",
+                "Open on YouTube",
+                "Copy YouTube link",
+                "Copy file link",
+                "Reveal in Finder",
+                "Rename\u{2026}",
+                "Delete\u{2026}"
+            ]
+        );
+        // Never published: no publish entries, and "Copy link" keeps its name.
+        let plain =
+            CaptureItem::from_json(&rec("a", "T", "recording", "2026-10-20T09:30:00Z", None, 1))
+                .unwrap();
+        assert_eq!(CardAction::for_item(&plain), CardAction::ALL.to_vec());
+        for a in [CardAction::OpenPublished, CardAction::CopyPublishedLink] {
+            assert!(!a.glyph().is_empty());
+            assert_eq!(a.hint(), None);
+        }
+    }
+
     /// STO-4.AC3: "Copy link" is in the menu of a capture whose upload has a link, after Reveal.
     #[test]
     fn sto4_copy_link_only_with_a_share_link() {
@@ -1184,7 +1594,7 @@ mod tests {
 
     /// LIB-1.AC7: the sidebar counts come from the whole library, whatever page is showing: a
     /// kind page, a search or a chip is not "the whole library" (the view then asks for its own
-    /// unfiltered list), and the totals count each kind and carry `published` over.
+    /// unfiltered list), and the totals count each kind.
     #[test]
     fn lib1_ac7_sidebar_counts_follow_the_whole_library() {
         let mk = |id: &str, kind: &str| {
@@ -1196,19 +1606,19 @@ mod tests {
             mk("c", "recording"),
             mk("d", "audio"),
         ];
-        let c = kind_counts(&items, Some(7));
+        let c = kind_counts(&items);
         assert_eq!(
-            (c.screenshots, c.recordings, c.audio, c.published),
-            (Some(2), Some(1), Some(1), Some(7))
+            (c.screenshots, c.recordings, c.audio),
+            (Some(2), Some(1), Some(1))
         );
         // A new screenshot moves only its own count, and never backwards.
         let mut more = items.clone();
         more.push(mk("e", "screenshot"));
-        let c2 = kind_counts(&more, Some(7));
+        let c2 = kind_counts(&more);
         assert_eq!(c2.screenshots, Some(3));
         assert_eq!((c2.recordings, c2.audio), (c.recordings, c.audio));
         // An empty library reads 0, not "unknown".
-        assert_eq!(kind_counts(&[], None).screenshots, Some(0));
+        assert_eq!(kind_counts(&[]).screenshots, Some(0));
 
         let mut s = LibraryState::new(LibraryStatus::Ready);
         assert!(s.is_whole_library());

@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, 13 of Nov 10, 2026: the AI page options for lines to leave out, 1 of Nov 10, 2026: preparing the sound in the editor, 17 of Nov 15, 2026: the Click Guide of a window and picture viewer drafts from the design boards S16, S17, S19, and 13 of Nov 15, 2026: the Text colour Auto of board S21); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, 13 of Nov 10, 2026: the AI page options for lines to leave out, 1 of Nov 10, 2026: preparing the sound in the editor, 17 of Nov 15, 2026: the Click Guide of a window and picture viewer drafts from the design boards S16, S17, S19, and 13 of Nov 15, 2026: the Text colour Auto of board S21, and 17 of Nov 15, 2026: the Published filter and the Published card of boards S22 and S23); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -818,6 +818,10 @@ msgstr "Sao chép cấu hình ứng dụng khách vào bộ nhớ tạm"
 msgid "Copy config"
 msgstr "Sao chép cấu hình"
 
+#, fuzzy
+msgid "Copy file link"
+msgstr "Sao chép liên kết tệp"
+
 msgid "Copy image"
 msgstr "Sao chép ảnh"
 
@@ -838,6 +842,10 @@ msgstr "Sao chép liên kết sau khi tải lên"
 
 msgid "Copy the link when an upload finishes"
 msgstr "Sao chép liên kết khi tải lên xong"
+
+#, fuzzy
+msgid "Copy {platform} link"
+msgstr "Sao chép liên kết {platform}"
 
 msgid "Corner radius"
 msgstr "Bán kính góc"
@@ -1986,9 +1994,6 @@ msgstr "Không có gì được lưu: video thử bị xoá khi bài kiểm tra 
 msgid "Nothing leaves this computer unless you connect a destination yourself."
 msgstr "Không có gì rời khỏi máy tính này trừ khi bạn tự kết nối một điểm lưu."
 
-msgid "Nothing published yet"
-msgstr "Chưa đăng gì"
-
 msgid "Nothing to redo"
 msgstr "Không có gì để làm lại"
 
@@ -2088,9 +2093,6 @@ msgstr "Mở Cài đặt"
 
 msgid "Open System Settings"
 msgstr "Mở Cài đặt Hệ thống"
-
-msgid "Open a recording and press Publish to send it to YouTube. Your published videos are listed here with their links."
-msgstr "Hãy mở một bản ghi và nhấn Đăng để gửi lên YouTube. Video đã đăng được liệt kê ở đây cùng liên kết."
 
 msgid "Open captions"
 msgstr "Mở phụ đề"
@@ -2340,14 +2342,27 @@ msgstr "Đăng video?"
 msgid "Published"
 msgstr "Đã đăng"
 
-msgid "Published videos"
-msgstr "Video đã đăng"
+#, fuzzy
+msgid "Published on {platform}"
+msgstr "Đã đăng trên {platform}"
+
+#, fuzzy
+msgid "Published {when}"
+msgstr "Đã đăng {when}"
+
+#, fuzzy
+msgid "Published · {platforms}"
+msgstr "Đã đăng · {platforms}"
 
 msgid "Publishing is not available in this build yet: {message}"
 msgstr "Bản này chưa hỗ trợ đăng: {message}"
 
 msgid "Publish…"
 msgstr "Đăng…"
+
+#, fuzzy
+msgid "Publish… in the header sends it to another platform. Visibility is changed on the platform."
+msgstr "Nút Đăng… ở thanh trên gửi video tới một nền tảng khác. Chế độ hiển thị được đổi trên nền tảng."
 
 msgid "Purpose"
 msgstr "Mục đích"
@@ -3983,9 +3998,6 @@ msgstr "macOS thường tiếp tục từ chối việc ghi hình đối với �
 msgid "macOS usually needs the app restarted before it can capture."
 msgstr "macOS thường cần khởi động lại ứng dụng trước khi ứng dụng có thể ghi hình."
 
-msgid "newest first"
-msgstr "mới nhất trước"
-
 msgid "no destination is set up"
 msgstr "chưa thiết lập điểm lưu nào"
 
@@ -4078,6 +4090,10 @@ msgstr "hôm qua"
 
 msgid "your library folder"
 msgstr "thư mục thư viện của bạn"
+
+#, fuzzy
+msgid "{account} · {when}"
+msgstr "{account} · {when}"
 
 msgid "{at} of {total}"
 msgstr "{at} trên {total}"
@@ -4281,6 +4297,11 @@ msgid "{n} pixel"
 msgid_plural "{n} pixels"
 msgstr[0] "{n} pixel"
 
+#, fuzzy
+msgid "{n} platform"
+msgid_plural "{n} platforms"
+msgstr[0] "{n} nền tảng"
+
 msgid "{n} rows (the limit is {limit})"
 msgstr "{n} dòng (giới hạn là {limit})"
 
@@ -4323,8 +4344,9 @@ msgstr "{platform} đã giữ ở chế độ {privacy}"
 msgid "{platform} · {account}"
 msgstr "{platform} · {account}"
 
-msgid "{platform} · {when}"
-msgstr "{platform} · {when}"
+#, fuzzy
+msgid "{platform} · {privacy}"
+msgstr "{platform} · {privacy}"
 
 msgid "{provider} said no: {error} {hint}"
 msgstr "{provider} từ chối: {error} {hint}"
@@ -4374,12 +4396,6 @@ msgstr "{title}, {hint}, phím tắt {shortcut}"
 msgid "{title}, {hint}, unavailable"
 msgstr "{title}, {hint}, không khả dụng"
 
-msgid "{title}, {platform}, {privacy}, {status}"
-msgstr "{title}, {platform}, {privacy}, {status}"
-
-msgid "{title}, {platform}, {privacy}, {status}, {when}"
-msgstr "{title}, {platform}, {privacy}, {status}, {when}"
-
 msgid "{title}, {tool}: {tier}"
 msgstr "{title}, {tool}: {tier}"
 
@@ -4388,9 +4404,6 @@ msgstr "{title}, {tool}: {tier}, đã khoá"
 
 msgid "{title}. {body}"
 msgstr "{title}. {body}"
-
-msgid "{title}. {text}"
-msgstr "{title}. {text}"
 
 msgid "{tool} from {client}, {decision}"
 msgstr "{tool} từ {client}, {decision}"
@@ -5396,10 +5409,6 @@ msgid "Settings…"
 msgstr "Cài đặt…"
 
 msgctxt "navigation"
-msgid "Published"
-msgstr "Đã đăng"
-
-msgctxt "navigation"
 msgid "Recordings"
 msgstr "Bản ghi"
 
@@ -5798,6 +5807,11 @@ msgctxt "sort key"
 msgid "Date"
 msgstr "Ngày"
 
+#, fuzzy
+msgctxt "sort key"
+msgid "Date published"
+msgstr "Ngày đăng"
+
 msgctxt "sort key"
 msgid "Duration"
 msgstr "Thời lượng"
@@ -5841,6 +5855,11 @@ msgstr "Độ dài"
 msgctxt "stat tile"
 msgid "Pauses"
 msgstr "Lần tạm dừng"
+
+#, fuzzy
+msgctxt "stat tile"
+msgid "Published"
+msgstr "Đã đăng"
 
 msgctxt "stat tile"
 msgid "Recorded"
@@ -6746,6 +6765,14 @@ msgstr[0] "{n} cửa sổ"
 msgid "{shown} of {total} windows"
 msgstr "{shown} trong {total} cửa sổ"
 
+#, fuzzy
+msgid "{shown} of {total} · needs attention"
+msgstr "{shown} trên {total} · cần chú ý"
+
+#, fuzzy
+msgid "{shown} of {total} · published"
+msgstr "{shown} trên {total} · đã đăng"
+
 msgid "{title}, {app}, {width} by {height} pixels"
 msgstr "{title}, {app}, {width} × {height} điểm ảnh"
 
@@ -6806,6 +6833,10 @@ msgstr "{pct}% · Đang chờ…"
 
 msgid "{pct}% · less than a minute left"
 msgstr "{pct}% · còn chưa đến 1 phút"
+
+#, fuzzy
+msgid "{platform} is processing"
+msgstr "{platform} đang xử lý"
 
 msgid "{pct}% · about {n} sec left"
 msgstr "{pct}% · còn khoảng {n} giây"
@@ -7311,6 +7342,10 @@ msgstr "Chỉ đo mức âm. Không có gì được ghi; micrô tự tắt khi 
 msgid "Live camera"
 msgstr "Camera trực tiếp"
 
+#, fuzzy
+msgid "Live on {platform}"
+msgstr "Đã phát trên {platform}"
+
 msgid "Look again"
 msgstr "Tìm lại"
 
@@ -7568,7 +7603,6 @@ msgstr "Luôn được giữ cả trong thư mục xuất của bản ghi"
 
 msgid "Audio exported"
 msgstr "Đã xuất âm thanh"
-
 
 msgid "Choose a folder…"
 msgstr "Chọn thư mục…"
@@ -8618,6 +8652,11 @@ msgctxt "report template"
 msgid "suggested"
 msgstr "gợi ý"
 
+#, fuzzy
+msgctxt "section"
+msgid "Published"
+msgstr "Đã đăng"
+
 msgid "Cited by “{section} · {n}”, playing from {time}"
 msgstr "Trích dẫn bởi “{section} · {n}”, đang phát từ {time}"
 
@@ -9317,6 +9356,11 @@ msgstr "Chọn tệp"
 msgctxt "filter chip"
 msgid "Imported"
 msgstr "Đã nhập"
+
+#, fuzzy
+msgctxt "filter chip"
+msgid "Needs attention"
+msgstr "Cần chú ý"
 
 msgctxt "import status"
 msgid "Can't import"

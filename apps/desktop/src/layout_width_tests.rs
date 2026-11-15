@@ -603,6 +603,113 @@ fn cases() -> Vec<Case> {
         );
     }
 
+    // ---- Recordings with the Published filter (S22) and the Published card (S23) --------------
+    // The narrowest card is 200 px (CARD_FLOOR). The platform pill sits 10 px from the left, with
+    // 8 px padding each side, a 12 px icon and a 5 px gap; it gives way to the "..." button on
+    // hover, so it only has to fit inside the card (10 px kept free on the right).
+    let published = |privacy: &'static str, status: &'static str| {
+        crate::published::PublishRecord::from_json(&serde_json::json!({
+            "platform": "youtube", "account": "My channel", "remote_id": "v",
+            "url": "https://youtu.be/v", "privacy": privacy, "status": status,
+            "at": "2026-10-23T15:41:00Z",
+        }))
+        .unwrap()
+    };
+    v.push(
+        Case::new(
+            "Published card platform pill (narrowest card)",
+            "200 - 10 left - 10 right - 16 padding - 12 icon - 5 gap",
+            200. - 10. - 10. - 16. - 12. - 5.,
+            11.,
+            400,
+            one,
+        )
+        .texts(["private", "unlisted", "public", ""].into_iter().map(|p| {
+            t(format!("platform_pill({p:?})"), move || {
+                crate::published::platform_pill(&published(p, "processed"))
+            })
+        })),
+    );
+    // The status line under the meta: the card (200 px) less its 2 px side padding, a 12 px icon
+    // and a 6 px gap; it truncates on one line.
+    v.push(
+        Case::new(
+            "Published card status line (narrowest card)",
+            "200 - 2*2 padding - 12 icon - 6 gap",
+            200. - 4. - 12. - 6.,
+            11.5,
+            400,
+            one,
+        )
+        .texts(
+            ["processed", "processing", "privacy_locked"]
+                .into_iter()
+                .map(|st| {
+                    t(format!("state_line({st})"), move || {
+                        let at = time::OffsetDateTime::parse(
+                            "2026-10-23T16:00:00Z",
+                            &time::format_description::well_known::Rfc3339,
+                        )
+                        .unwrap();
+                        crate::published::state_line(&published("private", st), at).text
+                    })
+                }),
+        )
+        .text("state_line(plain)", move || {
+            let at = time::OffsetDateTime::parse(
+                "2026-11-23T16:00:00Z",
+                &time::format_description::well_known::Rfc3339,
+            )
+            .unwrap();
+            crate::published::state_line(&published("private", "processing"), at).text
+        })
+        .text("Upload waiting for sign-in", || {
+            cm_i18n::tr!("Upload waiting for sign-in")
+        }),
+    );
+    // The card menu: 232 wide (board S22), 6 px padding, 1 px border, a row has 10 px padding, a 15 px icon
+    // and a 10 px gap.
+    let menu_item = crate::library::CaptureItem::from_json(&serde_json::json!({
+        "id": "rec_1", "title": "T", "kind": "recording", "created": "2026-10-20T09:30:00Z",
+        "duration": 1, "size_bytes": 1,
+        "publishes": [{ "platform": "youtube", "remote_id": "v", "url": "https://youtu.be/v",
+                        "privacy": "unlisted", "status": "processed" }],
+        "uploads": [{ "destination": "Drive", "what": "export", "share_link": "https://d/1" }],
+    }))
+    .unwrap();
+    v.push(
+        Case::new(
+            "Card menu row (with a published recording)",
+            "232 - 2*6 padding - 2 border - 2*10 padding - 15 icon - 10 gap",
+            232. - 12. - 2. - 20. - 15. - 10.,
+            13.5,
+            400,
+            one,
+        )
+        .texts(
+            crate::library::CardAction::for_item(&menu_item)
+                .into_iter()
+                .map(|a| {
+                    let item = menu_item.clone();
+                    t(format!("CardAction::label_for({a:?})"), move || {
+                        a.label_for(crate::platform_text::Platform::Windows, Some(&item))
+                    })
+                }),
+        ),
+    );
+    // The Published tile of the details page: 150 px basis, 16 px padding, 13 px icon, 6 px gap.
+    v.push(
+        Case::new(
+            "Details stat tile label (Published)",
+            "150 - 2*16 padding - 2 border - 13 icon - 6 gap",
+            150. - 32. - 2. - 13. - 6.,
+            cap,
+            400,
+            one,
+        )
+        .text("Published", || cm_i18n::tr_ctx!("stat tile", "Published")),
+    );
+
     // ---- sidebar 248 px: 12 px side padding ----------------------------------------------------
     // nav_row: border 2, padding 20, 18 px icon, 10 px gap, then the label; a count takes about
     // 32 px more.

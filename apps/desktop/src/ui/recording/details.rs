@@ -13,7 +13,7 @@ use gpui::{
 };
 use image::Frame;
 
-use cm_i18n::{tr, tr_ctx};
+use cm_i18n::{tr, tr_ctx, trn};
 
 use crate::library::{format_size, LocalClock};
 use crate::poster::{decode_poster, MAX_POSTER_WIDTH};
@@ -578,6 +578,14 @@ impl Render for RecordingDetails {
                 // ---- the header's verbs: Reveal, Publish..., Edit (the neutral primary) -----
                 let reveal_label =
                     crate::platform_text::here(crate::platform_text::Term::RevealLabel);
+                // S23: "Published \u{b7} YouTube" in the header once a video was sent.
+                if let Some(names) = published_header(&d.publishes) {
+                    actions.push(
+                        crate::ui::kit::pill(&t, Tone::Neutral, Some("send"), names)
+                            .id("rec-published-pill")
+                            .into_any_element(),
+                    );
+                }
                 actions.push(
                     icon_button(
                         &t,
@@ -774,13 +782,21 @@ impl Render for RecordingDetails {
                     }));
 
                 // ---- the facts and the tracks -----------------------------------------------
-                let tiles = facts(
+                let mut tiles = facts(
                     clock_label(&clock, d.created),
                     d.duration_s.map(|s| clock_text((s * 1000.0) as i64)),
                     format_size(d.size_bytes),
                     d.video.clone(),
                     d.pauses,
                 );
+                // S23: the Published tile (platforms and their names), only once published.
+                if let Some(value) = crate::published::platforms_summary(&d.publishes) {
+                    tiles.push(Fact {
+                        glyph: "send",
+                        label: tr_ctx!("stat tile", "Published"),
+                        value,
+                    });
+                }
                 let tracks = div()
                     .flex()
                     .flex_col()
@@ -978,6 +994,7 @@ impl Render for RecordingDetails {
                     .flex()
                     .flex_col()
                     .gap(px(16.))
+                    .children(published_card(&t, d, &clock, &self.app))
                     .child(exports_card)
                     .child(transcript_card)
                     .child(
@@ -1055,6 +1072,240 @@ fn upload_rows(t: &Theme, capture_id: &str) -> Vec<gpui::AnyElement> {
             )
         })
         .collect()
+}
+
+/// "Published \u{b7} YouTube": the header pill of a published recording (S23); `None` when it was
+/// never published.
+pub fn published_header(publishes: &[crate::published::PublishRecord]) -> Option<String> {
+    let names = crate::published::platforms(publishes);
+    (!names.is_empty()).then(|| {
+        tr!(
+            "Published \u{00B7} {platforms}",
+            platforms = names.join(", ")
+        )
+    })
+}
+
+/// The Published card of the details page (S23): one row per video sent from this recording,
+/// newest first, with the platform, the channel, the time, the visibility, the link, what the
+/// platform says about the video and its warnings. `None` when the recording was never published.
+/// Everything the old Published page showed lives here.
+fn published_card(
+    t: &Theme,
+    d: &Details,
+    clock: &LocalClock,
+    app: &Entity<AppModel>,
+) -> Option<gpui::AnyElement> {
+    if d.publishes.is_empty() {
+        return None;
+    }
+    let now = time::OffsetDateTime::now_utc();
+    let mut rows: Vec<&crate::published::PublishRecord> = d.publishes.iter().collect();
+    rows.sort_by_key(|r| std::cmp::Reverse(r.at));
+    let platforms = crate::published::platforms(&d.publishes).len();
+    let rows = rows.into_iter().enumerate().map(|(i, r)| {
+        let when = r.at.map(|a| clock.format_date(a)).unwrap_or_default();
+        let who = match (r.account.is_empty(), when.is_empty()) {
+            (false, false) => tr!(
+                "{account} \u{00B7} {when}",
+                account = r.account,
+                when = when
+            ),
+            (false, true) => r.account.clone(),
+            (true, false) => when,
+            (true, true) => String::new(),
+        };
+        let state = crate::published::state_line(r, now);
+        let state_color = match state.kind {
+            crate::published::StatusKind::Warning => t.warning,
+            _ => t.text_3,
+        };
+        let lead: gpui::AnyElement = match state.kind {
+            crate::published::StatusKind::Warning => {
+                icon("triangle-alert", 12., t.warning).into_any_element()
+            }
+            crate::published::StatusKind::Processing => {
+                icon("loader-circle", 12., t.mist).into_any_element()
+            }
+            crate::published::StatusKind::Live => div()
+                .size(px(7.))
+                .rounded(px(scale::RADIUS_PILL))
+                .bg(rgba_of(t.success))
+                .into_any_element(),
+            crate::published::StatusKind::Plain => {
+                icon("circle-check", 12., t.mist).into_any_element()
+            }
+        };
+        let (a1, l1, a2, l2) = (app.clone(), r.url.clone(), app.clone(), r.url.clone());
+        let glyph = match crate::ui::brand::platform(&r.platform.to_lowercase()) {
+            Some(b) => b.icon,
+            None => "send",
+        };
+        div()
+            .id(("rec-published-row", i))
+            .role(Role::ListItem)
+            .p(px(12.))
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .rounded(px(scale::RADIUS_LG))
+            .border_1()
+            .border_color(rgba_of(t.border))
+            .bg(rgba_of(t.ground))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(10.))
+                    .child(
+                        div()
+                            .size(px(30.))
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(scale::RADIUS_MD))
+                            .bg(rgba_of(t.icon_tile()))
+                            .child(icon(glyph, 16., t.text)),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .flex()
+                            .flex_col()
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_size(px(13.5))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(SharedString::from(crate::published::platform_label(
+                                        &r.platform,
+                                    ))),
+                            )
+                            .children((!who.is_empty()).then(|| {
+                                div()
+                                    .truncate()
+                                    .text_size(px(11.5))
+                                    .text_color(rgba_of(t.mist))
+                                    .child(SharedString::from(who))
+                            })),
+                    )
+                    .child(crate::ui::kit::pill(
+                        t,
+                        crate::published::privacy_tone(r),
+                        Some(crate::published::privacy_icon(&r.privacy)),
+                        crate::published::privacy_line(r),
+                    )),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .h(px(32.))
+                            .px(px(10.))
+                            .flex()
+                            .items_center()
+                            .rounded(px(scale::RADIUS_SM))
+                            .border_1()
+                            .border_color(rgba_of(t.line))
+                            .bg(rgba_of(t.surface))
+                            .text_size(px(11.5))
+                            .text_color(rgba_of(t.text_2))
+                            .mono()
+                            .truncate()
+                            .child(SharedString::from(crate::published::short_link(&r.url))),
+                    )
+                    .child(
+                        small_icon_button(t, ("rec-published-copy", i), "link", tr!("Copy link"))
+                            .on_click(move |_, _, cx| {
+                                let (app, l) = (a1.clone(), l1.clone());
+                                cx.defer(move |cx| crate::ui::upload_ui::copy_link(&app, &l, cx));
+                            }),
+                    )
+                    .child(
+                        small_icon_button(
+                            t,
+                            ("rec-published-open", i),
+                            "external-link",
+                            crate::published::open_label(r),
+                        )
+                        .on_click(move |_, _, cx| {
+                            let (app, l) = (a2.clone(), l2.clone());
+                            cx.defer(move |cx| crate::ui::upload_ui::open_link(&app, &l, cx));
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .text_size(px(11.5))
+                    .text_color(rgba_of(state_color))
+                    .child(div().flex_none().flex().items_center().child(lead))
+                    .child(SharedString::from(state.text)),
+            )
+            .children(r.warnings.iter().map(|w| {
+                crate::ui::kit::callout(
+                    t,
+                    Tone::Brass,
+                    "triangle-alert",
+                    SharedString::from(w.clone()),
+                    None,
+                    None,
+                )
+            }))
+    });
+    Some(
+        card(t)
+            .id("rec-published-card")
+            .p(px(18.))
+            .rounded(px(16.))
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(10.))
+                    .child(
+                        div()
+                            .text_size(px(15.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(tr_ctx!("section", "Published")),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(11.5))
+                            .text_color(rgba_of(t.mist))
+                            .mono()
+                            .child(SharedString::from(trn!(
+                                "{n} platform",
+                                "{n} platforms",
+                                platforms
+                            ))),
+                    ),
+            )
+            .children(rows)
+            .child(
+                div()
+                    .text_size(px(11.5))
+                    .line_height(px(17.))
+                    .text_color(rgba_of(t.mist))
+                    .child(SharedString::from(tr!(
+                        "Publish\u{2026} in the header sends it to another platform. Visibility is changed on the platform."
+                    ))),
+            )
+            .into_any_element(),
+    )
 }
 
 /// The copies that finished (STO-4.AC3): the destination with a check, "Video \u{b7} 12.3 MB \u{b7}
