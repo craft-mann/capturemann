@@ -136,11 +136,7 @@ fn duplicate_note_retake_and_reopen() {
         .insert_note_step(Some(&a), "Type your password", "", &Actor::User, T0)
         .unwrap();
     assert!(g.step(&note).unwrap().is_note());
-    g.retake_step(&copy, &png(120, 80, 99), true, &Actor::User, T0)
-        .unwrap();
-    // R1: the flag follows the new frame, in both directions.
-    assert!(g.step(&copy).unwrap().has_proposals);
-    g.retake_step(&copy, &png(120, 80, 98), false, &Actor::User, T0)
+    g.retake_step(&copy, &png(120, 80, 99), &Actor::User, T0)
         .unwrap();
     assert!(!g.step(&copy).unwrap().has_proposals);
     assert_eq!(steps_dirs(&g), 3);
@@ -260,4 +256,18 @@ fn a_retina_step_gets_the_logical_sized_crop_gde_1() {
     g.set_focus_crop(&s.id, true, &Actor::User, T0).unwrap();
     let r = g.open_step(&s.id).unwrap().visible_rect().unwrap();
     assert_eq!((r.w, r.h), (2400.0, 1600.0));
+}
+
+/// The frozen schema 1 keeps `has_proposals`; an old file that says `true` still reads, and a file
+/// without the key reads as false (the feature is withdrawn for 0.3.4).
+#[test]
+fn an_old_step_with_has_proposals_still_reads() {
+    use cm_library::guide::GuideStep;
+    let old: GuideStep =
+        serde_json::from_str(r#"{"id":"step_1","type":"image","title":"t","has_proposals":true}"#)
+            .unwrap();
+    assert!(old.has_proposals);
+    let none: GuideStep =
+        serde_json::from_str(r#"{"id":"step_1","type":"image","title":"t"}"#).unwrap();
+    assert!(!none.has_proposals);
 }

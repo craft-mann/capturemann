@@ -470,7 +470,6 @@ pub(crate) fn guide_json(id: &str, g: &cm_library::guide::GuideBundle, state: &s
                 o.insert("click".into(), json!(c));
             }
             o.insert("focus_crop".into(), json!(s.focus_crop));
-            o.insert("has_proposals".into(), json!(s.has_proposals));
             Value::Object(o)
         })
         .collect();

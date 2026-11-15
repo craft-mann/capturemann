@@ -26,7 +26,7 @@ Tell the user to do the task once, slowly, and to say when they are done. You ca
 
 ## 3. Stop
 
-`stop_guide` when the user says they are done. It returns the guide: every step has `title` (a draft such as `Click "Save"` or `Click here`), `note`, the `click` point, `has_proposals` and `image_id`. A guide with no step is not kept.
+`stop_guide` when the user says they are done. It returns the guide: every step has `title` (a draft such as `Click "Save"` or `Click here`), `note`, the `click` point and `image_id`. A guide with no step is not kept.
 
 ## 4. Rewrite the titles
 
@@ -40,11 +40,11 @@ Do not invent steps, button names or outcomes that you cannot see in the picture
 
 ## 5. Check for secrets before it leaves the computer
 
-A guide can show emails, tokens, names and other private text. Steps with `has_proposals: true` have redaction proposals nobody accepted.
+A guide can show emails, tokens, names and other private text, and the draft titles come from the text near the click, so they can hold it too. Click Guide does not mark or blur anything: nothing tells you which steps are sensitive.
 
-1. For each such step (and for any step that may hold private text), `suggest_redactions { capture_id: image_id }` returns proposals; show the user the kinds and positions (the previews are masked).
+1. For each step that may hold private text, `suggest_redactions { capture_id: image_id }` returns proposals; show the user the kinds and positions (the previews are masked).
 2. Apply the ones the user accepts with `annotate { capture_id: image_id, ops: [{ "op": "blur", "rect": [...] }] }`. `blur` and `pixelate` are the only ops that hide text.
-3. Say plainly: **blurred does not mean certain**. The user must look at the pictures before sharing. `export_guide` lists the steps that still have proposals in `steps_to_review` and warns; it exports them without blurs.
+3. Say plainly: **blurred does not mean certain**. The user must look at the pictures before sharing. `export_guide` exports the pictures as they are, without a warning.
 
 ## 6. Export
 

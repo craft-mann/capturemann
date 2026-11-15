@@ -47,7 +47,6 @@ pub struct StepRow {
     pub note: String,
     pub image_id: Option<String>,
     pub image_file: Option<String>,
-    pub has_proposals: bool,
     pub focus_crop: bool,
     pub click: Option<(f64, f64)>,
 }
@@ -79,7 +78,6 @@ impl GuideData {
                 note: s(&st["note"]),
                 image_id: st["image_id"].as_str().map(str::to_owned),
                 image_file: st["image_file"].as_str().map(str::to_owned),
-                has_proposals: st["has_proposals"] == true,
                 focus_crop: st["focus_crop"] == true,
                 click: st["click"]["x"].as_f64().zip(st["click"]["y"].as_f64()),
             })
@@ -731,31 +729,18 @@ fn step_row_view(
                 .child(icon(if note { "file-text" } else { "image" }, 16., t.faint)),
         })
         .child(
-            div()
-                .flex_1()
-                .min_w(px(0.))
-                .flex()
-                .flex_col()
-                .child(
-                    div()
-                        .text_size(px(type_scale::UI))
-                        .text_color(rgba_of(t.text))
-                        .when(s.is_note, |d| d.italic())
-                        .overflow_hidden()
-                        .child(SharedString::from(if s.title.is_empty() {
-                            tr!("Untitled step")
-                        } else {
-                            s.title.clone()
-                        })),
-                )
-                .when(s.has_proposals, |d| {
-                    d.child(
-                        div()
-                            .text_size(px(type_scale::CAPTION))
-                            .text_color(rgba_of(t.warning))
-                            .child(tr!("Redaction proposals to review")),
-                    )
-                }),
+            div().flex_1().min_w(px(0.)).flex().flex_col().child(
+                div()
+                    .text_size(px(type_scale::UI))
+                    .text_color(rgba_of(t.text))
+                    .when(s.is_note, |d| d.italic())
+                    .overflow_hidden()
+                    .child(SharedString::from(if s.title.is_empty() {
+                        tr!("Untitled step")
+                    } else {
+                        s.title.clone()
+                    })),
+            ),
         );
     if selected {
         let mini = |name: &'static str, aria: String, id2: &'static str| {
@@ -1008,7 +993,7 @@ impl Render for GuideView {
             })
             .child(body)
             .when_some(self.export.as_ref(), |d, ex| {
-                d.child(export::sheet(&t, ex, self, cx))
+                d.child(export::sheet(&t, ex, cx))
             })
             .children(
                 self.viewer
