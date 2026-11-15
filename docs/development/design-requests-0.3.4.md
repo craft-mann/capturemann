@@ -105,3 +105,32 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
   and missing endpoint show "MCP offline" with their own reason, never "Another app owns the socket". The board's
   "2 min ago" is not shown: the activity log's last entry has no time in `LastCall`.
 - Not seen on screen: tested with pure models and width tests only.
+
+## D10. Default colour of new Text annotations (screenshot editor, Text tool, key T)
+- Today: a Text annotation placed from the Text tool starts white, 24 px, with no outline and no shadow
+  (a deliberate 0.2.9 choice). On a light screenshot (a document, a web page, a dialog) the text is
+  invisible until the user opens the panel and changes the colour. Black would fail the same way on a
+  dark screenshot. QA of 0.3.4 flagged it twice. The colour the user last picked for the Text tool is
+  remembered; an existing annotation keeps its stored colour; Callout, Step labels, Stamps and Retype have
+  their own defaults and are not part of this request.
+- Decide and draw (the editor at 1440 x 900, dark UI, tokens and recipes of the existing pack):
+  (a) which default a new Text annotation should have, with the reason, for both a light and a dark
+  screenshot; options to weigh: keep white; black (`#111111`); a **contrast-aware default** (the editor
+  samples the picture around the click and starts with black or white, whichever reads better, and the
+  swatch in the panel shows which one was chosen); or white with a thin dark **outline or shadow** by
+  default so it reads on any picture (the panel's Outline and Shadow controls already exist; today both
+  are off);
+  (b) how the text looks while it is being typed (the box, caret and selection from the text-field spec)
+  on a light picture and on a dark picture with the chosen default;
+  (c) the Text panel: where the colour swatch sits, whether a one-click "Light / Dark" toggle is worth
+  adding beside the palette, and how the panel shows that the colour came from the picture rather than
+  from the user's last choice (a small "Auto" label on the swatch?);
+  (d) states: first text on a light picture, first text on a dark picture, a picture with a busy
+  photograph behind the text, and a second text after the user changed the colour by hand (it keeps
+  their colour, not the automatic one).
+- Constraints: text stays editable and stored as an op (colour is a stored value, not a render-time
+  guess); an agent calling `annotate` without a colour must get a deterministic result (state what the
+  default is for an agent, since it cannot see the picture); WCAG 4.5:1 for text on the picture is the
+  target where the design can reach it; the choice must not change annotations that already exist.
+- Output wanted: the recommended default and one fallback, the panel and on-canvas states for light,
+  dark and photo pictures, exact colour values, and the one-line rule I can write into the spec (ANN-1.AC8).
