@@ -5,7 +5,7 @@
 use gpui::{
     anchored, deferred, div, img, list, point, prelude::*, px, Anchor, AnyElement, ClickEvent,
     Context, Entity, FocusHandle, FontWeight, ListAlignment, ListState, MouseButton, ObjectFit,
-    Pixels, Point, Render, Role, SharedString, Subscription, Task, WeakEntity, Window,
+    Pixels, Point, Render, Role, SharedString, Subscription, Task, Toggled, WeakEntity, Window,
 };
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -25,9 +25,10 @@ use crate::library::{
 use crate::nav::{self, NavCounts};
 use crate::overlay::CaptureMode;
 use crate::shortcuts::ShortcutAction;
-use crate::theme::{scale, type_scale, Theme};
+use crate::theme::{scale, type_scale, Color, Theme};
 use crate::ui::app::{self, AppModel, Command, Route};
 use crate::ui::audio_cache::{self, AudioCache};
+use crate::ui::bar_layout;
 use crate::ui::components::{
     button, button_with_icon, icon, icon_size, keycap, keycaps, shrink_text, status_pill,
     ButtonKind,
@@ -37,7 +38,8 @@ use crate::ui::kit::{callout, Tone};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::settings::widgets::small_button;
 use crate::ui::studio::{
-    OpenSelected, SelectDown, SelectLeft, SelectRight, SelectUp, ThemeGlobal, SIDEBAR_WIDTH,
+    ClearSelection, OpenSelected, SelectDown, SelectLeft, SelectRight, SelectUp, ThemeGlobal,
+    SIDEBAR_WIDTH,
 };
 use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
 use crate::ui::thumbs::{Thumb, ThumbCache};
@@ -433,6 +435,15 @@ impl LibraryView {
         self.multi.clear();
         self.close_menu(cx);
         cx.notify();
+    }
+
+    /// Esc (S15): an open card menu closes first, then the ticks clear.
+    fn escape(&mut self, cx: &mut Context<Self>) {
+        if self.menu.is_some() {
+            self.close_menu(cx);
+        } else if !self.multi.is_empty() {
+            self.clear_selection(cx);
+        }
     }
 
     fn toggle_multi(&mut self, ix: usize, cx: &mut Context<Self>) {
@@ -871,7 +882,37 @@ fn board_layout_label(layout: &str) -> String {
     }
 }
 
-/// The check circle of a card in selection mode (design S11): 20 px at the top left.
+/// The words of the selection bar: the counter and the labels of Make a board, Export selected
+/// and Delete (each at most 22 characters, design S20).
+pub(crate) fn selection_texts(n: u64) -> (String, [String; 3]) {
+    (
+        trn!("{n} selected", "{n} selected", n),
+        [
+            tr!("Make a board"),
+            tr!("Export selected\u{2026}"),
+            tr!("Delete"),
+        ],
+    )
+}
+
+/// The 1 px ring a hovered card gets (design S15), outside its border.
+const HOVER_RING: Color = Color::rgb(0x3A3A42);
+
+/// A ring of `spread` px outside an element, no blur: nothing moves.
+fn ring_shadow(color: Color, spread: f32) -> gpui::BoxShadow {
+    gpui::BoxShadow {
+        color: crate::ui::paint::hsla_of(color),
+        offset: gpui::point(px(0.), px(0.)),
+        blur_radius: px(0.),
+        spread_radius: px(spread),
+        inset: false,
+    }
+}
+
+/// The tick of a card (design S15): a 24 px circle in a 28 px hit area, 6 px from the card's top
+/// left. Off: a 45 % ink fill and a 2 px white border (100 % on hover). On: the text colour with
+/// a 14 px ink check. Keyboard focus: a 2 px text ring with a 2 px gap. Space toggles and Enter
+/// opens the card. It shows on hover, always while selecting, and on a ticked card.
 fn select_check(
     t: &Theme,
     on: bool,
@@ -880,10 +921,17 @@ fn select_check(
     ix: usize,
     view: WeakEntity<LibraryView>,
 ) -> AnyElement {
+    let tick_group = SharedString::from(format!("tick-{ix}"));
+    let focus = (t.ground, t.text);
+    let (v_click, v_key) = (view.clone(), view);
     div()
         .id(("card-tick", ix))
+        .group(tick_group.clone())
         .role(Role::CheckBox)
         .aria_label(SharedString::from(tr!("Select")))
+        .aria_toggled(if on { Toggled::True } else { Toggled::False })
+        .focusable()
+        .tab_stop(true)
         .occlude()
         .absolute()
         .top(px(6.))
@@ -892,24 +940,54 @@ fn select_check(
         .flex()
         .items_center()
         .justify_center()
+        .rounded(px(14.))
         .cursor_pointer()
         .opacity(if always || on { 1. } else { 0. })
         .group_hover(group, |s| s.opacity(1.))
         .hover(|s| s.opacity(1.))
+        .focus_visible(move |s| {
+            s.opacity(1.)
+                .shadow(vec![ring_shadow(focus.0, 2.), ring_shadow(focus.1, 4.)])
+        })
         .child(
             div()
-                .size(px(20.))
+                .size(px(24.))
                 .flex()
                 .items_center()
                 .justify_center()
-                .rounded(px(10.))
-                .border_1()
-                .border_color(rgba_of(if on { t.text } else { Theme::DARK.text }))
-                .bg(if on { rgba_of(t.text) } else { overlay_bg(60) })
-                .children(on.then(|| icon("check", 13., t.ground))),
+                .rounded(px(12.))
+                .border_2()
+                .border_color(if on {
+                    rgba_of(t.text)
+                } else {
+                    rgba_of(Theme::DARK.text.with_alpha(215))
+                })
+                .group_hover(tick_group, |s| s.border_color(rgba_of(Theme::DARK.text)))
+                .bg(if on { rgba_of(t.text) } else { overlay_bg(115) })
+                .children(on.then(|| icon("check", 14., t.ink))),
         )
-        .on_click(move |_, _, cx| {
-            view.update(cx, |this, cx| this.toggle_multi(ix, cx)).ok();
+        .on_click(move |_, window, cx| {
+            let list = v_click
+                .update(cx, |this, cx| {
+                    this.toggle_multi(ix, cx);
+                    this.list_focus.clone()
+                })
+                .ok();
+            // Esc and the arrow keys work from here on.
+            if let Some(f) = list {
+                window.focus(&f, cx);
+            }
+        })
+        .on_key_down(move |ev, _, cx| match ev.keystroke.key.as_str() {
+            "space" => {
+                v_key.update(cx, |this, cx| this.toggle_multi(ix, cx)).ok();
+                cx.stop_propagation();
+            }
+            "enter" => {
+                v_key.update(cx, |this, cx| this.open_index(ix, cx)).ok();
+                cx.stop_propagation();
+            }
+            _ => {}
         })
         .into_any_element()
 }
@@ -1010,6 +1088,15 @@ fn thumb_frame(
             );
         }
     }
+    // A ticked card: a 10 % light wash over the picture.
+    if ctx.multi.contains(&item.id) {
+        frame = frame.child(
+            div()
+                .absolute()
+                .inset_0()
+                .bg(rgba_of(Theme::DARK.text.with_alpha(26))),
+        );
+    }
     // The pill gives way to the tick: always while selecting, on hover otherwise.
     if ctx.multi.is_empty() {
         frame = frame.child(
@@ -1068,14 +1155,15 @@ fn thumb_frame(
 
 /// The "Record audio" button of the Audio page header (board V3): the rec tint of the sidebar's
 /// mic button, the label and the chord.
-/// "New Click Guide" in the header of All captures and Click Guides (GDE-1, design S11).
+/// "New Click Guide" in the header of All captures and Click Guides (GDE-1, design S11, S16): the
+/// primary button, last in the pair (the main action sits at the end).
 fn new_click_guide_button(t: &Theme, app: &Entity<AppModel>) -> gpui::Stateful<gpui::Div> {
     let app = app.clone();
     button_with_icon(
         t,
         "library-new-guide",
         tr!("New Click Guide"),
-        ButtonKind::Secondary,
+        ButtonKind::Primary,
         Some("mouse-pointer-click"),
     )
     // GDE-1.AC6: a session with no click events (Wayland) shows the entry off, with the reason.
@@ -1086,32 +1174,95 @@ fn new_click_guide_button(t: &Theme, app: &Entity<AppModel>) -> gpui::Stateful<g
     .on_click(move |_, _, cx| app::handle_command(&app, Command::NewClickGuide, cx))
 }
 
-/// "Click Guide of a window..." next to it (GDE-1): the window picker, then the guide follows
-/// that window only.
-fn new_window_guide_button(t: &Theme, app: &Entity<AppModel>) -> gpui::Stateful<gpui::Div> {
+/// "Click Guide of a window..." before it (GDE-1, S16): the window picker, then the guide follows
+/// that window only. It is the secondary button; when the header has no room for both it is an
+/// icon button (the app-window icon) and its label is the tooltip.
+fn new_window_guide_button(
+    t: &Theme,
+    app: &Entity<AppModel>,
+    icon_only: bool,
+) -> gpui::Stateful<gpui::Div> {
     let app = app.clone();
-    button_with_icon(
-        t,
-        "library-new-window-guide",
-        tr!("Click Guide of a window\u{2026}"),
-        ButtonKind::Secondary,
-        Some("app-window"),
-    )
-    .when_some(
+    let label = tr!("Click Guide of a window\u{2026}");
+    let b = if icon_only {
+        let c = ButtonKind::Secondary.colors(t);
+        let (hover, focus) = (rgba_of(c.hover), rgba_of(t.text));
+        div()
+            .id("library-new-window-guide")
+            .role(Role::Button)
+            .aria_label(SharedString::from(label.clone()))
+            .focusable()
+            .tab_stop(true)
+            .size(px(scale::CONTROL_H))
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(scale::RADIUS_MD))
+            .border_1()
+            .border_color(rgba_of(c.border))
+            .bg(rgba_of(c.bg))
+            .cursor_pointer()
+            .hover(move |s| s.bg(hover))
+            .focus_visible(move |s| s.border_color(focus))
+            .tooltip(tip(label, Vec::new()))
+            .child(icon("app-window", 16., c.fg))
+    } else {
+        button_with_icon(
+            t,
+            "library-new-window-guide",
+            label,
+            ButtonKind::Secondary,
+            Some("app-window"),
+        )
+    };
+    b.when_some(
         crate::ui::guide_view::preflight::disabled_reason(),
         |b, reason| b.opacity(0.45).tooltip(tip(reason, Vec::new())),
     )
     .on_click(move |_, _, cx| app::handle_command(&app, Command::NewClickGuideWindow, cx))
 }
 
-/// Both Click Guide entries, side by side.
-fn click_guide_buttons(t: &Theme, app: &Entity<AppModel>) -> gpui::Div {
+/// Both Click Guide entries, side by side: the window one first, "New Click Guide" last.
+/// `window_icon_only` turns the first into an icon button (the header is too narrow for both).
+fn click_guide_buttons(t: &Theme, app: &Entity<AppModel>, window_icon_only: bool) -> gpui::Div {
     div()
         .flex()
+        .flex_none()
         .items_center()
         .gap(px(8.))
+        .child(new_window_guide_button(t, app, window_icon_only))
         .child(new_click_guide_button(t, app))
-        .child(new_window_guide_button(t, app))
+}
+
+/// Whether the header row (title, search, Import and the two guide buttons) has no room for both
+/// guide buttons with their labels (design S16). The widths are measured from the same labels
+/// the row draws; the row never wraps because of the guide buttons.
+pub(crate) fn guide_buttons_need_icon(title: &str, count: Option<usize>, row_w: f32) -> bool {
+    let title_w = bar_layout::text_w(title, HEADLINE, false, 600)
+        + count.map_or(0.0, |n| {
+            12.0 + bar_layout::text_w(&n.to_string(), 13.0, true, 400)
+        });
+    let import_w = 2.0
+        + 28.0
+        + 16.0
+        + 8.0
+        + bar_layout::text_w(&tr_ctx!("button", "Import\u{2026}"), type_scale::UI, false, 400)
+        // The key hint beside the label.
+        + 8.0
+        + 14.0
+        + bar_layout::text_w("Ctrl+I", 11.0, true, 400);
+    let others = title_w + 320.0 + import_w + 3.0 * 16.0;
+    bar_layout::window_button_collapses(
+        f64::from(row_w) - others,
+        bar_layout::text_w(&tr!("New Click Guide"), type_scale::UI, false, 600),
+        bar_layout::text_w(
+            &tr!("Click Guide of a window\u{2026}"),
+            type_scale::UI,
+            false,
+            400,
+        ),
+    )
 }
 
 fn record_audio_header_button(t: &Theme, keys: &[String], app: &Entity<AppModel>) -> AnyElement {
@@ -1308,7 +1459,7 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     let selecting = !ctx.multi.is_empty();
     let multi_on = ctx.multi.contains(&item.id);
     let border = if multi_on {
-        t.text
+        t.border
     } else if selected {
         if ctx.list_focused {
             t.text
@@ -1319,14 +1470,24 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
         t.border
     };
     let group = SharedString::from(format!("card-{ix}"));
-    let hover_border = rgba_of(t.line);
+    let ground = t.ground;
+    let ring_color = t.text;
     let frame = if item.kind == Kind::Audio {
         audio_frame(ctx, item, width, group.clone(), cx)
     } else {
         thumb_frame(ctx, item, width, group.clone(), cx)
     }
     .border_color(rgba_of(border))
-    .group_hover(group.clone(), move |s| s.border_color(hover_border));
+    // S15: a hovered card gets a 1 px #3A3A42 ring; a ticked card a 2 px text ring with a 2 px
+    // gap (it reads even when a small card hides its tick).
+    .when(multi_on, move |d| {
+        d.shadow(vec![ring_shadow(ground, 2.), ring_shadow(ring_color, 4.)])
+    })
+    .when(!multi_on, |d| {
+        d.group_hover(group.clone(), |s| {
+            s.shadow(vec![ring_shadow(HOVER_RING, 1.)])
+        })
+    });
     // IMP-5: an imported capture carries the badge, and a strip while its import still runs. A
     // running transcription shows the same strip on any capture (a recording or an audio capture
     // made here as well as an import), unless the import's own step is showing.
@@ -1734,6 +1895,14 @@ impl Render for LibraryView {
         let list_focused = self.list_focus.contains_focused(window, cx);
 
         // ---- title row: the page title, its real count, the search field ---------------------
+        let icon_only = {
+            let row_w = f32::from(window.viewport_size().width) - SIDEBAR_WIDTH - PAGE_PADDING * 2.;
+            guide_buttons_need_icon(
+                &nav::page_heading(&route).1,
+                nav::route_count(&route, &counts),
+                row_w,
+            )
+        };
         let view = cx.entity().downgrade();
         let (_, title) = nav::page_heading(&route);
         let title_row = div()
@@ -1786,7 +1955,7 @@ impl Render for LibraryView {
             }))
             .children(
                 matches!(route, Route::Guides | Route::Library)
-                    .then(|| click_guide_buttons(&t, &self.app).into_any_element()),
+                    .then(|| click_guide_buttons(&t, &self.app, icon_only).into_any_element()),
             );
 
         // ---- toolbar: the chips and the sort bar -------------------------------------------
@@ -2040,7 +2209,7 @@ impl Render for LibraryView {
                 "mouse-pointer-click",
                 &tr!("No Click Guides yet"),
                 &tr!("Click through a task and CaptureMann writes the steps. It records clicks only, never keystrokes."),
-                Some(click_guide_buttons(&t, &app).into_any_element()),
+                Some(click_guide_buttons(&t, &app, false).into_any_element()),
             ),
             (_, Some(EmptyKind::NoCaptures)) => {
                 let keys = shortcuts
@@ -2156,6 +2325,7 @@ impl Render for LibraryView {
                     )
                     .on_action(cx.listener(|this, _: &SelectUp, _, cx| this.move_vertical(-1, cx)))
                     .on_action(cx.listener(|this, _: &SelectDown, _, cx| this.move_vertical(1, cx)))
+                    .on_action(cx.listener(|this, _: &ClearSelection, _, cx| this.escape(cx)))
                     .on_action(cx.listener(|this, _: &OpenSelected, _, cx| {
                         if let Some(i) = this.state.selected {
                             this.open_index(i, cx);
@@ -2177,7 +2347,8 @@ impl Render for LibraryView {
             .menu
             .as_ref()
             .map(|m| self.card_menu(&t, m, window, cx));
-        let bar = (!self.multi.is_empty()).then(|| self.selection_bar(&t, cx));
+        let content_w = f32::from(window.viewport_size().width) - SIDEBAR_WIDTH;
+        let bar = (!self.multi.is_empty()).then(|| self.selection_bar(&t, content_w, cx));
         div()
             .relative()
             .size_full()
@@ -2196,44 +2367,69 @@ impl Render for LibraryView {
 }
 
 impl LibraryView {
-    /// The floating selection bar (design S11): `3 selected | Make a board, Export selected...,
-    /// Delete | x`. No Copy: several images have no single clipboard meaning.
-    fn selection_bar(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+    /// The floating selection bar (design S11, S15, S20): `3 selected | Make a board, Export
+    /// selected..., Delete | x`. No Copy: several images have no single clipboard meaning. The
+    /// bar is as wide as its content and at most the content area less 48 px (`content_w` is the
+    /// area right of the sidebar); when it would pass that, Delete, then Export selected, then
+    /// Make a board turn into icon buttons (their labels stay as tooltips and accessible names);
+    /// the counter never truncates and the clear button is always an icon.
+    fn selection_bar(&self, t: &Theme, content_w: f32, cx: &mut Context<Self>) -> AnyElement {
         let items = self.multi_items();
         let shots = items.iter().filter(|i| i.kind == Kind::Screenshot).count();
         let n = items.len();
         // Make a board: 2 to 12 screenshots, and nothing else selected.
         let can_board = (2..=12).contains(&shots) && shots == n;
         let can_export = shots > 0;
+        let (counter, labels) = selection_texts(n as u64);
+        let layout = bar_layout::selection_bar(
+            bar_layout::text_w(&counter, 13.5, false, 500),
+            [
+                bar_layout::text_w(&labels[0], 13.5, false, 400),
+                bar_layout::text_w(&labels[1], 13.5, false, 400),
+                bar_layout::text_w(&labels[2], 13.5, false, 400),
+            ],
+            f64::from(content_w) - 48.0,
+        );
         let v = cx.entity().downgrade();
-        let action =
-            |id: &'static str, label: String, glyph: &'static str, enabled: bool, warn: bool| {
-                let fg = if warn { t.warning } else { t.text };
-                div()
-                    .id(id)
-                    .role(Role::Button)
-                    .aria_label(SharedString::from(label.clone()))
-                    .focusable()
-                    .tab_stop(enabled)
-                    .h(px(34.))
-                    .px(px(12.))
-                    .flex()
-                    .items_center()
-                    .gap(px(7.))
-                    .rounded(px(scale::RADIUS_SM))
-                    .text_size(px(13.5))
-                    .text_color(rgba_of(fg))
-                    .when(enabled, |d| {
-                        d.cursor_pointer().hover(|s| s.bg(rgba_of(t.raised)))
-                    })
-                    .when(!enabled, |d| d.opacity(0.4))
-                    .child(icon(glyph, 15., fg))
-                    .child(SharedString::from(label))
-            };
+        let action = |id: &'static str,
+                      label: String,
+                      glyph: &'static str,
+                      enabled: bool,
+                      with_label: bool| {
+            let fg = t.text;
+            div()
+                .id(id)
+                .role(Role::Button)
+                .aria_label(SharedString::from(label.clone()))
+                .focusable()
+                .tab_stop(enabled)
+                .h(px(bar_layout::SEL_BTN_H as f32))
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .gap(px(bar_layout::SEL_ICON_GAP as f32))
+                .rounded(px(scale::RADIUS_SM))
+                .whitespace_nowrap()
+                .text_size(px(13.5))
+                .text_color(rgba_of(fg))
+                .when(enabled, |d| {
+                    d.cursor_pointer().hover(|s| s.bg(rgba_of(t.raised)))
+                })
+                .when(!enabled, |d| d.opacity(0.4))
+                .when(with_label, |d| d.px(px(bar_layout::SEL_BTN_PAD as f32)))
+                .when(!with_label, |d| {
+                    d.w(px(bar_layout::SEL_BTN_H as f32))
+                        .tooltip(tip(label.clone(), Vec::new()))
+                })
+                .child(icon(glyph, bar_layout::SEL_ICON as f32, fg))
+                .when(with_label, |d| d.child(SharedString::from(label)))
+        };
+        let [l_board, l_export, l_delete] = labels;
         let (v1, v2, v3, v4) = (v.clone(), v.clone(), v.clone(), v);
         div()
             .absolute()
-            .bottom(px(24.))
+            .bottom(px(28.))
             .left_0()
             .right_0()
             .flex()
@@ -2244,10 +2440,11 @@ impl LibraryView {
                     .role(Role::Toolbar)
                     .aria_label(tr!("Selection"))
                     .occlude()
-                    .p(px(6.))
+                    .p(px(bar_layout::SEL_PAD as f32))
                     .flex()
+                    .flex_none()
                     .items_center()
-                    .gap(px(4.))
+                    .gap(px(bar_layout::SEL_GAP as f32))
                     .rounded(px(14.))
                     .border_1()
                     .border_color(rgba_of(t.line))
@@ -2255,20 +2452,22 @@ impl LibraryView {
                     .shadow_lg()
                     .child(
                         div()
-                            .px(px(12.))
+                            .flex_none()
+                            .whitespace_nowrap()
+                            .px(px(bar_layout::SEL_COUNTER_PAD as f32))
                             .text_size(px(13.5))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(rgba_of(t.text))
-                            .child(SharedString::from(trn!("{n} selected", "{n} selected", n))),
+                            .child(SharedString::from(counter)),
                     )
-                    .child(div().w(px(1.)).h(px(20.)).bg(rgba_of(t.border)))
+                    .child(div().w(px(1.)).h(px(20.)).flex_none().bg(rgba_of(t.border)))
                     .child({
                         let b = action(
                             "bar-board",
-                            tr!("Make a board"),
+                            l_board,
                             "layout-panel-left",
                             can_board,
-                            false,
+                            layout.labels[0],
                         );
                         if can_board {
                             b.on_click(move |_, _, cx| {
@@ -2281,10 +2480,10 @@ impl LibraryView {
                     .child({
                         let b = action(
                             "bar-export",
-                            tr!("Export selected\u{2026}"),
+                            l_export,
                             "folder-output",
                             can_export,
-                            false,
+                            layout.labels[1],
                         );
                         if can_export {
                             b.on_click(move |_, _, cx| {
@@ -2294,14 +2493,15 @@ impl LibraryView {
                             b
                         }
                     })
+                    // Delete uses the text colour; the destructive look is the confirmation's.
                     .child(
-                        action("bar-delete", tr!("Delete"), "trash-2", true, true).on_click(
+                        action("bar-delete", l_delete, "trash-2", true, layout.labels[2]).on_click(
                             move |_, _, cx| {
                                 v3.update(cx, |this, cx| this.delete_selected(cx)).ok();
                             },
                         ),
                     )
-                    .child(div().w(px(1.)).h(px(20.)).bg(rgba_of(t.border)))
+                    .child(div().w(px(1.)).h(px(20.)).flex_none().bg(rgba_of(t.border)))
                     .child(
                         div()
                             .id("bar-clear")
@@ -2309,13 +2509,15 @@ impl LibraryView {
                             .aria_label(tr!("Clear selection"))
                             .focusable()
                             .tab_stop(true)
-                            .size(px(34.))
+                            .size(px(bar_layout::SEL_BTN_H as f32))
+                            .flex_none()
                             .flex()
                             .items_center()
                             .justify_center()
                             .rounded(px(scale::RADIUS_SM))
                             .cursor_pointer()
                             .hover(|s| s.bg(rgba_of(t.raised)))
+                            .tooltip(tip(tr!("Clear selection"), Vec::new()))
                             .child(icon("x", 16., t.text_2))
                             .on_click(move |_, _, cx| {
                                 v4.update(cx, |this, cx| this.clear_selection(cx)).ok();

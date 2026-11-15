@@ -566,3 +566,81 @@ async fn gde_1_retina_step_crops_in_logical_px_and_names_text_in_logical_px() {
     assert_eq!(crop["rect"][2].as_f64(), Some(2400.0), "{crop}");
     assert_eq!(crop["rect"][3].as_f64(), Some(1600.0), "{crop}");
 }
+
+/// The desktop of `desktop()` whose window 10 can be closed.
+struct Closable {
+    inner: cm_capture::fake::FakeBackend,
+    closed: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl cm_capture::CaptureBackend for Closable {
+    fn check_permission(&self) -> Result<(), CmError> {
+        self.inner.check_permission()
+    }
+    fn displays(&self) -> Result<Vec<cm_capture::DisplayInfo>, CmError> {
+        self.inner.displays()
+    }
+    fn windows(&self) -> Result<Vec<cm_capture::WindowInfo>, CmError> {
+        if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
+            return Ok(Vec::new());
+        }
+        self.inner.windows()
+    }
+    fn capture_display(&self, id: u32) -> Result<cm_capture::Frame, CmError> {
+        self.inner.capture_display(id)
+    }
+    fn capture_window(&self, id: u32) -> Result<cm_capture::Frame, CmError> {
+        self.inner.capture_window(id)
+    }
+}
+
+/// GDE-1 (design S16): when the followed window closes the guide pauses itself, says why in
+/// `get_guide` and an event, keeps its steps, cannot resume, and `stop_guide` still saves it.
+#[tokio::test]
+async fn gde_1_a_closed_window_pauses_the_guide_and_keeps_its_steps() {
+    let dir = tempfile::tempdir().unwrap();
+    let lib = cm_library::Library::open_or_create(dir.path()).unwrap();
+    let closed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let clicks = ScriptedClicks::new();
+    let daemon = Daemon::builder(
+        cm_capture::Capturer::new(Closable {
+            inner: desktop(),
+            closed: closed.clone(),
+        })
+        .with_own_pid(None),
+        lib,
+    )
+    .guide_clicks(clicks.clone())
+    .text_recognizer(Screen { with_email: false })
+    .confirmer(Arc::new(FixedConfirmer::new(Decision::Approve)))
+    .build();
+    let mut c = Client::connect(&daemon, "agent");
+    let r = c
+        .call(
+            "start_guide",
+            json!({"target": {"window_id": 10}, "countdown_s": 0}),
+        )
+        .await;
+    let id = ok(&r)["guide_id"].as_str().unwrap().to_owned();
+    clicks.click(30.0, 28.0);
+    let g = c.call("get_guide", json!({})).await;
+    assert_eq!(ok(&g)["window_closed"], false);
+    closed.store(true, std::sync::atomic::Ordering::SeqCst);
+    let mut state = Value::Null;
+    for _ in 0..40 {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let g = c.call("get_guide", json!({})).await;
+        if ok(&g)["window_closed"] == true {
+            state = ok(&g).clone();
+            break;
+        }
+    }
+    assert_eq!(state["state"], "paused", "{state}");
+    assert_eq!(state["recorded_steps"], 1);
+    // A click now is not a step, and the guide cannot resume on a window that is gone.
+    clicks.click(60.0, 28.0);
+    let resume = c.call("set_guide", json!({"paused": false})).await;
+    assert_eq!(code(&resume), "invalid_input", "{resume}");
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    assert_eq!(ok(&done)["step_count"], 1);
+}

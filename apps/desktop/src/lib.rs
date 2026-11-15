@@ -61,7 +61,8 @@ pub mod shortcuts;
 pub mod studio_window;
 pub mod surfaces;
 pub mod text_buffer;
-#[cfg(test)]
+// The advance widths of the bundled fonts: the layout tests use them, and so do the bars that
+// size themselves to their content (`ui::bar_layout`).
 mod text_metrics_tests;
 pub mod theme;
 pub mod toast;

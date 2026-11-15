@@ -170,6 +170,18 @@ pub fn action_label(purpose: Purpose) -> String {
     }
 }
 
+/// The title of the Click Guide purpose (design S16).
+fn follow_a_window() -> String {
+    tr_ctx!("window picker for a Click Guide", "Follow a window")
+}
+
+fn follow_a_window_hint() -> String {
+    tr_ctx!(
+        "window picker for a Click Guide",
+        "Only clicks inside this window become steps. Clicks anywhere else are ignored."
+    )
+}
+
 /// Like [`open`], for the given purpose.
 pub fn open_for(app: &Entity<AppModel>, purpose: Purpose, cx: &mut App) {
     crate::trace::mark("window_picker_open");
@@ -467,6 +479,8 @@ impl PickerView {
                 self.close(window, cx, true);
                 return;
             }
+            // The hover mode takes a screenshot; a Click Guide picks from the list only.
+            Outcome::PickOnScreen if self.purpose == Purpose::ClickGuide => {}
             Outcome::PickOnScreen => {
                 // The overlay is its own process and takes the screen and the keyboard.
                 self.close(window, cx, false);
@@ -491,7 +505,7 @@ impl PickerView {
                         cx.defer(move |cx| app::run_window_capture(&app, window_id, cx));
                     }
                     Purpose::ClickGuide => cx.defer(move |cx| {
-                        crate::ui::guide_view::hud::start_window(&app, window_id, cx)
+                        crate::ui::guide_view::hud::start_window(&app, window_id, title, cx)
                     }),
                 }
                 return;
@@ -844,6 +858,29 @@ impl Render for PickerView {
         let rail = self.rail(&t, cx);
         let main = self.main_column(&t, cx);
         let footer = self.footer(&t, platform, cx);
+        // Design S16: a Click Guide follows one window, and says so above the list.
+        let banner = (self.purpose == Purpose::ClickGuide).then(|| {
+            div()
+                .flex()
+                .flex_none()
+                .flex_col()
+                .gap(px(4.))
+                .px(px(18.))
+                .pb(px(12.))
+                .child(
+                    div()
+                        .text_size(px(17.))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(rgba_of(t.text))
+                        .child(SharedString::from(follow_a_window())),
+                )
+                .child(
+                    div()
+                        .text_size(px(13.))
+                        .text_color(rgba_of(t.text_3))
+                        .child(SharedString::from(follow_a_window_hint())),
+                )
+        });
         div()
             .id("window-picker")
             .role(Role::Dialog)
@@ -866,6 +903,7 @@ impl Render for PickerView {
                     .border_color(rgba_of(t.line))
                     .bg(rgba_of(derived::PICKER_FILL))
                     .child(header)
+                    .children(banner)
                     .child(div().flex_1().min_h(px(0.)).flex().child(rail).child(main))
                     .child(footer),
             )
@@ -976,6 +1014,7 @@ impl PickerView {
         };
         let can_capture = self.state.selected_window().is_some();
         let hints = footer_hints(platform);
+        let guide = self.purpose == Purpose::ClickGuide;
         div()
             .flex()
             .flex_none()
@@ -987,8 +1026,53 @@ impl PickerView {
             .border_t_1()
             .border_color(rgba_of(t.border))
             .bg(rgba_of(derived::PICKER_FOOTER))
-            .children(hints.into_iter().map(|(k, l)| hint(k, l)))
-            .child(
+            .children(guide.then(|| {
+                // The countdown line of the Click Guide purpose (S16).
+                div()
+                    .text_size(px(12.))
+                    .text_color(rgba_of(t.mist))
+                    .child(SharedString::from(tr_ctx!(
+                        "window picker for a Click Guide",
+                        "3-second countdown after Start guide"
+                    )))
+            }))
+            .children(
+                (!guide)
+                    .then(|| hints.into_iter().map(|(k, l)| hint(k, l)))
+                    .into_iter()
+                    .flatten(),
+            )
+            .children(guide.then(|| {
+                div()
+                    .id("window-picker-cancel")
+                    .role(Role::Button)
+                    .aria_label(tr_ctx!("window picker footer", "Cancel"))
+                    .focusable()
+                    .tab_stop(true)
+                    .ml_auto()
+                    .h(px(36.))
+                    .px(px(14.))
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .whitespace_nowrap()
+                    .rounded(px(scale::RADIUS_SM + 1.))
+                    .border_1()
+                    .border_color(rgba_of(t.line))
+                    .bg(rgba_of(t.surface_2))
+                    .text_size(px(13.5))
+                    .text_color(rgba_of(t.text))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgba_of(t.raised)))
+                    .child(SharedString::from(tr_ctx!(
+                        "window picker footer",
+                        "Cancel"
+                    )))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.close(window, cx, true);
+                    }))
+            }))
+            .children((!guide).then(|| {
                 div()
                     .id("window-picker-pick-on-screen")
                     .role(Role::Button)
@@ -1024,8 +1108,8 @@ impl PickerView {
                     .on_click(cx.listener(|this, _, window, cx| {
                         let o = this.state.tab();
                         this.apply(o, window, cx);
-                    })),
-            )
+                    }))
+            }))
             .child(
                 div()
                     .id("window-picker-capture")
@@ -1049,7 +1133,15 @@ impl PickerView {
                         d.cursor_pointer().hover(|s| s.bg(rgba_of(t.primary_hover)))
                     })
                     .when(!can_capture, |d| d.opacity(0.4))
-                    .child(icon("camera", 15., t.primary_fg))
+                    .child(icon(
+                        if guide {
+                            "mouse-pointer-click"
+                        } else {
+                            "camera"
+                        },
+                        15.,
+                        t.primary_fg,
+                    ))
                     .child(SharedString::from(action_label(self.purpose)))
                     .child(
                         div()

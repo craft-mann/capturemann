@@ -65,6 +65,11 @@ pub enum ToastAction {
     CancelImport(String),
     /// Open the recording's Report tab on the setup, with the preset's template suggested.
     SuggestReport(String),
+    /// The Click Guide's followed window closed: stop the guide (its steps are kept) and open the
+    /// window picker for a new one (design S16).
+    GuidePickWindow,
+    /// The same toast's other button: stop the guide and open it in the editor (guide id).
+    GuideStopOpen(String),
     /// `upload { file }` of a file made from a capture (the exported audio): capture id, path.
     UploadFile(String, String),
 }
@@ -124,6 +129,8 @@ impl ToastAction {
             ToastAction::StopRecording(_) => "cm-stop",
             ToastAction::CancelJob(_) | ToastAction::CancelImport(_) => "x",
             ToastAction::UploadFile(..) => "cloud-upload",
+            ToastAction::GuidePickWindow => "app-window",
+            ToastAction::GuideStopOpen(_) => "mouse-pointer-click",
             ToastAction::SuggestReport(_) => "file-text",
         }
     }

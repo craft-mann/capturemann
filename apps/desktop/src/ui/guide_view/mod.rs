@@ -13,8 +13,8 @@ use std::sync::Arc;
 
 use base64::Engine as _;
 use gpui::{
-    div, img, prelude::*, px, Context, Entity, FontWeight, ObjectFit, Render, RenderImage, Role,
-    SharedString, Subscription, Window,
+    div, img, prelude::*, px, Context, Entity, FocusHandle, FontWeight, ObjectFit, Render,
+    RenderImage, Role, SharedString, Subscription, Window,
 };
 use image::Frame;
 use serde_json::{json, Value};
@@ -33,6 +33,7 @@ use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
 
 pub mod card;
 pub mod export;
+pub mod fit;
 pub mod hud;
 pub mod preflight;
 
@@ -185,6 +186,9 @@ pub struct GuideView {
     pub(crate) error: Option<String>,
     pub(crate) export: Option<export::ExportState>,
     epoch: u64,
+    /// The full-size picture viewer is open (design S19), and what takes its keys.
+    viewer: bool,
+    viewer_focus: FocusHandle,
     /// "Edit image" opened the editor: the next time the page shows, the guide and its
     /// pictures are read again (the step's image may have changed), keeping the selection.
     away: bool,
@@ -256,6 +260,8 @@ impl GuideView {
             thumbs: Vec::new(),
             error: None,
             export: None,
+            viewer: false,
+            viewer_focus: cx.focus_handle(),
             epoch,
             away: false,
             _subs: subs,
@@ -784,7 +790,7 @@ fn step_row_view(
 }
 
 impl Render for GuideView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
         let app = self.app.clone();
         let crumb = crumb_link(
@@ -956,7 +962,7 @@ impl Render for GuideView {
                             .child(numbering("1 2 3", "number", "guide-num-1"))
                             .child(numbering("A B C", "upper", "guide-num-a")),
                     );
-                let right = self.selected_view(&t, cx);
+                let right = self.selected_view(&t, window, cx);
                 div()
                     .flex_1()
                     .min_h(px(0.))
@@ -990,11 +996,224 @@ impl Render for GuideView {
             .when_some(self.export.as_ref(), |d, ex| {
                 d.child(export::sheet(&t, ex, self, cx))
             })
+            .children(
+                self.viewer
+                    .then(|| self.viewer_overlay(&t, window, cx))
+                    .flatten(),
+            )
     }
 }
 
 impl GuideView {
-    fn selected_view(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::AnyElement {
+    /// The step picture (design S19): fitted by `fit`, centred, never cropped and never larger
+    /// than its own size. A tall one sits on #0D0D0F with a chip; a click or Space opens the
+    /// full-size viewer.
+    fn picture_box(
+        &self,
+        t: &Theme,
+        im: &Arc<RenderImage>,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let size = im.size(0);
+        let sf = window.scale_factor().max(1.0);
+        let (nw, nh) = (
+            u32::from(size.width).max(1) as f32 / sf,
+            u32::from(size.height).max(1) as f32 / sf,
+        );
+        let vp = window.viewport_size();
+        let (col_h, col_w) = fit::column_size(f32::from(vp.width), f32::from(vp.height));
+        let f = fit::fit(nw, nh, col_w, fit::max_height(col_h));
+        let picture = div()
+            .w(px(f.w))
+            .h(px(f.h))
+            .flex_none()
+            .rounded(px(scale::RADIUS_MD))
+            .overflow_hidden()
+            .border_1()
+            .border_color(rgba_of(t.border))
+            .child(img(im.clone()).size_full().object_fit(ObjectFit::Contain));
+        let mut holder = div()
+            .id("guide-picture")
+            .role(Role::Button)
+            .aria_label(tr!("Show the picture at full size"))
+            .focusable()
+            .tab_stop(true)
+            .relative()
+            .w_full()
+            .h(px(f.h))
+            .flex()
+            .justify_center()
+            .cursor_pointer()
+            .on_click(cx.listener(|this, _, window, cx| this.open_viewer(window, cx)))
+            .on_key_down(cx.listener(|this, ev: &gpui::KeyDownEvent, window, cx| {
+                if ev.keystroke.key == "space" {
+                    this.open_viewer(window, cx);
+                    cx.stop_propagation();
+                }
+            }))
+            .child(picture);
+        if f.tall {
+            holder = holder
+                .rounded(px(scale::RADIUS_MD))
+                .bg(rgba_of(crate::theme::Color::rgb(0x0D0D0F)))
+                .child(
+                    div()
+                        .absolute()
+                        .bottom(px(10.))
+                        .left_0()
+                        .right_0()
+                        .flex()
+                        .justify_center()
+                        .child(
+                            div()
+                                .h(px(26.))
+                                .px(px(10.))
+                                .flex()
+                                .items_center()
+                                .gap(px(6.))
+                                .rounded(px(999.))
+                                .bg(rgba_of(t.surface_2))
+                                .border_1()
+                                .border_color(rgba_of(t.line))
+                                .text_size(px(type_scale::CAPTION))
+                                .text_color(rgba_of(t.text_2))
+                                .whitespace_nowrap()
+                                .child(icon("maximize", 13., t.text_2))
+                                .child(SharedString::from(tr!(
+                                    "Tall picture \u{b7} click to see full size"
+                                ))),
+                        ),
+                );
+        }
+        holder.into_any_element()
+    }
+
+    fn open_viewer(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.picture.is_none() {
+            return;
+        }
+        self.viewer = true;
+        window.focus(&self.viewer_focus, cx);
+        cx.notify();
+    }
+
+    fn close_viewer(&mut self, cx: &mut Context<Self>) {
+        self.viewer = false;
+        cx.notify();
+    }
+
+    /// The full-size viewer over the editor (design S19): the picture at its actual size inside a
+    /// panel that scrolls both ways; Esc or the close button closes it.
+    fn viewer_overlay(
+        &self,
+        t: &Theme,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::AnyElement> {
+        let (_, im) = self.picture.as_ref()?;
+        let size = im.size(0);
+        let sf = window.scale_factor().max(1.0);
+        let (pw, ph) = (u32::from(size.width), u32::from(size.height));
+        let (nw, nh) = (pw.max(1) as f32 / sf, ph.max(1) as f32 / sf);
+        let number = self
+            .selected_row()
+            .map(|s| s.label.clone())
+            .unwrap_or_default();
+        let heading = tr!(
+            "Step {n} \u{b7} full size {w} \u{d7} {h}",
+            n = number,
+            w = group_thousands(pw),
+            h = group_thousands(ph)
+        );
+        Some(
+            div()
+                .id("guide-viewer")
+                .role(Role::Dialog)
+                .aria_label(SharedString::from(heading.clone()))
+                .track_focus(&self.viewer_focus)
+                .on_key_down(cx.listener(|this, ev: &gpui::KeyDownEvent, _, cx| {
+                    if ev.keystroke.key == "escape" {
+                        this.close_viewer(cx);
+                        cx.stop_propagation();
+                    }
+                }))
+                .occlude()
+                .absolute()
+                .inset_0()
+                .p(px(32.))
+                .flex()
+                .flex_col()
+                .bg(rgba_of(crate::theme::Color::rgb(0x000000).with_alpha(184)))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_h(px(0.))
+                        .flex()
+                        .flex_col()
+                        .rounded(px(scale::RADIUS_LG))
+                        .border_1()
+                        .border_color(rgba_of(t.line))
+                        .bg(rgba_of(crate::theme::Color::rgb(0x0D0D0F)))
+                        .overflow_hidden()
+                        .child(
+                            div()
+                                .h(px(48.))
+                                .flex_none()
+                                .px(px(16.))
+                                .flex()
+                                .items_center()
+                                .gap(px(12.))
+                                .border_b_1()
+                                .border_color(rgba_of(t.line))
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w(px(0.))
+                                        .text_size(px(type_scale::UI))
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(rgba_of(t.text))
+                                        .child(SharedString::from(heading)),
+                                )
+                                .child(
+                                    icon_button(
+                                        t,
+                                        "guide-viewer-close",
+                                        "x",
+                                        tr!("Close"),
+                                        false,
+                                        Some(vec!["Esc".to_owned()]),
+                                    )
+                                    .on_click(cx.listener(|this, _, _, cx| this.close_viewer(cx))),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .id("guide-viewer-scroll")
+                                .flex_1()
+                                .min_h(px(0.))
+                                .overflow_scroll()
+                                .child(
+                                    div().flex().justify_center().child(
+                                        img(im.clone())
+                                            .w(px(nw))
+                                            .h(px(nh))
+                                            .flex_none()
+                                            .object_fit(ObjectFit::Fill),
+                                    ),
+                                ),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
+
+    fn selected_view(
+        &self,
+        t: &Theme,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
         let Some(s) = self.selected_row().cloned() else {
             return div()
                 .flex_1()
@@ -1028,20 +1247,7 @@ impl GuideView {
             .as_ref()
             .filter(|(i, _)| Some(i) == s.image_id.as_ref())
         {
-            // The box takes the picture's own proportions: with only a width, the picture sat at
-            // the bottom of an oversized box and was clipped (QA G1).
-            let size = im.size(0);
-            let ratio = u32::from(size.width).max(1) as f32 / u32::from(size.height).max(1) as f32;
-            col = col.child(
-                div()
-                    .w_full()
-                    .aspect_ratio(ratio)
-                    .rounded(px(scale::RADIUS_MD))
-                    .overflow_hidden()
-                    .border_1()
-                    .border_color(rgba_of(t.border))
-                    .child(img(im.clone()).size_full().object_fit(ObjectFit::Contain)),
-            );
+            col = col.child(self.picture_box(t, im, window, cx));
         }
         if !s.is_note {
             let (a, b, c, e) = (id.clone(), id.clone(), id.clone(), id.clone());
@@ -1146,12 +1352,33 @@ impl GuideView {
     }
 }
 
+/// 6360 as "6,360" (the viewer's heading).
+fn group_thousands(n: u32) -> String {
+    let s = n.to_string();
+    let mut out = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn ids(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    /// S19: the viewer's heading groups thousands ("758 x 6,360").
+    #[test]
+    fn the_viewer_heading_groups_thousands() {
+        assert_eq!(group_thousands(758), "758");
+        assert_eq!(group_thousands(6360), "6,360");
+        assert_eq!(group_thousands(1_234_567), "1,234,567");
     }
 
     /// GDE-2: a drop on a row puts the dragged step where that row was, in both directions.

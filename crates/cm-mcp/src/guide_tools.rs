@@ -31,6 +31,7 @@ fn guide_output() -> Value {
         "numbering": { "type": "string", "enum": ["number", "upper", "lower"] },
         "state": { "type": "string", "enum": ["countdown", "recording", "paused", "stopped", "cancelled", "discarded"] },
         "step_count": { "type": "integer" },
+        "window_closed": { "type": "boolean", "description": "While recording: the followed window has closed. The guide paused itself and cannot resume; its steps are kept, `stop_guide` saves it." },
         "steps": { "type": "array", "items": { "type": "object", "properties": {
             "id": { "type": "string" },
             "number": { "type": "integer", "description": "Position, from 1." },

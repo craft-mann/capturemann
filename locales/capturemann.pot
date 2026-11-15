@@ -2276,6 +2276,9 @@ msgstr ""
 msgid "Follow cursor"
 msgstr ""
 
+msgid "Following “{window}” · clicks only"
+msgstr ""
+
 msgid "Footer kept once"
 msgstr ""
 
@@ -3893,7 +3896,10 @@ msgstr ""
 msgid "Paused at {percent}%"
 msgstr ""
 
-msgid "Paused · clicks are not recorded"
+msgid "Paused · the followed window closed"
+msgstr ""
+
+msgid "Paused · {rest}"
 msgstr ""
 
 msgid "Paused, {t}"
@@ -3926,7 +3932,13 @@ msgstr ""
 msgid "Pick a tool, or click an annotation to edit it."
 msgstr ""
 
+msgid "Pick a window…"
+msgstr ""
+
 msgid "Pick an annotation"
+msgstr ""
+
+msgid "Pick another window"
 msgstr ""
 
 msgid "Pick from list"
@@ -5046,6 +5058,9 @@ msgstr ""
 msgid "Show the permissions setup screen again"
 msgstr ""
 
+msgid "Show the picture at full size"
+msgstr ""
+
 msgid "Show webcam bubble"
 msgstr ""
 
@@ -5315,6 +5330,9 @@ msgstr ""
 msgid "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs."
 msgstr ""
 
+msgid "Step {n} · full size {w} × {h}"
+msgstr ""
+
 msgid "Steps {list} still have redaction proposals. Exporting anyway writes them without those blurs."
 msgstr ""
 
@@ -5330,7 +5348,13 @@ msgstr ""
 msgid "Stop a recording"
 msgstr ""
 
+msgid "Stop and open guide"
+msgstr ""
+
 msgid "Stop excluding {id}"
+msgstr ""
+
+msgid "Stop or Esc cancels"
 msgstr ""
 
 msgid "Stop playing this line"
@@ -5436,6 +5460,9 @@ msgid "Take screenshot"
 msgstr ""
 
 msgid "Take screenshots"
+msgstr ""
+
+msgid "Tall picture · click to see full size"
 msgstr ""
 
 msgid "Target"
@@ -5567,6 +5594,11 @@ msgstr ""
 
 msgid "The CaptureMann engine is not running."
 msgstr ""
+
+msgid "The Click Guide is paused. Your {n} step is kept."
+msgid_plural "The Click Guide is paused. Your {n} steps are kept."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "The MP4 export applies trims, cuts, speed, the background and, if you choose, the captions."
 msgstr ""
@@ -5725,6 +5757,9 @@ msgid "The first time, your desktop asks which screen to share. Choose the scree
 msgstr ""
 
 msgid "The folder pattern can’t be empty."
+msgstr ""
+
+msgid "The followed window"
 msgstr ""
 
 msgid "The glossary is full. Remove an entry to add another."
@@ -6721,6 +6756,9 @@ msgid "Window \"{title}\" of {app}"
 msgstr ""
 
 msgid "Window \"{title}\" of {app}, {w} x {h} px (follows the window)"
+msgstr ""
+
+msgid "Window closed"
 msgstr ""
 
 msgid "Window is minimized"
@@ -7962,6 +8000,9 @@ msgstr ""
 
 #. FACT: owner review required (a permission was removed during a recording)
 msgid "{what} permission was removed; the recording is stopped and what was recorded is kept"
+msgstr ""
+
+msgid "{window} closed"
 msgstr ""
 
 msgid "{w} by {h} pixels"
@@ -11102,6 +11143,18 @@ msgstr ""
 
 msgctxt "window picker footer"
 msgid "Move"
+msgstr ""
+
+msgctxt "window picker for a Click Guide"
+msgid "3-second countdown after Start guide"
+msgstr ""
+
+msgctxt "window picker for a Click Guide"
+msgid "Follow a window"
+msgstr ""
+
+msgctxt "window picker for a Click Guide"
+msgid "Only clicks inside this window become steps. Clicks anywhere else are ignored."
 msgstr ""
 
 msgctxt "window picker for a Click Guide"
