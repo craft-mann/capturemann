@@ -107,7 +107,6 @@ fn corpus() -> Vec<(String, String)> {
         Route::Screenshots,
         Route::Recordings,
         Route::Audio,
-        Route::Published,
         Route::Destinations,
         Route::Agents,
         Route::Editor(id()),
@@ -126,7 +125,10 @@ fn corpus() -> Vec<(String, String)> {
         c.add(format!("DockAction::label({d:?})"), d.label());
     }
     for p in crate::platform_text::Platform::ALL {
-        for a in CardAction::ALL {
+        for a in CardAction::ALL
+            .iter()
+            .chain([&CardAction::OpenPublished, &CardAction::CopyPublishedLink])
+        {
             c.add(format!("CardAction::label({a:?}, {p:?})"), a.label(p));
         }
     }
@@ -136,8 +138,63 @@ fn corpus() -> Vec<(String, String)> {
     for ch in Chip::ALL {
         c.add(format!("Chip::label({ch:?})"), ch.label());
     }
-    for s in SortKey::ALL {
+    for s in SortKey::ALL.iter().chain([&SortKey::DatePublished]) {
         c.add(format!("SortKey::label({s:?})"), s.label());
+    }
+    // S22: the published cards, the Published card of the details page and the count note.
+    {
+        use crate::published::{self, PublishRecord};
+        let rec = PublishRecord::from_json(&serde_json::json!({
+            "platform": "youtube", "account": "My channel", "remote_id": "v",
+            "url": "https://youtu.be/v", "privacy": "unlisted", "status": "processing",
+            "at": "2026-10-23T15:41:00Z",
+        }))
+        .unwrap();
+        let at = time::OffsetDateTime::parse(
+            "2026-10-23T16:00:00Z",
+            &time::format_description::well_known::Rfc3339,
+        )
+        .unwrap();
+        c.add("published::platform_pill", published::platform_pill(&rec));
+        c.add(
+            "published::published_meta",
+            published::published_meta("Today 15:41", "11.9 MB"),
+        );
+        c.add(
+            "published::state_line(processing)",
+            published::state_line(&rec, at).text,
+        );
+        c.add(
+            "published::state_line(plain)",
+            published::state_line(&rec, at + time::Duration::days(3)).text,
+        );
+        c.add(
+            "published::state_line(processed)",
+            published::state_line(
+                &PublishRecord {
+                    state: published::PublishState::Processed,
+                    ..rec.clone()
+                },
+                at,
+            )
+            .text,
+        );
+        c.add(
+            "details::published_header",
+            crate::ui::recording::details::published_header(std::slice::from_ref(&rec)).unwrap(),
+        );
+        let mut st = crate::library::LibraryState::new(crate::library::LibraryStatus::Ready);
+        st.attention_only = true;
+        c.add(
+            "LibraryState::count_note(attention)",
+            st.count_note(Some(61)).unwrap(),
+        );
+        st.attention_only = false;
+        st.remote = Some(crate::library::RemoteFilter::Published);
+        c.add(
+            "LibraryState::count_note(published)",
+            st.count_note(Some(61)).unwrap(),
+        );
     }
 
     // ---- settings -----------------------------------------------------------------------------

@@ -238,6 +238,8 @@ pub struct Details {
     pub pauses: usize,
     /// Copies at destinations (`uploads[]`), oldest first.
     pub uploads: Vec<crate::published::UploadRecord>,
+    /// Videos published from the recording (`publishes[]`), oldest first (the Published card).
+    pub publishes: Vec<crate::published::PublishRecord>,
     /// The recording has captions (lines in the manifest, or a transcript to make them from);
     /// the publish sheet offers to upload them.
     pub has_captions: bool,
@@ -331,6 +333,9 @@ pub fn read_details(dir: &Path) -> Result<Details, FileError> {
         pauses: m.gaps.len(),
         uploads: crate::published::parse_uploads(Some(&serde_json::Value::Array(
             cm_library::uploads_of(dir),
+        ))),
+        publishes: crate::published::parse_publishes(Some(&serde_json::Value::Array(
+            cm_library::publishes_of(dir),
         ))),
         has_captions: cm_library::rec_edit::captions_of(&m)
             .and_then(serde_json::Value::as_array)

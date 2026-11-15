@@ -19,7 +19,6 @@ pub enum NavItem {
     /// Click Guides (`Route::Guides`, design S11).
     Guides,
     Screenshots,
-    Published,
     /// The speech-model manager (`Route::Ai`).
     AiModels,
     /// MCP status, clients and the CLI (`Route::Agents`).
@@ -33,8 +32,6 @@ pub enum NavItem {
 pub struct NavCounts {
     pub screenshots: Option<usize>,
     pub recordings: Option<usize>,
-    /// Published videos (the Published page loads the library itself).
-    pub published: Option<usize>,
     /// Audio-only recordings.
     pub audio: Option<usize>,
     /// Click Guides.
@@ -42,26 +39,24 @@ pub struct NavCounts {
 }
 
 impl NavItem {
-    pub const ALL: [NavItem; 9] = [
+    pub const ALL: [NavItem; 8] = [
         NavItem::AllCaptures,
         NavItem::Recordings,
         NavItem::Audio,
         NavItem::Screenshots,
         NavItem::Guides,
-        NavItem::Published,
         NavItem::AiModels,
         NavItem::Agents,
         NavItem::Settings,
     ];
 
     /// The LIBRARY group of the app sidebar.
-    pub const LIBRARY: [NavItem; 6] = [
+    pub const LIBRARY: [NavItem; 5] = [
         NavItem::AllCaptures,
         NavItem::Recordings,
         NavItem::Audio,
         NavItem::Screenshots,
         NavItem::Guides,
-        NavItem::Published,
     ];
 
     /// The INTELLIGENCE group of the app sidebar.
@@ -74,7 +69,6 @@ impl NavItem {
             NavItem::Audio => tr_ctx!("navigation", "Audio"),
             NavItem::Guides => tr_ctx!("navigation", "Click Guides"),
             NavItem::Screenshots => tr_ctx!("navigation", "Screenshots"),
-            NavItem::Published => tr_ctx!("navigation", "Published"),
             NavItem::AiModels => tr!("AI models"),
             NavItem::Agents => tr!("Agents & CLI"),
             NavItem::Settings => tr_ctx!("navigation", "Settings"),
@@ -88,7 +82,6 @@ impl NavItem {
             NavItem::Audio => "nav-audio",
             NavItem::Guides => "nav-guides",
             NavItem::Screenshots => "nav-screenshots",
-            NavItem::Published => "nav-published",
             NavItem::AiModels => "nav-ai",
             NavItem::Agents => "nav-agents",
             NavItem::Settings => "nav-settings",
@@ -103,7 +96,6 @@ impl NavItem {
             NavItem::Audio => "audio-lines",
             NavItem::Guides => "mouse-pointer-click",
             NavItem::Screenshots => "image",
-            NavItem::Published => "send",
             NavItem::AiModels => "sparkles",
             NavItem::Agents => "bot",
             NavItem::Settings => "settings",
@@ -117,7 +109,6 @@ impl NavItem {
             NavItem::Audio => Route::Audio,
             NavItem::Guides => Route::Guides,
             NavItem::Screenshots => Route::Screenshots,
-            NavItem::Published => Route::Published,
             NavItem::AiModels => Route::Ai,
             NavItem::Agents => Route::Agents,
             NavItem::Settings => Route::Settings,
@@ -125,7 +116,7 @@ impl NavItem {
     }
 
     /// The nav item a route belongs to (the boards: details and the recording editor under
-    /// Recordings, the screenshot editor under Screenshots, the publish page under Published,
+    /// Recordings, the screenshot editor under Screenshots, the publish page under Recordings,
     /// the permissions setup screen under Settings).
     pub fn of_route(route: &Route) -> NavItem {
         match route {
@@ -133,17 +124,17 @@ impl NavItem {
             Route::Audio => NavItem::Audio,
             Route::Screenshots | Route::Editor(_) => NavItem::Screenshots,
             Route::Guides | Route::Guide(_) => NavItem::Guides,
-            Route::Recordings | Route::Recording(_) | Route::RecordingEditor(_) => {
-                NavItem::Recordings
-            }
-            Route::Published | Route::Publish(_) => NavItem::Published,
+            Route::Recordings
+            | Route::Recording(_)
+            | Route::RecordingEditor(_)
+            | Route::Publish(_) => NavItem::Recordings,
             Route::Ai => NavItem::AiModels,
             Route::Agents => NavItem::Agents,
             Route::Settings | Route::Destinations | Route::Permissions => NavItem::Settings,
         }
     }
 
-    /// The right-aligned count: the real library counts, and the number of published videos.
+    /// The right-aligned count: the real library counts.
     /// "All captures" shows none (the kinds are counted on their own rows).
     pub fn count(self, counts: &NavCounts) -> Option<usize> {
         match self {
@@ -151,7 +142,6 @@ impl NavItem {
             NavItem::Audio => counts.audio,
             NavItem::Guides => counts.guides,
             NavItem::Screenshots => counts.screenshots,
-            NavItem::Published => counts.published,
             _ => None,
         }
     }
@@ -213,7 +203,7 @@ pub fn library_filter(route: &Route) -> Option<Filter> {
 }
 
 /// The count beside a library page's title: the kind's real count, "All captures" the sum of the
-/// two kinds when both are known, Published its own. `None` while unknown (no placeholder).
+/// two kinds when both are known. `None` while unknown (no placeholder).
 pub fn route_count(route: &Route, counts: &NavCounts) -> Option<usize> {
     match route {
         // Audio joins the sum when its count is known (an older daemon has none: then 0).
@@ -225,7 +215,6 @@ pub fn route_count(route: &Route, counts: &NavCounts) -> Option<usize> {
         Route::Audio => counts.audio,
         Route::Guides => counts.guides,
         Route::Screenshots => counts.screenshots,
-        Route::Published => counts.published,
         _ => None,
     }
 }
@@ -235,12 +224,7 @@ pub fn route_count(route: &Route, counts: &NavCounts) -> Option<usize> {
 pub fn is_library_page(route: &Route) -> bool {
     matches!(
         route,
-        Route::Library
-            | Route::Screenshots
-            | Route::Recordings
-            | Route::Audio
-            | Route::Guides
-            | Route::Published
+        Route::Library | Route::Screenshots | Route::Recordings | Route::Audio | Route::Guides
     )
 }
 
@@ -274,7 +258,6 @@ impl SidebarMode {
             | Route::Recordings
             | Route::Audio
             | Route::Guides
-            | Route::Published
             | Route::Ai
             | Route::Agents
             | Route::Permissions => SidebarMode::App,
@@ -320,7 +303,6 @@ pub fn rail_layout() -> Vec<RailEntry> {
         RailEntry::Nav(NavItem::Audio),
         RailEntry::Nav(NavItem::Screenshots),
         RailEntry::Nav(NavItem::Guides),
-        RailEntry::Nav(NavItem::Published),
         RailEntry::Nav(NavItem::AiModels),
         RailEntry::Nav(NavItem::Agents),
         RailEntry::Spacer,
@@ -639,7 +621,7 @@ pub fn record_audio_aria(keys: &[String]) -> String {
 }
 
 /// Crumb and title of a route. The page headers are gone (OD-16); the title feeds the library
-/// pages' title row and the Published page.
+/// pages' title row.
 pub fn page_heading(route: &Route) -> (String, String) {
     match route {
         Route::Library => (tr_ctx!("breadcrumb", "Library /"), tr!("All captures")),
@@ -679,10 +661,6 @@ pub fn page_heading(route: &Route) -> (String, String) {
             tr_ctx!("breadcrumb", "Recordings /"),
             tr_ctx!("page title", "Publish"),
         ),
-        Route::Published => (
-            tr_ctx!("breadcrumb", "Library /"),
-            tr_ctx!("navigation", "Published"),
-        ),
         Route::Destinations => (
             tr_ctx!("breadcrumb", "Settings /"),
             tr_ctx!("page title", "Destinations"),
@@ -711,7 +689,6 @@ mod tests {
             Route::Screenshots,
             Route::Recordings,
             Route::Audio,
-            Route::Published,
             Route::Destinations,
             Route::Agents,
             Route::Editor("cap_1".into()),
@@ -735,7 +712,6 @@ mod tests {
                 "Audio",
                 "Screenshots",
                 "Click Guides",
-                "Published",
                 "AI models",
                 "Agents & CLI",
                 "Settings"
@@ -749,8 +725,7 @@ mod tests {
                 "Recordings",
                 "Audio",
                 "Screenshots",
-                "Click Guides",
-                "Published"
+                "Click Guides"
             ]
         );
         let intelligence: Vec<_> = NavItem::INTELLIGENCE.iter().map(|i| i.label()).collect();
@@ -832,18 +807,18 @@ mod tests {
         assert_eq!(highlight_route(&Route::Recordings, true), Route::Recordings);
     }
 
-    /// PUB-2 and the board: the publish page highlights Published (it used to say Recordings).
+    /// 0.3.4 (S22): there is no Published item; the publish page highlights Recordings.
     #[test]
-    fn the_publish_page_highlights_published() {
+    fn the_publish_page_highlights_recordings() {
         let r = Route::Publish("rec_1".into());
-        assert_eq!(NavItem::of_route(&r), NavItem::Published);
+        assert_eq!(NavItem::of_route(&r), NavItem::Recordings);
         assert_eq!(page_heading(&r).1, "Publish");
         let active: Vec<_> = entries(&r, &NavCounts::default())
             .into_iter()
             .filter(|e| e.active)
             .map(|e| e.item)
             .collect();
-        assert_eq!(active, [NavItem::Published]);
+        assert_eq!(active, [NavItem::Recordings]);
     }
 
     #[test]
@@ -854,7 +829,6 @@ mod tests {
         let c = NavCounts {
             screenshots: Some(138),
             recordings: Some(0),
-            published: Some(3),
             audio: Some(5),
             guides: Some(2),
         };
@@ -864,12 +838,6 @@ mod tests {
         assert_eq!(NavItem::Audio.count(&none), None);
         assert_eq!(NavItem::Guides.count(&c), Some(2));
         assert_eq!(NavItem::Guides.count(&none), None);
-        assert_eq!(
-            NavItem::Published.count(&none),
-            None,
-            "unknown until loaded"
-        );
-        assert_eq!(NavItem::Published.count(&c), Some(3));
         assert_eq!(NavItem::AllCaptures.count(&c), None);
         assert_eq!(NavItem::AiModels.count(&c), None);
         assert_eq!(NavItem::Agents.count(&c), None);
@@ -906,7 +874,6 @@ mod tests {
             library_filter(&Route::Screenshots),
             Some(Filter::Screenshots)
         );
-        assert_eq!(library_filter(&Route::Published), None);
         assert_eq!(library_filter(&Route::Editor("cap_1".into())), None);
         assert_ne!(Route::Library, Route::Screenshots);
         assert_eq!(page_heading(&Route::Library).1, "All captures");
@@ -921,14 +888,12 @@ mod tests {
             Route::Recordings,
             Route::Audio,
             Route::Screenshots,
-            Route::Published,
         ] {
             assert_eq!(route_count(&r, &none), None);
         }
         let c = NavCounts {
             screenshots: Some(11),
             recordings: Some(24),
-            published: Some(2),
             audio: Some(6),
             guides: Some(1),
         };
@@ -937,7 +902,6 @@ mod tests {
         assert_eq!(route_count(&Route::Audio, &c), Some(6));
         assert_eq!(route_count(&Route::Recordings, &c), Some(24));
         assert_eq!(route_count(&Route::Screenshots, &c), Some(11));
-        assert_eq!(route_count(&Route::Published, &c), Some(2));
         // One kind unknown: no made-up total.
         let half = NavCounts {
             recordings: Some(3),
@@ -955,7 +919,6 @@ mod tests {
             Route::Screenshots,
             Route::Recordings,
             Route::Audio,
-            Route::Published,
         ] {
             assert!(is_library_page(&r), "{r:?}");
             assert!(NavItem::LIBRARY.contains(&NavItem::of_route(&r)));
@@ -982,7 +945,6 @@ mod tests {
             (Route::Screenshots, M::App),
             (Route::Recordings, M::App),
             (Route::Audio, M::App),
-            (Route::Published, M::App),
             (Route::Ai, M::App),
             (Route::Agents, M::App),
             (Route::Permissions, M::App),
@@ -1024,7 +986,6 @@ mod tests {
                 NavItem::Audio,
                 NavItem::Screenshots,
                 NavItem::Guides,
-                NavItem::Published,
                 NavItem::AiModels,
                 NavItem::Agents,
                 NavItem::Settings,

@@ -17,8 +17,8 @@ nothing is exposed. This sends a video to YouTube: run it only when you mean to.
 2. **No question.** Press Cancel. No dialog opens. The line and the button change at once to
    "Cancelling..." (the button is muted and cannot be pressed again).
 3. **Stops.** Within a few seconds the page returns to the form (title and fields as you left
-   them, Publish enabled) and a neutral toast "Publish cancelled" appears. Check the Published
-   list: no entry for this video. Check YouTube Studio: no new video (or none that finished).
+   them, Publish enabled) and a neutral toast "Publish cancelled" appears. Check Recordings with the
+   Published chip on: no entry for this video. Check YouTube Studio: no new video (or none that finished).
 4. **Again.** Press Publish... again and let it finish: the result block with the link shows as
    usual.
 5. **Finished while cancelling.** Use a small file so it ends fast; press Cancel in the last

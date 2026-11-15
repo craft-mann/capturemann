@@ -1356,6 +1356,9 @@ msgstr ""
 msgid "Copy config"
 msgstr ""
 
+msgid "Copy file link"
+msgstr ""
+
 msgid "Copy image"
 msgstr ""
 
@@ -1384,6 +1387,9 @@ msgid "Copy the link after an upload"
 msgstr ""
 
 msgid "Copy the link when an upload finishes"
+msgstr ""
+
+msgid "Copy {platform} link"
 msgstr ""
 
 msgid "Copying into the library"
@@ -2903,6 +2909,9 @@ msgstr ""
 msgid "Live camera"
 msgstr ""
 
+msgid "Live on {platform}"
+msgstr ""
+
 msgid "Live preview on screen. Drag it anywhere; it stays out of the recording."
 msgstr ""
 
@@ -3687,9 +3696,6 @@ msgstr ""
 msgid "Nothing leaves this computer unless you connect a destination yourself."
 msgstr ""
 
-msgid "Nothing published yet"
-msgstr ""
-
 msgid "Nothing scrolled: check that the window can scroll"
 msgstr ""
 
@@ -3817,9 +3823,6 @@ msgid "Open Settings"
 msgstr ""
 
 msgid "Open System Settings"
-msgstr ""
-
-msgid "Open a recording and press Publish to send it to YouTube. Your published videos are listed here with their links."
 msgstr ""
 
 msgid "Open captions"
@@ -4214,7 +4217,13 @@ msgstr ""
 msgid "Published"
 msgstr ""
 
-msgid "Published videos"
+msgid "Published on {platform}"
+msgstr ""
+
+msgid "Published {when}"
+msgstr ""
+
+msgid "Published · {platforms}"
 msgstr ""
 
 #. FACT: owner review required (confirmation guarantee)
@@ -4225,6 +4234,9 @@ msgid "Publishing is not available in this build yet: {message}"
 msgstr ""
 
 msgid "Publish…"
+msgstr ""
+
+msgid "Publish… in the header sends it to another platform. Visibility is changed on the platform."
 msgstr ""
 
 msgid "Purpose"
@@ -7260,9 +7272,6 @@ msgstr ""
 msgid "mono"
 msgstr ""
 
-msgid "newest first"
-msgstr ""
-
 msgid "no destination is set up"
 msgstr ""
 
@@ -7420,6 +7429,9 @@ msgid "yesterday"
 msgstr ""
 
 msgid "your library folder"
+msgstr ""
+
+msgid "{account} · {when}"
 msgstr ""
 
 msgid "{agent} is asking to run “{title}”. You set this tool to Ask first in Settings → Agents & CLI."
@@ -7831,6 +7843,11 @@ msgid_plural "{n} pixels"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} platform"
+msgid_plural "{n} platforms"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} report"
 msgid_plural "{n} reports"
 msgstr[0] ""
@@ -7937,6 +7954,9 @@ msgstr ""
 msgid "{pct}% · less than a minute left"
 msgstr ""
 
+msgid "{platform} is processing"
+msgstr ""
+
 msgid "{platform} keeps videos from an unverified API project private; the result says so if it happens"
 msgstr ""
 
@@ -7946,7 +7966,7 @@ msgstr ""
 msgid "{platform} · {account}"
 msgstr ""
 
-msgid "{platform} · {when}"
+msgid "{platform} · {privacy}"
 msgstr ""
 
 msgid "{pos} of {total}"
@@ -7986,6 +8006,12 @@ msgid "{shape} shape"
 msgstr ""
 
 msgid "{shown} of {total} windows"
+msgstr ""
+
+msgid "{shown} of {total} · needs attention"
+msgstr ""
+
+msgid "{shown} of {total} · published"
 msgstr ""
 
 msgid "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one."
@@ -8075,12 +8101,6 @@ msgstr ""
 msgid "{title}, {place}"
 msgstr ""
 
-msgid "{title}, {platform}, {privacy}, {status}"
-msgstr ""
-
-msgid "{title}, {platform}, {privacy}, {status}, {when}"
-msgstr ""
-
 msgid "{title}, {tool}: {tier}"
 msgstr ""
 
@@ -8088,9 +8108,6 @@ msgid "{title}, {tool}: {tier}, locked"
 msgstr ""
 
 msgid "{title}. {body}"
-msgstr ""
-
-msgid "{title}. {text}"
 msgstr ""
 
 msgid "{title}: {reason}"
@@ -9351,6 +9368,10 @@ msgid "Imported"
 msgstr ""
 
 msgctxt "filter chip"
+msgid "Needs attention"
+msgstr ""
+
+msgctxt "filter chip"
 msgid "Published"
 msgstr ""
 
@@ -9900,10 +9921,6 @@ msgstr ""
 
 msgctxt "navigation"
 msgid "Click Guides"
-msgstr ""
-
-msgctxt "navigation"
-msgid "Published"
 msgstr ""
 
 msgctxt "navigation"
@@ -10583,6 +10600,10 @@ msgid "suggested"
 msgstr ""
 
 msgctxt "section"
+msgid "Published"
+msgstr ""
+
+msgctxt "section"
 msgid "Tracks"
 msgstr ""
 
@@ -10767,6 +10788,10 @@ msgid "Date"
 msgstr ""
 
 msgctxt "sort key"
+msgid "Date published"
+msgstr ""
+
+msgctxt "sort key"
 msgid "Duration"
 msgstr ""
 
@@ -10852,6 +10877,10 @@ msgstr ""
 
 msgctxt "stat tile"
 msgid "Pauses"
+msgstr ""
+
+msgctxt "stat tile"
+msgid "Published"
 msgstr ""
 
 msgctxt "stat tile"

@@ -51,8 +51,9 @@ pub fn set_route(app: &Entity<AppModel>, route: Route, cx: &mut App) {
     if app.read(cx).route == Route::Permissions && route != Route::Permissions {
         dismiss_first_run(app, cx);
     }
-    // Looking at the publishes is how a failed publish is acknowledged (the tray's Attention).
-    if matches!(route, Route::Published | Route::Publish(_)) {
+    // Looking at the publishes is how a failed publish is acknowledged (the tray's Attention):
+    // the publish page, or the Recordings page with the Published filter on (`show_published`).
+    if matches!(route, Route::Publish(_)) {
         crate::ui::upload_ui::publishes_seen(app, cx);
     }
     app.update(cx, |m, cx| {
@@ -65,6 +66,16 @@ pub fn set_route(app: &Entity<AppModel>, route: Route, cx: &mut App) {
         m.route = route;
         cx.notify();
     });
+}
+
+/// Opens Recordings with the Published filter on: where the old Published page, its deep links
+/// (`--page published`) and any "see my published videos" entry lead (0.3.4, S22). Like
+/// [`set_route`], for the Studio window's own handlers.
+pub fn show_published(app: &Entity<AppModel>, cx: &mut App) {
+    app.update(cx, |m, _| m.show_published = true);
+    set_route(app, Route::Recordings, cx);
+    // Looking at the published videos acknowledges failed publishes (the tray's Attention).
+    crate::ui::upload_ui::publishes_seen(app, cx);
 }
 
 /// Opens the screenshot editor on `capture_id` and makes Back return to `back` (the guide

@@ -64,8 +64,7 @@ pub enum Route {
     Audio,
     /// The Click Guides library (nav item "Click Guides", the grid filtered to `kind: "guide"`).
     Guides,
-    /// Not built yet: publishing and drive destinations show an honest "Not available yet" page.
-    Published,
+    /// Destinations (Settings): where captures are saved and published to.
     Destinations,
     /// Agents & CLI: MCP status and the agent activity log.
     Agents,
@@ -120,9 +119,13 @@ pub struct AppModel {
     pub clock: LocalClock,
     pub toasts: ToastQueue,
     pub route: Route,
-    /// The last library page shown (All captures, Screenshots, Recordings or Published): where
+    /// The last library page shown (All captures, Screenshots, Recordings, Audio or Click Guides): where
     /// "Back to library" in the settings sidebar returns to.
     pub library_route: Route,
+    /// 0.3.4 (S22): the Published page is gone; something asked for Recordings with the
+    /// Published filter on (an old deep link, `--page published`). The library view takes it
+    /// when it next draws.
+    pub show_published: bool,
     /// Where the screenshot editor returns to when another page opened it: the guide
     /// editor's "Edit image" (GDE-2). Cleared when the route leaves the editor.
     pub editor_return: Option<Route>,
@@ -265,6 +268,7 @@ impl AppModel {
             toasts: ToastQueue::default(),
             route: Route::Library,
             library_route: Route::Library,
+            show_published: false,
             editor_return: None,
             library_epoch: 0,
             editor_strip: Arc::new(Vec::new()),

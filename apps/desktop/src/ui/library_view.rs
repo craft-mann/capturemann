@@ -332,14 +332,10 @@ impl LibraryView {
         if !self.state.is_whole_library() {
             return;
         }
-        let published = self.app.read(cx).counts.published;
         let counts = if matches!(self.state.status, LibraryStatus::Ready) {
-            kind_counts(self.state.items(), published)
+            kind_counts(self.state.items())
         } else {
-            NavCounts {
-                published,
-                ..NavCounts::default()
-            }
+            NavCounts::default()
         };
         self.set_counts(counts, cx);
     }
@@ -375,8 +371,7 @@ impl LibraryView {
                 if generation != this.counts_gen {
                     return;
                 }
-                let published = this.app.read(cx).counts.published;
-                this.set_counts(kind_counts(&all.items, published), cx);
+                this.set_counts(kind_counts(&all.items), cx);
             })
             .ok();
         })
@@ -384,19 +379,7 @@ impl LibraryView {
     }
 
     fn sync_items(&mut self, cx: &mut Context<Self>) {
-        let only = self.state.imported_only;
-        let boards = self.state.boards_only;
-        let guides = self.state.guides_only;
-        self.items = Arc::new(
-            self.state
-                .items()
-                .iter()
-                .filter(|i| !only || i.imported_from.is_some())
-                .filter(|i| !boards || i.board.is_some())
-                .filter(|i| !guides || i.kind == Kind::Guide)
-                .cloned()
-                .collect(),
-        );
+        self.items = Arc::new(self.state.visible_items());
         // A selected capture that left the list is no longer selected.
         let ids: BTreeSet<&str> = self.items.iter().map(|i| i.id.as_str()).collect();
         self.multi.retain(|id| ids.contains(id.as_str()));
@@ -415,11 +398,26 @@ impl LibraryView {
         }
     }
 
+    /// An old Published link: Recordings with the Published chip on (S22).
+    pub fn show_published(&mut self, cx: &mut Context<Self>) {
+        self.state.show_published();
+        self.keep_scroll = false;
+        self.reload(cx);
+    }
+
     fn click_chip(&mut self, chip: Chip, cx: &mut Context<Self>) {
+        // Looking at the published videos acknowledges failed publishes (the tray's Attention).
+        if matches!(chip, Chip::Published | Chip::NeedsAttention) && !self.state.chip_active(chip) {
+            let app = self.app.clone();
+            cx.defer(move |cx| crate::ui::upload_ui::publishes_seen(&app, cx));
+        }
         if self.state.click_chip(chip) {
             self.keep_scroll = false;
             self.reload(cx);
-        } else if matches!(chip, Chip::Imported | Chip::Boards | Chip::Guides) {
+        } else if matches!(
+            chip,
+            Chip::Imported | Chip::Boards | Chip::Guides | Chip::NeedsAttention
+        ) {
             // Filtered here: the page is already loaded.
             self.keep_scroll = false;
             self.sync_items(cx);
@@ -553,6 +551,9 @@ impl LibraryView {
                 this.update(cx, |this, cx| {
                     if *this.waiting != map {
                         this.waiting = Arc::new(map);
+                        // The "Needs attention" chip counts and filters on these (S22).
+                        this.state.set_waiting(this.waiting.keys());
+                        this.sync_items(cx);
                         cx.notify();
                     }
                 })
@@ -718,6 +719,21 @@ impl LibraryView {
                     cx.defer(move |cx| crate::ui::upload_ui::copy_link(&app, &link, cx));
                 }
             }
+            CardAction::OpenPublished => {
+                // S22: the video on its platform, in the browser.
+                self.close_menu(cx);
+                if let Some(r) = item.latest_publish() {
+                    let (app, link) = (self.app.clone(), r.url.clone());
+                    cx.defer(move |cx| crate::ui::upload_ui::open_link(&app, &link, cx));
+                }
+            }
+            CardAction::CopyPublishedLink => {
+                self.close_menu(cx);
+                if let Some(r) = item.latest_publish() {
+                    let (app, link) = (self.app.clone(), r.url.clone());
+                    cx.defer(move |cx| crate::ui::upload_ui::copy_link(&app, &link, cx));
+                }
+            }
             CardAction::CopyText => {
                 // ANN-5: the daemon reads the rendered screenshot and copies the text.
                 self.close_menu(cx);
@@ -867,6 +883,9 @@ struct RowCtx {
     multi: Arc<BTreeSet<String>>,
     /// Captures whose upload waits for a sign-in (B1).
     waiting: Arc<HashMap<String, String>>,
+    /// A published filter is on: cards show the platform, the publish time and the status of the
+    /// newest publish (S22).
+    published_mode: bool,
 }
 
 /// The darkened overlay behind the pills on a thumbnail (the thumbnail is an image, so the
@@ -1031,6 +1050,76 @@ fn kind_pill(item: &CaptureItem) -> AnyElement {
         .into_any_element()
 }
 
+/// The pill on a published card's thumbnail, top left: the platform's mark and "YouTube \u{b7}
+/// Unlisted" (S22).
+fn platform_pill(r: &crate::published::PublishRecord) -> AnyElement {
+    let glyph = match crate::ui::brand::platform(&r.platform.to_lowercase()) {
+        Some(b) => b.icon,
+        None => "send",
+    };
+    div()
+        .absolute()
+        .top(px(10.))
+        .left(px(10.))
+        .h(px(24.))
+        .px(px(8.))
+        .flex()
+        .items_center()
+        .gap(px(5.))
+        .rounded(px(7.))
+        .bg(overlay_bg(72))
+        .text_size(px(11.))
+        .text_color(rgba_of(Theme::DARK.text))
+        .child(icon(glyph, icon_size::PILL, Theme::DARK.text))
+        .child(SharedString::from(crate::published::platform_pill(r)))
+        .into_any_element()
+}
+
+/// The status line under a published card (S22): brass with a triangle for a warning, a ring
+/// while the platform processes, a green dot when live, else the quiet grey.
+fn status_line_view(t: &Theme, st: &crate::published::StatusLine) -> AnyElement {
+    use crate::published::StatusKind;
+    let (color, lead): (Color, AnyElement) = match st.kind {
+        StatusKind::Warning => (
+            t.warning,
+            icon("triangle-alert", 12., t.warning).into_any_element(),
+        ),
+        StatusKind::Processing => (
+            t.text_3,
+            icon("loader-circle", 12., t.mist).into_any_element(),
+        ),
+        StatusKind::Live => (
+            t.text_3,
+            div()
+                .size(px(7.))
+                .flex_none()
+                .rounded(px(scale::RADIUS_PILL))
+                .bg(rgba_of(t.success))
+                .into_any_element(),
+        ),
+        StatusKind::Plain => (
+            t.text_3,
+            icon("circle-check", 12., t.mist).into_any_element(),
+        ),
+    };
+    div()
+        .id("card-status")
+        .w_full()
+        .flex()
+        .items_center()
+        .gap(px(6.))
+        .text_size(px(11.5))
+        .text_color(rgba_of(color))
+        .child(div().flex_none().flex().items_center().child(lead))
+        .child(
+            div()
+                .min_w(px(0.))
+                .truncate()
+                .child(SharedString::from(st.text.clone())),
+        )
+        .into_any_element()
+}
+
 fn thumb_frame(
     ctx: &RowCtx,
     item: &CaptureItem,
@@ -1102,10 +1191,14 @@ fn thumb_frame(
     }
     // The pill gives way to the tick: always while selecting, on hover otherwise.
     if ctx.multi.is_empty() {
+        let pill = match ctx.published_mode.then(|| item.latest_publish()).flatten() {
+            Some(r) => platform_pill(r),
+            None => kind_pill(item),
+        };
         frame = frame.child(
             div()
                 .group_hover(group.clone(), |s| s.opacity(0.))
-                .child(kind_pill(item)),
+                .child(pill),
         );
     }
     if let (Kind::Recording, Some(ticks)) = (item.kind, item.duration_ticks) {
@@ -1131,7 +1224,7 @@ fn thumb_frame(
             frame.child(div().absolute().bottom(px(10.)).left(px(10.)).child(
                 status_pill(t, t.warning, tr_ctx!("status", "Broken")).bg(rgba_of(t.surface)),
             ));
-    } else if ctx.waiting.contains_key(&item.id) {
+    } else if ctx.waiting.contains_key(&item.id) && !ctx.published_mode {
         // B1: the upload is paused, not lost; Reconnect and Cancel upload are in the card menu.
         frame = frame.child(
             div()
@@ -1441,7 +1534,21 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     let selected = ctx.selected == Some(ix);
     let label = SharedString::from(item.accessible_label(&ctx.clock));
     let view = ctx.view.clone();
-    let meta = {
+    // S22: in published mode the card says when the video was published, and how it is doing.
+    let published = ctx
+        .published_mode
+        .then(|| item.latest_publish())
+        .flatten()
+        .cloned();
+    let meta = if let Some(r) = &published {
+        let when = r.at.map(|a| ctx.clock.format_date(a)).unwrap_or_default();
+        let size = if item.size_bytes > 0 {
+            format_size(item.size_bytes)
+        } else {
+            String::new()
+        };
+        crate::published::published_meta(&when, &size)
+    } else {
         let mut m = ctx.clock.format_date(item.created);
         if item.kind == Kind::Audio {
             // The board: "Today 10:02 · 4 speakers" (no size).
@@ -1459,6 +1566,17 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
         }
         m
     };
+    let status = published.as_ref().map(|r| {
+        // An upload waiting for a sign-in outranks the record's own status (S22).
+        if ctx.waiting.contains_key(&item.id) {
+            crate::published::StatusLine {
+                text: tr!("Upload waiting for sign-in"),
+                kind: crate::published::StatusKind::Warning,
+            }
+        } else {
+            crate::published::status_line(r, OffsetDateTime::now_utc())
+        }
+    });
     let selecting = !ctx.multi.is_empty();
     let multi_on = ctx.multi.contains(&item.id);
     let border = if multi_on {
@@ -1611,7 +1729,8 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
                         .text_color(rgba_of(t.mist))
                         .tnum()
                         .child(SharedString::from(meta)),
-                ),
+                )
+                .children(status.map(|st| status_line_view(&t, &st))),
         );
     div()
         .group(group.clone())
@@ -1734,7 +1853,7 @@ fn filter_chip(
         .when(active, |d| d.bg(rgba_of(t.raised)))
         .when(!active, |d| d.hover(move |s| s.bg(hover)))
         .focus_visible(move |s| s.border_color(focus))
-        .child(icon(chip.glyph(), icon_size::SMALL, fg))
+        .children((!chip.glyph().is_empty()).then(|| icon(chip.glyph(), icon_size::SMALL, fg)))
         .child(chip.label())
         .children(count.map(|n| {
             div()
@@ -1932,13 +2051,18 @@ impl Render for LibraryView {
                             .child(title),
                     )
                     .children(nav::route_count(&route, &counts).map(|n| {
+                        // S22: "6 of 61 \u{b7} published" while a published filter is on.
+                        let note = self.state.count_note(Some(n));
                         div()
                             .id("page-count")
-                            .aria_label(SharedString::from(trn!("{n} item", "{n} items", n)))
+                            .aria_label(SharedString::from(
+                                note.clone()
+                                    .unwrap_or_else(|| trn!("{n} item", "{n} items", n)),
+                            ))
                             .text_size(px(13.))
                             .text_color(rgba_of(t.mist))
                             .mono()
-                            .child(SharedString::from(n.to_string()))
+                            .child(SharedString::from(note.unwrap_or_else(|| n.to_string())))
                     })),
             )
             .child(
@@ -1972,7 +2096,7 @@ impl Render for LibraryView {
                 },
             )
         });
-        let sorts = SortKey::offered(self.state.filter).into_iter().map(|k| {
+        let sorts = self.state.offered_sorts().into_iter().map(|k| {
             let v = view.clone();
             sort_segment(&t, k, self.state.sort == k, self.state.descending).on_click(
                 move |_, _, cx| {
@@ -2293,6 +2417,7 @@ impl Render for LibraryView {
                     app: self.app.clone(),
                     multi: Arc::new(self.multi.clone()),
                     waiting: self.waiting.clone(),
+                    published_mode: self.state.published_mode(),
                     transcribing: Arc::new({
                         let m = self.app.read(cx);
                         self.items
@@ -2540,7 +2665,8 @@ impl LibraryView {
             .occlude()
             .role(Role::Menu)
             .aria_label(tr!("Capture actions"))
-            .w(px(220.))
+            // The board (S22) draws it 232 px wide: "Sao chép liên kết YouTube" needs the room.
+            .w(px(232.))
             .p(px(6.))
             .flex()
             .flex_col()
@@ -2622,6 +2748,7 @@ impl LibraryView {
                 .items
                 .get(m.ix)
                 .map_or_else(|| CardAction::ALL.to_vec(), CardAction::for_item);
+            let menu_item = self.items.get(m.ix).cloned();
             let mut panel = panel;
             // B1: the upload of this capture waits for a sign-in; say what the choices do.
             let waiting_id = self
@@ -2690,24 +2817,31 @@ impl LibraryView {
                     )
                     .child(div().h(px(1.)).mx(px(6.)).my(px(4.)).bg(rgba_of(t.border)));
             }
+            let mut prev: Option<CardAction> = None;
             for a in actions {
                 let fg = if a == CardAction::Delete {
                     t.warning
                 } else {
                     t.text_2
                 };
-                if a == CardAction::Delete {
-                    // The rule before the destructive row.
+                // The rule before the destructive row, and (S22) after the video's own entries.
+                let rule_before = a == CardAction::Delete
+                    || (a != CardAction::OpenPublished
+                        && prev == Some(CardAction::CopyPublishedLink));
+                if rule_before {
                     panel =
                         panel.child(div().h(px(1.)).mx(px(6.)).my(px(4.)).bg(rgba_of(t.border)));
                 }
+                prev = Some(a);
+                let label = a.label_for(
+                    crate::platform_text::Platform::current(),
+                    menu_item.as_ref(),
+                );
                 panel = panel.child(
                     div()
                         .id(SharedString::from(format!("card-menu-{}", a.key(mac))))
                         .role(Role::MenuItem)
-                        .aria_label(SharedString::from(
-                            a.label(crate::platform_text::Platform::current()),
-                        ))
+                        .aria_label(SharedString::from(label.clone()))
                         .focusable()
                         .tab_stop(true)
                         .min_h(px(34.))
@@ -2726,7 +2860,7 @@ impl LibraryView {
                             this.run_card_action(a, window, cx)
                         }))
                         .child(icon(a.glyph(), 15., fg))
-                        .child(a.label(crate::platform_text::Platform::current()))
+                        .child(label)
                         .children(a.hint().map(|h| {
                             div()
                                 .ml_auto()

@@ -2,11 +2,11 @@
 //! settings). Studio mode is flat (DESIGN section 1): tone separates panels, no shadows.
 
 use gpui::{
-    actions, div, prelude::*, px, AnyElement, App, Context, Entity, FocusHandle, FontWeight,
-    KeyBinding, Menu, MenuItem, Render, Role, SharedString, Subscription, Window,
+    actions, div, prelude::*, px, AnyElement, App, Context, Entity, FocusHandle, KeyBinding, Menu,
+    MenuItem, Render, Role, Subscription, Window,
 };
 
-use cm_i18n::{tr, tr_ctx, trn};
+use cm_i18n::{tr, tr_ctx};
 
 use crate::agent_status::{self, McpStatus};
 use crate::backend::Backend;
@@ -16,10 +16,9 @@ use crate::ui::ai_view::AiPage;
 use crate::ui::app::{self, AppHandle, AppModel, Command, Route};
 use crate::ui::editor_view::EditorView;
 use crate::ui::library_view::LibraryView;
-use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
+use crate::ui::paint::{rgba_of, ui_features, UI_FONT};
 use crate::ui::permissions_view::PermissionsScreen;
 use crate::ui::publish_sheet::PublishPage;
-use crate::ui::published_view::PublishedView;
 use crate::ui::recording::details::RecordingDetails;
 use crate::ui::recording_editor::RecordingEditor;
 use crate::ui::settings_view::SettingsView;
@@ -172,7 +171,6 @@ pub struct Studio {
     rec_editor: Entity<RecordingEditor>,
     publish: Entity<PublishPage>,
     ai: Entity<AiPage>,
-    published: Entity<PublishedView>,
     /// The import sheet (IMP-5), drawn over the window while it is open.
     import_sheet: Entity<crate::ui::import_sheet::ImportSheetView>,
     /// The Export selected sheet (BLK-1) and the Make a board sheet (BRD-1).
@@ -216,8 +214,6 @@ impl Studio {
         let rec_editor = cx.new(|cx| RecordingEditor::new(app.clone(), cx));
         let publish = cx.new(|cx| PublishPage::new(app.clone(), cx));
         let ai = cx.new(|cx| AiPage::new(app.clone(), cx));
-        // Loads at once, so the sidebar number is real before the page is opened.
-        let published = cx.new(|cx| PublishedView::new(app.clone(), cx));
         let import_sheet =
             cx.new(|cx| crate::ui::import_sheet::ImportSheetView::new(app.clone(), cx));
         let bulk_sheet = cx.new(|cx| crate::ui::bulk_sheet::BulkSheetView::new(app.clone(), cx));
@@ -257,7 +253,6 @@ impl Studio {
             rec_editor,
             publish,
             ai,
-            published,
             import_sheet,
             bulk_sheet,
             board_sheet,
@@ -268,39 +263,6 @@ impl Studio {
             focus,
             _subs: subs,
         }
-    }
-
-    /// The minimal title row of Published (the three library pages draw their own, with the search): the title and the real count
-    /// (hidden while unknown). The capture buttons are the sidebar's dock now; search, chips and
-    /// sort stay in the library toolbar below (the Library restyle is Phase 2).
-    fn title_row(&self, t: &Theme, route: &Route, counts: &nav::NavCounts) -> AnyElement {
-        let (_, title) = nav::page_heading(route);
-        let count = nav::route_count(route, counts);
-        div()
-            .id("page-title")
-            .w_full()
-            .flex_none()
-            .flex()
-            .items_baseline()
-            .gap(px(10.))
-            .px(px(24.))
-            .pt(px(18.))
-            .child(
-                div()
-                    .text_size(px(type_scale::H2))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(title),
-            )
-            .children(count.map(|n| {
-                div()
-                    .id("page-count")
-                    .aria_label(SharedString::from(trn!("{n} item", "{n} items", n)))
-                    .text_size(px(type_scale::UI))
-                    .text_color(rgba_of(t.mist))
-                    .tnum()
-                    .child(SharedString::from(n.to_string()))
-            }))
-            .into_any_element()
     }
 }
 
@@ -383,6 +345,14 @@ impl Render for Studio {
                     self.shown = Some(filter);
                     self.library.update(cx, |l, cx| l.show_kind(filter, cx));
                 }
+                // An old Published deep link: Recordings with the Published filter on (S22).
+                if self
+                    .app
+                    .update(cx, |m, _| std::mem::take(&mut m.show_published))
+                {
+                    self.shown = Some(filter);
+                    self.library.update(cx, |l, cx| l.show_published(cx));
+                }
                 // The title row, the chips and the "no speech model" hint are the library view's own.
                 self.library.clone().into_any_element()
             }
@@ -411,23 +381,10 @@ impl Render for Studio {
                 self.editor.update(cx, |e, cx| e.set_capture(id, cx));
                 self.editor.clone().into_any_element()
             }
-            Route::Published => self.published.clone().into_any_element(),
         };
 
         let app = self.app.clone();
         let library = self.library.clone();
-        // The library pages and Published get a minimal title row; every other page has its own
-        // title (settings pages, AI, Agents, the toolbars of the details page and the editors).
-        let title = (nav::is_library_page(&route)
-            && !matches!(
-                route,
-                Route::Library
-                    | Route::Screenshots
-                    | Route::Recordings
-                    | Route::Audio
-                    | Route::Guides
-            ))
-        .then(|| self.title_row(&t, &route, &counts));
         let app_for_search = app.clone();
         let dim = {
             let m = self.app.read(cx);
@@ -445,9 +402,7 @@ impl Render for Studio {
             .on_action(move |_: &FocusSearch, window, cx| {
                 // The search field belongs to the library: land on All captures unless a library
                 // page is already showing.
-                if !nav::is_library_page(&app_for_search.read(cx).route)
-                    || app_for_search.read(cx).route == Route::Published
-                {
+                if !nav::is_library_page(&app_for_search.read(cx).route) {
                     app::set_route(&app_for_search, Route::Library, cx);
                 }
                 let f = library.read(cx).search_focus(cx);
@@ -513,7 +468,6 @@ impl Render for Studio {
                     .flex()
                     .flex_col()
                     .child(self.rec_banner.clone())
-                    .children(title)
                     .child(div().flex_1().min_h(px(0.)).child(main)),
             )
             .child(
