@@ -41,8 +41,7 @@ fn guide_output() -> Value {
             "note": { "type": "string" },
             "image_id": { "type": "string", "description": "The step's screenshot as a capture id (`<guide_id>/<step_id>`): `annotate`, `get_capture`, `suggest_redactions`, `recognize_text` and `undo` take it. Absent for a note step." },
             "click": click_schema(),
-            "focus_crop": { "type": "boolean" },
-            "has_proposals": { "type": "boolean", "description": "Auto-redact found something to review; nothing was blurred." } },
+            "focus_crop": { "type": "boolean" } },
             "required": ["id", "number", "type", "title", "note"] } },
         "can_undo": { "type": "boolean" },
         "can_redo": { "type": "boolean" },
@@ -95,7 +94,7 @@ pub fn tools() -> Vec<ToolSpec> {
             mutating: false,
             destructive: false,
             spec: "GDE-4",
-            summary: "Read a guide: title, intro, numbering, and the ordered steps with title, note, click point, `has_proposals` and `image_id` (a capture id for the step's screenshot, so `get_capture` returns the image and `recognize_text` reads the step's text). Works while the guide records (`state`, `recorded_steps`).",
+            summary: "Read a guide: title, intro, numbering, and the ordered steps with title, note, click point and `image_id` (a capture id for the step's screenshot, so `get_capture` returns the image and `recognize_text` reads the step's text). Works while the guide records (`state`, `recorded_steps`).",
             input: json!({ "type": "object", "properties": {
                 "guide_id": guide_id("Default: the guide that is recording.") },
                 "additionalProperties": false }),
@@ -137,7 +136,7 @@ pub fn tools() -> Vec<ToolSpec> {
             mutating: true,
             destructive: false,
             spec: "GDE-3, GDE-4",
-            summary: "Export a stopped guide. `markdown`: a folder `dest` with `guide.md` and `images/step-NN.png` (relative links, no absolute paths; pastes into a GitHub wiki). `html`: one self-contained file (images embedded, light and dark styles, table of contents, print styles; `dest` is a file or a folder). `rich_text`: puts formatted text with the pictures on the clipboard (no `dest`). `pdf`: one file (`dest` is a file or a folder), A4 or `paper` `letter`, one or two steps per page, the fonts embedded (Vietnamese text works). The pictures are rendered, so annotations and blurs are in every export; steps that still have redaction proposals are listed in `steps_to_review` and exported without those blurs (review them with `suggest_redactions` and `annotate` first). Options: `headings` (`numbered` `1. Title`, `step` `Step 1 · Title`, `title_only`), `image_scale` 1 or 2 (images are at most 800 px wide, or 1600 at 2, never larger than the frame), and `intro`, `notes`, `note_steps` switches (default true).",
+            summary: "Export a stopped guide. `markdown`: a folder `dest` with `guide.md` and `images/step-NN.png` (relative links, no absolute paths; pastes into a GitHub wiki). `html`: one self-contained file (images embedded, light and dark styles, table of contents, print styles; `dest` is a file or a folder). `rich_text`: puts formatted text with the pictures on the clipboard (no `dest`). `pdf`: one file (`dest` is a file or a folder), A4 or `paper` `letter`, one or two steps per page, the fonts embedded (Vietnamese text works). The pictures are rendered, so annotations and blurs are in every export; Click Guide does not mark or blur text: a step can show private text, so look at the pictures first (`suggest_redactions` and `annotate` work on a step's `image_id`). Options: `headings` (`numbered` `1. Title`, `step` `Step 1 · Title`, `title_only`), `image_scale` 1 or 2 (images are at most 800 px wide, or 1600 at 2, never larger than the frame), and `intro`, `notes`, `note_steps` switches (default true).",
             input: json!({ "type": "object", "properties": {
                 "guide_id": guide_id("The guide to export."),
                 "format": { "type": "string", "enum": ["markdown", "html", "pdf", "rich_text"] },
@@ -156,8 +155,6 @@ pub fn tools() -> Vec<ToolSpec> {
                 "steps": { "type": "integer" },
                 "path": { "type": "string" },
                 "files": { "type": "array", "items": { "type": "string" } },
-                "steps_to_review": { "type": "array", "items": { "type": "object", "properties": {
-                    "step_id": { "type": "string" }, "number": { "type": "integer" } } } },
                 "copied_to_clipboard": { "type": "boolean", "description": "Only with rich_text." },
                 "html": { "type": "string", "description": "Only with rich_text." },
                 "warnings": { "type": "array", "items": { "type": "string" } } },

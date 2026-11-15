@@ -315,28 +315,11 @@ impl Inner {
         blocking(move || {
             let g = GuideBundle::open(&dir)?;
             let doc = build_doc(&g, &a)?;
-            let pending: Vec<Value> = g
-                .steps()
-                .iter()
-                .enumerate()
-                .filter(|(_, s)| s.has_proposals)
-                .map(|(i, s)| json!({ "step_id": s.id, "number": i + 1 }))
-                .collect();
-            let mut warnings: Vec<String> = pending
-                .iter()
-                .map(|p| {
-                    format!(
-                        "Step {} still has redaction proposals to review; it is exported \
-                         without those blurs",
-                        p["number"]
-                    )
-                })
-                .collect();
+            let mut warnings: Vec<String> = Vec::new();
             let mut out = json!({
                 "guide_id": a.guide_id,
                 "format": a.format.as_str(),
                 "steps": doc.steps.len(),
-                "steps_to_review": pending,
             });
             match a.format {
                 Format::Markdown => {

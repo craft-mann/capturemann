@@ -108,11 +108,11 @@ bar (design S3). Mark them "not built" when running this script.
    system theme, a clean print preview.
 3. **PDF:** A4 and Letter; one or two steps a page; the fonts are Geist; the badge and ring show.
 4. **Rich text:** paste into a note app or a ticket form: the steps with their pictures.
-5. Put a blur (or Auto-redact proposal accepted) over text in one step and export in each format:
+5. Put a blur (Edit image, then Blur or Auto-redact) over text in one step and export in each format:
    the blur shows, and a text search over the picture (the OS's Live Text on the Markdown image)
    finds nothing in that region. The automated version is `guide_ocr_real` (see the top).
-6. A step that still has redaction proposals is named in the sheet with **Review step N**; export
-   anyway is allowed and the files carry no blur for that step.
+6. A step that shows an email is not marked and the sheet shows no warning (GDE-1.AC4 is withdrawn
+   for 0.3.4): the export runs directly and nothing is blurred unless you did it in step 5.
 
 ## 7. Agent tools (GDE-4)
 

@@ -112,7 +112,7 @@ Specs final and defaults accepted Nov 14, 2026; plan `specs/plans/release-0.3.4-
 | Feature | Built on `main` | How it was checked (Nov 14, 2026) |
 |---|---|---|
 | Long Shot (CAP-6) | scrolling capture, auto and by hand | tested with fakes; Windows PARTIAL report `verification/L1-windows-0.3.4-long-shot-scroll-2026-11-14-claude.md`; not run on Linux, Intel Mac |
-| Click Guide (GDE-1 to GDE-4) | the `guide` capture kind, `start_guide` | tested with fakes; Windows PARTIAL report `verification/GDE-windows-0.3.3-guide-cases-2026-11-14-claude.md` (cases run on the 0.3.3 install) |
+| Click Guide (GDE-1 to GDE-4) | the `guide` capture kind, `start_guide`; the redaction-proposals marker (GDE-1.AC4) was removed on Nov 15, 2026 (maintainer decision; a later release), so a guide records clicks only and flags no text | tested with fakes; Windows PARTIAL report `verification/GDE-windows-0.3.3-guide-cases-2026-11-14-claude.md` (cases run on the 0.3.3 install) |
 | Touch-up: Retype, Move area (ANN-9, ANN-10) | base-edit ops with a measured fill | tested with fakes and golden images (`cm-render` `touchup_034`); fill quality measured on real macOS and Windows screens, PARTIAL report `verification/S2-fill-quality-0.3.4-2026-11-14-claude.md` (a busy-fill warning fires on an icon or control in the box, not on a busy photo: wording changed; the erased box is padded by 1 px) |
 | Zoom Lens (ANN-8, op `magnify`) | loupe op | tested with fakes and golden images; not seen by eye on Windows or Linux |
 | Blueprint (ANN-11) | bars over text, kept lines | tested with fakes and golden images; fill quality as the S2 report above |

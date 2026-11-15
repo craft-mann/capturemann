@@ -220,47 +220,8 @@ fn option_row(t: &Theme, id: &'static str, label: String, on: bool) -> gpui::Sta
         .child(SharedString::from(label))
 }
 
-/// The sheet's warning about steps that still have redaction proposals (GDE-1.AC4): it names every
-/// such step (G3), not only the first. `numbers` are 1-based step numbers.
-pub(crate) fn review_warning(numbers: &[usize]) -> String {
-    match numbers {
-        [] => String::new(),
-        [n] => tr!(
-            "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs.",
-            n = n
-        ),
-        many => {
-            let list = many
-                .iter()
-                .map(|n| n.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            tr!(
-                "Steps {list} still have redaction proposals. Exporting anyway writes them without those blurs.",
-                list = list
-            )
-        }
-    }
-}
-
 /// The sheet, drawn over the guide editor.
-pub fn sheet(
-    t: &Theme,
-    ex: &ExportState,
-    view: &GuideView,
-    cx: &mut Context<GuideView>,
-) -> gpui::AnyElement {
-    let review: Vec<(usize, String)> = view
-        .data()
-        .map(|d| {
-            d.steps
-                .iter()
-                .enumerate()
-                .filter(|(_, s)| s.has_proposals)
-                .map(|(i, s)| (i + 1, s.id.clone()))
-                .collect()
-        })
-        .unwrap_or_default();
+pub fn sheet(t: &Theme, ex: &ExportState, cx: &mut Context<GuideView>) -> gpui::AnyElement {
     let set = |f: fn(&mut ExportState)| {
         cx.listener(move |this: &mut GuideView, _, _, cx| {
             if let Some(e) = &mut this.export {
@@ -380,32 +341,6 @@ pub fn sheet(
                     "Pictures are rendered with your annotations and blurs. Links in the Markdown are relative, so it pastes into a wiki or a docs repo as it is."
                 )),
         )
-        .when(!review.is_empty(), |d| {
-            let (n, id) = review[0].clone();
-            d.child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .text_size(px(type_scale::UI))
-                    .text_color(rgba_of(t.warning))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(0.))
-                            .child(SharedString::from(review_warning(
-                                &review.iter().map(|(n, _)| *n).collect::<Vec<_>>(),
-                            ))),
-                    )
-                    .child(
-                        button(t, "guide-review", tr!("Review step {n}", n = n), ButtonKind::Ghost)
-                            .on_click(cx.listener(move |this: &mut GuideView, _, _, cx| {
-                                this.export = None;
-                                this.select(&id, cx);
-                            })),
-                    ),
-            )
-        })
         .child(
             div()
                 .flex()
@@ -444,19 +379,4 @@ pub fn sheet(
         .bg(rgba_of(t.modal_scrim))
         .child(card)
         .into_any_element()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// G3: the warning names every step with proposals, not only the first.
-    #[test]
-    fn the_warning_names_every_step_with_proposals() {
-        assert_eq!(review_warning(&[]), "");
-        let one = review_warning(&[3]);
-        assert!(one.starts_with("Step 3 still has"), "{one}");
-        let many = review_warning(&[1, 2, 5]);
-        assert!(many.starts_with("Steps 1, 2, 5 still have"), "{many}");
-    }
 }

@@ -4558,9 +4558,6 @@ msgstr ""
 msgid "Rectangle {n}"
 msgstr ""
 
-msgid "Redaction proposals to review"
-msgstr ""
-
 msgid "Redo"
 msgstr ""
 
@@ -4816,9 +4813,6 @@ msgid "Reveal in Finder"
 msgstr ""
 
 msgid "Revert to original"
-msgstr ""
-
-msgid "Review step {n}"
 msgstr ""
 
 msgid "Role"
@@ -5423,13 +5417,7 @@ msgstr ""
 msgid "Step {n}"
 msgstr ""
 
-msgid "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs."
-msgstr ""
-
 msgid "Step {n} · full size {w} × {h}"
-msgstr ""
-
-msgid "Steps {list} still have redaction proposals. Exporting anyway writes them without those blurs."
 msgstr ""
 
 msgid "Still online: {items}."

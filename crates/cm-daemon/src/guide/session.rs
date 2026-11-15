@@ -21,7 +21,7 @@ use std::time::Duration;
 use cm_capture::{CaptureRequest, CaptureTarget, Capturer, Frame};
 use cm_core::{Actor, CmError};
 use cm_library::guide::{ClickPoint, GuideBundle};
-use cm_render::ocr::{suggest_redactions, SuggestOptions, TextLine, TextRecognizer};
+use cm_render::ocr::{TextLine, TextRecognizer};
 use image::RgbaImage;
 use serde_json::{json, Value};
 
@@ -200,28 +200,17 @@ fn read_lines(recognizer: &dyn TextRecognizer, frame: Frame) -> Vec<TextLine> {
 impl Worker {
     fn step(&mut self, frame: Frame, click: ClickPoint) -> Result<(), CmError> {
         let png = frame.to_png()?;
-        let size = frame.size();
         let lines = read_lines(self.recognizer.as_ref(), frame);
         let title = draft_title(&lines, (click.x, click.y), click.scale, &click.button, 1);
         let step =
             self.guide
                 .add_click_step(&png, click.clone(), &title, &self.by, self.clock.now())?;
-        // Auto-redact proposes; nothing is blurred here (GDE-1.AC4).
-        let proposals = !suggest_redactions(
-            &lines,
-            (size.width, size.height),
-            &SuggestOptions::default(),
-        )
-        .is_empty();
-        if proposals {
-            self.guide.set_has_proposals(&step.id, true)?;
-        }
         self.last = Some((lines, click));
         let n = self.steps.fetch_add(1, Ordering::SeqCst) + 1;
         self.events.publish(
             "guide.step_added",
             json!({ "guide_id": self.guide_id, "step_id": step.id, "count": n,
-                    "title": step.title, "has_proposals": proposals }),
+                    "title": step.title }),
         );
         Ok(())
     }
@@ -771,7 +760,6 @@ impl Inner {
         let dir = self.guide_dir(&id)?;
         let (by, now) = (actor.clone(), self.clock.now());
         let capturer = self.capturer.clone();
-        let recognizer = self.recognizer.clone();
         let (library, events, gid) = (self.library.clone(), self.events.clone(), id.clone());
         let v = blocking(move || {
             let mut g = GuideBundle::open(&dir)?;
@@ -802,16 +790,7 @@ impl Inner {
                         .capture(CaptureRequest::new(target.to_capture_target()), None)?
                         .ok_or_else(|| CmError::invalid_input("capture was cancelled"))?;
                     let png = cap.frame.to_png()?;
-                    let size = cap.frame.size();
-                    let lines = read_lines(recognizer.as_ref(), cap.frame);
-                    // R1: Auto-redact runs again on the new frame; the flag is not just cleared.
-                    let proposals = !suggest_redactions(
-                        &lines,
-                        (size.width, size.height),
-                        &SuggestOptions::default(),
-                    )
-                    .is_empty();
-                    g.retake_step(s, &png, proposals, &by, now)?;
+                    g.retake_step(s, &png, &by, now)?;
                 }
             }
             write_guide_poster(&dir);

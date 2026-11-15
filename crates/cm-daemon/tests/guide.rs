@@ -224,31 +224,18 @@ async fn gde_1_double_click_is_one_step_and_a_note_step_is_added() {
     assert_eq!(steps[2]["title"], "Right-click \"Bravo\"");
 }
 
-/// R1: a retaken step is read again; a new frame that still shows the email keeps the flag.
+/// GDE-1.AC4 is withdrawn for 0.3.4: Click Guide records clicks only. A step whose picture shows
+/// an email has no proposals marker anywhere (steps, event, retake), nothing is blurred, and the
+/// export has no review list and no warning.
 #[tokio::test]
-async fn gde_2_a_retaken_step_keeps_its_proposals_flag_when_the_new_frame_has_them() {
-    let r = rig(ScriptedClicks::new(), true, Decision::Approve);
-    let mut c = Client::connect(&r.daemon, "agent");
-    let id = start(&mut c).await;
-    r.clicks.click(on_button(0).0, on_button(0).1);
-    let g = c.call("stop_guide", json!({"guide_id": id})).await;
-    let step = ok(&g)["steps"][0]["id"].as_str().unwrap().to_owned();
-    assert_eq!(ok(&g)["steps"][0]["has_proposals"], true);
-    let t = c
-        .call("set_guide", json!({"guide_id": id, "retake": [step]}))
-        .await;
-    assert_eq!(ok(&t)["steps"][0]["has_proposals"], true, "{t}");
-}
-
-#[tokio::test]
-async fn gde_1_ac4_a_step_with_an_email_is_marked_and_nothing_is_blurred() {
+async fn gde_1_ac4_withdrawn_a_step_with_an_email_has_no_proposals_marker_and_exports_cleanly() {
     let r = rig(ScriptedClicks::new(), true, Decision::Approve);
     let mut c = Client::connect(&r.daemon, "agent");
     let id = start(&mut c).await;
     r.clicks.click(on_button(0).0, on_button(0).1);
     let g = c.call("stop_guide", json!({"guide_id": id})).await;
     let s = &ok(&g)["steps"][0];
-    assert_eq!(s["has_proposals"], true);
+    assert!(s.get("has_proposals").is_none(), "{s}");
     let cap = c
         .call("get_capture", json!({"capture_id": s["image_id"]}))
         .await;
@@ -256,6 +243,21 @@ async fn gde_1_ac4_a_step_with_an_email_is_marked_and_nothing_is_blurred() {
     assert!(ops
         .iter()
         .all(|o| o["op"] != "blur" && o["op"] != "pixelate"));
+    let step = s["id"].as_str().unwrap().to_owned();
+    let t = c
+        .call("set_guide", json!({"guide_id": id, "retake": [step]}))
+        .await;
+    assert!(ok(&t)["steps"][0].get("has_proposals").is_none(), "{t}");
+    let out = r.dir.path().join("no-review.html");
+    let ex = c
+        .call(
+            "export_guide",
+            json!({"guide_id": id, "format": "html", "dest": out}),
+        )
+        .await;
+    let res = ok(&ex);
+    assert!(res.get("steps_to_review").is_none(), "{res}");
+    assert_eq!(res["warnings"].as_array().unwrap().len(), 0, "{res}");
 }
 
 #[tokio::test]
@@ -471,12 +473,8 @@ async fn gde_3_html_is_one_file_and_rich_text_reaches_the_clipboard() {
     let html = std::fs::read_to_string(&out).unwrap();
     assert!(html.contains("data:image/png;base64,"));
     assert!(html.contains("Step 1 · Click"));
-    // Auto-redact proposals not reviewed: named, exported without blurs.
-    assert!(res["steps_to_review"].as_array().unwrap().len() == 2);
-    assert!(res["warnings"][0]
-        .as_str()
-        .unwrap()
-        .contains("redaction proposals"));
+    assert!(res.get("steps_to_review").is_none());
+    assert_eq!(res["warnings"].as_array().unwrap().len(), 0);
     let rich = c
         .call(
             "export_guide",

@@ -131,7 +131,8 @@ pub struct GuideStep {
     pub click: Option<ClickPoint>,
     #[serde(default)]
     pub focus_crop: bool,
-    /// Auto-redact found something to review that nobody accepted yet (GDE-1.AC4).
+    /// Kept only so the frozen schema 1 reads and writes unchanged; always false since 0.3.4
+    /// (the redaction-proposals feature was withdrawn, maintainer decision Nov 15, 2026).
     #[serde(default)]
     pub has_proposals: bool,
     #[serde(flatten)]
@@ -724,20 +725,6 @@ impl GuideBundle {
         Ok(Some(id))
     }
 
-    pub fn set_has_proposals(&mut self, step_id: &str, v: bool) -> Result<(), CmError> {
-        let s = self
-            .doc
-            .steps
-            .iter_mut()
-            .find(|s| s.id == step_id)
-            .ok_or_else(|| CmError::not_found(format!("no step `{step_id}` in this guide")))?;
-        if s.has_proposals != v {
-            s.has_proposals = v;
-            self.save()?;
-        }
-        Ok(())
-    }
-
     // ---- editing (GDE-2): every call is one undo step ------------------------------------
 
     pub fn set_title(
@@ -1095,13 +1082,10 @@ impl GuideBundle {
 
     /// Replaces a step's picture with a fresh frame. The badge, ring and crop are made again
     /// from the click point, so earlier edits of the old picture are not carried over.
-    /// `has_proposals` says whether Auto-redact found something on the NEW frame (R1: the flag is
-    /// recomputed from the new picture, not cleared).
     pub fn retake_step(
         &mut self,
         id: &str,
         png: &[u8],
-        has_proposals: bool,
         by: &Actor,
         at: OffsetDateTime,
     ) -> Result<(), CmError> {
@@ -1152,7 +1136,7 @@ impl GuideBundle {
                 .expect("checked");
             s.image = name;
             s.focus_crop = crop;
-            s.has_proposals = has_proposals;
+            s.has_proposals = false;
             Ok(())
         })
     }

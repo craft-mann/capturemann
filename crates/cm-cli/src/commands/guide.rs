@@ -325,20 +325,14 @@ fn show(r: &Value) -> String {
         }
     );
     for st in r["steps"].as_array().into_iter().flatten() {
-        let mark = if st["has_proposals"] == true {
-            "  [redaction proposals]"
-        } else {
-            ""
-        };
         let kind = if st["type"] == "note" { " (note)" } else { "" };
         let _ = writeln!(
             s,
-            "  {}. {}{}  {}{}",
+            "  {}. {}{}  {}",
             plain(&st["label"]),
             plain(&st["title"]),
             kind,
-            plain(&st["id"]),
-            mark
+            plain(&st["id"])
         );
     }
     s
