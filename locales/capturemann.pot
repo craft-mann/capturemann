@@ -5315,6 +5315,9 @@ msgstr ""
 msgid "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs."
 msgstr ""
 
+msgid "Steps {list} still have redaction proposals. Exporting anyway writes them without those blurs."
+msgstr ""
+
 msgid "Still online: {items}."
 msgstr ""
 
@@ -5755,6 +5758,9 @@ msgid "The library couldn’t be opened, so there is nowhere to save captures."
 msgstr ""
 
 msgid "The library couldn’t be opened, so there is nowhere to save recordings."
+msgstr ""
+
+msgid "The library did not answer. Check that its folder is reachable and its path is not too long, then try again."
 msgstr ""
 
 msgid "The library folder changed"

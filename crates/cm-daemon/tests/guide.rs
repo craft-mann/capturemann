@@ -224,6 +224,22 @@ async fn gde_1_double_click_is_one_step_and_a_note_step_is_added() {
     assert_eq!(steps[2]["title"], "Right-click \"Bravo\"");
 }
 
+/// R1: a retaken step is read again; a new frame that still shows the email keeps the flag.
+#[tokio::test]
+async fn gde_2_a_retaken_step_keeps_its_proposals_flag_when_the_new_frame_has_them() {
+    let r = rig(ScriptedClicks::new(), true, Decision::Approve);
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = start(&mut c).await;
+    r.clicks.click(on_button(0).0, on_button(0).1);
+    let g = c.call("stop_guide", json!({"guide_id": id})).await;
+    let step = ok(&g)["steps"][0]["id"].as_str().unwrap().to_owned();
+    assert_eq!(ok(&g)["steps"][0]["has_proposals"], true);
+    let t = c
+        .call("set_guide", json!({"guide_id": id, "retake": [step]}))
+        .await;
+    assert_eq!(ok(&t)["steps"][0]["has_proposals"], true, "{t}");
+}
+
 #[tokio::test]
 async fn gde_1_ac4_a_step_with_an_email_is_marked_and_nothing_is_blurred() {
     let r = rig(ScriptedClicks::new(), true, Decision::Approve);

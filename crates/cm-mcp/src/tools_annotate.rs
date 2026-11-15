@@ -68,7 +68,7 @@ pub fn op_variants() -> Vec<Value> {
                 "weight": { "type": "integer", "minimum": 100, "maximum": 900, "default": 400, "description": "600 and above draw bold." },
                 "align": { "enum": ["left", "center", "right"], "default": "left" } }),
             &["rect", "fill", "text"],
-            "BASE EDIT: replaces the text in `rect` (fill, then the new text in the UI font, clipped to `rect`). Base edits must come before every other op, or the call is invalid_input naming ops[i]; to add one to an image that has ops, send the whole list with `replace: true`. Not redaction: use blur or pixelate for secrets.",
+            "BASE EDIT: replaces the text in `rect` (fill, then the new text in the UI font, clipped to `rect`: a text wider than `rect` is cut at its edge without a warning, so make `rect` wide enough; the desktop editor widens the box itself). Base edits must come before every other op, or the call is invalid_input naming ops[i]; to add one to an image that has ops, send the whole list with `replace: true`. Not redaction: use blur or pixelate for secrets.",
         ),
         variant(
             "move_area",

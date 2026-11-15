@@ -168,8 +168,6 @@ pub struct RetypeInfo {
     pub align: TextAlign,
     pub fill_kind: FillKind,
     pub fill_color: Color,
-    /// The new text is wider than the box and will be cut (ANN-9).
-    pub too_wide: bool,
     /// The text is being typed on the canvas.
     pub editing: bool,
     pub has_op: bool,
@@ -718,14 +716,9 @@ impl EditorState {
                     ..
                 },
             ) => {
-                let OpKind::Retype {
-                    text, fill, rect, ..
-                } = &k
-                else {
+                let OpKind::Retype { text, fill, .. } = &k else {
                     return None;
                 };
-                let too_wide = cm_render::touchup::retype_text_extent(&k)
-                    .is_some_and(|(w, _)| w > rect.normalized().w + 0.5);
                 let (fk, fc) = fill_summary(fill);
                 Some(RetypeInfo {
                     text: text.clone(),
@@ -735,7 +728,6 @@ impl EditorState {
                     align,
                     fill_kind: fk,
                     fill_color: fc,
-                    too_wide,
                     editing,
                     has_op,
                     note,
@@ -751,7 +743,6 @@ impl EditorState {
                     align: st.align,
                     fill_kind: FillKind::Solid,
                     fill_color: Color::WHITE,
-                    too_wide: false,
                     editing: false,
                     has_op: false,
                     note,
@@ -1645,8 +1636,8 @@ mod tests {
         assert_eq!(req.text, "");
     }
 
-    /// Editing a stored retype: double click opens it; the panel info reports a text that is
-    /// wider than the box; weight and align are one edit on a selected retype.
+    /// Editing a stored retype: double click opens it; a text wider than the box
+    /// widens it (no warning, no cut); weight and align are one edit on a selected retype.
     #[test]
     fn ann_9_a_stored_retype_is_edited_and_styled() {
         let mut s = st();
@@ -1666,7 +1657,7 @@ mod tests {
         assert!(s.text.is_some(), "a double click edits it");
         type_text(&mut s, "A much longer text than the box can hold");
         let info = s.retype_info().unwrap();
-        assert!(info.too_wide && info.editing && info.has_op);
+        assert!(info.editing && info.has_op);
         assert!(
             s.set_retype_weight(700).is_none(),
             "while typing it goes into the op committed with the text"

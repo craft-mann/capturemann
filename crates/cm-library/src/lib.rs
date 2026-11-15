@@ -125,3 +125,4 @@ pub use rec::{
     record_remote_deletions, record_upload, remote_deletions_of, source_of, uploads_of, RecBundle,
     RecoveryReport,
 };
+pub use util::check_root_path_len;
