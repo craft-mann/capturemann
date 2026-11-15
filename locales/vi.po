@@ -10344,1510 +10344,1156 @@ msgctxt "annotation kind"
 msgid "stamp"
 msgstr "dấu"
 
-#, fuzzy
 msgid "1 frame"
 msgstr "1 khung hình"
 
-#, fuzzy
 msgid "1. Title"
 msgstr "1. Tiêu đề"
 
-#, fuzzy
 msgid "A board needs 2 to 12 screenshots."
 msgstr "Bảng ảnh cần từ 2 đến 12 ảnh chụp màn hình."
 
-#, fuzzy
 msgid "A line you kept"
 msgstr "Dòng bạn đã giữ lại"
 
-#, fuzzy
 msgid "A name that exists gets a number; nothing is overwritten"
-msgstr "Tên đã có sẽ được thêm số; không có gì bị ghi đè"
+msgstr "Thêm số vào tên trùng để tránh ghi đè tệp"
 
-#, fuzzy
 msgid "A note (optional)"
 msgstr "Ghi chú (không bắt buộc)"
 
-#, fuzzy
 msgid "A sentence or two before step 1"
-msgstr "Một hai câu trước bước 1"
+msgstr "Một hoặc hai câu giới thiệu trước bước 1"
 
-#, fuzzy
 msgid "AFTER"
 msgstr "SAU"
 
-#, fuzzy
 msgid "Adding frame {n}…"
 msgstr "Đang thêm khung hình {n}…"
 
-#, fuzzy
 msgid "Allow Accessibility to scroll for you. Hand scroll still works without it."
-msgstr "Cho phép Trợ năng để tự cuộn giúp bạn. Cuộn tay vẫn dùng được khi không có quyền này."
+msgstr "Cấp quyền Trợ năng để CaptureMann tự cuộn. Bạn vẫn có thể cuộn thủ công khi chưa cấp quyền."
 
-#, fuzzy
 msgid "Allow CaptureMann in Accessibility"
-msgstr "Cho phép CaptureMann trong Trợ năng"
+msgstr "Cấp quyền Trợ năng cho CaptureMann"
 
-#, fuzzy
 msgid "Allow larger than the original"
 msgstr "Cho phép lớn hơn bản gốc"
 
-#, fuzzy
 msgid "Applied as one edit and one undo step. Copy text will read only the kept lines."
-msgstr "Áp dụng như một lần chỉnh sửa và một bước hoàn tác. Sao chép văn bản sẽ chỉ đọc các dòng được giữ lại."
+msgstr "Áp dụng tất cả trong một lần chỉnh sửa và có thể hoàn tác bằng một thao tác. Tính năng Sao chép văn bản chỉ đọc những dòng được giữ lại."
 
-#, fuzzy
 msgid "Apply Blueprint"
 msgstr "Áp dụng Bản phác thảo"
 
-#, fuzzy
 msgid "Arrangement"
 msgstr "Cách sắp xếp"
 
-#, fuzzy
 msgid "Auto"
 msgstr "Tự động"
 
-#, fuzzy
 msgid "Auto scroll"
 msgstr "Tự cuộn"
 
-#, fuzzy
 msgid "Auto scroll needs Accessibility"
 msgstr "Tự cuộn cần quyền Trợ năng"
 
-#, fuzzy
 msgid "BEFORE"
 msgstr "TRƯỚC"
 
-#, fuzzy
 msgid "BEFORE and AFTER labels"
 msgstr "Nhãn TRƯỚC và SAU"
 
-#, fuzzy
 msgid "Back to the guide"
 msgstr "Quay lại hướng dẫn"
 
-#, fuzzy
 msgid "Back to the library"
 msgstr "Quay lại thư viện"
 
-#, fuzzy
 msgid "Background"
 msgstr "Nền"
 
-#, fuzzy
 msgid "Blueprint"
 msgstr "Bản phác thảo"
 
-#, fuzzy
 msgid "Board created"
 msgstr "Đã tạo bảng ảnh"
 
-#, fuzzy
 msgid "Board of {n} screenshot"
 msgid_plural "Board of {n} screenshots"
 msgstr[0] "Bảng ảnh gồm {n} ảnh chụp màn hình"
 
-#, fuzzy
 msgid "Board title"
 msgstr "Tiêu đề bảng ảnh"
 
-#, fuzzy
 msgid "Cancel keeps the files already written."
 msgstr "Huỷ sẽ giữ lại các tệp đã ghi."
 
-#, fuzzy
 msgid "Cancel upload"
 msgstr "Huỷ tải lên"
 
-#, fuzzy
 msgid "CaptureMann has no library to save the guide in."
 msgstr "CaptureMann không có thư viện để lưu hướng dẫn."
 
-#, fuzzy
 msgid "Choose a folder to save to."
 msgstr "Chọn một thư mục để lưu."
 
-#, fuzzy
 msgid "Choose picture"
 msgstr "Chọn ảnh"
 
-#, fuzzy
 msgid "Choose the watermark picture."
 msgstr "Chọn ảnh làm hình mờ."
 
-#, fuzzy
 msgid "Choose…"
 msgstr "Chọn…"
 
-#, fuzzy
 msgid "Clear selection"
 msgstr "Bỏ chọn"
 
-#, fuzzy
 msgid "Click Guide"
-msgstr "Hướng dẫn nhấp chuột"
+msgstr "Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgid "Click Guide did not start"
-msgstr "Hướng dẫn nhấp chuột không bắt đầu được"
+msgstr "Không thể bắt đầu ghi hướng dẫn"
 
-#, fuzzy
 msgid "Click Guide is not available here"
-msgstr "Hướng dẫn nhấp chuột không khả dụng ở đây"
+msgstr "Hướng dẫn theo thao tác không khả dụng ở đây"
 
-#, fuzzy
 msgid "Click Guide is unavailable"
-msgstr "Hướng dẫn nhấp chuột không khả dụng"
+msgstr "Hướng dẫn theo thao tác không khả dụng"
 
-#, fuzzy
 msgid "Click Guide needs Input Monitoring"
-msgstr "Hướng dẫn nhấp chuột cần quyền Giám sát đầu vào"
+msgstr "Hướng dẫn theo thao tác cần quyền Giám sát đầu vào"
 
-#, fuzzy
 msgid "Click Guide of a window…"
-msgstr "Hướng dẫn nhấp chuột của một cửa sổ…"
+msgstr "Ghi hướng dẫn trong cửa sổ…"
 
-#, fuzzy
 msgid "Click Guide only needs to know where you click. Nothing records until you grant access."
-msgstr "Hướng dẫn nhấp chuột chỉ cần biết bạn nhấp ở đâu. Chưa có gì được ghi cho đến khi bạn cấp quyền."
+msgstr "Hướng dẫn theo thao tác chỉ cần xác định vị trí bạn nhấp. Ứng dụng chỉ bắt đầu ghi sau khi bạn cấp quyền."
 
-#, fuzzy
 msgid "Click Guide · clicks only"
-msgstr "Hướng dẫn nhấp chuột · chỉ ghi lần nhấp"
+msgstr "Hướng dẫn theo thao tác · chỉ ghi thao tác nhấp chuột"
 
-#, fuzzy
 msgid "Click a line on the image to keep its real text."
 msgstr "Nhấp vào một dòng trên ảnh để giữ lại văn bản gốc."
 
-#, fuzzy
 msgid "Click a line on the image, or drag a box over text that was not found."
-msgstr "Nhấp vào một dòng trên ảnh, hoặc kéo một khung qua phần văn bản chưa được tìm thấy."
+msgstr "Nhấp vào một dòng trên ảnh hoặc khoanh vùng chữ chưa được nhận dạng."
 
-#, fuzzy
 msgid "Click a line to retype it, or drag a box over text that was not found"
-msgstr "Nhấp vào một dòng để gõ lại, hoặc kéo một khung qua phần văn bản chưa được tìm thấy"
+msgstr "Nhấp vào dòng cần gõ lại hoặc khoanh vùng chữ chưa được nhận dạng"
 
-#, fuzzy
 msgid "Click through a task and CaptureMann writes the steps. It records clicks only, never keystrokes."
-msgstr "Nhấp qua một tác vụ và CaptureMann sẽ viết các bước. Chỉ ghi lần nhấp, không bao giờ ghi phím gõ."
+msgstr "Thực hiện tác vụ bằng chuột để CaptureMann viết hướng dẫn từng bước. Ứng dụng chỉ ghi thao tác nhấp chuột và bỏ qua mọi thao tác gõ phím."
 
-#, fuzzy
 msgid "Click through a task, get the steps"
-msgstr "Nhấp qua một tác vụ, nhận các bước"
+msgstr "Nhấp chuột để thực hiện tác vụ, CaptureMann sẽ viết các bước"
 
-#, fuzzy
 msgid "Click to use this area, or drag a region"
 msgstr "Nhấp để dùng vùng này, hoặc kéo để chọn một vùng"
 
-#, fuzzy
 msgid "Columns"
 msgstr "Cột"
 
-#, fuzzy
 msgid "Copied the guide"
 msgstr "Đã sao chép hướng dẫn"
 
-#, fuzzy
 msgid "Copy as rich text"
 msgstr "Sao chép dưới dạng văn bản có định dạng"
 
-#, fuzzy
 msgid "Dark"
 msgstr "Tối"
 
-#, fuzzy
 msgid "Decrease text size"
 msgstr "Giảm cỡ chữ"
 
-#, fuzzy
 msgid "Delete"
 msgstr "Xoá"
 
-#, fuzzy
 msgid "Delete {n} capture"
 msgid_plural "Delete {n} captures"
 msgstr[0] "Xoá {n} bản chụp"
 
-#, fuzzy
 msgid "Delete {n} capture?"
 msgid_plural "Delete {n} captures?"
 msgstr[0] "Xoá {n} bản chụp?"
 
-#, fuzzy
 msgid "Display"
 msgstr "Màn hình"
 
-#, fuzzy
 msgid "Done"
 msgstr "Xong"
 
-#, fuzzy
 msgid "Drag a box over what to move or remove"
-msgstr "Kéo một khung qua phần cần di chuyển hoặc xoá"
+msgstr "Kéo để khoanh vùng cần di chuyển hoặc xoá"
 
-#, fuzzy
 msgid "Drag a box over what to move, then drag its contents to the new place."
-msgstr "Kéo một khung qua phần cần di chuyển, rồi kéo nội dung đến vị trí mới."
+msgstr "Khoanh vùng cần di chuyển, rồi kéo nội dung trong vùng đến vị trí mới."
 
-#, fuzzy
 msgid "Drag a picture to place it, drag a corner to resize it. Hold Alt to turn snapping off, Shift to keep a line."
-msgstr "Kéo ảnh để đặt vị trí, kéo một góc để đổi kích thước. Giữ Alt để tắt bắt dính, giữ Shift để giữ thẳng hàng."
+msgstr "Kéo ảnh đến vị trí cần đặt hoặc kéo góc ảnh để đổi kích thước. Giữ Alt để tắt tự căn chỉnh hoặc giữ Shift để kéo theo đường thẳng."
 
-#, fuzzy
 msgid "Drag the contents to move them, or press Delete to remove them"
 msgstr "Kéo nội dung để di chuyển, hoặc nhấn Delete để xoá"
 
-#, fuzzy
 msgid "Drawn from the original, so it stays sharp and shows what you drew before it. Blur and Pixelate always apply inside the lens."
-msgstr "Được vẽ từ bản gốc nên vẫn sắc nét và hiện cả những gì bạn đã vẽ trước đó. Làm mờ và Pixel hoá luôn áp dụng bên trong kính lúp."
+msgstr "Kính lúp lấy hình từ ảnh gốc để giữ độ nét và hiển thị cả những gì bạn đã vẽ trước khi đặt kính. Hiệu ứng Làm mờ và Pixel hoá luôn áp dụng cả bên trong kính lúp."
 
-#, fuzzy
 msgid "Drawn in the system font, with the size and colour measured from the box. Custom fonts are not matched. It is a base edit: it sits under your other annotations."
-msgstr "Được vẽ bằng phông chữ hệ thống, với cỡ chữ và màu đo từ khung. Không khớp phông chữ tuỳ chỉnh. Đây là chỉnh sửa nền: nằm dưới các chú thích khác của bạn."
+msgstr "Văn bản mới dùng phông chữ hệ thống, với cỡ chữ và màu lấy từ vùng đã chọn. Phông chữ tuỳ chỉnh sẽ được thay bằng phông chữ hệ thống. Phần gõ lại nằm dưới các lớp chú thích."
 
-#, fuzzy
 msgid "Drawn on each file, not stored"
-msgstr "Được vẽ lên từng tệp, không lưu lại"
+msgstr "Chỉ chèn hình mờ khi xuất từng tệp"
 
-#, fuzzy
 msgid "Each change is one undo step. Copy text will read only the kept lines."
-msgstr "Mỗi thay đổi là một bước hoàn tác. Sao chép văn bản sẽ chỉ đọc các dòng được giữ lại."
+msgstr "Có thể hoàn tác từng thay đổi. Tính năng Sao chép văn bản chỉ đọc những dòng được giữ lại."
 
-#, fuzzy
 msgid "Edit a Click Guide"
-msgstr "Sửa Hướng dẫn nhấp chuột"
+msgstr "Sửa Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgid "Edit image"
 msgstr "Sửa ảnh"
 
-#, fuzzy
 msgid "Example: {name}"
 msgstr "Ví dụ: {name}"
 
-#, fuzzy
 msgid "Export HTML"
 msgstr "Xuất HTML"
 
-#, fuzzy
 msgid "Export Markdown"
 msgstr "Xuất Markdown"
 
-#, fuzzy
 msgid "Export PDF"
 msgstr "Xuất PDF"
 
-#, fuzzy
 msgid "Export a Click Guide"
-msgstr "Xuất Hướng dẫn nhấp chuột"
+msgstr "Xuất Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgid "Export cancelled. The files already written are in the folder."
 msgstr "Đã huỷ xuất. Các tệp đã ghi nằm trong thư mục."
 
-#, fuzzy
 msgid "Export guide"
 msgstr "Xuất hướng dẫn"
 
-#, fuzzy
 msgid "Export progress"
 msgstr "Tiến trình xuất"
 
-#, fuzzy
 msgid "Export screenshots as picture files"
 msgstr "Xuất ảnh chụp màn hình thành tệp ảnh"
 
-#, fuzzy
 msgid "Export selected…"
 msgstr "Xuất mục đã chọn…"
 
-#, fuzzy
 msgid "Export {n} image"
 msgid_plural "Export {n} images"
 msgstr[0] "Xuất {n} ảnh"
 
-#, fuzzy
 msgid "Export {n} screenshot"
 msgid_plural "Export {n} screenshots"
 msgstr[0] "Xuất {n} ảnh chụp màn hình"
 
-#, fuzzy
 msgid "Exporting needs the CaptureMann engine, which is not running."
-msgstr "Việc xuất cần công cụ nền của CaptureMann, hiện đang không chạy."
+msgstr "Không thể xuất vì bộ máy của CaptureMann chưa chạy."
 
-#, fuzzy
 msgid "Exporting {n} of {total}"
-msgstr "Đang xuất {n} trên {total}"
+msgstr "Đang xuất {n}/{total}"
 
-#, fuzzy
 msgid "Export…"
 msgstr "Xuất…"
 
-#, fuzzy
 msgid "File name pattern"
 msgstr "Mẫu tên tệp"
 
-#, fuzzy
 msgid "File names"
 msgstr "Tên tệp"
 
-#, fuzzy
 msgid "Finish board"
 msgstr "Hoàn tất bảng ảnh"
 
-#, fuzzy
 msgid "Finish copies the screenshots into the board, with their annotations drawn in. The originals are not changed."
-msgstr "Hoàn tất sẽ sao chép các ảnh chụp màn hình vào bảng ảnh, kèm chú thích đã vẽ. Bản gốc không bị thay đổi."
+msgstr "Khi chọn “Hoàn tất”, ứng dụng tạo bảng ảnh từ các bản sao đã chèn chú thích và giữ nguyên ảnh gốc."
 
-#, fuzzy
 msgid "Focus crop"
-msgstr "Cắt tập trung"
+msgstr "Cắt quanh điểm nhấp"
 
-#, fuzzy
 msgid "Footer kept once"
-msgstr "Chân trang chỉ giữ một lần"
+msgstr "Chỉ giữ một chân trang"
 
-#, fuzzy
 msgid "Free"
 msgstr "Tự do"
 
-#, fuzzy
 msgid "Gap"
 msgstr "Khoảng cách"
 
-#, fuzzy
 msgid "Granted"
 msgstr "Đã cấp"
 
-#, fuzzy
 msgid "Guide"
 msgstr "Hướng dẫn"
 
-#, fuzzy
 msgid "Guide exported"
 msgstr "Đã xuất hướng dẫn"
 
-#, fuzzy
 msgid "Guide title"
 msgstr "Tiêu đề hướng dẫn"
 
-#, fuzzy
 msgid "HTML"
 msgstr "HTML"
 
-#, fuzzy
 msgid "Hand"
 msgstr "Tay"
 
-#, fuzzy
 msgid "Hand scroll"
-msgstr "Cuộn tay"
+msgstr "Cuộn thủ công"
 
-#, fuzzy
 msgid "Header kept once"
-msgstr "Đầu trang chỉ giữ một lần"
+msgstr "Chỉ giữ một đầu trang"
 
-#, fuzzy
 msgid "Height"
 msgstr "Chiều cao"
 
-#, fuzzy
 msgid "Hold Shift to keep the move on one row or column. It is a base edit: it sits under your other annotations, and the hole is filled with the background colour."
-msgstr "Giữ Shift để di chuyển theo một hàng hoặc một cột. Đây là chỉnh sửa nền: nằm dưới các chú thích khác của bạn, và phần trống được lấp bằng màu nền."
+msgstr "Giữ Shift để chỉ di chuyển theo chiều ngang hoặc dọc. Nội dung được di chuyển bên dưới các lớp chú thích. Vùng trống để lại được tô bằng màu nền."
 
-#, fuzzy
 msgid "Horizontal"
 msgstr "Ngang"
 
-#, fuzzy
 msgid "Icons and pictures stay as they are in 0.3.4."
 msgstr "Biểu tượng và ảnh được giữ nguyên trong 0.3.4."
 
-#, fuzzy
 msgid "Image"
 msgstr "Ảnh"
 
-#, fuzzy
 msgid "Image size"
 msgstr "Kích thước ảnh"
 
-#, fuzzy
 msgid "Increase text size"
 msgstr "Tăng cỡ chữ"
 
-#, fuzzy
 msgid "Intro"
 msgstr "Mở đầu"
 
-#, fuzzy
 msgid "It never records what you type."
 msgstr "Không bao giờ ghi lại những gì bạn gõ."
 
-#, fuzzy
 msgid "Keep size"
 msgstr "Giữ kích thước"
 
-#, fuzzy
 msgid "Kept lines"
 msgstr "Các dòng được giữ lại"
 
-#, fuzzy
 msgid "Larger corners"
-msgstr "Góc lớn hơn"
+msgstr "Tăng độ bo góc"
 
-#, fuzzy
 msgid "Layout editable until Finish"
-msgstr "Có thể sửa bố cục cho đến khi Hoàn tất"
+msgstr "Có thể chỉnh bố cục trước khi chọn “Hoàn tất”"
 
 #. FACT: owner review required (what the permission is for)
-#, fuzzy
 msgid "Lets Long Shot scroll for you. Without it, scroll by hand and Long Shot still works."
-msgstr "Cho phép Chụp dài tự cuộn giúp bạn. Nếu không có, hãy cuộn tay và Chụp dài vẫn hoạt động."
+msgstr "Cấp quyền này để Chụp dài có thể tự cuộn. Bạn vẫn có thể cuộn thủ công khi chưa cấp quyền."
 
-#, fuzzy
 msgid "Light grey"
 msgstr "Xám nhạt"
 
-#, fuzzy
 msgid "Long Shot"
 msgstr "Chụp dài"
 
-#, fuzzy
 msgid "Long Shot failed"
 msgstr "Chụp dài không thành công"
 
-#, fuzzy
 msgid "Long Shot needs a permission"
-msgstr "Chụp dài cần một quyền"
+msgstr "Chụp dài cần quyền truy cập"
 
-#, fuzzy
 msgid "Long Shot saved"
 msgstr "Đã lưu ảnh Chụp dài"
 
-#, fuzzy
 msgid "Long Shot: Auto scroll"
 msgstr "Chụp dài: Tự cuộn"
 
-#, fuzzy
 msgid "Longest side"
 msgstr "Cạnh dài nhất"
 
-#, fuzzy
 msgid "Make a board"
 msgstr "Tạo bảng ảnh"
 
-#, fuzzy
 msgid "Make a board of screenshots"
 msgstr "Tạo bảng ảnh từ các ảnh chụp màn hình"
 
-#, fuzzy
 msgid "Making a board needs the CaptureMann engine, which is not running."
 msgstr "Việc tạo bảng ảnh cần công cụ nền của CaptureMann, hiện đang không chạy."
 
-#, fuzzy
 msgid "Making the board…"
 msgstr "Đang tạo bảng ảnh…"
 
-#, fuzzy
 msgid "Measured colour"
-msgstr "Màu đo được"
+msgstr "Màu lấy mẫu"
 
-#, fuzzy
 msgid "Measuring the background…"
-msgstr "Đang đo màu nền…"
+msgstr "Đang lấy mẫu màu nền…"
 
-#, fuzzy
 msgid "Move down"
 msgstr "Di chuyển xuống"
 
-#, fuzzy
 msgid "Move up"
 msgstr "Di chuyển lên"
 
-#, fuzzy
 msgid "Never larger than the original unless you allow it"
-msgstr "Không bao giờ lớn hơn bản gốc trừ khi bạn cho phép"
+msgstr "Kích thước tối đa bằng ảnh gốc, trừ khi bạn cho phép phóng lớn"
 
-#, fuzzy
 msgid "New Click Guide"
-msgstr "Hướng dẫn nhấp chuột mới"
+msgstr "Hướng dẫn theo thao tác mới"
 
-#, fuzzy
 msgid "New board"
 msgstr "Bảng ảnh mới"
 
-#, fuzzy
 msgid "New files are written; the originals are never changed. Annotations and redactions are drawn into every file."
-msgstr "Các tệp mới được ghi ra; bản gốc không bao giờ bị thay đổi. Chú thích và phần che được vẽ vào mọi tệp."
+msgstr "Ứng dụng tạo tệp mới, giữ nguyên ảnh gốc và chèn chú thích cùng vùng che vào từng tệp xuất."
 
-#, fuzzy
 msgid "New note step"
 msgstr "Bước ghi chú mới"
 
-#, fuzzy
 msgid "No Click Guides yet"
-msgstr "Chưa có Hướng dẫn nhấp chuột nào"
+msgstr "Chưa có Hướng dẫn theo thao tác nào"
 
-#, fuzzy
 msgid "No picture yet"
 msgstr "Chưa có ảnh"
 
-#, fuzzy
 msgid "No space left"
 msgstr "Hết dung lượng"
 
-#, fuzzy
 msgid "No steps were taken"
-msgstr "Chưa có bước nào được thực hiện"
+msgstr "Chưa ghi được bước nào"
 
-#, fuzzy
 msgid "No text was found in this image, so there is nothing to turn into bars."
-msgstr "Không tìm thấy văn bản nào trong ảnh này, nên không có gì để chuyển thành thanh."
+msgstr "Ảnh này không có dòng chữ nào được nhận dạng để thay bằng thanh."
 
-#, fuzzy
 msgid "None"
 msgstr "Không có"
 
-#, fuzzy
 msgid "Not a redaction. To hide secrets, use Blur (B) or Pixelate (X)."
-msgstr "Đây không phải là che thông tin. Để ẩn thông tin bí mật, hãy dùng Làm mờ (B) hoặc Pixel hoá (X)."
+msgstr "Để che thông tin nhạy cảm, hãy dùng Làm mờ (B) hoặc Pixel hoá (X). Thay chữ bằng thanh không che được thông tin đó."
 
-#, fuzzy
 msgid "Not a screenshot"
 msgstr "Không phải ảnh chụp màn hình"
 
-#, fuzzy
 msgid "Not granted"
 msgstr "Chưa cấp"
 
-#, fuzzy
 msgid "Note step"
 msgstr "Bước ghi chú"
 
-#, fuzzy
 msgid "Note steps without an image"
 msgstr "Các bước ghi chú không có ảnh"
 
-#, fuzzy
 msgid "Nothing is selected."
 msgstr "Chưa chọn gì."
 
-#, fuzzy
 msgid "Nothing scrolled: check that the window can scroll"
-msgstr "Không cuộn được: hãy kiểm tra cửa sổ có cuộn được không"
+msgstr "Cửa sổ chưa cuộn. Hãy kiểm tra xem cửa sổ có cuộn được không."
 
-#, fuzzy
 msgid "Opacity"
 msgstr "Độ đục"
 
-#, fuzzy
 msgid "Open"
 msgstr "Mở"
 
 #. FACT: owner review required (every permission note states what macOS does)
-#, fuzzy
 msgid "Optional: without it Long Shot offers Hand scroll only. Allow Accessibility to scroll for you."
-msgstr "Không bắt buộc: nếu không có, Chụp dài chỉ cho cuộn tay. Cho phép Trợ năng để tự cuộn giúp bạn."
+msgstr "Quyền Trợ năng là tuỳ chọn. Cấp quyền để Chụp dài tự cuộn. Khi chưa cấp quyền, bạn có thể cuộn thủ công."
 
-#, fuzzy
 msgid "Outer margin"
 msgstr "Lề ngoài"
 
-#, fuzzy
 msgid "PDF"
 msgstr "PDF"
 
-#, fuzzy
 msgid "Pair"
 msgstr "Cặp"
 
-#, fuzzy
 msgid "Paste it into a ticket or a document: the text and the pictures are on the clipboard."
-msgstr "Dán vào phiếu yêu cầu hoặc tài liệu: văn bản và ảnh đều có trong clipboard."
+msgstr "Văn bản và ảnh đã được sao chép vào bộ nhớ tạm. Bạn có thể dán vào phiếu yêu cầu hoặc tài liệu."
 
-#, fuzzy
 msgid "Pause"
 msgstr "Tạm dừng"
 
-#, fuzzy
 msgid "Paused"
-msgstr "Tạm dừng"
+msgstr "Đã tạm dừng"
 
-#, fuzzy
 msgid "Paused · clicks are not recorded"
-msgstr "Tạm dừng · lần nhấp không được ghi"
+msgstr "Đã tạm dừng · không ghi thao tác nhấp chuột"
 
-#, fuzzy
 msgid "Percent"
 msgstr "Phần trăm"
 
-#, fuzzy
 msgid "Pictures are rendered with your annotations and blurs. Links in the Markdown are relative, so it pastes into a wiki or a docs repo as it is."
-msgstr "Ảnh được kết xuất kèm chú thích và vùng làm mờ của bạn. Liên kết trong Markdown là liên kết tương đối, nên có thể dán nguyên vào wiki hoặc kho tài liệu."
+msgstr "Ảnh xuất có sẵn chú thích và vùng làm mờ. Markdown dùng liên kết tương đối, nên bạn có thể đưa nguyên nội dung vào wiki hoặc kho tài liệu."
 
-#, fuzzy
 msgid "Preview"
 msgstr "Xem trước"
 
-#, fuzzy
 msgid "Reached the longest image CaptureMann can edit"
-msgstr "Đã đạt tới ảnh dài nhất mà CaptureMann có thể chỉnh sửa"
+msgstr "Đã đạt chiều dài tối đa của ảnh mà CaptureMann có thể chỉnh sửa"
 
-#, fuzzy
 msgid "Read a Click Guide"
-msgstr "Đọc Hướng dẫn nhấp chuột"
+msgstr "Đọc Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgid "Reconnect"
 msgstr "Kết nối lại"
 
-#, fuzzy
 msgid "Redaction proposals to review"
-msgstr "Đề xuất che cần xem lại"
+msgstr "Vùng đề xuất che cần xem lại"
 
-#, fuzzy
 msgid "Region"
 msgstr "Vùng"
 
-#, fuzzy
 msgid "Remove contents"
 msgstr "Xoá nội dung"
 
-#, fuzzy
 msgid "Remove from the board"
 msgstr "Gỡ khỏi bảng ảnh"
 
-#, fuzzy
 msgid "Replace text with bars"
 msgstr "Thay văn bản bằng thanh"
 
-#, fuzzy
 msgid "Replace text with neutral bars"
 msgstr "Thay văn bản bằng thanh trung tính"
 
-#, fuzzy
 msgid "Replaces every line of text with a bar in the files; the screenshots stay as they are"
-msgstr "Thay mọi dòng văn bản bằng một thanh trong các tệp; ảnh chụp màn hình gốc được giữ nguyên"
+msgstr "Trong tệp xuất, mỗi dòng chữ được thay bằng một thanh. Ảnh chụp màn hình gốc được giữ nguyên."
 
-#, fuzzy
 msgid "Resume"
 msgstr "Tiếp tục"
 
-#, fuzzy
 msgid "Retake"
 msgstr "Chụp lại"
 
-#, fuzzy
 msgid "Retry skipped"
 msgstr "Thử lại phần đã bỏ qua"
 
-#, fuzzy
 msgid "Review step {n}"
 msgstr "Xem lại bước {n}"
 
-#, fuzzy
 msgid "Scroll at your own pace…"
-msgstr "Cuộn theo nhịp của bạn…"
+msgstr "Cuộn theo tốc độ bạn muốn…"
 
-#, fuzzy
 msgid "Scrollable area"
 msgstr "Vùng cuộn được"
 
-#, fuzzy
 msgid "Scrolling capture"
 msgstr "Chụp cuộn"
 
-#, fuzzy
 msgid "Select"
 msgstr "Chọn"
 
-#, fuzzy
 msgid "Selection"
 msgstr "Vùng chọn"
 
-#, fuzzy
 msgid "Side by side"
 msgstr "Cạnh nhau"
 
-#, fuzzy
 msgid "Smaller corners"
-msgstr "Góc nhỏ hơn"
+msgstr "Giảm độ bo góc"
 
-#, fuzzy
 msgid "Snap to the source row and column"
-msgstr "Bắt dính vào hàng và cột nguồn"
+msgstr "Tự căn theo hàng và cột của vị trí gốc"
 
-#, fuzzy
 msgid "Stacked"
 msgstr "Xếp chồng"
 
-#, fuzzy
 msgid "Start"
 msgstr "Bắt đầu"
 
-#, fuzzy
 msgid "Start Long Shot"
 msgstr "Bắt đầu Chụp dài"
 
-#, fuzzy
 msgid "Start a Click Guide"
-msgstr "Bắt đầu Hướng dẫn nhấp chuột"
+msgstr "Bắt đầu Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgid "Start a guide"
 msgstr "Bắt đầu một hướng dẫn"
 
-#, fuzzy
 msgid "Starting…"
 msgstr "Đang bắt đầu…"
 
-#, fuzzy
 msgid "Step 1 · Title"
 msgstr "Bước 1 · Tiêu đề"
 
-#, fuzzy
 msgid "Step headings"
 msgstr "Tiêu đề các bước"
 
-#, fuzzy
 msgid "Step note"
 msgstr "Ghi chú của bước"
 
-#, fuzzy
 msgid "Step notes"
 msgstr "Ghi chú của các bước"
 
-#, fuzzy
 msgid "Step title"
 msgstr "Tiêu đề bước"
 
-#, fuzzy
 msgid "Step {n}"
 msgstr "Bước {n}"
 
-#, fuzzy
 msgid "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs."
-msgstr "Bước {n} vẫn còn đề xuất che. Nếu vẫn xuất, bước này sẽ được ghi mà không có các vùng làm mờ đó."
+msgstr "Bước {n} vẫn có vùng đề xuất che. Nếu vẫn xuất, các vùng này sẽ không được làm mờ."
 
-#, fuzzy
 msgid "Stop"
 msgstr "Dừng"
 
-#, fuzzy
 msgid "Stop a Click Guide"
-msgstr "Dừng Hướng dẫn nhấp chuột"
+msgstr "Dừng Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgid "Stopped: the next part did not line up"
-msgstr "Đã dừng: phần tiếp theo không khớp"
+msgstr "Đã dừng vì phần ảnh tiếp theo không khớp"
 
-#, fuzzy
 msgid "Strip"
 msgstr "Dải"
 
-#, fuzzy
 msgid "Suggest placeholder bars for text"
 msgstr "Đề xuất thanh giữ chỗ cho văn bản"
 
-#, fuzzy
 msgid "Switch CaptureMann on under Input Monitoring in the privacy settings. This card closes by itself and the guide starts."
-msgstr "Bật CaptureMann trong Giám sát đầu vào ở phần cài đặt quyền riêng tư. Thẻ này tự đóng và hướng dẫn sẽ bắt đầu."
+msgstr "Bật CaptureMann trong mục Giám sát đầu vào của phần cài đặt quyền riêng tư. Thông báo sẽ tự đóng và ứng dụng sẽ bắt đầu ghi hướng dẫn."
 
-#, fuzzy
 msgid "Text"
 msgstr "Văn bản"
 
-#, fuzzy
 msgid "Text recognition is not available here, so Blueprint cannot find the text."
 msgstr "Nhận dạng văn bản không khả dụng ở đây, nên Bản phác thảo không tìm được văn bản."
 
-#, fuzzy
 msgid "Text recognition is not available here."
 msgstr "Nhận dạng văn bản không khả dụng ở đây."
 
-#, fuzzy
 msgid "That lens would be too large (16,384 px a side, 32 megapixels). Draw a smaller source."
-msgstr "Kính lúp đó sẽ quá lớn (16.384 px mỗi cạnh, 32 megapixel). Hãy vẽ vùng nguồn nhỏ hơn."
+msgstr "Kính lúp vượt giới hạn kích thước (16.384 px mỗi cạnh, 32 megapixel). Hãy chọn vùng nguồn nhỏ hơn."
 
-#, fuzzy
 msgid "That zoom would make the lens too large (16,384 px a side, 32 megapixels)."
-msgstr "Mức thu phóng đó sẽ làm kính lúp quá lớn (16.384 px mỗi cạnh, 32 megapixel)."
+msgstr "Mức thu phóng này sẽ khiến kính lúp vượt giới hạn kích thước (16.384 px mỗi cạnh, 32 megapixel)."
 
-#, fuzzy
 msgid "The capture is not in the library"
 msgstr "Bản chụp không có trong thư viện"
 
-#, fuzzy
 msgid "The empty guide was not kept."
-msgstr "Hướng dẫn trống đã không được giữ lại."
+msgstr "Hướng dẫn chưa có bước nào nên không được lưu."
 
-#, fuzzy
 msgid "The export stopped: {reason}"
 msgstr "Việc xuất đã dừng: {reason}"
 
-#, fuzzy
 msgid "The file could not be written"
 msgstr "Không thể ghi tệp"
 
-#, fuzzy
 msgid "The file name pattern is empty."
 msgstr "Mẫu tên tệp đang trống."
 
-#, fuzzy
 msgid "The guide did not stop cleanly"
-msgstr "Hướng dẫn không dừng êm"
+msgstr "Đã xảy ra lỗi khi dừng ghi hướng dẫn"
 
-#, fuzzy
 msgid "The guide was not copied"
-msgstr "Hướng dẫn chưa được sao chép"
+msgstr "Không thể sao chép hướng dẫn"
 
-#, fuzzy
 msgid "The hole left behind will not match what is around it. You can still go on, or cancel and nothing is stored."
-msgstr "Chỗ trống để lại sẽ không khớp với xung quanh. Bạn vẫn có thể tiếp tục, hoặc huỷ và không có gì được lưu."
+msgstr "Phần lấp vào chỗ trống sẽ không khớp với vùng xung quanh. Bạn có thể tiếp tục hoặc chọn “Huỷ” để bỏ thay đổi."
 
-#, fuzzy
 msgid "The new text will sit on a patch that does not match what is around it. You can still go on, or cancel and nothing is stored."
-msgstr "Văn bản mới sẽ nằm trên một mảng không khớp với xung quanh. Bạn vẫn có thể tiếp tục, hoặc huỷ và không có gì được lưu."
+msgstr "Phần nền dưới văn bản mới sẽ không khớp với vùng xung quanh. Bạn có thể tiếp tục hoặc chọn “Huỷ” để bỏ thay đổi."
 
-#, fuzzy
 msgid "The picture could not be encoded"
 msgstr "Không thể mã hoá ảnh"
 
-#, fuzzy
 msgid "The picture could not be read"
 msgstr "Không thể đọc ảnh"
 
-#, fuzzy
 msgid "The size must be a number of pixels from 1 to 16384."
-msgstr "Kích thước phải là số pixel từ 1 đến 16384."
+msgstr "Nhập kích thước từ 1 đến 16.384 pixel."
 
-#, fuzzy
 msgid "The size must be a percentage from 1 to 400."
-msgstr "Kích thước phải là phần trăm từ 1 đến 400."
+msgstr "Nhập kích thước từ 1% đến 400%."
 
-#, fuzzy
 msgid "The tint must be a colour like #DCE6F5."
-msgstr "Màu nhuộm phải là một màu như #DCE6F5."
+msgstr "Nhập mã màu nền theo định dạng #DCE6F5."
 
-#, fuzzy
 msgid "The upload is paused, not lost. Delete and rename still work; deleting cancels the paused upload."
-msgstr "Việc tải lên đang tạm dừng, không bị mất. Xoá và đổi tên vẫn dùng được; xoá sẽ huỷ việc tải lên đang tạm dừng."
+msgstr "Lượt tải lên đang tạm dừng và có thể tiếp tục sau. Bạn vẫn có thể đổi tên hoặc xoá mục này. Xoá mục sẽ huỷ lượt tải lên."
 
-#, fuzzy
 msgid "The watermark could not be drawn"
 msgstr "Không thể vẽ hình mờ"
 
-#, fuzzy
 msgid "Then start Long Shot again. Until then, Hand scroll still works."
-msgstr "Sau đó hãy bắt đầu Chụp dài lại. Cho đến lúc đó, cuộn tay vẫn dùng được."
+msgstr "Sau đó, hãy mở lại Chụp dài. Trong lúc chờ, bạn vẫn có thể cuộn thủ công."
 
-#, fuzzy
 msgid "They are removed from your library and moved to {trash}."
-msgstr "Chúng bị gỡ khỏi thư viện của bạn và chuyển vào {trash}."
+msgstr "Các mục đã chọn sẽ được chuyển từ thư viện vào {trash}."
 
-#, fuzzy
 msgid "They are removed from your library and moved to {trash}. Their copies online stay there unless you tick the box: deleting them cannot be undone ({services})."
-msgstr "Chúng bị gỡ khỏi thư viện của bạn và chuyển vào {trash}. Bản sao trực tuyến của chúng vẫn ở lại trừ khi bạn đánh dấu ô này: xoá chúng không thể hoàn tác ({services})."
+msgstr "Các mục đã chọn sẽ được chuyển từ thư viện vào {trash}. Đánh dấu ô này nếu bạn cũng muốn xoá các bản sao trực tuyến ({services}). Không thể hoàn tác việc xoá các bản sao trực tuyến."
 
-#, fuzzy
 msgid "This area has an image or a control in it, so the fill may show"
-msgstr "Vùng này có ảnh hoặc một điều khiển bên trong, nên phần lấp có thể lộ ra"
+msgstr "Vùng này có ảnh hoặc thành phần giao diện, nên phần được tô để lấp chỗ trống có thể trông khác vùng xung quanh"
 
-#, fuzzy
 msgid "This guide could not be opened"
 msgstr "Không thể mở hướng dẫn này"
 
-#, fuzzy
 msgid "This guide has no steps yet"
 msgstr "Hướng dẫn này chưa có bước nào"
 
-#, fuzzy
 msgid "This image already has 4 zoom lenses, the most it can have. Delete one to add another."
-msgstr "Ảnh này đã có 4 kính lúp, là nhiều nhất có thể. Hãy xoá một kính để thêm kính khác."
+msgstr "Ảnh đã có tối đa 4 kính lúp. Hãy xoá một kính lúp để thêm kính mới."
 
-#, fuzzy
 msgid "This image has 4 zoom lenses, the most it can have. Delete one to add another."
-msgstr "Ảnh này có 4 kính lúp, là nhiều nhất có thể. Hãy xoá một kính để thêm kính khác."
+msgstr "Ảnh đã có tối đa 4 kính lúp. Hãy xoá một kính lúp để thêm kính mới."
 
-#, fuzzy
 msgid "This line"
 msgstr "Dòng này"
 
-#, fuzzy
 msgid "This session gives no click events, so a Click Guide cannot see where you click."
-msgstr "Phiên này không cung cấp sự kiện nhấp, nên Hướng dẫn nhấp chuột không thấy được bạn nhấp ở đâu."
+msgstr "Phiên hiện tại không cung cấp thông tin về thao tác nhấp chuột, nên ứng dụng không thể ghi vị trí bạn nhấp."
 
-#, fuzzy
 msgid "Tint"
-msgstr "Màu nhuộm"
+msgstr "Màu nền tuỳ chỉnh"
 
-#, fuzzy
 msgid "Tint colour"
-msgstr "Màu nhuộm"
+msgstr "Màu nền tuỳ chỉnh"
 
-#, fuzzy
 msgid "Title only"
 msgstr "Chỉ tiêu đề"
 
-#, fuzzy
 msgid "Transparent"
 msgstr "Trong suốt"
 
-#, fuzzy
 msgid "Transparent is for PNG; a JPEG export puts it on white"
-msgstr "Trong suốt dành cho PNG; bản xuất JPEG sẽ đặt nó trên nền trắng"
+msgstr "PNG giữ nền trong suốt. Khi xuất JPEG, vùng trong suốt sẽ có nền trắng"
 
-#, fuzzy
 msgid "Turn this line back into a bar"
 msgstr "Chuyển dòng này về lại thành thanh"
 
-#, fuzzy
 msgid "Type the watermark text."
-msgstr "Nhập văn bản hình mờ."
+msgstr "Nhập nội dung hình mờ."
 
-#, fuzzy
 msgid "Undo step"
 msgstr "Hoàn tác bước"
 
-#, fuzzy
 msgid "Untitled step"
 msgstr "Bước chưa đặt tên"
 
-#, fuzzy
 msgid "Upload waiting for sign-in"
-msgstr "Tải lên đang chờ đăng nhập"
+msgstr "Đang chờ đăng nhập để tải lên"
 
-#, fuzzy
 msgid "Use Hand scroll"
-msgstr "Dùng cuộn tay"
+msgstr "Dùng cuộn thủ công"
 
-#, fuzzy
 msgid "Use anyway"
 msgstr "Vẫn dùng"
 
-#, fuzzy
 msgid "Vertical"
 msgstr "Dọc"
 
-#, fuzzy
 msgid "Watermark"
 msgstr "Hình mờ"
 
-#, fuzzy
 msgid "Watermark text"
-msgstr "Văn bản hình mờ"
+msgstr "Nội dung hình mờ"
 
-#, fuzzy
 msgid "WebP (lossless)"
 msgstr "WebP (không mất dữ liệu)"
 
-#, fuzzy
 msgid "What the reader does"
-msgstr "Việc người đọc làm"
+msgstr "Thao tác người đọc cần thực hiện"
 
-#, fuzzy
 msgid "White"
 msgstr "Trắng"
 
-#, fuzzy
 msgid "Whole window"
 msgstr "Toàn bộ cửa sổ"
 
-#, fuzzy
 msgid "Window"
 msgstr "Cửa sổ"
 
-#, fuzzy
 msgid "a colour profile that could not be read (standard conversion used)"
 msgstr "một hồ sơ màu không đọc được (đã dùng cách chuyển đổi chuẩn)"
 
-#, fuzzy
 msgid "and {n} more"
 msgid_plural "and {n} more"
 msgstr[0] "và {n} mục nữa"
 
-#, fuzzy
 msgid "click at {x}, {y}"
 msgstr "nhấp tại {x}, {y}"
 
-#, fuzzy
 msgid "filled · {hex}"
-msgstr "đã lấp · {hex}"
+msgstr "đã tô nền · {hex}"
 
-#, fuzzy
 msgid "taken on mouse-down"
-msgstr "lấy khi nhấn chuột xuống"
+msgstr "chụp ngay khi nhấn nút chuột"
 
-#, fuzzy
 msgid "{exported}, {skipped} skipped"
 msgstr "{exported}, bỏ qua {skipped}"
 
-#, fuzzy
 msgid "{found} text lines found · {bars} become bars · {kept} kept"
-msgstr "Tìm thấy {found} dòng văn bản · {bars} thành thanh · giữ {kept}"
+msgstr "Nhận dạng {found} dòng · thay {bars} dòng bằng thanh · giữ lại {kept} dòng"
 
-#, fuzzy
 msgid "{line} · click to keep the real text"
 msgstr "{line} · nhấp để giữ lại văn bản gốc"
 
-#, fuzzy
 msgid "{line} · click to make it a bar again"
 msgstr "{line} · nhấp để chuyển lại thành thanh"
 
-#, fuzzy
 msgid "{name}, {status}"
 msgstr "{name}, {status}"
 
-#, fuzzy
 msgid "{n} capture deleted"
 msgid_plural "{n} captures deleted"
 msgstr[0] "Đã xoá {n} bản chụp"
 
-#, fuzzy
 msgid "{n} capture wasn’t deleted"
 msgid_plural "{n} captures weren’t deleted"
 msgstr[0] "Không xoá được {n} bản chụp"
 
-#, fuzzy
 msgid "{n} exported"
 msgid_plural "{n} exported"
 msgstr[0] "Đã xuất {n}"
 
-#, fuzzy
 msgid "{n} frames"
 msgstr "{n} khung hình"
 
-#, fuzzy
 msgid "{n} of {max}"
 msgstr "{n} trên {max}"
 
-#, fuzzy
 msgid "{n} screenshot, drag order = list order"
 msgid_plural "{n} screenshots, drag order = list order"
-msgstr[0] "{n} ảnh chụp màn hình, thứ tự kéo = thứ tự trong danh sách"
+msgstr[0] "{n} ảnh chụp màn hình · kéo để đổi thứ tự trong danh sách"
 
-#, fuzzy
 msgid "{n} selected"
 msgid_plural "{n} selected"
 msgstr[0] "Đã chọn {n}"
 
-#, fuzzy
 msgid "{n} step"
 msgid_plural "{n} steps"
 msgstr[0] "{n} bước"
 
-#, fuzzy
 msgid "{n} steps written to {path}"
 msgstr "Đã ghi {n} bước vào {path}"
 
-#, fuzzy
 msgid "{n} times"
 msgstr "{n} lần"
 
-#, fuzzy
 msgid "{title}: {reason}"
 msgstr "{title}: {reason}"
 
-#, fuzzy
 msgid "{x}, {y} · column locked"
 msgstr "{x}, {y} · khoá cột"
 
-#, fuzzy
 msgid "{x}, {y} · row locked"
 msgstr "{x}, {y} · khoá hàng"
 
-#, fuzzy
 msgid "↵ Enter to apply · Esc to cancel"
 msgstr "↵ Enter để áp dụng · Esc để huỷ"
 
-#, fuzzy
 msgctxt "annotation kind"
 msgid "blueprint"
 msgstr "Bản phác thảo"
 
-#, fuzzy
 msgctxt "annotation kind"
 msgid "move area"
 msgstr "Di chuyển vùng"
 
-#, fuzzy
 msgctxt "annotation kind"
 msgid "retype"
 msgstr "Gõ lại"
 
-#, fuzzy
 msgctxt "annotation kind"
 msgid "zoom lens"
 msgstr "Kính lúp"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Align"
 msgstr "Căn lề"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Background"
 msgstr "Nền"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Border"
 msgstr "Viền"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Border width"
 msgstr "Độ dày viền"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Colour"
 msgstr "Màu"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Corner radius"
-msgstr "Bo góc"
+msgstr "Bán kính bo góc"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Fill behind"
-msgstr "Lấp phía sau"
+msgstr "Tô nền phía sau"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Shape"
 msgstr "Hình dạng"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Text colour"
 msgstr "Màu chữ"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Weight"
 msgstr "Độ đậm"
 
-#, fuzzy
 msgctxt "annotation setting"
 msgid "Zoom"
 msgstr "Thu phóng"
 
-#, fuzzy
 msgctxt "blueprint"
 msgid "kept"
 msgstr "giữ lại"
 
-#, fuzzy
 msgctxt "blueprint colour"
 msgid "Auto"
 msgstr "Tự động"
 
-#, fuzzy
 msgctxt "blueprint colour"
 msgid "One colour"
 msgstr "Một màu"
 
-#, fuzzy
 msgctxt "blueprint style"
 msgid "Bars"
 msgstr "Thanh"
 
-#, fuzzy
 msgctxt "blueprint style"
 msgid "Boxes"
 msgstr "Khung"
 
-#, fuzzy
 msgctxt "breadcrumb"
 msgid "Click Guide /"
-msgstr "Hướng dẫn nhấp chuột /"
+msgstr "Hướng dẫn theo thao tác /"
 
-#, fuzzy
 msgctxt "breadcrumb"
 msgid "Click Guides /"
-msgstr "Hướng dẫn nhấp chuột /"
+msgstr "Hướng dẫn theo thao tác /"
 
-#, fuzzy
 msgctxt "capture kind"
 msgid "Click Guide"
-msgstr "Hướng dẫn nhấp chuột"
+msgstr "Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgctxt "card badge"
 msgid "BOARD"
 msgstr "BẢNG ẢNH"
 
-#, fuzzy
 msgctxt "card badge"
 msgid "FREE"
 msgstr "TỰ DO"
 
-#, fuzzy
 msgctxt "card badge"
 msgid "GRID"
 msgstr "LƯỚI"
 
-#, fuzzy
 msgctxt "card badge"
 msgid "GUIDE"
 msgstr "HƯỚNG DẪN"
 
-#, fuzzy
 msgctxt "card badge"
 msgid "PAIR"
 msgstr "CẶP"
 
-#, fuzzy
 msgctxt "card badge"
 msgid "STRIP"
 msgstr "DẢI"
 
-#, fuzzy
 msgctxt "colour"
 msgid "Charcoal"
 msgstr "Than chì"
 
-#, fuzzy
 msgctxt "colour"
 msgid "Dark grey"
 msgstr "Xám đậm"
 
-#, fuzzy
 msgctxt "colour"
 msgid "Grey"
 msgstr "Xám"
 
-#, fuzzy
 msgctxt "colour"
 msgid "Light grey"
 msgstr "Xám nhạt"
 
-#, fuzzy
 msgctxt "field"
 msgid "1600"
 msgstr "1600"
 
-#, fuzzy
 msgctxt "field"
 msgid "Watermark text"
-msgstr "Văn bản hình mờ"
+msgstr "Nội dung hình mờ"
 
-#, fuzzy
 msgctxt "file dialog"
 msgid "Choose picture"
 msgstr "Chọn ảnh"
 
-#, fuzzy
 msgctxt "fill kind"
 msgid "Gradient"
 msgstr "Chuyển màu"
 
-#, fuzzy
 msgctxt "fill kind"
 msgid "Solid"
 msgstr "Đơn sắc"
 
-#, fuzzy
 msgctxt "filter chip"
 msgid "Boards"
 msgstr "Bảng ảnh"
 
-#, fuzzy
 msgctxt "filter chip"
 msgid "Click Guides"
-msgstr "Hướng dẫn nhấp chuột"
+msgstr "Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgctxt "font weight"
 msgid "Bold"
 msgstr "Đậm"
 
-#, fuzzy
 msgctxt "font weight"
 msgid "Medium"
 msgstr "Vừa"
 
-#, fuzzy
 msgctxt "font weight"
 msgid "Regular"
 msgstr "Thường"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "clicks"
 msgstr "nhấp chuột"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "guide"
 msgstr "hướng dẫn"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "how-to"
 msgstr "cách làm"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "long"
 msgstr "dài"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "page"
 msgstr "trang"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "scroll"
 msgstr "cuộn"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "scrolling"
 msgstr "chụp cuộn"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "steps"
 msgstr "các bước"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "tutorial"
 msgstr "hướng dẫn sử dụng"
 
-#, fuzzy
 msgctxt "lens setting"
 msgid "Connector"
 msgstr "Đường nối"
 
-#, fuzzy
 msgctxt "lens setting"
 msgid "Lenses on this image"
 msgstr "Kính lúp trên ảnh này"
 
-#, fuzzy
 msgctxt "lens setting"
 msgid "Source"
 msgstr "Nguồn"
 
-#, fuzzy
 msgctxt "lens setting"
 msgid "Zoom badge"
 msgstr "Nhãn thu phóng"
 
-#, fuzzy
 msgctxt "lens shape"
 msgid "Circle"
 msgstr "Tròn"
 
-#, fuzzy
 msgctxt "lens shape"
 msgid "Rect"
 msgstr "Chữ nhật"
 
-#, fuzzy
 msgctxt "lens shape"
 msgid "Rounded"
 msgstr "Bo tròn"
 
-#, fuzzy
 msgctxt "menu"
 msgid "Click Guide of a window…"
-msgstr "Hướng dẫn nhấp chuột của một cửa sổ…"
+msgstr "Ghi hướng dẫn trong cửa sổ…"
 
-#, fuzzy
 msgctxt "menu"
 msgid "Long Shot"
 msgstr "Chụp dài"
 
-#, fuzzy
 msgctxt "menu"
 msgid "New Click Guide"
-msgstr "Hướng dẫn nhấp chuột mới"
+msgstr "Hướng dẫn theo thao tác mới"
 
-#, fuzzy
 msgctxt "move area"
 msgid "Moved to"
-msgstr "Chuyển đến"
+msgstr "Đã chuyển đến"
 
-#, fuzzy
 msgctxt "move area"
 msgid "Removed"
 msgstr "Đã xoá"
 
-#, fuzzy
 msgctxt "move area"
 msgid "Source"
 msgstr "Nguồn"
 
-#, fuzzy
 msgctxt "navigation"
 msgid "Click Guides"
-msgstr "Hướng dẫn nhấp chuột"
+msgstr "Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgctxt "page title"
 msgid "Click Guide"
-msgstr "Hướng dẫn nhấp chuột"
+msgstr "Hướng dẫn theo thao tác"
 
-#, fuzzy
 msgctxt "panel badge"
 msgid "New in 0.3.4"
 msgstr "Mới trong 0.3.4"
 
-#, fuzzy
 msgctxt "shortcut"
 msgid "Long Shot"
 msgstr "Chụp dài"
 
-#, fuzzy
 msgctxt "shortcut"
 msgid "Set"
 msgstr "Đặt"
 
-#, fuzzy
 msgctxt "text alignment"
 msgid "Center"
 msgstr "Giữa"
 
-#, fuzzy
 msgctxt "text alignment"
 msgid "Left"
 msgstr "Trái"
 
-#, fuzzy
 msgctxt "text alignment"
 msgid "Right"
 msgstr "Phải"
 
-#, fuzzy
 msgctxt "tool"
 msgid "Move area"
 msgstr "Di chuyển vùng"
 
-#, fuzzy
 msgctxt "tool"
 msgid "Retype"
 msgstr "Gõ lại"
 
-#, fuzzy
 msgctxt "tool"
 msgid "Zoom Lens"
 msgstr "Kính lúp"
 
-#, fuzzy
 msgctxt "tool group"
 msgid "Touch-up"
 msgstr "Chỉnh sửa nhanh"
 
-#, fuzzy
 msgctxt "window picker for a Click Guide"
 msgid "Start guide"
 msgstr "Bắt đầu hướng dẫn"
