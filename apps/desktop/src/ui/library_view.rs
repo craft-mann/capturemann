@@ -1957,7 +1957,8 @@ impl Render for LibraryView {
                 )
             }))
             .children(
-                matches!(route, Route::Guides | Route::Library)
+                // Only on the Click Guides page, not on All captures.
+                matches!(route, Route::Guides)
                     .then(|| click_guide_buttons(&t, &self.app, icon_only).into_any_element()),
             );
 
