@@ -5818,9 +5818,6 @@ msgstr ""
 msgid "The move was cancelled"
 msgstr ""
 
-msgid "The new text is wider than the box and will be cut. Widen the box or shorten the text."
-msgstr ""
-
 msgid "The new text will sit on a patch that does not match what is around it. You can still go on, or cancel and nothing is stored."
 msgstr ""
 

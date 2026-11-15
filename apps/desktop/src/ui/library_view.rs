@@ -109,10 +109,9 @@ pub struct LibraryView {
     keep_scroll: bool,
     /// Captures whose thumbnails to drop when the next load lands (R1-7).
     pending_invalidate: Vec<String>,
-    /// Selection mode (BRD-1, BLK-1): a click on a card selects it instead of opening it, and a
-    /// bar offers Make a board, Export selected and Delete.
-    select_mode: bool,
-    /// The selected captures, by id (kept across reloads).
+    /// The selected captures, by id (kept across reloads). Selecting is on while any is ticked (a
+    /// click on a card then selects it instead of opening it, and a bar offers Make a board,
+    /// Export selected and Delete; BRD-1, BLK-1).
     multi: BTreeSet<String>,
     /// Captures whose upload or publish waits for a Google sign-in (B1): capture id -> job id.
     waiting: Arc<HashMap<String, String>>,
@@ -225,7 +224,6 @@ impl LibraryView {
             counts_gen: 0,
             keep_scroll: false,
             pending_invalidate: Vec::new(),
-            select_mode: false,
             multi: BTreeSet::new(),
             waiting: Arc::new(HashMap::new()),
             _subs: subs,
@@ -397,11 +395,10 @@ impl LibraryView {
 
     // ---- selection mode (BRD-1, BLK-1) -----------------------------------------------------
 
-    fn toggle_select_mode(&mut self, cx: &mut Context<Self>) {
-        self.select_mode = !self.select_mode;
-        if !self.select_mode {
-            self.multi.clear();
-        }
+    /// Clearing the ticks ends selecting. There is no Select or Done button: a tick on a hovered
+    /// card starts it.
+    fn clear_selection(&mut self, cx: &mut Context<Self>) {
+        self.multi.clear();
         self.close_menu(cx);
         cx.notify();
     }
@@ -467,7 +464,6 @@ impl LibraryView {
     fn delete_selected(&mut self, cx: &mut Context<Self>) {
         let items = self.multi_items();
         let app = self.app.clone();
-        self.select_mode = false;
         self.multi.clear();
         cx.notify();
         let caps: Vec<(String, String)> = items
@@ -821,8 +817,7 @@ struct RowCtx {
     /// Imported captures whose own transcription runs (the same `TranscribeVm` the editor reads,
     /// fed by `transcript.started` and `job.progress`), with its fraction when known.
     transcribing: Arc<std::collections::HashMap<String, (String, Option<f32>)>>,
-    /// Selection mode and the selected captures (BRD-1, BLK-1).
-    select_mode: bool,
+    /// The selected captures (BRD-1, BLK-1); any selected means selecting is on.
     multi: Arc<BTreeSet<String>>,
     /// Captures whose upload waits for a sign-in (B1).
     waiting: Arc<HashMap<String, String>>,
@@ -845,20 +840,45 @@ fn board_layout_label(layout: &str) -> String {
 }
 
 /// The check circle of a card in selection mode (design S11): 20 px at the top left.
-fn select_check(t: &Theme, on: bool) -> AnyElement {
+fn select_check(
+    t: &Theme,
+    on: bool,
+    always: bool,
+    group: SharedString,
+    ix: usize,
+    view: WeakEntity<LibraryView>,
+) -> AnyElement {
     div()
+        .id(("card-tick", ix))
+        .role(Role::CheckBox)
+        .aria_label(SharedString::from(tr!("Select")))
+        .occlude()
         .absolute()
-        .top(px(10.))
-        .left(px(10.))
-        .size(px(20.))
+        .top(px(6.))
+        .left(px(6.))
+        .size(px(28.))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(10.))
-        .border_1()
-        .border_color(rgba_of(if on { t.text } else { Theme::DARK.text }))
-        .bg(if on { rgba_of(t.text) } else { overlay_bg(60) })
-        .children(on.then(|| icon("check", 13., t.ground)))
+        .cursor_pointer()
+        .opacity(if always || on { 1. } else { 0. })
+        .group_hover(group, |s| s.opacity(1.))
+        .hover(|s| s.opacity(1.))
+        .child(
+            div()
+                .size(px(20.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(10.))
+                .border_1()
+                .border_color(rgba_of(if on { t.text } else { Theme::DARK.text }))
+                .bg(if on { rgba_of(t.text) } else { overlay_bg(60) })
+                .children(on.then(|| icon("check", 13., t.ground))),
+        )
+        .on_click(move |_, _, cx| {
+            view.update(cx, |this, cx| this.toggle_multi(ix, cx)).ok();
+        })
         .into_any_element()
 }
 
@@ -898,7 +918,13 @@ fn kind_pill(item: &CaptureItem) -> AnyElement {
         .into_any_element()
 }
 
-fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App) -> gpui::Div {
+fn thumb_frame(
+    ctx: &RowCtx,
+    item: &CaptureItem,
+    width: f32,
+    group: SharedString,
+    cx: &mut gpui::App,
+) -> gpui::Div {
     let t = &ctx.t;
     let id = item.id.clone();
     let (frame_w, frame_h) = (width, (width * THUMB_ASPECT).round());
@@ -952,11 +978,14 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
             );
         }
     }
-    frame = if ctx.select_mode {
-        frame.child(select_check(t, ctx.multi.contains(&item.id)))
-    } else {
-        frame.child(kind_pill(item))
-    };
+    // The pill gives way to the tick: always while selecting, on hover otherwise.
+    if ctx.multi.is_empty() {
+        frame = frame.child(
+            div()
+                .group_hover(group.clone(), |s| s.opacity(0.))
+                .child(kind_pill(item)),
+        );
+    }
     if let (Kind::Recording, Some(ticks)) = (item.kind, item.duration_ticks) {
         frame = frame.child(
             div()
@@ -1244,7 +1273,8 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
         }
         m
     };
-    let multi_on = ctx.select_mode && ctx.multi.contains(&item.id);
+    let selecting = !ctx.multi.is_empty();
+    let multi_on = ctx.multi.contains(&item.id);
     let border = if multi_on {
         t.text
     } else if selected {
@@ -1261,7 +1291,7 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     let frame = if item.kind == Kind::Audio {
         audio_frame(ctx, item, width, group.clone(), cx)
     } else {
-        thumb_frame(ctx, item, width, cx)
+        thumb_frame(ctx, item, width, group.clone(), cx)
     }
     .border_color(rgba_of(border))
     .group_hover(group.clone(), move |s| s.border_color(hover_border));
@@ -1339,7 +1369,7 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
         .gap(px(10.))
         .cursor_pointer()
         .on_click({
-            let select = ctx.select_mode;
+            let select = selecting;
             move |_, _, cx| {
                 view.update(cx, |this, cx| {
                     if select {
@@ -1388,11 +1418,19 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
                 ),
         );
     div()
-        .group(group)
+        .group(group.clone())
         .relative()
         .w(px(width))
         .flex_none()
         .child(clickable)
+        .child(select_check(
+            &t,
+            multi_on,
+            selecting,
+            group.clone(),
+            ix,
+            ctx.view.clone(),
+        ))
         .child(more)
         .into_any_element()
 }
@@ -1707,24 +1745,6 @@ impl Render for LibraryView {
                     .child(self.search.clone()),
             )
             .child(crate::ui::import_cards::header_button(&t, &self.app))
-            .child({
-                let v = view.clone();
-                let on = self.select_mode;
-                button_with_icon(
-                    &t,
-                    "library-select",
-                    if on { tr!("Done") } else { tr!("Select") },
-                    if on {
-                        ButtonKind::Primary
-                    } else {
-                        ButtonKind::Secondary
-                    },
-                    Some("check-check"),
-                )
-                .on_click(move |_, _, cx| {
-                    v.update(cx, |this, cx| this.toggle_select_mode(cx)).ok();
-                })
-            })
             .children((route == Route::Audio).then(|| {
                 record_audio_header_button(
                     &t,
@@ -2075,7 +2095,6 @@ impl Render for LibraryView {
                     imports: Arc::new(self.app.read(cx).import.clone()),
                     pending: self.pending.clone(),
                     app: self.app.clone(),
-                    select_mode: self.select_mode,
                     multi: Arc::new(self.multi.clone()),
                     waiting: self.waiting.clone(),
                     transcribing: Arc::new({
@@ -2126,7 +2145,7 @@ impl Render for LibraryView {
             .menu
             .as_ref()
             .map(|m| self.card_menu(&t, m, window, cx));
-        let bar = (self.select_mode && !self.multi.is_empty()).then(|| self.selection_bar(&t, cx));
+        let bar = (!self.multi.is_empty()).then(|| self.selection_bar(&t, cx));
         div()
             .relative()
             .size_full()
@@ -2267,7 +2286,7 @@ impl LibraryView {
                             .hover(|s| s.bg(rgba_of(t.raised)))
                             .child(icon("x", 16., t.text_2))
                             .on_click(move |_, _, cx| {
-                                v4.update(cx, |this, cx| this.toggle_select_mode(cx)).ok();
+                                v4.update(cx, |this, cx| this.clear_selection(cx)).ok();
                             }),
                     ),
             )
