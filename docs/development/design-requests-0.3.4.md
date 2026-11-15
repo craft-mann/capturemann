@@ -13,6 +13,8 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
   events; a recording is running) states, plus the tooltip text for the disabled reason.
 
 ## D2. Library selection (replaces the Select / Done buttons) — S11 update
+**Designed (board S15, Nov 15, 2026) and built:** card states, the 24 px tick in a 28 px hit area, Esc clears, the selection bar (S20: Delete in the text colour, collapse order Delete, Export selected, Make a board).
+
 - Built: no Select or Done button. Hovering a card shows a round tick at its top-left (the kind pill
   fades out); ticking starts selecting; while any card is ticked every card shows its tick, a click
   on a card toggles instead of opening, and the bar offers Make a board, Export selected, Delete, and
@@ -22,6 +24,8 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
   the selection bar; keyboard focus ring on the tick; how a card shows "selected" besides the tick.
 
 ## D3. "Click Guide of a window…" (start a guide on a chosen window)
+**Designed (board S16) and built:** header order and icon fallback, empty state, the picker's purpose text and countdown line, the bar's "Following" line, the closed-window state (daemon `window_closed`) and its toast.
+
 - Built: a secondary button beside "New Click Guide" (library header and the Click Guides empty state),
   an app-menu item, and the existing window picker reused with the primary button "Start guide".
 - Draw: the two header buttons together (widths, icon, Vietnamese labels are about 30 % longer),
@@ -31,6 +35,8 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
   (toast and bar state).
 
 ## D4. Click Guide bar (S3) — confirm width rule and the in-between states
+**Designed (board S17) and built:** countdown, paused, following, long languages, narrow displays; width measured from the text.
+
 - Built: 580 px wide, 58 px high; Stop is a 44 px red square icon button; Step n with a `rec` dot,
   "Click Guide · clicks only", a divider, then Pause, Note step, Undo step with labels.
 - Draw/confirm: the bar for (1) countdown "Starting…" with a Cancel (Stop during the countdown
@@ -74,12 +80,16 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
   status line so the colour is not the only cue (colour-blind safe).
 
 ## D8. Click Guide editor (S8) details found in QA
+**Designed (board S19) and built:** contain fit, 240 px minimum, tall picture chip and the full-size viewer.
+
 - The step picture must keep its own aspect ratio inside the right column (fixed in code); confirm the
   maximum picture height and what happens with very tall pictures (scroll inside the column or fit).
 - G3 to G5 and R1 (see `verification/QA-0.3.4-*` reports) are small layout defects being fixed in code;
   design check afterwards only.
 
 ## D9. Translations and length
+**Designed (board S20) and built for the Click Guide bar and the selection bar** (layout tests `s17_*`, `s20_*`); the Long Shot bar and the Make-a-board sheet are built by their own tracks.
+
 - Vietnamese strings run about 20 to 40 % longer than English. Please state, for the Long Shot bar,
   Click Guide bar, library selection bar and the Make-a-board sheet, the maximum label length and the
   truncation or wrapping rule, so the layout tests can assert it.

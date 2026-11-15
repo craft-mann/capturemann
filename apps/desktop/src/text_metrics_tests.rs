@@ -160,6 +160,7 @@ pub(crate) fn width(text: &str, face: Face, size: f32) -> f32 {
     units * size / f.units_per_em
 }
 
+#[allow(dead_code)] // the layout tests use it
 /// How many lines `text` needs in a box `avail` px wide when it wraps at spaces, or `None` when a
 /// single word is wider than the box (it would overflow whatever the line count).
 pub(crate) fn lines(text: &str, face: Face, size: f32, avail: f32) -> Option<usize> {

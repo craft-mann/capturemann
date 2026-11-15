@@ -40,6 +40,10 @@ const DOUBLE_CLICK_NS: u64 = 400_000_000;
 const DOUBLE_CLICK_PX: f64 = 6.0;
 /// How long a HUD control waits for the worker (a step in the queue may be reading its text).
 const REPLY_TIMEOUT: Duration = Duration::from_secs(60);
+/// How often the followed window is looked for, and how many polls in a row must miss it before
+/// the guide pauses (a window that is being moved between spaces can vanish for one poll).
+const WINDOW_POLL: Duration = Duration::from_millis(500);
+const WINDOW_MISSES: u32 = 2;
 
 type Reply = mpsc::SyncSender<Result<Value, CmError>>;
 
@@ -65,6 +69,8 @@ struct Active {
     tx: mpsc::Sender<Job>,
     join: Option<JoinHandle<()>>,
     steps: Arc<AtomicUsize>,
+    /// The followed window is gone (S16): the guide paused itself and cannot resume.
+    window_closed: Arc<AtomicBool>,
 }
 
 /// The one running Click Guide, the click source and the HUD exclusion rectangles.
@@ -334,6 +340,58 @@ fn target_scale(target: &CaptureTarget, targets: &cm_capture::Targets) -> f64 {
     s.filter(|v| v.is_finite() && *v >= 1.0).unwrap_or(1.0)
 }
 
+/// Watches the followed window of a guide: when it is gone from the desktop's window list the
+/// guide pauses itself and says why (`window_closed`), and nothing already recorded is lost.
+struct WindowWatch {
+    window_id: u32,
+    capturer: Arc<Capturer>,
+    events: EventBus,
+    guide_id: String,
+    paused: Arc<AtomicBool>,
+    closed: Arc<AtomicBool>,
+    /// Set by `stop_guide`: the watch ends.
+    cancelled: Arc<AtomicBool>,
+    steps: Arc<AtomicUsize>,
+}
+
+impl WindowWatch {
+    async fn run(self) {
+        let mut misses = 0;
+        loop {
+            tokio::time::sleep(WINDOW_POLL).await;
+            if self.cancelled.load(Ordering::SeqCst) {
+                return;
+            }
+            let c = self.capturer.clone();
+            // A listing that fails (the permission was taken back) is not a closed window.
+            let Ok(targets) = blocking(move || c.list_targets_with(true)).await else {
+                continue;
+            };
+            if targets.windows.iter().any(|w| w.id == self.window_id) {
+                misses = 0;
+                continue;
+            }
+            misses += 1;
+            if misses < WINDOW_MISSES {
+                continue;
+            }
+            if self.cancelled.load(Ordering::SeqCst) {
+                return;
+            }
+            self.closed.store(true, Ordering::SeqCst);
+            self.paused.store(true, Ordering::SeqCst);
+            self.events.publish(
+                "guide.window_closed",
+                json!({ "guide_id": self.guide_id, "window_id": self.window_id,
+                        "step_count": self.steps.load(Ordering::SeqCst) }),
+            );
+            self.events
+                .publish("guide.paused", json!({ "guide_id": self.guide_id }));
+            return;
+        }
+    }
+}
+
 async fn ask(
     tx: &mpsc::Sender<Job>,
     make: impl FnOnce(Reply) -> Job,
@@ -357,6 +415,14 @@ impl Inner {
             return Err(CmError::invalid_field("guide_id", "not a Click Guide"));
         }
         Ok(lib.bundle_path(&rec))
+    }
+
+    /// Whether the guide `id` is recording and its followed window has closed.
+    fn window_closed(&self, id: &str) -> bool {
+        self.guide
+            .lock()
+            .as_ref()
+            .is_some_and(|a| a.guide_id == id && a.window_closed.load(Ordering::SeqCst))
     }
 
     /// `guide_id` of the call, or the guide that is being recorded.
@@ -426,6 +492,7 @@ impl Inner {
                 tx,
                 join: Some(join),
                 steps,
+                window_closed: Arc::new(AtomicBool::new(false)),
             });
             (id, dir)
         };
@@ -460,11 +527,31 @@ impl Inner {
         // before anything is recorded (GDE-1.AC5, AC6), and the empty guide is removed.
         let started = {
             let slot = self.guide.lock();
-            slot.as_ref()
-                .map(|a| (a.paused.clone(), a.tx.clone(), a.listening.clone()))
+            slot.as_ref().map(|a| {
+                (
+                    a.paused.clone(),
+                    a.tx.clone(),
+                    a.listening.clone(),
+                    a.window_closed.clone(),
+                    a.steps.clone(),
+                )
+            })
         };
-        let Some((paused, tx, listening)) = started else {
+        let Some((paused, tx, listening, window_closed, steps)) = started else {
             return Ok(json!({ "guide_id": guide_id, "state": "cancelled", "step_count": 0 }));
+        };
+        let watch = match capture_target {
+            CaptureTarget::Window { window_id } => Some(WindowWatch {
+                window_id,
+                capturer: capturer.clone(),
+                events: self.events.clone(),
+                guide_id: guide_id.clone(),
+                paused: paused.clone(),
+                closed: window_closed,
+                cancelled: cancelled.clone(),
+                steps,
+            }),
+            _ => None,
         };
         let mut sink = SinkState {
             paused,
@@ -487,6 +574,9 @@ impl Inner {
             return Err(e.into());
         }
         listening.store(true, Ordering::SeqCst);
+        if let Some(w) = watch {
+            tokio::spawn(w.run());
+        }
         self.events.publish(
             "guide.started",
             json!({ "guide_id": guide_id, "by": actor }),
@@ -498,6 +588,7 @@ impl Inner {
     async fn discard_active_guide(&self) {
         let a = self.guide.lock().take();
         let Some(mut a) = a else { return };
+        a.cancelled.store(true, Ordering::SeqCst);
         self.guide.clicks.stop();
         let (rtx, rrx) = mpsc::sync_channel(1);
         let _ = a.tx.send(Job::Stop(rtx));
@@ -608,6 +699,11 @@ impl Inner {
         .await?;
         // While recording the worker may be ahead of the file.
         if state != "stopped" {
+            v["window_closed"] = json!(self
+                .guide
+                .lock()
+                .as_ref()
+                .is_some_and(|a| a.window_closed.load(Ordering::SeqCst)));
             if let Some(n) = self
                 .guide
                 .lock()
@@ -643,6 +739,13 @@ impl Inner {
                 .into());
             }
             let (_, paused, tx) = active.expect("checked");
+            if a.paused == Some(false) && self.window_closed(&id) {
+                return Err(CmError::invalid_input(
+                    "the followed window closed: stop the guide (its steps are kept) and start \
+                     another on a window that is open",
+                )
+                .into());
+            }
             if let Some(p) = a.paused {
                 paused.store(p, Ordering::SeqCst);
                 self.events.publish(

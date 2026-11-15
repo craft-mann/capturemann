@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, 13 of Nov 10, 2026: the AI page options for lines to leave out, and 1 of Nov 10, 2026: preparing the sound in the editor); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, 13 of Nov 10, 2026: the AI page options for lines to leave out, 1 of Nov 10, 2026: preparing the sound in the editor, and 17 of Nov 15, 2026: the Click Guide of a window and picture viewer drafts from the design boards S16, S17, S19); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -10831,9 +10831,6 @@ msgstr "Tạm dừng"
 msgid "Paused"
 msgstr "Đã tạm dừng"
 
-msgid "Paused · clicks are not recorded"
-msgstr "Đã tạm dừng · không ghi thao tác nhấp chuột"
-
 msgid "Percent"
 msgstr "Phần trăm"
 
@@ -11661,3 +11658,75 @@ msgstr "Thử Cuộn tay"
 #, fuzzy
 msgid "to stop"
 msgstr "để dừng"
+
+#, fuzzy
+msgid "Following “{window}” · clicks only"
+msgstr "Đang theo dõi “{window}” · chỉ ghi lượt nhấp"
+
+#, fuzzy
+msgid "Paused · the followed window closed"
+msgstr "Đã tạm dừng · cửa sổ đang theo dõi đã đóng"
+
+#, fuzzy
+msgid "Paused · {rest}"
+msgstr "Đã tạm dừng · {rest}"
+
+#, fuzzy
+msgid "Pick a window…"
+msgstr "Chọn một cửa sổ…"
+
+#, fuzzy
+msgid "Pick another window"
+msgstr "Chọn cửa sổ khác"
+
+#, fuzzy
+msgid "Show the picture at full size"
+msgstr "Xem ảnh ở kích thước đầy đủ"
+
+#, fuzzy
+msgid "Step {n} · full size {w} × {h}"
+msgstr "Bước {n} · kích thước đầy đủ {w} × {h}"
+
+#, fuzzy
+msgid "Stop and open guide"
+msgstr "Dừng và mở hướng dẫn"
+
+#, fuzzy
+msgid "Stop or Esc cancels"
+msgstr "Dừng hoặc Esc để huỷ"
+
+#, fuzzy
+msgid "Tall picture · click to see full size"
+msgstr "Ảnh dài · nhấp để xem đầy đủ"
+
+#, fuzzy
+msgid "The followed window"
+msgstr "Cửa sổ đang theo dõi"
+
+#, fuzzy
+msgid "Window closed"
+msgstr "Cửa sổ đã đóng"
+
+#, fuzzy
+msgid "{window} closed"
+msgstr "{window} đã đóng"
+
+#, fuzzy
+msgid "The Click Guide is paused. Your {n} step is kept."
+msgid_plural "The Click Guide is paused. Your {n} steps are kept."
+msgstr[0] "Hướng dẫn đã tạm dừng. {n} bước của bạn vẫn được giữ."
+
+#, fuzzy
+msgctxt "window picker for a Click Guide"
+msgid "3-second countdown after Start guide"
+msgstr "Đếm ngược 3 giây sau khi bấm Bắt đầu hướng dẫn"
+
+#, fuzzy
+msgctxt "window picker for a Click Guide"
+msgid "Follow a window"
+msgstr "Theo dõi một cửa sổ"
+
+#, fuzzy
+msgctxt "window picker for a Click Guide"
+msgid "Only clicks inside this window become steps. Clicks anywhere else are ignored."
+msgstr "Chỉ các lượt nhấp trong cửa sổ này mới thành bước. Nhấp ở nơi khác sẽ bị bỏ qua."

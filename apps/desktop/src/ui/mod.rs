@@ -6,6 +6,7 @@ pub mod ai_view;
 pub mod ai_voice;
 pub mod app;
 pub mod audio_cache;
+pub mod bar_layout;
 pub mod board_sheet;
 pub mod brand;
 pub mod bulk_sheet;

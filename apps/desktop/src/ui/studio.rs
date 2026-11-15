@@ -74,6 +74,7 @@ actions!(
         SelectUp,
         SelectDown,
         OpenSelected,
+        ClearSelection,
     ]
 );
 
@@ -97,6 +98,8 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("up", SelectUp, Some("LibraryList")),
         KeyBinding::new("down", SelectDown, Some("LibraryList")),
         KeyBinding::new("enter", OpenSelected, Some("LibraryList")),
+        // S15: Esc clears the ticks (and closes an open card menu first).
+        KeyBinding::new("escape", ClearSelection, Some("LibraryList")),
     ]);
     cx.set_menus(app_menus());
 }

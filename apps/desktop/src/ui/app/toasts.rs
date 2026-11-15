@@ -645,6 +645,8 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
         ToastAction::RevealPath(path) => crate::ui::upload_ui::reveal_path(app, &path, cx),
         ToastAction::RetryJob(id) => crate::ui::upload_ui::retry(app, &id, cx),
         ToastAction::OpenDestinations => crate::ui::upload_ui::open_destinations(app, cx),
+        ToastAction::GuidePickWindow => crate::ui::guide_view::hud::pick_another(app, cx),
+        ToastAction::GuideStopOpen(id) => crate::ui::guide_view::hud::stop_and_open(app, &id, cx),
         ToastAction::StopRecording(id) => {
             crate::ui::recording::stop_recording_if_running(app, &id, cx)
         }
