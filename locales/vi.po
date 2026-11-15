@@ -6574,7 +6574,7 @@ msgstr "Không thể bắt đầu bản ghi {track}: {detail}"
 
 # FACT: owner review required
 msgid "{what} permission was removed; the recording continues without this track from here on"
-msgstr "Quyền {what} đã bị gỡ; quá trình quay vẫn tiếp tục nhưng từ đây sẽ không còn ghi {what}."
+msgstr "Quyền {what} đã bị gỡ; quá trình quay vẫn tiếp tục nhưng từ đây sẽ không còn ghi bản ghi này."
 
 # FACT: owner review required
 msgid "{what} permission was removed; the recording is stopped and what was recorded is kept"
