@@ -2883,7 +2883,7 @@ mod tests {
                 at: Pt::new(130.0, 320.0),
                 text: "Click\nSave".into(),
                 size: 24.0,
-                color: crate::editor::tools::PALETTE[6].1,
+                color: Color::WHITE,
                 outline: None,
                 bg: None
             }

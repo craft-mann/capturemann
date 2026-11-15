@@ -440,9 +440,8 @@ impl ToolStyle {
                 color: stamp_color(StampKind::Check),
                 ..base
             },
-            // The palette's Black: readable on a light picture (QA E2); the panel changes it.
             Tool::Text => ToolStyle {
-                color: PALETTE[6].1,
+                color: Color::WHITE,
                 ..base
             },
             Tool::Highlight => ToolStyle {
@@ -794,13 +793,13 @@ mod tests {
         assert_eq!(keys.len(), Tool::ALL.len());
     }
 
-    /// ANN-1 defaults: red, 4 px; text black; highlighter yellow at 35%.
+    /// ANN-1 defaults: red, 4 px; text white; highlighter yellow at 35%.
     #[test]
     fn defaults_follow_the_spec() {
         let s = Styles::default();
         assert_eq!(s.get(Tool::Arrow).color, DEFAULT_COLOR);
         assert_eq!(s.get(Tool::Arrow).width, 4.0);
-        assert_eq!(s.get(Tool::Text).color, PALETTE[6].1, "the palette's Black");
+        assert_eq!(s.get(Tool::Text).color, Color::WHITE);
         assert_eq!(s.get(Tool::Text).size, 24.0);
         assert_eq!(s.get(Tool::Highlight).color, DEFAULT_HIGHLIGHT_COLOR);
         assert_eq!(s.get(Tool::Blur).strength, 12);
