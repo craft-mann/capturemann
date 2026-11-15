@@ -143,6 +143,7 @@ impl Action {
                 f.only(&[
                     "request_id",
                     "paused",
+                    "stop",
                     "since_seq",
                     "preview_w",
                     "preview_h",
@@ -163,6 +164,13 @@ impl Action {
                             .ok_or_else(|| CmError::invalid_field("paused", "must be a boolean"))?,
                     ),
                 };
+                let stop = match f.obj.get("stop") {
+                    None | Some(Value::Null) => None,
+                    Some(v) => Some(
+                        v.as_bool()
+                            .ok_or_else(|| CmError::invalid_field("stop", "must be a boolean"))?,
+                    ),
+                };
                 let since_seq = match f.obj.get("since_seq") {
                     None | Some(Value::Null) => None,
                     Some(v) => Some(v.as_u64().ok_or_else(|| {
@@ -172,6 +180,7 @@ impl Action {
                 Action::LongShotState(LongShotStateParams {
                     request_id: f.str_req("request_id")?,
                     paused,
+                    stop,
                     since_seq,
                     preview_w: dim("preview_w", 360)?,
                     preview_h: dim("preview_h", 560)?,

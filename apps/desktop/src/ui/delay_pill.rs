@@ -166,7 +166,7 @@ pub fn escape_hotkey_id() -> u32 {
 }
 
 /// Registers Esc. Failure (another app owns it) leaves the click-then-Esc path on the pill.
-fn grab_escape(cx: &App) {
+pub(crate) fn grab_escape(cx: &App) {
     if let Some(h) = cx.try_global::<crate::platform::HotkeyHolder>() {
         if let Err(e) = h.0.register(escape_hotkey()) {
             log::warn!("could not register Esc for the delay: {e}");
@@ -174,7 +174,7 @@ fn grab_escape(cx: &App) {
     }
 }
 
-fn release_escape(cx: &App) {
+pub(crate) fn release_escape(cx: &App) {
     if let Some(h) = cx.try_global::<crate::platform::HotkeyHolder>() {
         let _ = h.0.unregister(escape_hotkey());
     }

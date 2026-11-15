@@ -79,6 +79,33 @@ pub fn is_running(cx: &App) -> bool {
     cx.try_global::<Holder>().is_some_and(|h| h.0.is_some())
 }
 
+/// The hotkey id of the bare Esc key (the delay pill's key; one id for both).
+pub fn escape_hotkey_id() -> u32 {
+    crate::ui::delay_pill::escape_hotkey_id()
+}
+
+/// A daemon event about a Long Shot run: Esc is grabbed as a global key while one runs and let go
+/// when it ends. The window being scrolled has the focus, and the HUD never takes it, so no
+/// window of ours would see the key.
+pub fn on_event(name: &str, cx: &mut App) {
+    match model::escape_for_event(name) {
+        Some(model::EscapeKey::Grab) => crate::ui::delay_pill::grab_escape(cx),
+        Some(model::EscapeKey::Release) => crate::ui::delay_pill::release_escape(cx),
+        None => {}
+    }
+}
+
+/// Esc: stops every running Long Shot, the app's own or one started from the CLI or by an agent
+/// (the CLI run has no HUD). What was captured is kept. Returns whether one was running, so the
+/// key falls through to the delay pill's handler otherwise.
+pub fn stop_running(app: &Entity<AppModel>, cx: &App) -> bool {
+    app.read(cx)
+        .backend
+        .daemon
+        .as_ref()
+        .is_some_and(|d| d.cancel_long_shots() > 0)
+}
+
 /// "Long Shot" (the launcher command, the hotkey, the menu): opens the overlay in Long Shot mode.
 pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     if is_running(cx) {

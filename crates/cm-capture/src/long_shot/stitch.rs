@@ -231,6 +231,21 @@ impl Lines {
         true
     }
 
+    /// Pixels of line `ia` that differ from line `ib` of `other` by more than the tolerance.
+    fn diff_px(&self, ia: usize, other: &Lines, ib: usize) -> usize {
+        self.line(ia)
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(other.line(ib).as_chunks::<4>().0.iter())
+            .filter(|(p, q)| {
+                p.iter()
+                    .zip(q.iter())
+                    .any(|(a, b)| a.abs_diff(*b) > NOISE_TOLERANCE)
+            })
+            .count()
+    }
+
     fn same_line_tol(&self, other: &Lines, i: usize, max_px: usize) -> bool {
         self.near_tol(i, other, i, max_px)
     }
@@ -357,6 +372,54 @@ fn find_join(
     }
 }
 
+/// Most candidates whose overlaps are compared pixel by pixel (see [`best_by_difference`]).
+const MAX_SCORED_CANDIDATES: usize = 4096;
+/// The runner-up must differ by at least this share of the best (plus [`SCORE_MARGIN_PX`]).
+const SCORE_MARGIN_SHARE: f64 = 0.1;
+/// ... and by this many pixels per compared line.
+const SCORE_MARGIN_PX: f64 = 0.5;
+
+/// Among shifts that all match within the tolerance, the one whose overlap has the fewest
+/// differing pixels per line, when the next one has clearly more. `rival` is a score (pixels per
+/// line) the best one must also beat (the frames as they are, no scroll); infinity for none.
+/// `None` on a tie or when there are too many to compare.
+fn best_by_difference(
+    a: &Lines,
+    b: &Lines,
+    header: usize,
+    cw: usize,
+    candidates: &[usize],
+    rival: f64,
+) -> Option<usize> {
+    if candidates.len() > MAX_SCORED_CANDIDATES {
+        return None;
+    }
+    let (mut best, mut best_s, mut second) = (f64::INFINITY, 0, rival);
+    for &s in candidates {
+        let overlap = cw - s;
+        let g = GUARD.min(overlap / 3);
+        let lines = (overlap - 2 * g).max(1) as f64;
+        // Beyond this many differing pixels the shift is neither the best nor the runner-up.
+        let cap = second * lines;
+        let mut total = 0usize;
+        for i in g..overlap - g {
+            total += a.diff_px(header + s + i, b, header + i);
+            if total as f64 > cap {
+                break;
+            }
+        }
+        let score = total as f64 / lines;
+        if score < best {
+            second = second.min(best);
+            (best, best_s) = (score, s);
+        } else if score < second {
+            second = score;
+        }
+    }
+    let margin = best * SCORE_MARGIN_SHARE + SCORE_MARGIN_PX;
+    (best.is_finite() && second.is_finite() && second >= best + margin).then_some(best_s)
+}
+
 fn find_join_with(
     a: &Lines,
     b: &Lines,
@@ -365,8 +428,19 @@ fn find_join_with(
     max_px: usize,
 ) -> Result<Join, NoJoin> {
     let n = a.count;
-    if a.data == b.data || (0..n).all(|i| a.same_line_tol(b, i, max_px)) {
+    if a.data == b.data {
         return Err(NoJoin::Same);
+    }
+    // Every line equal within the tolerance: a blink (the exact look says the same), or, with the
+    // tolerant look, lines that differ in a few pixels each (a terminal's numbered lines, the
+    // text of a page) that scrolled. It is a scroll when a shift explains the difference better
+    // than no shift does.
+    let mut rival = f64::INFINITY;
+    if (0..n).all(|i| a.same_line_tol(b, i, max_px)) {
+        if max_px == 0 {
+            return Err(NoJoin::Same);
+        }
+        rival = (0..n).map(|i| a.diff_px(i, b, i)).sum::<usize>() as f64 / n as f64;
     }
     let (header, footer) = match bands {
         Some((h, f)) => {
@@ -427,7 +501,19 @@ fn find_join_with(
             candidates.push(s);
         }
     }
+    // The tolerant look can call many shifts equal (text lines that differ in a few pixels each,
+    // a terminal's numbered lines): the shift whose overlap differs least is the join, when it
+    // clearly is the least. Never a guess: a tie is left to the expected step as before.
+    let scored = if (candidates.len() > 1 || rival.is_finite()) && max_px > 0 {
+        best_by_difference(a, b, header, cw, &candidates, rival)
+    } else {
+        None
+    };
+    if rival.is_finite() && scored.is_none() {
+        return Err(NoJoin::Same);
+    }
     let shift = match (candidates.len(), hint) {
+        _ if scored.is_some() => scored.unwrap_or(0),
         (0, _) => {
             let near_miss = if super::debug::enabled() {
                 closest_shift(a, b, header, cw, min_ov)
@@ -513,6 +599,71 @@ fn edge_strips(a: &Lines, b: &Lines, core: &Join, max: (usize, usize)) -> Option
     let (l, r) = (strip(false), strip(true));
     (l + r > 0).then_some((l, r))
 }
+
+/// The widths of the moving edges (see [`edge_strips`]) that, cut from both frames, let them
+/// join. `None` when no such cut makes them join.
+fn edge_trim(prev: &Lines, lines: &Lines, hint: Option<usize>) -> Option<(usize, usize)> {
+    let cross = lines.line_len / 4;
+    // Too narrow to have edges to cut.
+    if cross < 64 {
+        return None;
+    }
+    // The join is first looked for without the widest strips an edge can be (a scrollbar and
+    // a window border), which holds the content that matters and none of the moving edges.
+    let (ml, mr) = (
+        (cross / 8).min(MAX_LEFT_STRIP),
+        (cross / 8).min(MAX_RIGHT_STRIP),
+    );
+    let (c0, c1) = (ml, cross - mr);
+    let core = find_join(&prev.cropped(c0, c1), &lines.cropped(c0, c1), hint, None).ok()?;
+    let (l, r) = edge_strips(prev, lines, &core, (ml, mr))?;
+    let (p, n) = (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
+    find_join(&p, &n, hint, None).is_ok().then_some((l, r))
+}
+
+/// Rows (columns) that stay put across the whole scroll: a share of the lines at most
+/// [`STATIC_SHARE`] differ in them. Only the unbroken run from each end counts: a browser's tab
+/// strip and toolbar above a page that scrolls sideways, a status bar below it. No line of the
+/// frame then matches the shifted line of the next frame, since the toolbar's icons do not move
+/// with the page (Edge and Chrome on Windows, whole window, Nov 15, 2026). Returns the widths of
+/// the two runs; the capture is cut to the part between them.
+fn static_strips(a: &Lines, b: &Lines) -> (usize, usize) {
+    let cross = a.line_len / 4;
+    if cross < 32 || a.count != b.count {
+        return (0, 0);
+    }
+    let limit = ((a.count as f64 * STATIC_SHARE) as usize).max(2);
+    let mut bad = vec![0usize; cross];
+    for i in 0..a.count {
+        let (la, lb) = (a.line(i), b.line(i));
+        for (x, c) in bad.iter_mut().enumerate() {
+            let (p, q) = (&la[x * 4..x * 4 + 4], &lb[x * 4..x * 4 + 4]);
+            if p.iter()
+                .zip(q)
+                .any(|(u, v)| u.abs_diff(*v) > NOISE_TOLERANCE)
+            {
+                *c += 1;
+            }
+        }
+    }
+    let is_static = |x: usize| bad[x] <= limit;
+    let l = (0..cross).take_while(|&x| is_static(x)).count();
+    if l == cross {
+        return (0, 0);
+    }
+    let r = (0..cross - l)
+        .take_while(|&k| is_static(cross - 1 - k))
+        .count();
+    // What is left must be able to hold a join.
+    if cross - l - r < 16 {
+        return (0, 0);
+    }
+    (l, r)
+}
+
+/// The share of the lines in which a row (column) of a static strip may differ between two
+/// frames (a blinking caret, a loading spinner in the toolbar).
+const STATIC_SHARE: f64 = 0.02;
 
 /// Collects frames and builds the long image.
 pub struct Stitcher {
@@ -671,31 +822,26 @@ impl Stitcher {
             Err(NoJoin::Same) => return (prev, lines),
             Err(NoJoin::NoOverlap(_)) => {}
         }
-        // Too narrow to have edges to cut.
-        if cross < 64 {
-            return (prev, lines);
-        }
-        // The join is first looked for without the widest strips an edge can be (a scrollbar and
-        // a window border), which holds the content that matters and none of the moving edges.
-        let (ml, mr) = (
-            (cross / 8).min(MAX_LEFT_STRIP),
-            (cross / 8).min(MAX_RIGHT_STRIP),
-        );
-        let (c0, c1) = (ml, cross - mr);
-        let core = find_join(&prev.cropped(c0, c1), &lines.cropped(c0, c1), hint, None);
-        let Ok(core) = core else {
-            return (prev, lines);
-        };
-        let Some((l, r)) = edge_strips(&prev, &lines, &core, (ml, mr)) else {
-            return (prev, lines);
-        };
-        let (p, n) = (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
-        if find_join(&p, &n, hint, None).is_ok() {
+        // Moving edges (a scrollbar, a border) first, then static rows or columns across the
+        // scroll direction (a browser's toolbar when a whole window scrolls sideways).
+        if let Some((l, r)) = edge_trim(&prev, &lines, hint) {
             self.trim = Some((l, r));
-            (p, n)
-        } else {
-            (prev, lines)
+            return (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
         }
+        let (sl, sr) = static_strips(&prev, &lines);
+        if (sl, sr) == (0, 0) {
+            return (prev, lines);
+        }
+        let (p0, n0) = (prev.cropped(sl, cross - sr), lines.cropped(sl, cross - sr));
+        let (l, r) = if find_join(&p0, &n0, hint, None).is_ok() {
+            (sl, sr)
+        } else if let Some((l, r)) = edge_trim(&p0, &n0, hint) {
+            (sl + l, sr + r)
+        } else {
+            return (prev, lines);
+        };
+        self.trim = Some((l, r));
+        (prev.cropped(l, cross - r), lines.cropped(l, cross - r))
     }
 
     fn join(

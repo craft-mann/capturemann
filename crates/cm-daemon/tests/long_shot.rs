@@ -306,3 +306,64 @@ async fn cap_6_stop_while_paused_keeps_the_image() {
     assert_eq!(out["long_shot"]["end"], "stopped_by_user");
     assert!(out["capture_id"].as_str().is_some());
 }
+
+/// QA, Windows, Nov 15, 2026: a Long Shot started from the CLI or MCP has no HUD and no
+/// `request_id` to name, and Esc did not end it. The app's Esc key calls `cancel_long_shots`: it
+/// stops every running Long Shot, whoever started it, and each keeps what it captured.
+#[tokio::test]
+async fn cap_6_esc_stops_a_run_that_has_no_request_id_and_keeps_the_frames() {
+    let page = SyntheticPage::new(24, 6000, 300);
+    let (b, _dir) = builder(desktop());
+    let d = b.long_shot_system(Slow(Scripted::new(page))).build();
+    let mut events = d.subscribe();
+    let d2 = d.clone();
+    let run = tokio::spawn(async move { call(&d2, Actor::User, params(json!({}))).await });
+    // The run announces itself, so the app knows to grab Esc.
+    loop {
+        let ev = tokio::time::timeout(std::time::Duration::from_secs(10), events.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        if ev.name == "capture.long_shot.started" {
+            assert!(ev.data["request_id"].is_null());
+            break;
+        }
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+    assert_eq!(d.cancel_long_shots(), 1);
+    let out = run.await.unwrap().unwrap();
+    assert_eq!(out["long_shot"]["end"], "stopped_by_user");
+    assert!(out["long_shot"]["frames"].as_u64().unwrap() >= 1);
+    assert!(out["capture_id"].as_str().is_some(), "the image is kept");
+    assert_eq!(d.cancel_long_shots(), 0, "nothing is running any more");
+    let mut ended = false;
+    while let Ok(ev) = events.try_recv() {
+        ended |= ev.name == "capture.long_shot.ended";
+    }
+    assert!(ended, "the end is announced");
+}
+
+/// `long_shot_state { stop: true }` (a client that knows the `request_id`) ends the run too.
+#[tokio::test]
+async fn cap_6_long_shot_state_stop_ends_the_run_and_keeps_the_image() {
+    let page = SyntheticPage::new(24, 6000, 300);
+    let (b, _dir) = builder(desktop());
+    let d = b.long_shot_system(Slow(Scripted::new(page))).build();
+    let d2 = d.clone();
+    let run =
+        tokio::spawn(
+            async move { call(&d2, Actor::User, params(json!({"request_id": "ls-1"}))).await },
+        );
+    for _ in 0..300 {
+        if state(&d, json!({})).await["running"] == true {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let s = state(&d, json!({"stop": true})).await;
+    assert_eq!(s["stopped"], true, "{s}");
+    let out = run.await.unwrap().unwrap();
+    assert_eq!(out["long_shot"]["end"], "stopped_by_user");
+    assert!(out["capture_id"].as_str().is_some());
+}

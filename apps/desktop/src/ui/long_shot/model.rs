@@ -205,10 +205,63 @@ pub fn overlay_flag(s: cm_capture::long_shot::AutoScrollSupport) -> &'static str
     }
 }
 
+/// What a daemon event means for the Esc key (CAP-6: "Esc or Stop keeps what has been captured").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscapeKey {
+    /// A Long Shot started (from the app, the CLI or an agent): Esc is a global key until it ends.
+    Grab,
+    /// The run ended: Esc goes back to the other apps.
+    Release,
+}
+
+/// The daemon's `capture.long_shot.started` and `.ended` events, as the Esc key sees them.
+pub fn escape_for_event(name: &str) -> Option<EscapeKey> {
+    match name {
+        cm_daemon::long_shot_ops::STARTED_EVENT => Some(EscapeKey::Grab),
+        cm_daemon::long_shot_ops::ENDED_EVENT => Some(EscapeKey::Release),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Esc is registered while any Long Shot runs, the app's or the CLI's, and let go after.
+    #[test]
+    fn esc_follows_the_daemons_long_shot_events() {
+        assert_eq!(
+            escape_for_event("capture.long_shot.started"),
+            Some(EscapeKey::Grab)
+        );
+        assert_eq!(
+            escape_for_event("capture.long_shot.ended"),
+            Some(EscapeKey::Release)
+        );
+        // The progress event arrives many times a run and changes nothing.
+        assert_eq!(escape_for_event("capture.long_shot.progress"), None);
+        assert_eq!(escape_for_event("capture.created"), None);
+    }
+
+    /// The key is the bare Escape, the same id the delay pill's handler already routes, so no
+    /// shortcut chord can collide with it.
+    #[test]
+    fn esc_is_the_bare_escape_key() {
+        assert_eq!(
+            super::super::escape_hotkey_id(),
+            crate::ui::delay_pill::escape_hotkey_id()
+        );
+        let map = crate::shortcuts::ShortcutMap::defaults(crate::shortcuts::Platform::Mac);
+        for (_, chord) in map.iter().filter(|(_, c)| !c.is_unset()) {
+            let id = crate::platform::chord_to_hotkey(chord).unwrap().id();
+            assert_ne!(id, super::super::escape_hotkey_id());
+        }
+        assert_eq!(
+            crate::delay::key_action("escape"),
+            crate::delay::KeyAction::Cancel
+        );
+    }
 
     #[test]
     fn numbers_get_thousands_separators() {

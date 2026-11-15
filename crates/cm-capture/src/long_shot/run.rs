@@ -13,6 +13,15 @@ const LATE_SCROLL_WAIT: std::time::Duration = std::time::Duration::from_millis(1
 /// `run_auto_ex`): real wheel steps move about as much as asked or more.
 const MIN_MOVED_PER_ASKED: f64 = 0.5;
 
+/// The first frame is taken again after this wait, and the later one is the first: a window that
+/// has just been activated (its title bar changes colour), an overlay or a dialog that is still
+/// fading out, a scroller that is not ready. A first frame that is not what stays on screen
+/// refuses every join after it (Windows, Nov 15, 2026: one frame, `no_overlap`).
+const FIRST_FRAME_WARMUP: std::time::Duration = std::time::Duration::from_millis(250);
+/// A first pair that does not join is looked at again this many times (waiting longer each
+/// time) before the run ends with `no_overlap`.
+const FIRST_PAIR_RETRIES: u32 = 2;
+
 /// Settings of one Long Shot.
 #[derive(Debug, Clone, Copy)]
 pub struct LongShotConfig {
@@ -109,6 +118,8 @@ pub fn run_auto_ex(
     on_stitch: &mut dyn FnMut(&Stitcher),
 ) -> Result<LongShotResult, CmError> {
     let mut stitcher = Stitcher::new(cfg.direction, cfg.limits);
+    wait_settled(src, sleeper, cfg.settle)?;
+    sleeper.sleep(FIRST_FRAME_WARMUP);
     let first = wait_settled(src, sleeper, cfg.settle)?;
     stitcher.push(&first.frame, None);
     {
@@ -125,6 +136,19 @@ pub fn run_auto_ex(
         scroller.scroll(cfg.direction, step)?;
         let mut next = wait_settled(src, sleeper, cfg.settle)?;
         let mut outcome = stitcher.push(&next.frame, Some(step));
+        // The first pair that does not join: the screen may still be changing for another
+        // reason than the scroll (a window coming to the front, a dialog fading out). Looked at
+        // again, waiting longer each time, before the run is given up.
+        let mut retry = 0;
+        while outcome == PushOutcome::NoOverlap
+            && stitcher.frames() == 1
+            && retry < FIRST_PAIR_RETRIES
+        {
+            retry += 1;
+            sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
+            next = wait_settled(src, sleeper, cfg.settle)?;
+            outcome = stitcher.push(&next.frame, Some(step));
+        }
         // An unchanged frame is the end of the content only when something has scrolled before.
         // A wheel event can arrive late (a browser's smooth scrolling starts after the settle
         // check), so the screen is looked at again a few times before "nothing changed" is
@@ -241,9 +265,17 @@ pub fn run_hand(
 /// Polls without two equal frames in a row after which Hand scroll takes a frame anyway.
 const HAND_MAX_MOVING_POLLS: u32 = 20;
 
+/// Equal polls in a row (the content holds still for this many poll intervals, about 100 to
+/// 150 ms) before Hand scroll takes the settled frame. Decision of Nov 15, 2026.
+const HAND_STILL_POLLS: u32 = 2;
+
 /// A frame seen while the content moves is taken when it is this share of the content area on
 /// from the last one taken (the overlap kept is the rest).
-const HAND_TAKE_SHARE: f64 = 0.7;
+/// Decision of Nov 15, 2026 (maintainer away, may change it): a third of the area, so that slow
+/// continuous scrolling (small wheel steps one after the other, which never holds still) gives a
+/// frame every third of a screen. The other trigger is the content holding still
+/// ([`HAND_STILL_POLLS`]).
+const HAND_TAKE_SHARE: f64 = 1.0 / 3.0;
 
 /// Pushes a frame that was checked to join (see [`Stitcher::joins`]) and reports it. `Some` is
 /// the end of the capture (the limit was reached by it).
@@ -274,12 +306,18 @@ pub fn run_hand_ex(
     on_stitch: &mut dyn FnMut(&Stitcher),
 ) -> Result<LongShotResult, CmError> {
     let mut stitcher = Stitcher::new(cfg.direction, cfg.limits);
+    // No warm-up here: the person scrolls when they like, and the rebase below covers a first
+    // frame that was not what stayed on screen.
     let first = wait_settled(src, sleeper, cfg.settle)?;
     stitcher.push(&first.frame, None);
     {
         on_progress(progress(&stitcher));
         on_stitch(&stitcher);
     }
+    // The last settled frame that did not join the first one: when the next one joins it but
+    // neither joins the first, the first frame was not what stayed on screen (a window coming
+    // to the front, a dialog fading out) and the capture goes on from these two.
+    let mut first_refused: Option<Frame> = None;
     let mut last_taken = first.frame;
     let mut prev_poll = last_taken.clone();
     // The settled frame that did not join the last one taken (the stitcher's state has not
@@ -293,6 +331,7 @@ pub fn run_hand_ex(
     // an animation (an image fading in) is not what the person scrolled to.
     let mut bridge: Option<Frame> = None;
     let mut moving_polls = 0u32;
+    let mut still_polls = 0u32;
     let end = loop {
         if stop() {
             break if refused.is_some() {
@@ -304,7 +343,8 @@ pub fn run_hand_ex(
         sleeper.sleep(cfg.settle.interval);
         let g = src.grab()?;
         // Content that never holds still (a video, a spinner) is taken after a second anyway.
-        let settled = g == prev_poll || moving_polls >= HAND_MAX_MOVING_POLLS;
+        still_polls = if g == prev_poll { still_polls + 1 } else { 0 };
+        let settled = still_polls >= HAND_STILL_POLLS || moving_polls >= HAND_MAX_MOVING_POLLS;
         prev_poll = g.clone();
         if g == last_taken {
             // Back at the last good frame: nothing is left out any more.
@@ -369,6 +409,25 @@ pub fn run_hand_ex(
             PushOutcome::NoChange => refused = None,
             PushOutcome::NoOverlap => {
                 super::debug::dump_refused(&last_taken, &g, stitcher.last_refusal(), "hand scroll");
+                if stitcher.frames() == 1 {
+                    let earlier = first_refused.take().filter(|e| *e != g);
+                    let mut fresh = Stitcher::new(cfg.direction, cfg.limits);
+                    let rebased = earlier.is_some_and(|e| {
+                        fresh.push(&e, None);
+                        matches!(fresh.push(&g, None), PushOutcome::Added { .. })
+                    });
+                    if rebased {
+                        stitcher = fresh;
+                        {
+                            on_progress(progress(&stitcher));
+                            on_stitch(&stitcher);
+                        }
+                        last_taken = g;
+                        refused = None;
+                        continue;
+                    }
+                    first_refused = Some(g.clone());
+                }
                 refused = Some(g);
             }
             PushOutcome::LimitReached { .. } => {
