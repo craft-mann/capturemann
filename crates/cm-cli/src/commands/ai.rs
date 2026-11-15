@@ -1161,7 +1161,7 @@ async fn captions_set(
             std::fs::read_to_string(&name)
                 .map_err(|e| CliError::invalid_input(format!("cannot read `{name}`: {e}")))?
         };
-        let v: Value = serde_json::from_str(&text)
+        let v: Value = serde_json::from_str(super::strip_bom(&text))
             .map_err(|e| CliError::invalid_input(format!("the caption file is not JSON: {e}")))?;
         if !v.is_array() {
             return Err(CliError::invalid_input(
@@ -1226,7 +1226,7 @@ async fn captions_replace(
                 std::fs::read_to_string(&name)
                     .map_err(|e| CliError::invalid_input(format!("cannot read `{name}`: {e}")))?
             };
-            let v: Value = serde_json::from_str(&text)
+            let v: Value = serde_json::from_str(super::strip_bom(&text))
                 .map_err(|e| CliError::invalid_input(format!("the file is not JSON: {e}")))?;
             if !v.is_array() {
                 return Err(CliError::invalid_input(

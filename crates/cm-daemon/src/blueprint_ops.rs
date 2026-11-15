@@ -72,7 +72,7 @@ pub(crate) fn detect(
     lines.truncate(MAX_BLUEPRINT_BOXES);
     let (iw, ih) = (f64::from(image.width()), f64::from(image.height()));
     // Whole pixels, outward, inside the image.
-    let rects: Vec<cm_core::Rc> = lines
+    let tight: Vec<cm_core::Rc> = lines
         .iter()
         .map(|l| {
             let (x0, y0) = (l.rect.x.floor().max(0.0), l.rect.y.floor().max(0.0));
@@ -83,6 +83,9 @@ pub(crate) fn detect(
             cm_core::Rc::new(x0, y0, (x1 - x0).max(1.0), (y1 - y0).max(1.0))
         })
         .collect();
+    // Recognizers that report only the letters' bodies (Windows: 17 to 19 px for 28 px text)
+    // would leave tall letters and tails showing: pad to the whole text line, here, once.
+    let rects = cm_render::ocr::pad_line_boxes(&tight, image.width(), image.height());
     let styles = cm_render::measure_blueprint(image, &rects);
     Ok((lines, rects, styles))
 }
@@ -144,6 +147,7 @@ impl Inner {
                 "capture_id": p.capture_id,
                 "recognizer": recognizer.name(),
                 "image_size": [image.width(), image.height()],
+                "line_count": boxes.len(),
                 "boxes": boxes,
             }))
         })

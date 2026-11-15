@@ -400,9 +400,9 @@ async fn blueprint_step_replaces_text_boxes_and_leaves_the_capture_alone() {
     let (mut inside, mut outside) = (0, 0);
     for (x, y, p) in plain.enumerate_pixels() {
         if plan.get_pixel(x, y) != p {
-            // laid_out(text, x, y, char_w, h): 11 chars of 8 px, 16 px tall; allow the outward
-            // rounding of the box.
-            if (39..131).contains(&x) && (39..57).contains(&y) {
+            // laid_out(text, x, y, char_w, h): 11 chars of 8 px, 16 px tall; the box is padded
+            // to the whole text line (`pad_line_boxes`: 20 % above, 15 % below, 2 px a side).
+            if (37..131).contains(&x) && (36..60).contains(&y) {
                 inside += 1;
             } else {
                 outside += 1;

@@ -654,12 +654,14 @@ pub(crate) fn apply_retype(
     let (bx, by) = (x.round() as i32 - l.pad, y.round() as i32 - l.pad);
     // A box fitted to the ink of the old text is about as tall as its capitals, but the new
     // text may carry marks above them (Vietnamese stacks two: Ế, Ộ) and tails below the baseline
-    // (g, y, ỵ). The erase and the clip grow vertically to the text's own height, by at most a
-    // third of the size on each side, so those parts are not cut off.
-    let max_grow = f64::from(px) / 3.0;
-    let top = (f64::from(by) + f64::from(l.pad) * 0.5).clamp(n.y - max_grow, n.y);
-    let bottom = (f64::from(by) + f64::from(l.pixmap.height()) - f64::from(l.pad) * 0.5)
-        .clamp(n.y + n.h, n.y + n.h + max_grow);
+    // (g, y, ỵ). The erase and the clip grow vertically to the text's own height (the whole
+    // layout, marks included), by at most half the size on each side, so those parts are not cut
+    // off. The old text's own marks are covered by the source box, which is padded to the whole
+    // line when it comes from a recognized line (`ocr::pad_line_boxes`).
+    let max_grow = f64::from(px) * 0.5;
+    let top = f64::from(by).clamp(n.y - max_grow, n.y);
+    let bottom =
+        (f64::from(by) + f64::from(l.pixmap.height())).clamp(n.y + n.h, n.y + n.h + max_grow);
     let grown = Rc::new(n.x, top, n.w, bottom - top);
     let Some(r) = Region::outward(grown.to_array(), pm.width(), pm.height()) else {
         return Ok(());

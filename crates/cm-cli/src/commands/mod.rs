@@ -183,6 +183,12 @@ impl Ctx<'_> {
     }
 }
 
+/// `text` without a leading UTF-8 byte order mark (EF BB BF): Windows editors write one and JSON
+/// parsing rejects it ("expected value at line 1 column 1").
+pub(crate) fn strip_bom(text: &str) -> &str {
+    text.strip_prefix('\u{feff}').unwrap_or(text)
+}
+
 /// Reads annotation ops: `-` is stdin, text starting with `[` or `{` is inline JSON, anything
 /// else is a file. Accepts an array or `{"ops": [...]}` (ANN-1, `--annotate ops.json`).
 fn load_ops(spec: &str, flag: &str, stdin: &mut dyn Read) -> Result<Value, CliError> {
@@ -198,7 +204,7 @@ fn load_ops(spec: &str, flag: &str, stdin: &mut dyn Read) -> Result<Value, CliEr
         std::fs::read_to_string(spec)
             .map_err(|e| CliError::invalid_input(format!("{flag}: cannot read `{spec}`: {e}")))?
     };
-    let v: Value = serde_json::from_str(&text)
+    let v: Value = serde_json::from_str(strip_bom(&text))
         .map_err(|e| CliError::invalid_input(format!("{flag}: invalid JSON: {e}")))?;
     let ops = match v {
         Value::Object(mut o) if o.contains_key("ops") => o.remove("ops").unwrap_or_default(),
@@ -214,4 +220,25 @@ fn load_ops(spec: &str, flag: &str, stdin: &mut dyn Read) -> Result<Value, CliEr
 
 fn plain(v: &Value) -> String {
     v.as_str().map_or_else(|| v.to_string(), str::to_owned)
+}
+
+#[cfg(test)]
+mod bom_tests {
+    use super::*;
+
+    #[test]
+    fn a_utf8_byte_order_mark_is_ignored_in_an_ops_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("ops.json");
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(br#"[{"op":"rect","rect":[1,2,3,4]}]"#);
+        std::fs::write(&file, bytes).unwrap();
+        let v = load_ops(file.to_str().unwrap(), "--ops", &mut std::io::empty()).unwrap();
+        assert_eq!(v.as_array().unwrap().len(), 1);
+        // Standard input too.
+        let mut stdin = "\u{feff}{\"ops\":[]}".as_bytes();
+        assert!(load_ops("-", "--ops", &mut stdin).unwrap().is_array());
+        assert_eq!(strip_bom("\u{feff}x"), "x");
+        assert_eq!(strip_bom("x"), "x");
+    }
 }

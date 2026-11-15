@@ -280,3 +280,65 @@ pub fn refine_lines(
     }
     out
 }
+
+/// Share of a line box's height added above it by [`pad_line_boxes`].
+const PAD_TOP: f64 = 0.20;
+/// Share of a line box's height added below it.
+const PAD_BOTTOM: f64 = 0.15;
+/// Horizontal padding: this share of the height, but at least [`PAD_X_MIN_PX`].
+const PAD_X_FRAC: f64 = 0.04;
+const PAD_X_MIN_PX: f64 = 2.0;
+/// Two padded boxes of neighbouring lines may overlap by this many px at most.
+const PAD_OVERLAP_PX: f64 = 1.0;
+
+/// Pads the boxes of recognized text lines to the whole text line (ANN-11, ANN-9). Some
+/// recognizers (Windows) report only the height of the letters' bodies (17 to 19 px for 28 px
+/// text), so a bar or an erase over the box leaves the tops of tall letters and the tails of
+/// g, y, p visible. Each box grows by 20 % of its height on top, 15 % at the bottom and by 2 px
+/// or 4 % of the height (the larger) on each side, clamped to the image; where another box
+/// sits above or below it (overlapping horizontally) the growth in the gap is shrunk so the two
+/// overlap by at most 1 px. Whole pixels in, whole pixels out. This is the single place the
+/// padding happens: the boxes it returns are what `suggest_blueprint`, the editor, Bulk export
+/// and agents see, and what a `blueprint` op stores.
+pub fn pad_line_boxes(boxes: &[Rc], image_w: u32, image_h: u32) -> Vec<Rc> {
+    let n = boxes.len();
+    let mut top: Vec<f64> = boxes.iter().map(|b| b.h * PAD_TOP).collect();
+    let mut bottom: Vec<f64> = boxes.iter().map(|b| b.h * PAD_BOTTOM).collect();
+    // Growth cut by a neighbour is rounded down so whole pixels keep the 1 px overlap limit.
+    let mut cut_top = vec![false; n];
+    let mut cut_bottom = vec![false; n];
+    for i in 0..n {
+        for j in 0..n {
+            let (a, b) = (boxes[i], boxes[j]);
+            // `a` above `b`: the vertical gap is what is left between them.
+            let h_overlap = a.x < b.x + b.w && b.x < a.x + a.w;
+            if i == j || !h_overlap || b.y + b.h <= a.y || b.y < a.y {
+                continue;
+            }
+            let gap = b.y - (a.y + a.h);
+            let want = bottom[i] + top[j];
+            let allowed = (gap + PAD_OVERLAP_PX).max(0.0);
+            if want > allowed {
+                let f = allowed / want;
+                bottom[i] *= f;
+                top[j] *= f;
+                cut_bottom[i] = true;
+                cut_top[j] = true;
+            }
+        }
+    }
+    let (iw, ih) = (f64::from(image_w), f64::from(image_h));
+    boxes
+        .iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let px = (b.h * PAD_X_FRAC).max(PAD_X_MIN_PX);
+            let x0 = (b.x - px).floor().max(0.0);
+            let x1 = (b.x + b.w + px).ceil().min(iw);
+            let round = |v: f64, cut: bool| if cut { v.floor() } else { v.ceil() };
+            let y0 = (b.y - round(top[i], cut_top[i])).max(0.0);
+            let y1 = (b.y + b.h + round(bottom[i], cut_bottom[i])).min(ih);
+            Rc::new(x0, y0, (x1 - x0).max(1.0), (y1 - y0).max(1.0))
+        })
+        .collect()
+}
