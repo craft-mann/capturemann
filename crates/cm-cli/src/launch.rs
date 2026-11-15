@@ -83,7 +83,44 @@ fn daemon_args(endpoint: &Endpoint, library: Option<&Path>) -> Vec<std::ffi::OsS
     args
 }
 
+/// The library folder a daemon started from here would open: the explicit one, then
+/// `CAPTUREMANN_LIBRARY`, then `library.path` in the app's `settings.json` (the same rule as
+/// `cm_daemon::config`, which the CLI does not link); `None` when the default folder applies.
+fn library_to_open(explicit: Option<&Path>) -> Option<PathBuf> {
+    let from_env = || {
+        std::env::var_os("CAPTUREMANN_LIBRARY")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+    };
+    let from_settings = || {
+        let dir = std::env::var_os("CAPTUREMANN_CONFIG_DIR")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| cm_platform::dirs::config_base_dir().map(|d| d.join("CaptureMann")))?;
+        let text = std::fs::read_to_string(dir.join("settings.json")).ok()?;
+        let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+        let s = v.get("library.path")?.as_str()?.trim().to_owned();
+        (!s.is_empty()).then(|| PathBuf::from(s))
+    };
+    explicit
+        .filter(|p| !p.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .or_else(from_env)
+        .or_else(from_settings)
+}
+
+/// A library folder whose path is too long cannot be opened: the daemon would exit at once and
+/// the CLI would wait 15 s for it and say only `daemon_unavailable` (QA Windows pass 3). Checked
+/// before anything is started; the error is `invalid_input` naming the path and the limit.
+pub(crate) fn check_library_path(explicit: Option<&Path>) -> Result<(), String> {
+    match library_to_open(explicit) {
+        Some(p) => cm_core::library_path::check_root_path_len(&p).map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
 fn spawn_daemon(endpoint: &Endpoint, library: Option<&Path>) -> io::Result<()> {
+    check_library_path(library).map_err(|m| io::Error::new(io::ErrorKind::InvalidInput, m))?;
     let library = library
         .map(Path::to_path_buf)
         .or_else(|| std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from));
@@ -108,6 +145,31 @@ fn spawn_daemon(endpoint: &Endpoint, library: Option<&Path>) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// QA Windows pass 3: a library path past the limit and no app running waited 15 s for a daemon
+    /// that could not open it and answered `daemon_unavailable` without the path. The launcher
+    /// now refuses at once, before it starts anything, and the client maps that to `invalid_input`
+    /// naming the path and the limit.
+    #[tokio::test]
+    async fn a_library_path_past_the_limit_is_invalid_input_at_once() {
+        let long = PathBuf::from(format!("/tmp/{}", "x".repeat(60).repeat(6)));
+        assert!(long.to_string_lossy().chars().count() > 340);
+        // No daemon listens here and `CAPTUREMANN_DAEMON` points nowhere: had the launcher gone
+        // on to spawn, the error would be about the binary or the 15 s wait.
+        let endpoint = Endpoint::Path(PathBuf::from("/tmp/cm-no-such-daemon-for-test.sock"));
+        let launcher = process_launcher(Some(long.clone()));
+        let started = std::time::Instant::now();
+        let err = crate::client::Client::connect_or_start(&endpoint, Some(&launcher))
+            .await
+            .err()
+            .expect("an error");
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        assert_eq!(err.code, "invalid_input");
+        let m = err.to_string();
+        assert!(m.contains(&*long.to_string_lossy()), "{m}");
+        assert!(m.contains("at most"), "{m}");
+        assert!(check_library_path(Some(Path::new("/tmp/CaptureMann"))).is_ok());
+    }
 
     /// R2-8: without an explicit library the daemon picks the app's folder itself; the CLI no
     /// longer invents `~/Library/Application Support/CaptureMann/Library`.

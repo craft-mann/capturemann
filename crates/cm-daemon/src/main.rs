@@ -109,6 +109,12 @@ async fn run() -> ExitCode {
         log::error!("cannot determine the library folder; pass --library <dir>");
         return usage();
     };
+    // A path that is too long cannot be opened: say so at once, naming the path and the limit.
+    if let Err(e) = cm_core::library_path::check_root_path_len(&library) {
+        log::error!("{e}");
+        eprintln!("cm-daemon: {e}");
+        return ExitCode::from(u8::try_from(e.exit_code()).unwrap_or(1));
+    }
     // An app (or another daemon) already serving this endpoint: say so, change nothing.
     if let Ok(Ok(_)) = tokio::time::timeout(
         std::time::Duration::from_secs(1),

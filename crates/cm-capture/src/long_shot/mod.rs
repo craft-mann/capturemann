@@ -22,7 +22,7 @@ use cm_core::CmError;
 
 pub use crate::sys::long_scroll::{
     accessibility_trusted, auto_scroll_support, platform_scroller, platform_scroller_at,
-    request_accessibility, AutoScrollSupport,
+    raise_window, request_accessibility, AutoScrollSupport,
 };
 pub use run::{
     run_auto, run_auto_ex, run_hand, run_hand_ex, LongShotConfig, LongShotProgress, LongShotResult,
@@ -47,6 +47,13 @@ pub trait Scroller {
     /// nothing: the wheel may have gone to another window). `false` when there is none.
     fn next_point(&mut self) -> bool {
         false
+    }
+
+    /// Scrolls the content back (up or left) by about `amount_px`; `Ok(false)` when this
+    /// scroller cannot (nothing was done). Used once after a join failed: the content may have
+    /// moved past the overlap, and half a step back gives the stitcher another try.
+    fn scroll_back(&mut self, _direction: Direction, _amount_px: u32) -> Result<bool, CmError> {
+        Ok(false)
     }
 }
 

@@ -119,10 +119,10 @@ pub mod thumbs;
 mod util;
 
 pub use bundle::ShotBundle;
+pub use cm_core::library_path::check_root_path_len;
 pub use index::Library;
 pub use rec::{
     exports_of, publishes_of, read_manifest, record_export, record_publish,
     record_remote_deletions, record_upload, remote_deletions_of, source_of, uploads_of, RecBundle,
     RecoveryReport,
 };
-pub use util::check_root_path_len;

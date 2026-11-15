@@ -987,6 +987,239 @@ fn cap_6_terminal_lines_that_differ_in_a_few_pixels_do_not_stop_the_join() {
     }
 }
 
+/// Windows Terminal, pass 3 (Nov 15, 2026): about 200 lines that differ only in their number
+/// (the last digits), a block cursor that blinks at the end of the newest line, a prompt and
+/// status strip at the bottom that does not scroll (and has its own blinking cell), and a wheel
+/// that moves whole notches, one less now and then. The run ended `no_overlap` at line 111.
+struct Term2 {
+    pos: u32,
+    max: u32,
+    grabs: u32,
+    scrolls: u32,
+    /// Pixels the wheel moves per notch; every `jitter`-th step is one notch short.
+    notch: u32,
+    jitter: u32,
+    footer: u32,
+    /// (scroll number, extra notches): that scroll overshoots.
+    kick: (u32, u32),
+}
+
+impl Term2 {
+    const W: u32 = 900;
+    const H: u32 = 300;
+    const LINE: u32 = 20;
+
+    fn pixel(&self, y: u32, x: u32) -> [u8; 4] {
+        let blink = self.grabs.is_multiple_of(2);
+        let mut v = 255u8;
+        if self.footer > 0 && y >= Self::H - self.footer {
+            // Status strip: fixed text, a cell that blinks.
+            if (20..300).contains(&x) && (y + x / 7) % 5 < 2 {
+                v = 60;
+            }
+            if (600..610).contains(&x) && blink {
+                v = 0;
+            }
+            return [v, v, v, 255];
+        }
+        let g = self.pos + y;
+        let (line, k) = (g / Self::LINE, g % Self::LINE);
+        if (4..14).contains(&k) {
+            // The same words on every line.
+            if (60..500).contains(&x) && (x / 3 + k).is_multiple_of(3) {
+                v = 90;
+            }
+            // The line number: three digits of 6 x 8 px, each a 5-bit hash of its value.
+            for (d, div) in [(0u32, 100u32), (1, 10), (2, 1)] {
+                let digit = (line / div) % 10;
+                let x0 = 10 + d * 8;
+                if (x0..x0 + 6).contains(&x) {
+                    let bits = (digit + 1).wrapping_mul(2_654_435_761) >> 7;
+                    if (bits >> (((x - x0) + (k - 4)) % 20)) & 1 == 1 {
+                        v = 0;
+                    }
+                }
+            }
+        }
+        // The block cursor at the end of line 100 (it scrolls with the text), blinking.
+        if line == 100 && blink && (4..14).contains(&k) && (520..530).contains(&x) {
+            v = 0;
+        }
+        [v, v, v, 255]
+    }
+
+    fn frame(&self) -> Frame {
+        let mut d = Vec::new();
+        for y in 0..Self::H {
+            for x in 0..Self::W {
+                d.extend_from_slice(&self.pixel(y, x));
+            }
+        }
+        Frame::new(Self::W, Self::H, d).unwrap()
+    }
+}
+
+struct Term2View(std::rc::Rc<std::cell::RefCell<Term2>>);
+
+impl FrameSource for Term2View {
+    fn grab(&mut self) -> Result<Frame, CmError> {
+        let mut t = self.0.borrow_mut();
+        t.grabs += 1;
+        Ok(t.frame())
+    }
+}
+
+impl Scroller for Term2View {
+    fn scroll(&mut self, _: Direction, amount_px: u32) -> Result<(), CmError> {
+        let mut t = self.0.borrow_mut();
+        t.scrolls += 1;
+        let mut notches = ((f64::from(amount_px) / f64::from(t.notch)).round() as u32).max(1);
+        if t.kick.0 == t.scrolls {
+            notches += t.kick.1;
+        }
+        if t.jitter > 0 && t.scrolls.is_multiple_of(t.jitter) {
+            notches = notches.saturating_sub(1).max(1);
+        }
+        t.pos = (t.pos + notches * t.notch).min(t.max);
+        Ok(())
+    }
+
+    fn scroll_back(&mut self, _: Direction, amount_px: u32) -> Result<bool, CmError> {
+        let mut t = self.0.borrow_mut();
+        let notches = (amount_px / t.notch).max(1);
+        t.pos = t.pos.saturating_sub(notches * t.notch);
+        Ok(true)
+    }
+}
+
+fn run_term2(
+    footer: u32,
+    notch: u32,
+    jitter: u32,
+    kick: (u32, u32),
+    max: u32,
+) -> (LongShotResult, Term2) {
+    let term = std::rc::Rc::new(std::cell::RefCell::new(Term2 {
+        pos: 0,
+        max,
+        grabs: 0,
+        scrolls: 0,
+        notch,
+        jitter,
+        footer,
+        kick,
+    }));
+    let (mut src, mut sc) = (Term2View(term.clone()), Term2View(term.clone()));
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    let t = Term2 {
+        pos: 0,
+        max: 0,
+        grabs: 1,
+        scrolls: 0,
+        notch,
+        jitter,
+        footer,
+        kick,
+    };
+    (r, t)
+}
+
+#[test]
+fn cap_6_terminal_near_identical_lines_with_a_status_strip_and_blinking_cursors() {
+    for (footer, notch, jitter, kick) in [
+        (0, 20, 0, (0, 0)),
+        (40, 20, 0, (0, 0)),
+        (40, 16, 5, (0, 0)),
+        (40, 32, 3, (0, 0)),
+        // One scroll overshoots by two notches and leaves 10 lines of overlap, too few and too
+        // alike to tell where: it is not guessed (a false join or a false end), the run scrolls
+        // back by half a step and looks again.
+        (40, 20, 0, (7, 2)),
+    ] {
+        let (r, t) = run_term2(footer, notch, jitter, kick, 4000);
+        assert_eq!(
+            r.end,
+            EndReason::ReachedEnd,
+            "footer {footer} notch {notch} jitter {jitter}: {} px",
+            r.image.frame.height()
+        );
+        let got = &r.image.frame;
+        assert!(
+            got.height() >= 4000,
+            "footer {footer} notch {notch} jitter {jitter} kick {kick:?}: {}",
+            got.height()
+        );
+        // The numbers (columns 10..34, clear of both cursors): every line once and in order,
+        // down to the status strip.
+        let reference = Term2 { footer: 0, ..t };
+        for y in 0..got.height() - footer {
+            for x in 10..34 {
+                assert_eq!(
+                    got.pixel(x, y),
+                    Some(reference.pixel(y, x)),
+                    "footer {footer} notch {notch} jitter {jitter} at {x},{y}"
+                );
+            }
+        }
+    }
+}
+
+/// Stop pressed while a frame is being joined, and the join fails at the same moment (the frame
+/// shows the HUD closing): the run ends `stopped_by_user` and keeps the image (QA Windows pass 3:
+/// `no_overlap` in 2 of 3 runs).
+#[test]
+fn cap_6_stop_while_the_join_fails_ends_as_stopped_by_user() {
+    struct Pair {
+        n: u32,
+        stopped: std::rc::Rc<std::cell::Cell<bool>>,
+        page: SyntheticPage,
+    }
+    // The second scroll's frame is another picture, and Stop is pressed while it is taken.
+    impl FrameSource for Pair {
+        fn grab(&mut self) -> Result<Frame, CmError> {
+            self.n += 1;
+            let f = self.page.clone().view().grab()?;
+            if self.n >= 14 {
+                self.stopped.set(true);
+                let d: Vec<u8> = f.rgba().iter().map(|b| b ^ 0x55).collect();
+                return Frame::new(f.width(), f.height(), d);
+            }
+            Ok(f)
+        }
+    }
+    struct Nop;
+    impl Scroller for Nop {
+        fn scroll(&mut self, _: Direction, _: u32) -> Result<(), CmError> {
+            Ok(())
+        }
+    }
+    let stopped = std::rc::Rc::new(std::cell::Cell::new(false));
+    let page = SyntheticPage::new(40, 1500, 300);
+    let r = run_auto(
+        &mut Pair {
+            n: 0,
+            stopped: stopped.clone(),
+            page,
+        },
+        &mut Nop,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || stopped.get(),
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert!(r.image.frame.height() > 0);
+}
+
 /// Slow continuous Hand scroll (QA, Windows, Nov 15, 2026: 30 small wheel steps 250 ms apart gave
 /// one frame). Decision of Nov 15, 2026: a frame is taken when the content has moved a third of
 /// the area from the last one taken, or has held still; a small shift is never a reason to drop a

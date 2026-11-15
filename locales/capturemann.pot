@@ -3690,7 +3690,7 @@ msgstr ""
 msgid "Nothing published yet"
 msgstr ""
 
-msgid "Nothing scrolled: check that the window can scroll"
+msgid "Nothing scrolled: the area may be covered by another window or the page is not scrollable"
 msgstr ""
 
 msgid "Nothing to redo"

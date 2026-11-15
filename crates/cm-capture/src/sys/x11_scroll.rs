@@ -45,6 +45,23 @@ impl X11Scroller {
 
 impl Scroller for X11Scroller {
     fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.wheel(direction, amount_px, true)
+    }
+
+    fn scroll_back(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.wheel(direction, amount_px, false)?;
+        Ok(true)
+    }
+}
+
+impl X11Scroller {
+    /// `forward`: the content moves down or to the right; otherwise up or left.
+    fn wheel(
+        &mut self,
+        direction: Direction,
+        amount_px: u32,
+        forward: bool,
+    ) -> Result<(), CmError> {
         if let Some((x, y)) = self.anchor {
             let (x, y) = (
                 x.clamp(0, i32::from(i16::MAX)) as i16,
@@ -52,10 +69,12 @@ impl Scroller for X11Scroller {
             );
             self.fake(MOTION_NOTIFY_EVENT, 0, x, y)?;
         }
-        // Forward is down (button 5) or right (button 7).
-        let button = match direction {
-            Direction::Vertical => 5,
-            Direction::Horizontal => 7,
+        // Forward is down (button 5) or right (button 7), back is up (4) or left (6).
+        let button = match (direction, forward) {
+            (Direction::Vertical, true) => 5,
+            (Direction::Horizontal, true) => 7,
+            (Direction::Vertical, false) => 4,
+            (Direction::Horizontal, false) => 6,
         };
         for _ in 0..super::long_scroll::notches_for(amount_px, PX_PER_CLICK) {
             self.fake(BUTTON_PRESS_EVENT, button, 0, 0)?;

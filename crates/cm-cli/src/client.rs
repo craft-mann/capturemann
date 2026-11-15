@@ -67,6 +67,9 @@ impl Client {
             return Err(first);
         };
         launcher(endpoint).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::InvalidInput {
+                return CliError::invalid_input(e.to_string());
+            }
             CliError::new(
                 ErrorCode::DaemonUnavailable,
                 format!("no daemon is running and starting one failed: {e}"),

@@ -108,6 +108,12 @@ pub trait LongShotSystem: Send + Sync {
     /// scroll (a wheel event goes to the window under the pointer).
     fn scroller(&self, anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError>;
     fn auto_scroll(&self) -> AutoScrollSupport;
+    /// Brings the window to the front before Auto scroll's first step, so that the wheel reaches
+    /// it and not a window that covers it. `true` when it is in front afterwards; the default is
+    /// "no helper on this system" (`false`).
+    fn raise_window(&self, _window_id: u32) -> bool {
+        false
+    }
 }
 
 /// The real screen.
@@ -142,6 +148,10 @@ impl LongShotSystem for RealLongShot {
 
     fn auto_scroll(&self) -> AutoScrollSupport {
         long_shot::auto_scroll_support()
+    }
+
+    fn raise_window(&self, window_id: u32) -> bool {
+        long_shot::raise_window(window_id)
     }
 }
 
@@ -301,6 +311,10 @@ impl MultiPointScroller {
 impl Scroller for MultiPointScroller {
     fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError> {
         self.current.scroll(direction, amount_px)
+    }
+
+    fn scroll_back(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.current.scroll_back(direction, amount_px)
     }
 
     fn next_point(&mut self) -> bool {
@@ -539,6 +553,12 @@ impl Inner {
                 // The confirmation panel (agents) or the picker has just closed: give the system
                 // a moment to take it off the screen so it is not in the first frame.
                 if matches!(scroll, ScrollMode::Auto) {
+                    // A window another one covers is brought to the front first: the wheel goes
+                    // to the window under the pointer (QA Windows pass 3: `nothing_scrolled`).
+                    // Only where the system has a helper (Windows); elsewhere nothing happens.
+                    if let cm_capture::CaptureTarget::Window { window_id } = target {
+                        system.raise_window(window_id);
+                    }
                     std::thread::sleep(std::time::Duration::from_millis(400));
                 }
                 let mut frames = system.frames(capturer, target);
@@ -786,5 +806,53 @@ mod point_tests {
         s.scroll(Direction::Vertical, 10).unwrap();
         assert!(!s.next_point());
         assert_eq!(*log.lock().unwrap(), vec![None]);
+    }
+
+    /// QA Windows pass 3 (unresolved): a horizontal Long Shot of a region ended after one frame in
+    /// one run. A region whose origin is not the display's origin, on a display that is not at
+    /// (0, 0) and is scaled: the offset is applied once (the crop inside the display, the scroll
+    /// points inside the global area) and the scale once (a logical rect only; a physical rect, as
+    /// the action passes it, never).
+    #[test]
+    fn ls_region_offset_and_scale_are_applied_once() {
+        use cm_capture::fake::{pattern_pixel, FakeBackend};
+        use cm_capture::{CaptureTarget, RegionRect};
+        let cap = Capturer::new(FakeBackend::new().with_display(7, 1920, -200, 1600, 1000, 2.0));
+        let phys = rect(300, 100, 800, 600);
+        let target = CaptureTarget::Region {
+            display_id: 7,
+            rect: RegionRect::Physical(phys),
+        };
+        // Global area: display origin plus the region's display-relative origin, once.
+        assert_eq!(area_rect(&cap, target), Some(rect(2220, -100, 800, 600)));
+        // What the overlay is told: display-relative, physical, with the display's scale.
+        assert_eq!(
+            area_in_display(&cap, target),
+            Some((7, [300, 100, 800, 600], 2.0))
+        );
+        // The wheel goes to the centre of the global area.
+        assert_eq!(
+            scroll_points(area_rect(&cap, target).unwrap(), &[])[0],
+            (2620, 200)
+        );
+        // The frame is the crop at the display-relative origin, once.
+        let frame = cap
+            .capture(CaptureRequest::new(target), None)
+            .unwrap()
+            .unwrap()
+            .frame;
+        assert_eq!((frame.width(), frame.height()), (800, 600));
+        assert_eq!(frame.pixel(0, 0), Some(pattern_pixel(300, 100)));
+        assert_eq!(frame.pixel(799, 599), Some(pattern_pixel(1099, 699)));
+        // A logical rect is scaled once: the same area.
+        let logical = CaptureTarget::Region {
+            display_id: 7,
+            rect: RegionRect::Logical(cm_core::Rect::new(150.0, 50.0, 400.0, 300.0)),
+        };
+        assert_eq!(area_rect(&cap, logical), area_rect(&cap, target));
+        assert_eq!(
+            area_in_display(&cap, logical),
+            area_in_display(&cap, target)
+        );
     }
 }

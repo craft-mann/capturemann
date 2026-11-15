@@ -20,13 +20,16 @@ use windows::Win32::Storage::FileSystem::{
 };
 use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
 use windows::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW,
+    PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumChildWindows, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, GWL_EXSTYLE,
+    BringWindowToTop, EnumChildWindows, GetForegroundWindow, GetWindowLongW, GetWindowRect,
+    GetWindowThreadProcessId, IsIconic, IsWindow, SetForegroundWindow, ShowWindow, GWL_EXSTYLE,
+    SW_RESTORE,
 };
 
 use super::win_names::{choose_app_name, crop_box, is_frame_host, visible_xywh};
@@ -68,6 +71,44 @@ pub fn is_pickable(id: u32) -> bool {
         )
     };
     is_pickable_style(ex_style, cloaked)
+}
+
+/// Brings the window to the front (restoring it when minimized), so that a wheel event sent to
+/// the middle of it reaches it and not a window that covers it. Windows lets only the program in
+/// front, or one that shares its input queue, change the foreground window: the call attaches to
+/// the front window's input queue for its duration. `true` when the window is in front afterwards.
+pub fn raise(id: u32) -> bool {
+    let hwnd = HWND(id as usize as *mut c_void);
+    // SAFETY: plain window calls with a handle (a stale one makes them fail, which is reported
+    // as `false`); no pointers other than the optional out-parameter, which is None.
+    unsafe {
+        if !IsWindow(Some(hwnd)).as_bool() {
+            return false;
+        }
+        if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+        let front = GetForegroundWindow();
+        if front == hwnd {
+            return true;
+        }
+        let front_thread = if front.0.is_null() {
+            0
+        } else {
+            GetWindowThreadProcessId(front, None)
+        };
+        let me = GetCurrentThreadId();
+        let attached = front_thread != 0 && front_thread != me;
+        if attached {
+            let _ = AttachThreadInput(me, front_thread, true);
+        }
+        let _ = BringWindowToTop(hwnd);
+        let ok = SetForegroundWindow(hwnd).as_bool();
+        if attached {
+            let _ = AttachThreadInput(me, front_thread, false);
+        }
+        ok || GetForegroundWindow() == hwnd
+    }
 }
 
 /// Makes this process per-monitor DPI aware (once). A process without a DPI manifest (the headless daemon,

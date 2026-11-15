@@ -10806,8 +10806,8 @@ msgstr "Các bước ghi chú không có ảnh"
 msgid "Nothing is selected."
 msgstr "Chưa chọn gì."
 
-msgid "Nothing scrolled: check that the window can scroll"
-msgstr "Cửa sổ chưa cuộn. Hãy kiểm tra xem cửa sổ có cuộn được không."
+msgid "Nothing scrolled: the area may be covered by another window or the page is not scrollable"
+msgstr "Không cuộn được: vùng này có thể bị cửa sổ khác che hoặc trang không cuộn được."
 
 msgid "Opacity"
 msgstr "Độ đục"

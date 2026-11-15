@@ -23,6 +23,8 @@ struct Scripted {
     page: SyntheticPage,
     pos: Arc<Mutex<u32>>,
     support: AutoScrollSupport,
+    /// Window ids the run asked to bring to the front.
+    raised: Arc<Mutex<Vec<u32>>>,
 }
 
 impl Scripted {
@@ -31,6 +33,7 @@ impl Scripted {
             page,
             pos: Arc::default(),
             support: AutoScrollSupport::Available,
+            raised: Arc::default(),
         }
     }
 }
@@ -59,6 +62,10 @@ impl LongShotSystem for Scripted {
     }
     fn auto_scroll(&self) -> AutoScrollSupport {
         self.support
+    }
+    fn raise_window(&self, window_id: u32) -> bool {
+        self.raised.lock().unwrap().push(window_id);
+        true
     }
 }
 
@@ -143,6 +150,21 @@ async fn cap_6_the_user_needs_no_confirmation() {
     let out = call(&d, Actor::User, params(json!({}))).await.unwrap();
     assert!(confirmer.shown().is_empty());
     assert_eq!(out["long_shot"]["end"], "reached_end");
+}
+
+/// QA Windows pass 3: Auto scroll of a window brings it to the front before the first step (a
+/// window that covers its centre would get the wheel); Hand scroll does not touch the windows.
+#[tokio::test]
+async fn cap_6_auto_scroll_raises_the_target_window_first() {
+    let sys = Scripted::new(SyntheticPage::new(24, 800, 300));
+    let raised = sys.raised.clone();
+    let pos = sys.pos.clone();
+    let (d, _c, _dir) = daemon(sys, Decision::Approve);
+    call(&d, Actor::User, params(json!({"scroll": "auto"})))
+        .await
+        .unwrap();
+    assert_eq!(*raised.lock().unwrap(), vec![1]);
+    assert!(*pos.lock().unwrap() > 0);
 }
 
 /// AC4 through the action: `max_px` stops the capture with the limit note, and the image is saved.

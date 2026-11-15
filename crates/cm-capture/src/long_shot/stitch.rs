@@ -85,7 +85,7 @@ impl EndReason {
             EndReason::NoOverlap => Some("Stopped: the next part did not line up"),
             EndReason::LimitReached => Some("Reached the longest image CaptureMann can edit"),
             EndReason::NothingScrolled => {
-                Some("Nothing scrolled: check that the window can scroll")
+                Some("Nothing scrolled: the area may be covered by another window or the page is not scrollable")
             }
             EndReason::ReachedEnd | EndReason::StoppedByUser => None,
         }
@@ -382,7 +382,8 @@ const SCORE_MARGIN_PX: f64 = 0.5;
 /// Among shifts that all match within the tolerance, the one whose overlap has the fewest
 /// differing pixels per line, when the next one has clearly more. `rival` is a score (pixels per
 /// line) the best one must also beat (the frames as they are, no scroll); infinity for none.
-/// `None` on a tie or when there are too many to compare.
+/// The first is `None` on a tie or when there are too many to compare; the second is the best
+/// score found (infinity for none), which tells a tie of good shifts from no good shift.
 fn best_by_difference(
     a: &Lines,
     b: &Lines,
@@ -390,17 +391,19 @@ fn best_by_difference(
     cw: usize,
     candidates: &[usize],
     rival: f64,
-) -> Option<usize> {
+) -> (Option<(usize, f64, usize)>, f64) {
     if candidates.len() > MAX_SCORED_CANDIDATES {
-        return None;
+        return (None, f64::INFINITY);
     }
-    let (mut best, mut best_s, mut second) = (f64::INFINITY, 0, rival);
+    // (shift, pixels per line, compared lines) of every candidate; a candidate that is already
+    // beyond what could still tie with the best so far is dropped without its full count.
+    let mut scores: Vec<(usize, f64, usize)> = Vec::with_capacity(candidates.len());
+    let mut best = rival;
     for &s in candidates {
         let overlap = cw - s;
         let g = GUARD.min(overlap / 3);
-        let lines = (overlap - 2 * g).max(1) as f64;
-        // Beyond this many differing pixels the shift is neither the best nor the runner-up.
-        let cap = second * lines;
+        let lines = (overlap - 2 * g).max(1);
+        let cap = (best + best * SCORE_MARGIN_SHARE + SCORE_MARGIN_PX) * lines as f64;
         let mut total = 0usize;
         for i in g..overlap - g {
             total += a.diff_px(header + s + i, b, header + i);
@@ -408,17 +411,37 @@ fn best_by_difference(
                 break;
             }
         }
-        let score = total as f64 / lines;
-        if score < best {
-            second = second.min(best);
-            (best, best_s) = (score, s);
-        } else if score < second {
-            second = score;
-        }
+        let score = total as f64 / lines as f64;
+        best = best.min(score);
+        scores.push((s, score, lines));
     }
+    let found = scores.iter().map(|c| c.1).fold(f64::INFINITY, f64::min);
     let margin = best * SCORE_MARGIN_SHARE + SCORE_MARGIN_PX;
-    (best.is_finite() && second.is_finite() && second >= best + margin).then_some(best_s)
+    // Everything that cannot be told from the best (the frames as they are count too: no scroll).
+    let tied: Vec<&(usize, f64, usize)> = scores.iter().filter(|c| c.1 < best + margin).collect();
+    if !best.is_finite() || rival < best + margin {
+        return (None, found);
+    }
+    let pick = match tied.as_slice() {
+        [one] => Some(**one),
+        // Several shifts fit equally well, but one of them over far more lines than any other:
+        // an overlap of a few lines that happens to match is little evidence (a terminal's
+        // numbered lines, nearly blank rows), a long overlap that matches is a lot. At least
+        // twice the lines of the next, and enough of them to mean something.
+        many => {
+            let mut by_lines: Vec<&&(usize, f64, usize)> = many.iter().collect();
+            by_lines.sort_by_key(|c| std::cmp::Reverse(c.2));
+            let (top, next) = (by_lines[0], by_lines[1]);
+            (top.2 >= LONG_OVERLAP_LINES && top.2 >= 2 * next.2).then_some(**top)
+        }
+    };
+    (pick, found)
 }
+
+/// Compared lines a match needs before the expected step may choose it among several equal ones.
+const MIN_TIE_LINES: usize = 12;
+/// Compared lines a matching overlap needs before it outweighs shorter ones that match as well.
+const LONG_OVERLAP_LINES: usize = 30;
 
 fn find_join_with(
     a: &Lines,
@@ -504,13 +527,37 @@ fn find_join_with(
     // The tolerant look can call many shifts equal (text lines that differ in a few pixels each,
     // a terminal's numbered lines): the shift whose overlap differs least is the join, when it
     // clearly is the least. Never a guess: a tie is left to the expected step as before.
-    let scored = if (candidates.len() > 1 || rival.is_finite()) && max_px > 0 {
+    let (scored, best_score) = if (candidates.len() > 1 || rival.is_finite()) && max_px > 0 {
         best_by_difference(a, b, header, cw, &candidates, rival)
     } else {
-        None
+        (None, f64::INFINITY)
     };
+    // The best shift is far short of the expected one and its overlap is not an exact match: when
+    // the wheel overshot, the true overlap is a few lines (too few to be a candidate) and the
+    // shift that fits least badly is a line of text matched with another that differs in a digit.
+    // Refused, so that the run scrolls back and looks again; never believed.
+    if let (Some((s, score, lines)), Some(h)) = (scored, hint) {
+        let wide = (cw / 20).max(2).max(h / 8);
+        let exact = score <= SCORE_MARGIN_PX && lines >= LONG_OVERLAP_LINES;
+        if s + wide < h && !exact {
+            return Err(NoJoin::NoOverlap(format!(
+                "the best shift ({s}) is far from the expected {h} and does not match exactly"
+            )));
+        }
+    }
+    let scored = scored.map(|c| c.0);
     if rival.is_finite() && scored.is_none() {
-        return Err(NoJoin::Same);
+        // A blink and nothing else, unless several shifts explain the difference equally well
+        // and clearly better than no shift does: the page scrolled and the overlap is too
+        // little or too alike to tell where (a terminal's numbered lines). That is not the end
+        // of the content, and it must not be believed to be.
+        if best_score + best_score * SCORE_MARGIN_SHARE + SCORE_MARGIN_PX >= rival {
+            return Err(NoJoin::Same);
+        }
+        return Err(NoJoin::NoOverlap(format!(
+            "{} shifts explain the change equally well (a terminal's numbered lines, or too little overlap)",
+            candidates.len()
+        )));
     }
     let shift = match (candidates.len(), hint) {
         _ if scored.is_some() => scored.unwrap_or(0),
@@ -535,12 +582,27 @@ fn find_join_with(
             // choose, but only when it names one candidate clearly.
             // The expected step names one candidate clearly (the nearest is within a twentieth of
             // the content and the next one is further than that from it) ...
-            let mut by_dist: Vec<(usize, usize)> =
-                candidates.iter().map(|&s| (s.abs_diff(h), s)).collect();
+            // Lines of the overlap that would be compared at a shift: a match over a handful of
+            // lines is no evidence when several shifts match, so the step does not choose among
+            // those (the run looks again, scrolled back by half a step).
+            let compared = |s: usize| {
+                let overlap = cw - s;
+                overlap - 2 * GUARD.min(overlap / 3)
+            };
+            let mut by_dist: Vec<(usize, usize)> = candidates
+                .iter()
+                .filter(|&&s| compared(s) >= MIN_TIE_LINES)
+                .map(|&s| (s.abs_diff(h), s))
+                .collect();
+            if by_dist.is_empty() {
+                return Err(NoJoin::NoOverlap(
+                    "several shifts match and only over a few lines each".into(),
+                ));
+            }
             by_dist.sort_unstable();
             let (d0, s0) = by_dist[0];
             let tol = (cw / 20).max(2);
-            if d0 <= tol && by_dist[1].0 > d0 + tol {
+            if d0 <= tol && by_dist.get(1).is_none_or(|b| b.0 > d0 + tol) {
                 s0
             } else {
                 // ... or the wheel moved more or less than asked (a real one up to a few times

@@ -353,7 +353,7 @@ pub fn done_toast(result: &Value, how: Ending) -> Option<ToastSpec> {
         }
         "nothing_scrolled" => generic(
             ToastKind::Warning,
-            tr!("Nothing scrolled: check that the window can scroll"),
+            tr!("Nothing scrolled: the area may be covered by another window or the page is not scrollable"),
         ),
         "limit_reached" => open(
             ToastSpec::new(ToastKind::Warning, tr!("Long Shot saved at the size limit")).body(tr!(

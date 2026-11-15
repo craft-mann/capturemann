@@ -45,6 +45,22 @@ pub fn auto_scroll_support() -> AutoScrollSupport {
     imp::support()
 }
 
+/// Brings the window with this id to the front, so that Auto scroll's wheel events reach it and
+/// not a window that covers it (QA Windows pass 3: `nothing_scrolled` with a console window over
+/// the target). Built on Windows only (`SetForegroundWindow`); on macOS, X11 and Wayland there is
+/// no helper yet and this does nothing and returns `false`. Never run in tests.
+pub fn raise_window(window_id: u32) -> bool {
+    #[cfg(windows)]
+    {
+        super::win_window::raise(window_id)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = window_id;
+        false
+    }
+}
+
 /// The scroller of this system, or why there is none.
 pub fn platform_scroller() -> Result<Box<dyn Scroller + Send>, CmError> {
     platform_scroller_at(None)
@@ -238,6 +254,24 @@ mod imp {
 
     impl Scroller for MacScroller {
         fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.wheel(direction, amount_px, true)
+        }
+
+        fn scroll_back(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
+            self.wheel(direction, amount_px, false)?;
+            Ok(true)
+        }
+    }
+
+    impl MacScroller {
+        /// `forward`: the content moves down or to the right; otherwise up or left.
+        fn wheel(
+            &mut self,
+            direction: Direction,
+            amount_px: u32,
+            forward: bool,
+        ) -> Result<(), CmError> {
+            let sign = if forward { -1 } else { 1 };
             if let Some(p) = self.anchor {
                 // SAFETY: plain calls with a value point; no pointers.
                 unsafe {
@@ -253,8 +287,8 @@ mod imp {
                 // Wheel 1 is vertical, wheel 2 horizontal. Positive is up / left, so the
                 // content moves forward (down / right) with a negative value.
                 let (w1, w2) = match direction {
-                    Direction::Vertical => (-part, 0),
-                    Direction::Horizontal => (0, -part),
+                    Direction::Vertical => (sign * part, 0),
+                    Direction::Horizontal => (0, sign * part),
                 };
                 // SAFETY: a null source is allowed; the event is released after posting.
                 unsafe {
@@ -373,6 +407,23 @@ mod imp {
 
     impl Scroller for WinScroller {
         fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.wheel(direction, amount_px, true)
+        }
+
+        fn scroll_back(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
+            self.wheel(direction, amount_px, false)?;
+            Ok(true)
+        }
+    }
+
+    impl WinScroller {
+        /// `forward`: the content moves down or to the right; otherwise up or left.
+        fn wheel(
+            &mut self,
+            direction: Direction,
+            amount_px: u32,
+            forward: bool,
+        ) -> Result<(), CmError> {
             if let Some((x, y)) = self.anchor {
                 // SAFETY: plain call with two integers; fails (and is ignored) only when the
                 // desktop is locked, where the wheel event below fails as well.
@@ -385,9 +436,9 @@ mod imp {
             for delta in wheel_deltas(amount_px, PX_PER_NOTCH, MAX_EVENT) {
                 // Vertical: a negative delta scrolls the content down (forward). Horizontal: a
                 // positive delta scrolls it to the right (forward).
-                let signed = match direction {
-                    Direction::Vertical => -(delta as i32),
-                    Direction::Horizontal => delta as i32,
+                let signed = match (direction, forward) {
+                    (Direction::Vertical, true) | (Direction::Horizontal, false) => -(delta as i32),
+                    (Direction::Vertical, false) | (Direction::Horizontal, true) => delta as i32,
                 };
                 let input = INPUT {
                     r#type: INPUT_MOUSE,

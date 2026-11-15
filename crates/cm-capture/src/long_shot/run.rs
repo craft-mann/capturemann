@@ -26,6 +26,12 @@ const FIRST_SCROLL_RETRY_WAIT: std::time::Duration = std::time::Duration::from_m
 /// A first pair that does not join is looked at again this many times (waiting longer each
 /// time) before the run ends with `no_overlap`.
 const FIRST_PAIR_RETRIES: u32 = 2;
+/// A later pair that does not join (the content moved past the overlap, or the overlap is too
+/// little or too alike to tell where it is: a terminal's numbered lines) is tried again this
+/// many times, each time after scrolling back by [`BACK_SHARE`] of the asked step, before the
+/// run ends with `no_overlap`.
+const NO_OVERLAP_RETRIES: u32 = 2;
+const BACK_SHARE: f64 = 0.5;
 
 /// Settings of one Long Shot.
 #[derive(Debug, Clone, Copy)]
@@ -97,6 +103,18 @@ fn extent(f: &Frame, d: Direction) -> u32 {
     }
 }
 
+/// The end of a run whose last frame did not give a clean result: when Stop or Esc was asked in
+/// the meantime, it was the user who ended it (the frame taken while the HUD was closing, or the
+/// frame the stop interrupted, is not a failed join). QA Windows pass 3: Stop stored
+/// `no_overlap` in 2 of 3 runs.
+fn stopped_or(stop: &mut dyn FnMut() -> bool, end: EndReason) -> EndReason {
+    if stop() {
+        EndReason::StoppedByUser
+    } else {
+        end
+    }
+}
+
 /// Auto scroll: frame, scroll about 80 % of the area, wait for the content to settle, frame,
 /// until the end, the limit, a failed join or `stop` returns true (Esc or Stop; what was
 /// captured is kept).
@@ -146,6 +164,7 @@ pub fn run_auto_ex(
     // Pixels the content moved per pixel asked, once a join has taught it (1 before): the
     // expected shift of a step, which breaks ties between equally good overlaps.
     let mut gain = 1.0f64;
+    let mut learned = 0u32;
     let end = loop {
         if stop() {
             break EndReason::StoppedByUser;
@@ -165,6 +184,35 @@ pub fn run_auto_ex(
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
             next = wait_settled(src, sleeper, cfg.settle)?;
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+        }
+        // A later pair that does not join: scroll back by half a step and look again before the
+        // run is given up (the scroller moved more than asked, or the overlap that is left is
+        // too alike to tell where it is). What the retries scroll back is not part of the
+        // distance the join teaches, which is counted from `asked`.
+        let mut asked = step;
+        let mut back_total = 0u32;
+        let mut retry = 0;
+        while outcome == PushOutcome::NoOverlap
+            && stitcher.frames() > 1
+            && retry < NO_OVERLAP_RETRIES
+            && !stop()
+        {
+            retry += 1;
+            let back = ((f64::from(step) * BACK_SHARE) as u32).max(1);
+            if !scroller.scroll_back(cfg.direction, back)? {
+                break;
+            }
+            back_total += back;
+            asked = step.saturating_sub(back_total).max(1);
+            sleeper.sleep(LATE_SCROLL_WAIT);
+            next = wait_settled(src, sleeper, cfg.settle)?;
+            // No expected shift: how far the scroll-back moved is no better known than how far
+            // the step did, and a wrong prior would pick one of several alike overlaps.
+            outcome = stitcher.push(&next.frame, None);
+            // Back where the last frame was taken is not the end of the content.
+            if outcome == PushOutcome::NoChange {
+                outcome = PushOutcome::NoOverlap;
+            }
         }
         // An unchanged frame is the end of the content only when something has scrolled before.
         // A wheel event can arrive late (a browser's smooth scrolling starts after the settle
@@ -197,7 +245,7 @@ pub fn run_auto_ex(
                 }
             }
             if outcome == PushOutcome::NoChange {
-                break EndReason::NothingScrolled;
+                break stopped_or(stop, EndReason::NothingScrolled);
             }
         }
         match outcome {
@@ -211,13 +259,13 @@ pub fn run_auto_ex(
                 let mut new_len = new_len;
                 let mut ended = None;
                 let mut tail = 0;
-                while f64::from(new_len) < f64::from(step) * MIN_MOVED_PER_ASKED
+                while f64::from(new_len) < f64::from(asked) * MIN_MOVED_PER_ASKED
                     && tail < LATE_SCROLL_POLLS
                 {
                     tail += 1;
                     sleeper.sleep(LATE_SCROLL_WAIT);
                     let more = wait_settled(src, sleeper, cfg.settle)?;
-                    match stitcher.push(&more.frame, Some(expected(step, gain))) {
+                    match stitcher.push(&more.frame, Some(expected(asked, gain))) {
                         PushOutcome::Added { new_len: n } => {
                             new_len += n;
                             last_ok = more.frame.clone();
@@ -236,19 +284,31 @@ pub fn run_auto_ex(
                 on_progress(progress(&stitcher));
                 on_stitch(&stitcher);
                 if let Some(e) = ended {
-                    break e;
+                    break stopped_or(stop, e);
                 }
                 // Pixels the content really moved per pixel asked (a wheel step differs per app
                 // and per display scale): learned from each join, so the next request lands on
                 // about 80 %.
-                let moved_per_asked = (f64::from(new_len) / f64::from(step)).clamp(0.25, 4.0);
-                gain = moved_per_asked;
+                // The first join replaces the guess; later ones move it halfway, so that one step
+                // that a wheel rounded the other way (a notch more or less) does not make the
+                // next one overshoot the overlap. A join found after scrolling back teaches
+                // nothing: how far the scroll-back moved is only about known.
+                if back_total == 0 {
+                    let seen = (f64::from(new_len) / f64::from(asked)).clamp(0.25, 4.0);
+                    gain = if learned == 0 {
+                        seen
+                    } else {
+                        (gain + seen) / 2.0
+                    };
+                    learned += 1;
+                }
+                let moved_per_asked = gain;
                 // 80 % of what actually scrolls: the area without the fixed bands.
                 let (h, f) = stitcher.bands();
                 let content = (size - f64::from(h) - f64::from(f)).max(1.0);
                 step = ((content * cfg.step_fraction / moved_per_asked) as u32).max(1);
             }
-            PushOutcome::NoChange => break EndReason::ReachedEnd,
+            PushOutcome::NoChange => break stopped_or(stop, EndReason::ReachedEnd),
             PushOutcome::NoOverlap => {
                 super::debug::dump_refused(
                     &last_ok,
@@ -256,7 +316,7 @@ pub fn run_auto_ex(
                     stitcher.last_refusal(),
                     "auto scroll",
                 );
-                break EndReason::NoOverlap;
+                break stopped_or(stop, EndReason::NoOverlap);
             }
             PushOutcome::LimitReached { .. } => {
                 {
