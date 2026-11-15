@@ -25,6 +25,10 @@ use crate::error::DaemonError;
 /// Bus event with the Long Shot's progress (`frames`, `len_px`, `max_len`, `header_px`,
 /// `footer_px`, `request_id`): the HUD counter and the side preview follow it.
 pub const PROGRESS_EVENT: &str = "capture.long_shot.progress";
+/// Bus events around one Long Shot run (`request_id`, which may be null for a CLI or MCP call
+/// without one): the app grabs the Esc key while one runs, whoever started it.
+pub const STARTED_EVENT: &str = "capture.long_shot.started";
+pub const ENDED_EVENT: &str = "capture.long_shot.ended";
 
 /// What a running Long Shot shows the HUD and the side preview, keyed by the call's
 /// `request_id` (`long_shot_state`). Counts only on the bus; the pixels of the preview leave the
@@ -266,6 +270,13 @@ impl Inner {
         let Some(st) = self.long_states.get(&p.request_id) else {
             return Ok(json!({ "running": false }));
         };
+        if p.stop == Some(true) {
+            // Stop (Esc, the HUD): the run ends at its next step and keeps what it has.
+            let stopped = self
+                .delayed
+                .cancel_matching(|r| r.as_deref() == Some(p.request_id.as_str()));
+            return Ok(json!({ "running": stopped == 0, "stopped": stopped > 0 }));
+        }
         if let Some(paused) = p.paused {
             st.paused.store(paused, std::sync::atomic::Ordering::SeqCst);
         }
@@ -344,7 +355,7 @@ impl Inner {
                 }
             }
         }
-        let guard = self.delayed.register(p.request_id.clone());
+        let guard = self.delayed.register_kind(p.request_id.clone(), true);
         let token = guard.token();
         let capturer = self.capturer.clone();
         let capturer_for_anchor = self.capturer.clone();
@@ -358,6 +369,9 @@ impl Inner {
         let meta_in = meta.clone();
         let state = request_id.as_deref().map(|id| self.long_states.start(id));
         let state_in = state.clone();
+        // The app grabs Esc for as long as a Long Shot runs, even one it did not start.
+        self.events
+            .publish(STARTED_EVENT, json!({ "request_id": request_id_after }));
         let out = self
             .store_capture_ex(actor, p.copy_to_clipboard, p.title, None, move || {
                 // The delay, in steps so Esc cancels it.
@@ -482,6 +496,8 @@ impl Inner {
         if let Some(id) = request_id_after.as_deref() {
             self.long_states.finish(id);
         }
+        self.events
+            .publish(ENDED_EVENT, json!({ "request_id": request_id_after }));
         let mut out = out?;
         drop(guard);
         let m = meta.lock().unwrap_or_else(PoisonError::into_inner).take();

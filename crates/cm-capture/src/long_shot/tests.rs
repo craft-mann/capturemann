@@ -766,3 +766,341 @@ fn cap_6_smooth_scroll_that_pauses_early_is_not_believed() {
         }
     }
 }
+
+/// A frame source that draws something over what the page shows: a browser's toolbar, a noise
+/// block. `over` gets the page position, the frame's size and its pixels as RGBA.
+struct Overlaid<F: FnMut(u32, u32, u32, &mut [u8])> {
+    view: fake::PageView,
+    pos: std::rc::Rc<std::cell::Cell<u32>>,
+    over: F,
+}
+
+impl<F: FnMut(u32, u32, u32, &mut [u8])> FrameSource for Overlaid<F> {
+    fn grab(&mut self) -> Result<Frame, cm_core::CmError> {
+        let f = self.view.grab()?;
+        let (w, h) = (f.width(), f.height());
+        let mut data = f.rgba().to_vec();
+        (self.over)(self.pos.get(), w, h, &mut data);
+        Frame::new(w, h, data)
+    }
+}
+
+/// A scroller that tells the overlay where the page is.
+struct Tracking {
+    view: fake::PageView,
+    pos: std::rc::Rc<std::cell::Cell<u32>>,
+}
+
+impl Scroller for Tracking {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.view.scroll(d, amount_px)?;
+        self.pos.set(self.pos.get() + amount_px);
+        Ok(())
+    }
+}
+
+/// Windows, Edge and Chrome, whole window, Nov 15, 2026: a page that scrolls sideways under the
+/// browser's tab strip and toolbar ended after one frame (`no_overlap`). The toolbar's rows run
+/// across the scroll axis and their icons do not move with the page, so no column of one frame
+/// matched a column of the next. The static rows (and a static status bar) are cut instead; the
+/// page between them is stitched, every column once and in order.
+#[test]
+fn cap_6_horizontal_whole_window_with_a_static_toolbar_joins() {
+    for (top, bottom) in [(60u32, 0u32), (60, 14), (0, 14)] {
+        let page = SyntheticPage::new(240, 3000, 600).horizontal();
+        let view = page.clone().view();
+        let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut src = Overlaid {
+            view: view.clone(),
+            pos: pos.clone(),
+            over: |_, w, h, data: &mut [u8]| {
+                // Static chrome: every pixel depends on its place only (icons, text, tabs).
+                for y in (0..top).chain(h - bottom..h) {
+                    for x in 0..w {
+                        let v = (x * 7 + y * 13) ^ (x >> 2);
+                        let i = ((y * w + x) * 4) as usize;
+                        data[i..i + 4].copy_from_slice(&[v as u8, (v >> 3) as u8, 90, 255]);
+                    }
+                }
+            },
+        };
+        let mut sc = Tracking { view, pos };
+        let r = run_auto(
+            &mut src,
+            &mut sc,
+            &mut NoSleep::default(),
+            cfg(Direction::Horizontal),
+            &mut || false,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(r.end, EndReason::ReachedEnd, "top {top} bottom {bottom}");
+        let want = page.expected();
+        let got = &r.image.frame;
+        assert_eq!(got.width(), want.width(), "top {top} bottom {bottom}");
+        assert_eq!(got.height(), 240 - top - bottom, "cut to the page");
+        for x in 0..want.width() {
+            for y in [0, got.height() / 2, got.height() - 1] {
+                assert_eq!(
+                    got.pixel(x, y),
+                    want.pixel(x, y + top),
+                    "top {top} bottom {bottom} at {x},{y}"
+                );
+            }
+        }
+    }
+}
+
+/// A terminal's numbered lines (Windows Terminal, Nov 15, 2026: 200 lines, stopped at line 86):
+/// text that differs from line to line in a few pixels, and a cell that changes in every frame
+/// (the cursor, a spinner) in the middle of the lines, so the exact look finds nothing and the
+/// tolerant look calls every shift equal. The shift whose overlap differs least is the join.
+struct Term {
+    pos: u32,
+    max: u32,
+    noisy: bool,
+}
+
+impl Term {
+    const W: u32 = 900;
+    const H: u32 = 300;
+    const LINE: u32 = 20;
+
+    fn pixel(&self, g: u32, x: u32) -> [u8; 4] {
+        let (line, k) = (g / Self::LINE, g % Self::LINE);
+        let mut v = 255u8;
+        if (4..14).contains(&k) && (10..26).contains(&x) {
+            let h = line.wrapping_mul(2_654_435_761) ^ k.wrapping_mul(40_503);
+            if (h >> (x - 10)) & 1 == 1 {
+                v = 0;
+            }
+        }
+        if self.noisy && (400..410).contains(&x) && k < 12 {
+            v = if (self.pos / 3 + x).is_multiple_of(2) {
+                20
+            } else {
+                200
+            };
+        }
+        [v, v, v, 255]
+    }
+
+    fn frame(&self) -> Frame {
+        let mut d = Vec::new();
+        for y in 0..Self::H {
+            for x in 0..Self::W {
+                d.extend_from_slice(&self.pixel(self.pos + y, x));
+            }
+        }
+        Frame::new(Self::W, Self::H, d).unwrap()
+    }
+}
+
+struct TermView(std::rc::Rc<std::cell::RefCell<Term>>);
+
+impl FrameSource for TermView {
+    fn grab(&mut self) -> Result<Frame, CmError> {
+        Ok(self.0.borrow().frame())
+    }
+}
+
+impl Scroller for TermView {
+    fn scroll(&mut self, _: Direction, amount_px: u32) -> Result<(), CmError> {
+        let mut t = self.0.borrow_mut();
+        t.pos = (t.pos + amount_px).min(t.max);
+        Ok(())
+    }
+}
+
+#[test]
+fn cap_6_terminal_lines_that_differ_in_a_few_pixels_do_not_stop_the_join() {
+    let term = std::rc::Rc::new(std::cell::RefCell::new(Term {
+        pos: 0,
+        max: 2000,
+        noisy: true,
+    }));
+    let (mut src, mut sc) = (TermView(term.clone()), TermView(term.clone()));
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    let reference = Term {
+        pos: 0,
+        max: 0,
+        noisy: false,
+    };
+    let got = &r.image.frame;
+    assert_eq!(got.height(), 2000 + Term::H);
+    // The text columns (the noise is in 400..410): every row once and in order.
+    for y in 0..got.height() {
+        for x in 8..30 {
+            assert_eq!(got.pixel(x, y), Some(reference.pixel(y, x)), "at {x},{y}");
+        }
+    }
+}
+
+/// Slow continuous Hand scroll (QA, Windows, Nov 15, 2026: 30 small wheel steps 250 ms apart gave
+/// one frame). Decision of Nov 15, 2026: a frame is taken when the content has moved a third of
+/// the area from the last one taken, or has held still; a small shift is never a reason to drop a
+/// frame. Steps of 15 px that never hold still: a frame every third of a screen.
+#[test]
+fn cap_6_hand_scroll_with_continuous_small_steps_takes_a_frame_every_third_of_the_area() {
+    let page = SyntheticPage::new(400, 8000, 1000).with_bands(30, 0);
+    let script: Vec<u32> = (0..121).map(|i| i * 15).collect();
+    let r = hand(&page, script, 160);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    // The first frame is the one the settle wait gave up on (3 steps on); the end is 1,800.
+    assert_eq!(r.image.frame, page.expected_range(45, 1800 + 970));
+    // About 970 / 3 rows between frames: more than 5 frames over 1,750 rows.
+    assert!(r.image.frames >= 5, "frames: {}", r.image.frames);
+}
+
+/// The same scroll with the content holding still for a moment between the steps: every pause is
+/// a frame, however small the shift.
+#[test]
+fn cap_6_hand_scroll_takes_a_frame_whenever_the_content_holds_still() {
+    let page = SyntheticPage::new(400, 8000, 1000).with_bands(30, 0);
+    let mut script = Vec::new();
+    for i in 0..41u32 {
+        script.extend_from_slice(&[i * 20, i * 20, i * 20]);
+    }
+    let r = hand(&page, script, 200);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_eq!(r.image.frame, page.expected_range(0, 800 + 970));
+    assert!(r.image.frames >= 30, "frames: {}", r.image.frames);
+}
+
+/// A source whose frames in `bad` (counted from 0) are another picture: a window that has just
+/// come to the front, a dialog fading out.
+struct Glitch<S: FrameSource> {
+    inner: S,
+    n: u32,
+    bad: std::ops::Range<u32>,
+}
+
+impl<S: FrameSource> FrameSource for Glitch<S> {
+    fn grab(&mut self) -> Result<Frame, CmError> {
+        let f = self.inner.grab()?;
+        let n = self.n;
+        self.n += 1;
+        if !self.bad.contains(&n) {
+            return Ok(f);
+        }
+        let data: Vec<u8> = f
+            .rgba()
+            .chunks(4)
+            .flat_map(|p| [255 - p[0], 255 - p[1], 255 - p[2], 255])
+            .collect();
+        Frame::new(f.width(), f.height(), data)
+    }
+}
+
+fn auto_with(src: &mut dyn FrameSource, sc: &mut dyn Scroller) -> LongShotResult {
+    run_auto(
+        src,
+        sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap()
+}
+
+/// QA, Windows, Nov 15, 2026: the very first Auto capture ended after one frame (`no_overlap`),
+/// not seen again. A first frame taken while the window was still changing refuses every join:
+/// the first frame is taken again after a short wait.
+#[test]
+fn cap_6_auto_first_frame_taken_while_the_screen_still_changes() {
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let mut src = Glitch {
+        inner: view.clone(),
+        n: 0,
+        bad: 0..2,
+    };
+    let mut sc = view;
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}
+
+/// The first pair that does not join is looked at again before the run gives up: the picture
+/// after the first scroll was another one (a dialog still fading) and the next one joins.
+#[test]
+fn cap_6_auto_first_pair_is_retried_before_no_overlap() {
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let mut src = Glitch {
+        inner: view.clone(),
+        n: 0,
+        bad: 4..6,
+    };
+    let mut sc = view;
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}
+
+/// A scroller that ignores the first step (the window was not ready for the wheel yet): the
+/// run scrolls once more and goes on instead of ending after one frame.
+#[test]
+fn cap_6_auto_scroller_that_ignores_the_first_step() {
+    struct Late(fake::PageView, u32);
+    impl Scroller for Late {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.1 += 1;
+            if self.1 == 1 {
+                return Ok(());
+            }
+            self.0.scroll(d, amount_px)
+        }
+    }
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let mut src = view.clone();
+    let mut sc = Late(view, 0);
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+    assert!(sc.1 > 1);
+}
+
+/// Hand scroll whose first frame was not what stayed on screen: no later frame joins it, but two
+/// later ones join each other, and the capture goes on from there instead of ending with one
+/// frame (QA, Windows, Nov 15, 2026).
+#[test]
+fn cap_6_hand_scroll_rebases_on_a_first_frame_that_joins_nothing() {
+    let page = SyntheticPage::new(400, 6000, 1000).with_bands(30, 0);
+    let script = vec![
+        0, 0, 0, // the first frame (another picture, see the glitch)
+        200, 200, 200, // refused
+        500, 500, 500, // refused too, but it joins the one before
+        800, 800, 800,
+    ];
+    let mut src = Glitch {
+        inner: HandScript::new(page.clone(), script),
+        n: 0,
+        bad: 0..3,
+    };
+    let mut n = 0;
+    let r = run_hand(
+        &mut src,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || {
+            n += 1;
+            n > 30
+        },
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_eq!(r.image.frame, page.expected_range(200, 800 + 970));
+}

@@ -196,6 +196,8 @@ pub struct WindowThumbnailParams {
 pub struct LongShotStateParams {
     pub request_id: String,
     pub paused: Option<bool>,
+    /// `true` stops the run (what was captured is kept), like Esc.
+    pub stop: Option<bool>,
     pub since_seq: Option<u64>,
     pub preview_w: u32,
     pub preview_h: u32,

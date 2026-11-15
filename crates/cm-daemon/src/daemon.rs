@@ -87,11 +87,14 @@ impl LockMap {
     }
 }
 
+/// request id, cancel token, whether it is a Long Shot.
+type Entry = (Option<String>, cm_capture::CancelToken, bool);
+
 /// Cancel tokens of in-flight `capture_screenshot` calls (R1-11, CAP-5.AC2).
 #[derive(Default)]
 pub(crate) struct DelayedCaptures {
     next: AtomicU64,
-    map: Mutex<HashMap<u64, (Option<String>, cm_capture::CancelToken)>>,
+    map: Mutex<HashMap<u64, Entry>>,
 }
 
 /// Cancels its capture when dropped, and unregisters it. Dropping the `execute` future (the
@@ -121,12 +124,17 @@ impl Drop for DelayGuard<'_> {
 
 impl DelayedCaptures {
     pub(crate) fn register(&self, request_id: Option<String>) -> DelayGuard<'_> {
+        self.register_kind(request_id, false)
+    }
+
+    /// A running Long Shot (CAP-6): `long` marks it for [`Daemon::cancel_long_shots`].
+    pub(crate) fn register_kind(&self, request_id: Option<String>, long: bool) -> DelayGuard<'_> {
         let id = self.next.fetch_add(1, Ordering::SeqCst);
         let token = cm_capture::CancelToken::new();
         self.map
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(id, (request_id, token.clone()));
+            .insert(id, (request_id, token.clone(), long));
         DelayGuard {
             reg: self,
             id,
@@ -134,11 +142,20 @@ impl DelayedCaptures {
         }
     }
 
-    fn cancel_matching(&self, pred: impl Fn(&Option<String>) -> bool) -> usize {
+    pub(crate) fn cancel_matching(&self, pred: impl Fn(&Option<String>) -> bool) -> usize {
+        self.cancel_where(|rid, _| pred(rid))
+    }
+
+    /// Cancels the running Long Shots (all of them, with or without a `request_id`).
+    fn cancel_long(&self) -> usize {
+        self.cancel_where(|_, long| long)
+    }
+
+    fn cancel_where(&self, pred: impl Fn(&Option<String>, bool) -> bool) -> usize {
         let g = self.map.lock().unwrap_or_else(PoisonError::into_inner);
         let mut n = 0;
-        for (rid, token) in g.values() {
-            if pred(rid) && !token.is_cancelled() {
+        for (rid, token, long) in g.values() {
+            if pred(rid, *long) && !token.is_cancelled() {
                 token.cancel();
                 n += 1;
             }
@@ -813,6 +830,13 @@ impl Daemon {
             .delayed
             .cancel_matching(|r| r.as_deref() == Some(request_id))
             > 0
+    }
+
+    /// Stops every running Long Shot, whoever started it (the app, the CLI, an agent): Esc. What
+    /// was captured so far is kept and returned by each call (`end: "stopped_by_user"`). Returns
+    /// how many were stopped.
+    pub fn cancel_long_shots(&self) -> usize {
+        self.inner.delayed.cancel_long()
     }
 
     /// Cancels every delayed capture still waiting (the picker's Esc); returns how many.
