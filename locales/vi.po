@@ -11827,3 +11827,19 @@ msgstr "Tối"
 msgctxt "text colour mode"
 msgid "Light"
 msgstr "Sáng"
+
+#, fuzzy
+msgid "It reached the size limit of {limit} px. Everything up to there is kept."
+msgstr "Ảnh đã đạt giới hạn kích thước {limit} px. Mọi thứ đến đó đều được giữ lại."
+
+#, fuzzy
+msgid "It reached the size limit of 50 megapixels. Everything up to there is kept."
+msgstr "Ảnh đã đạt giới hạn kích thước 50 megapixel. Mọi thứ đến đó đều được giữ lại."
+
+#, fuzzy
+msgid "The window was moved or resized. Everything up to there is kept: 1 frame, {size}."
+msgstr "Cửa sổ đã bị di chuyển hoặc đổi kích thước. Mọi thứ đến đó đều được giữ lại: 1 khung hình, {size}."
+
+#, fuzzy
+msgid "The window was moved or resized. Everything up to there is kept: {n} frames, {size}."
+msgstr "Cửa sổ đã bị di chuyển hoặc đổi kích thước. Mọi thứ đến đó đều được giữ lại: {n} khung hình, {size}."

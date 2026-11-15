@@ -122,14 +122,34 @@ pub struct RealLongShot;
 struct CapturerFrames {
     capturer: Arc<Capturer>,
     target: cm_capture::CaptureTarget,
+    /// Where the window was at the first frame (a window target only).
+    first_rect: Option<PhysicalRect>,
 }
 
 impl FrameSource for CapturerFrames {
     fn grab(&mut self) -> Result<Frame, CmError> {
-        self.capturer
+        let frame = self
+            .capturer
             .capture(CaptureRequest::new(self.target), None)?
             .map(|c| c.frame)
-            .ok_or_else(|| CmError::invalid_input("capture was cancelled"))
+            .ok_or_else(|| CmError::invalid_input("capture was cancelled"))?;
+        if self.first_rect.is_none()
+            && matches!(self.target, cm_capture::CaptureTarget::Window { .. })
+        {
+            self.first_rect = area_rect(&self.capturer, self.target);
+        }
+        Ok(frame)
+    }
+
+    /// A window target whose rectangle is not the one it had at the first frame (moved or
+    /// resized by the person). Display and region targets do not move.
+    fn target_changed(&mut self) -> bool {
+        let (Some(first), cm_capture::CaptureTarget::Window { .. }) =
+            (self.first_rect, self.target)
+        else {
+            return false;
+        };
+        area_rect(&self.capturer, self.target).is_some_and(|now| now != first)
     }
 }
 
@@ -139,7 +159,11 @@ impl LongShotSystem for RealLongShot {
         capturer: Arc<Capturer>,
         target: cm_capture::CaptureTarget,
     ) -> Box<dyn FrameSource + Send> {
-        Box::new(CapturerFrames { capturer, target })
+        Box::new(CapturerFrames {
+            capturer,
+            target,
+            first_rect: None,
+        })
     }
 
     fn scroller(&self, anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
@@ -463,7 +487,10 @@ impl Inner {
 struct LongMeta {
     frames: u32,
     end: EndReason,
-    note: Option<&'static str>,
+    note: Option<String>,
+    /// The longest side this run was allowed (`max_px`, at most 16,384), so that the toast can
+    /// name the limit it met.
+    limit_px: u32,
     header_px: u32,
     footer_px: u32,
     direction: Direction,
@@ -640,10 +667,15 @@ impl Inner {
                         &mut on_stitch,
                     )?,
                 };
+                let along = match direction {
+                    Direction::Vertical => result.image.frame.height(),
+                    Direction::Horizontal => result.image.frame.width(),
+                };
                 *meta_in.lock().unwrap_or_else(PoisonError::into_inner) = Some(LongMeta {
                     frames: result.image.frames,
                     end: result.end,
-                    note: result.end.note(),
+                    note: result.end.note_for(cfg.limits, along),
+                    limit_px: cfg.limits.max_len,
                     header_px: result.image.header_len,
                     footer_px: result.image.footer_len,
                     direction,
@@ -683,7 +715,7 @@ impl Inner {
         drop(guard);
         let m = meta.lock().unwrap_or_else(PoisonError::into_inner).take();
         if let Some(m) = m {
-            if let Some(note) = m.note {
+            if let Some(note) = &m.note {
                 if let Some(w) = out["warnings"].as_array_mut() {
                     w.push(json!(note));
                 }

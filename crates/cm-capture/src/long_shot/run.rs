@@ -115,6 +115,12 @@ fn stopped_or(stop: &mut dyn FnMut() -> bool, end: EndReason) -> EndReason {
     }
 }
 
+/// Whether the window was moved or resized: the frame is another size than the first, or the
+/// source says its window is not where it was. Asked when a join failed.
+fn window_changed(src: &mut dyn FrameSource, stitcher: &Stitcher, frame: &Frame) -> bool {
+    stitcher.size_differs(frame) || src.target_changed()
+}
+
 /// Auto scroll: frame, scroll about 80 % of the area, wait for the content to settle, frame,
 /// until the end, the limit, a failed join or `stop` returns true (Esc or Stop; what was
 /// captured is kept).
@@ -179,6 +185,7 @@ pub fn run_auto_ex(
         while outcome == PushOutcome::NoOverlap
             && stitcher.frames() == 1
             && retry < FIRST_PAIR_RETRIES
+            && !window_changed(src, &stitcher, &next.frame)
         {
             retry += 1;
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
@@ -196,6 +203,7 @@ pub fn run_auto_ex(
             && stitcher.frames() > 1
             && retry < NO_OVERLAP_RETRIES
             && !stop()
+            && !window_changed(src, &stitcher, &next.frame)
         {
             retry += 1;
             let back = ((f64::from(step) * BACK_SHARE) as u32).max(1);
@@ -272,7 +280,11 @@ pub fn run_auto_ex(
                         }
                         PushOutcome::NoChange => break,
                         PushOutcome::NoOverlap => {
-                            ended = Some(EndReason::NoOverlap);
+                            ended = Some(if window_changed(src, &stitcher, &more.frame) {
+                                EndReason::WindowChanged
+                            } else {
+                                EndReason::NoOverlap
+                            });
                             break;
                         }
                         PushOutcome::LimitReached { .. } => {
@@ -310,6 +322,10 @@ pub fn run_auto_ex(
             }
             PushOutcome::NoChange => break stopped_or(stop, EndReason::ReachedEnd),
             PushOutcome::NoOverlap => {
+                // The window was moved or resized: not a page that jumped.
+                if window_changed(src, &stitcher, &next.frame) {
+                    break stopped_or(stop, EndReason::WindowChanged);
+                }
                 super::debug::dump_refused(
                     &last_ok,
                     &next.frame,
@@ -503,6 +519,9 @@ pub fn run_hand_ex(
                 }
             }
             PushOutcome::NoOverlap => {
+                if window_changed(src, &stitcher, &g) {
+                    break EndReason::WindowChanged;
+                }
                 super::debug::dump_refused(&last_taken, &g, stitcher.last_refusal(), "hand scroll");
                 if stitcher.frames() == 1 {
                     let earlier = first_refused.take().filter(|e| *e != g);

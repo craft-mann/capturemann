@@ -893,67 +893,284 @@ fn cap_6_horizontal_whole_window_with_a_static_toolbar_joins() {
     }
 }
 
-/// macOS, Chrome, Nov 15, 2026 (the maintainer's two captures): the left 150 to 300 px of the
-/// window were missing, the right edge complete. A strip of columns that stay put while the page
-/// scrolls (a dashboard's sidebar, the white margin of a page) kept the rows from joining, so the
-/// static columns were cut from the frames to join them and then never put back. The image is as
-/// wide as the frames, the sidebar is the first frame's, and the page beside it is every row once.
+/// The old test, kept in spirit: full width, page columns exact, and the sides are the window's
+/// own pixels (see `check_side_chrome`).
 #[test]
 fn cap_6_vertical_static_sidebar_is_kept_not_cut() {
     for (left, right) in [(100u32, 0u32), (0, 90), (100, 90)] {
-        let side = (left, right);
-        let page = SyntheticPage::new(240, 1500, 300);
-        let view = page.clone().view();
-        let pos = std::rc::Rc::new(std::cell::Cell::new(0));
-        let mut src = Overlaid {
-            view: view.clone(),
-            pos: pos.clone(),
-            over: |_, w, h, data: &mut [u8]| {
-                for y in 0..h {
-                    for x in (0..left).chain(w - right..w) {
-                        let v = (x * 7 + y * 13) ^ (x >> 2);
-                        let i = ((y * w + x) * 4) as usize;
-                        data[i..i + 4].copy_from_slice(&[v as u8, (v >> 3) as u8, 90, 255]);
-                    }
-                }
-            },
-        };
-        let mut sc = Tracking { view, pos };
-        let r = run_auto(
-            &mut src,
-            &mut sc,
-            &mut NoSleep::default(),
-            cfg(Direction::Vertical),
-            &mut || false,
-            &mut |_| {},
-        )
-        .unwrap();
-        assert_eq!(r.end, EndReason::ReachedEnd, "{side:?}");
-        let want = page.expected();
-        let got = &r.image.frame;
-        assert_eq!(got.width(), 240, "{side:?}: every column of the window");
-        assert_eq!(got.height(), want.height(), "{side:?}");
-        for y in 0..got.height() {
-            for x in 0..240 {
-                if x < left || x >= 240 - right {
-                    // The first frame's pixels, repeated below its last row.
-                    let yy = y.min(299);
-                    let v = (x * 7 + yy * 13) ^ (x >> 2);
-                    assert_eq!(
-                        got.pixel(x, y),
-                        Some([v as u8, (v >> 3) as u8, 90, 255]),
-                        "{side:?} side at {x},{y}"
-                    );
-                } else {
-                    assert_eq!(
-                        got.pixel(x, y),
-                        want.pixel(x, y),
-                        "{side:?} page at {x},{y}"
-                    );
+        check_side_chrome(left, right);
+    }
+}
+
+/// The chrome of a real window capture around a page with fixed side content (QA macOS pass 4,
+/// LS-1): a fixed sidebar of `side` columns that differs in every row and stays while the page
+/// scrolls, a grey margin of 4 px at the outer edge (the window's edge and shadow) and, in the
+/// last 20 rows of every frame, a rounded corner (grey that grows towards the outer edge). Only
+/// the sides that have a sidebar get the margin and the corners. Everything depends on the place
+/// in the frame only, like the real thing.
+const GREY: [u8; 4] = [200, 200, 200, 255];
+const CORNER: u32 = 20;
+const MARGIN: u32 = 4;
+
+fn chrome_px(x: u32, y: u32, w: u32, h: u32, left: u32, right: u32) -> Option<[u8; 4]> {
+    let (on_left, on_right) = (x < left, x >= w - right);
+    if !on_left && !on_right {
+        return None;
+    }
+    let edge = if on_left { x } else { w - 1 - x };
+    let corner = h.saturating_sub(y).min(CORNER);
+    if edge < MARGIN || (y + CORNER >= h && edge < CORNER - corner + 1) {
+        return Some(GREY);
+    }
+    let v = x.wrapping_mul(7919) ^ y.wrapping_mul(104_729) ^ (y >> 3).wrapping_mul(31);
+    Some([v as u8, (v >> 8) as u8, (v >> 16) as u8 | 1, 255])
+}
+
+fn draw_chrome(left: u32, right: u32) -> impl FnMut(u32, u32, u32, &mut [u8]) {
+    move |_, w, h, data: &mut [u8]| {
+        for y in 0..h {
+            for x in (0..left).chain(w - right..w) {
+                if let Some(p) = chrome_px(x, y, w, h, left, right) {
+                    let i = ((y * w + x) * 4) as usize;
+                    data[i..i + 4].copy_from_slice(&p);
                 }
             }
         }
     }
+}
+
+/// Runs Auto scroll over a 240 px wide, 300 px high window of a page with the chrome above and
+/// checks the image: the page columns are the page, every row once; the side columns of every
+/// output row are the pixels of one row of one frame (found by their own signature), the rows go
+/// on one after the other with at most one break per seam (a first-frame-bottom smear would
+/// repeat one row), and the rounded corners are only where the last frame ends.
+fn check_side_chrome(left: u32, right: u32) {
+    let (w, h) = (240u32, 300u32);
+    let page = SyntheticPage::new(w, 1500, h);
+    let view = page.clone().view();
+    let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+    let mut src = Overlaid {
+        view: view.clone(),
+        pos: pos.clone(),
+        over: draw_chrome(left, right),
+    };
+    let mut sc = Tracking { view, pos };
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    let side = (left, right);
+    assert_eq!(r.end, EndReason::ReachedEnd, "{side:?}");
+    let want = page.expected();
+    let got = &r.image.frame;
+    assert_eq!(got.width(), w, "{side:?}: every column of the window");
+    assert_eq!(got.height(), want.height(), "{side:?}");
+    let sides: Vec<u32> = (0..left).chain(w - right..w).collect();
+    // The rows a frame can supply, by their side signature.
+    let mut rows = std::collections::HashMap::new();
+    for y in 0..h {
+        let sig: Vec<[u8; 4]> = sides
+            .iter()
+            .map(|&x| chrome_px(x, y, w, h, left, right).unwrap())
+            .collect();
+        assert!(
+            rows.insert(sig, y).is_none(),
+            "{side:?}: row {y} is not unique"
+        );
+    }
+    let mut prev_y: Option<u32> = None;
+    let mut breaks = 0;
+    let total = got.height();
+    for y in 0..total {
+        for x in left..w - right {
+            assert_eq!(
+                got.pixel(x, y),
+                want.pixel(x, y),
+                "{side:?} page at {x},{y}"
+            );
+        }
+        let sig: Vec<[u8; 4]> = sides.iter().map(|&x| got.pixel(x, y).unwrap()).collect();
+        let Some(&src_y) = rows.get(&sig) else {
+            panic!("{side:?}: row {y} of the image is no row of any frame at its sides");
+        };
+        // The corners belong to the end of the last frame and nowhere else.
+        let in_corner_rows = src_y + CORNER >= h;
+        assert_eq!(
+            in_corner_rows,
+            y + CORNER >= total,
+            "{side:?}: row {y} comes from frame row {src_y}"
+        );
+        if prev_y.is_some_and(|p| src_y != p + 1) {
+            breaks += 1;
+        }
+        prev_y = Some(src_y);
+    }
+    assert!(
+        breaks < r.image.frames,
+        "{side:?}: {breaks} breaks in the side rows for {} frames (a smeared row has many)",
+        r.image.frames
+    );
+}
+
+/// QA macOS pass 4, LS-1, and the maintainer's own captures (Nov 15, 2026): a window with a fixed
+/// LEFT sidebar. Every later frame showed the window's desktop-grey corner and shadow where the
+/// sidebar is: the first frame's last row was repeated down the side columns. Now the static
+/// columns only mask the comparison and every row is composed from the frame that supplies it.
+#[test]
+fn ls_1_fixed_left_sidebar_keeps_every_frames_own_side_pixels() {
+    check_side_chrome(100, 0);
+}
+
+#[test]
+fn ls_1_fixed_right_sidebar_keeps_every_frames_own_side_pixels() {
+    check_side_chrome(0, 90);
+}
+
+#[test]
+fn ls_1_fixed_sidebars_on_both_sides_keep_every_frames_own_side_pixels() {
+    check_side_chrome(100, 90);
+}
+
+/// Window moved or resized during an Auto run (QA macOS pass 4, LS-2): the toast said the page
+/// jumped. The frames before are kept; the end says what happened.
+struct Changing {
+    view: fake::PageView,
+    pos: std::rc::Rc<std::cell::Cell<u32>>,
+    /// Page position from which the window is different.
+    from: u32,
+    kind: Change,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Change {
+    /// The frames are narrower (the window was resized).
+    Resize,
+    /// The frames are as big, but the window is somewhere else (the source says so, and what it
+    /// shows is shifted).
+    Move,
+}
+
+impl FrameSource for Changing {
+    fn grab(&mut self) -> Result<Frame, cm_core::CmError> {
+        let f = self.view.grab()?;
+        if self.pos.get() < self.from {
+            return Ok(f);
+        }
+        let (w, h) = (f.width() as usize, f.height() as usize);
+        match self.kind {
+            Change::Resize => {
+                let mut data = Vec::new();
+                for y in 0..h {
+                    data.extend_from_slice(&f.rgba()[y * w * 4..(y * w + w - 10) * 4]);
+                }
+                Frame::new(w as u32 - 10, h as u32, data)
+            }
+            Change::Move => {
+                let mut data = f.rgba().to_vec();
+                for y in 0..h {
+                    data[y * w * 4..(y + 1) * w * 4].rotate_right(7 * 4);
+                }
+                Frame::new(w as u32, h as u32, data)
+            }
+        }
+    }
+
+    fn target_changed(&mut self) -> bool {
+        self.kind == Change::Move && self.pos.get() >= self.from
+    }
+}
+
+fn window_changed_run(kind: Change) {
+    let page = SyntheticPage::new(240, 1500, 300);
+    let view = page.clone().view();
+    let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+    let mut src = Changing {
+        view: view.clone(),
+        pos: pos.clone(),
+        from: 300,
+        kind,
+    };
+    let mut sc = Tracking { view, pos };
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::WindowChanged);
+    assert_eq!(
+        r.end.note(),
+        Some("The window was moved or resized"),
+        "not the page-jumped note"
+    );
+    // The frames before the change are kept, row for row.
+    assert!(r.image.frames >= 2, "{} frames", r.image.frames);
+    let want = page.expected();
+    let got = &r.image.frame;
+    assert_eq!(got.width(), 240);
+    assert!(got.height() > 300 && got.height() < want.height());
+    for y in 0..got.height() {
+        for x in 0..240 {
+            assert_eq!(got.pixel(x, y), want.pixel(x, y), "at {x},{y}");
+        }
+    }
+}
+
+#[test]
+fn ls_2_a_resized_window_ends_as_window_changed_and_keeps_the_frames() {
+    window_changed_run(Change::Resize);
+}
+
+#[test]
+fn ls_2_a_moved_window_ends_as_window_changed_and_keeps_the_frames() {
+    window_changed_run(Change::Move);
+}
+
+/// A page that jumps (no overlap, the window still where it was) is still `no_overlap`.
+#[test]
+fn ls_2_a_page_that_jumps_is_still_no_overlap() {
+    let (r, _) = auto(SyntheticPage::new(240, 3000, 300).with_jump(900, 600), None);
+    assert_eq!(r.end, EndReason::NoOverlap);
+}
+
+/// LS-4: the note names the limit that was met.
+#[test]
+fn ls_4_the_limit_note_names_the_limit_that_was_met() {
+    // The caller's own max_px.
+    let (r, _) = auto(SyntheticPage::new(240, 6000, 300), Some(1000));
+    assert_eq!(r.end, EndReason::LimitReached);
+    let limits = Limits::with_max_px(Some(1000));
+    let note = r.end.note_for(limits, r.image.frame.height()).unwrap();
+    assert_eq!(note, "Reached the size limit of 1000 px");
+    assert_eq!(limit_kind(limits, 1000), LimitKind::MaxPx);
+    // The 50 megapixel rule stops short of the length limit.
+    let wide = Limits::default();
+    assert_eq!(limit_kind(wide, 12_500), LimitKind::Pixels);
+    assert_eq!(
+        EndReason::LimitReached.note_for(wide, 12_500).unwrap(),
+        "Reached the size limit of 50 megapixels"
+    );
+    // Only the product limit is "the longest image CaptureMann can edit".
+    assert_eq!(limit_kind(wide, MAX_LONG_SIDE), LimitKind::Editor);
+    assert_eq!(
+        EndReason::LimitReached
+            .note_for(wide, MAX_LONG_SIDE)
+            .unwrap(),
+        "Reached the longest image CaptureMann can edit"
+    );
+    // Other endings keep their notes.
+    assert_eq!(
+        EndReason::NoOverlap.note_for(wide, 100).as_deref(),
+        EndReason::NoOverlap.note()
+    );
 }
 
 /// A terminal's numbered lines (Windows Terminal, Nov 15, 2026: 200 lines, stopped at line 86):

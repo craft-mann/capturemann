@@ -69,15 +69,39 @@ Synthetic-frame tests only (`cap_6_*` in `crates/cm-capture/src/long_shot/tests.
 
 Known limit of the join: when a wheel overshoots so far that fewer than about 12 lines overlap, and the lines are alike, the pair cannot be told from a wrong match; the retry scrolls back by half a step, which usually brings a clear overlap, but two notches too many on a 250-line area still gave a wrong join in two of the 36 synthetic cases tried.
 
-## Missing left side of a vertical capture (maintainer, macOS, Nov 15, 2026)
+## Missing left side of a vertical capture (maintainer, macOS, Nov 15, 2026), and grey sides (QA macOS pass 4, LS-1)
 
 Two Chrome captures (`Screenshot 2026-11-15 13.22` 2120x9930, 9 frames, `reached_end`; `13.25` 2446x4437,
-`no_overlap`) had the left 150 to 300 physical px of the window missing and the right edge complete.
+`no_overlap`) had the left 150 to 300 physical px of the window missing and the right edge complete. After the
+first fix, QA pass 4 (Chrome 770x860 pt at 2x, a position:fixed left sidebar and a red edge strip) found the full
+width kept and frame 1 right, but **every later frame had the window's shadow / desktop grey at the left (about
+58 px) and right (about 110 px)** and the red strip lost.
 
 | Finding | Cause found offline | Test |
 | --- | --- | --- |
-| Left strip of the window missing (an address bar that starts mid-URL, a dashboard without its sidebar) | not the picker or the capture target: a Window target is captured whole by `Capturer::capture` and the overlay's area only places the HUD. `Stitcher::apply_trim` cuts columns that do not change between the first two frames (`static_strips`, added on Nov 15 for the horizontal toolbar) when the plain join and the edge trim (at most 48 px left, 64 px right) fail. For a vertical capture those columns are a fixed sidebar or a page's margin, which is content, and the cut was never put back. The first frame's pixels of the cut columns are now kept (`KeptSides`) and added at both sides at the finish; below the first frame's last content row they repeat its last row. A horizontal capture still drops its static rows (a browser's toolbar) | `cap_6_vertical_static_sidebar_is_kept_not_cut` |
+| Left strip of the window missing | `Stitcher::apply_trim` cuts the columns that do not change between the first two frames (`static_strips`, added on Nov 15 for the horizontal toolbar) when the plain join and the edge trim fail. For a vertical capture those columns are a fixed sidebar or a page's margin, which is content, and the cut was never put back | `cap_6_vertical_static_sidebar_is_kept_not_cut` |
+| Grey sides in every later frame (LS-1) | The first fix put the first frame's cut columns back with `KeptSides` and **repeated the first frame's last content row below it**. That row is the bottom of the window, where the rounded corner and the shadow are drawn, so the corner pixels were smeared down both sides of the whole image. Not a different capture rectangle in the later frames: frames are the same size and the same window capture (`CGWindowListCreateImage` of the window id, no shadow; width 1540 = 770 x 2 in the normal screenshot too) | `ls_1_fixed_left_sidebar_keeps_every_frames_own_side_pixels`, `ls_1_fixed_right_sidebar_...`, `ls_1_fixed_sidebars_on_both_sides_...` (fail with the old restore: one row repeated, grey corner rows down the sides) |
 
-Not reproduced on a real screen (the two folders were read only; the frames were not dumped, `CM_LONG_SHOT_DEBUG_DIR`
-writes refused pairs only). A frame is cut only when the first pair did not join as it was, so a page that still
-shows the cut should be sent with its debug dump.
+Now: for a vertical capture the static columns are never cut. They only **mask the comparison** (they match at any
+shift, so they cannot say where the join is); the join is found on the columns between them as before, and every
+row of the image is composed from the **whole frame** that supplies it (`FullSides` in `stitch.rs`). A fixed
+sidebar appears once per slice, like anything that scrolls: honest, and no row is invented. `KeptSides` is gone.
+The rounded corners lie in the masked columns, which `corner_depth` cannot see, so `side_corner_depth` compares the
+outermost 96 columns of each cut side, at the shifted rows, to know how many rows at the end of the previous frame
+the next frame must replace (a fixed element at the edge only makes that stretch longer: safe). A horizontal capture
+still drops its static rows (a browser's toolbar), and an edge trim alone (scrollbar, border) still cuts.
+
+Not reproduced on a real screen (the pass-4 pictures were read, no frames were dumped; `CM_LONG_SHOT_DEBUG_DIR`
+writes refused pairs only). The cause above is from the code and the synthetic frames; a real run on the sidebar
+page is the proof still to be made.
+
+## Window moved or resized during a run (QA macOS pass 4, LS-2) and the limit wording (LS-4)
+
+| Finding | Cause and fix | Test |
+| --- | --- | --- |
+| LS-2: moving the window mid-run ended with "Stopped where the page jumped" | the frames no longer joined (another size, or the window elsewhere) and every failed join was `no_overlap`. Now, when a join fails, the run asks whether the window changed: the frame is another size than the first (`Stitcher::size_differs`), or the source says its window is not at the rectangle it had at the first frame (`FrameSource::target_changed`; the daemon's `CapturerFrames` lists the windows only then, never on every grab). Auto and Hand end `window_changed`, keeping the frames; the retries (first pair, scroll back) are skipped. Toast: "The window was moved or resized. Everything up to there is kept: {n} frames, {size}." [Open, Copy] | `ls_2_a_resized_window_ends_as_window_changed_and_keeps_the_frames`, `ls_2_a_moved_window_ends_as_window_changed_...`, `ls_2_a_page_that_jumps_is_still_no_overlap`; `s18_the_end_toasts_...` (desktop) |
+| LS-4: "the longest image CaptureMann can edit" for a user `max_px` and for the 50 MP rule | the end wording knew only the 16,384 px limit. `long_shot.limit_px` is sent; the daemon's warning and the toast name the limit met: "It reached the size limit of {limit} px." (user `max_px`), "...of 50 megapixels." (image shorter than the limit), and the 16,384 wording only for that limit (`limit_kind`) | `ls_4_the_limit_note_names_the_limit_that_was_met`; `s18_the_end_toasts_...` |
+
+A window moved without a resize is seen only where the target is a window and the listing gives its bounds
+(`area_rect`); a move that the capture follows (the frames stay whole) and that joins is not an error and does not
+end the run.

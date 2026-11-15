@@ -28,7 +28,8 @@ pub use run::{
     run_auto, run_auto_ex, run_hand, run_hand_ex, LongShotConfig, LongShotProgress, LongShotResult,
 };
 pub use stitch::{
-    Direction, EndReason, Limits, PushOutcome, Stitched, Stitcher, MAX_LONG_SIDE, MAX_PIXELS,
+    limit_kind, Direction, EndReason, LimitKind, Limits, PushOutcome, Stitched, Stitcher,
+    MAX_LONG_SIDE, MAX_PIXELS,
 };
 
 use crate::Frame;
@@ -36,6 +37,13 @@ use crate::Frame;
 /// Takes frames of the scrollable area (physical px, the same size every time).
 pub trait FrameSource {
     fn grab(&mut self) -> Result<Frame, CmError>;
+
+    /// Whether the window the frames come from is no longer where, or as big as, it was when the
+    /// run began (asked only when a join failed, so it may cost a listing of the windows).
+    /// `false` when the source cannot tell.
+    fn target_changed(&mut self) -> bool {
+        false
+    }
 }
 
 /// Scrolls the content under the area. `amount_px` is physical px along `direction`; the

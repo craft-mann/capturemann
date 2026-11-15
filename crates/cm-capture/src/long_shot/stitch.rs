@@ -76,6 +76,9 @@ pub enum EndReason {
     /// The first scroll changed nothing, twice: the window did not scroll (the wheel went to
     /// another window, or the content does not scroll). Never reported as the end of content.
     NothingScrolled,
+    /// The window was moved or resized while the run went on (the frames are another size, or
+    /// the window's rectangle is not where it was): what was captured before is kept.
+    WindowChanged,
 }
 
 impl EndReason {
@@ -87,8 +90,45 @@ impl EndReason {
             EndReason::NothingScrolled => {
                 Some("Nothing scrolled: the area may be covered by another window or the page is not scrollable")
             }
+            EndReason::WindowChanged => Some("The window was moved or resized"),
             EndReason::ReachedEnd | EndReason::StoppedByUser => None,
         }
+    }
+
+    /// [`EndReason::note`] that names the real limit when the run stopped at one: the caller's
+    /// `max_px`, the 50 megapixel rule, or the longest image the editor handles. `len` is the
+    /// image's length along the scroll direction.
+    pub fn note_for(self, limits: Limits, len: u32) -> Option<String> {
+        if self != EndReason::LimitReached {
+            return self.note().map(str::to_owned);
+        }
+        Some(match limit_kind(limits, len) {
+            LimitKind::MaxPx => format!("Reached the size limit of {} px", limits.max_len),
+            LimitKind::Pixels => "Reached the size limit of 50 megapixels".to_owned(),
+            LimitKind::Editor => "Reached the longest image CaptureMann can edit".to_owned(),
+        })
+    }
+}
+
+/// Which limit a run that ended with [`EndReason::LimitReached`] met.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitKind {
+    /// The caller asked for less than the product limit (`max_px`).
+    MaxPx,
+    /// The 50 megapixel rule: the image is shorter than the length limit.
+    Pixels,
+    /// [`MAX_LONG_SIDE`].
+    Editor,
+}
+
+/// The limit behind a stop at `len` px along the scroll direction.
+pub fn limit_kind(limits: Limits, len: u32) -> LimitKind {
+    if len < limits.max_len {
+        LimitKind::Pixels
+    } else if limits.max_len < MAX_LONG_SIDE {
+        LimitKind::MaxPx
+    } else {
+        LimitKind::Editor
     }
 }
 
@@ -773,62 +813,62 @@ fn static_strips(a: &Lines, b: &Lines) -> (usize, usize) {
 /// frames (a blinking caret, a loading spinner in the toolbar).
 const STATIC_SHARE: f64 = 0.02;
 
-/// The columns cut from the sides of a vertical capture so that its frames could join, with the
-/// first frame's pixels in them. At the finish every row of the image gets the first frame's
-/// row of them (the header rows as they were, the footer rows as the first frame had them); the
-/// rows below the first frame's content repeat its last content row, which is what a margin or
-/// a sidebar's background is.
-struct KeptSides {
+/// The outermost columns (per side) that are looked at for the window's rounded corners when the
+/// static columns of a vertical capture are not part of the join (see [`FullSides`]).
+const SIDE_CORNER_COLS: usize = 96;
+
+/// A vertical capture whose first pair needed its static side columns left out of the comparison
+/// (a fixed sidebar, a page's margin: they match at any shift, so no shift can be told from them).
+/// The columns are only a **mask**: the join is found on the columns between them, but every row of
+/// the image is composed from the whole frame that supplies it, side columns included. A fixed
+/// sidebar then appears once per slice like anything that scrolls, which is what a scrolling
+/// capture of such a page is. (Until Nov 15, 2026 the columns were cut and the first frame's were
+/// put back, repeating its last row below it: the window's rounded corner at the bottom of that
+/// row was smeared down both sides of the image, QA macOS pass 4, LS-1.)
+struct FullSides {
+    /// Static columns at the start and at the end of every row, left out of the comparison.
     l: usize,
     r: usize,
-    /// Rows of the first frame.
-    rows: usize,
-    left: Vec<u8>,
-    right: Vec<u8>,
+    /// The last accepted frame with all its columns.
+    prev: Lines,
 }
 
-impl KeptSides {
-    fn new(first: &Lines, l: usize, r: usize) -> KeptSides {
-        let cross = first.line_len / 4;
-        let (mut left, mut right) = (Vec::new(), Vec::new());
-        for i in 0..first.count {
-            left.extend_from_slice(&first.line(i)[..l * 4]);
-            right.extend_from_slice(&first.line(i)[(cross - r) * 4..]);
-        }
-        KeptSides {
-            l,
-            r,
-            rows: first.count,
-            left,
-            right,
+/// How many rows at the end of the last accepted frame (`prev`) differ, in the outermost columns
+/// of the cut sides, from the same page row of `next` (`join.shift` rows on): the window's
+/// rounded corners lie in the static columns, which the join does not compare, so the corner
+/// depth of the joined columns (see [`corner_depth`]) cannot see them. A fixed element at the
+/// edge also differs and only makes the replaced stretch longer, which is safe: the next frame
+/// has those rows.
+fn side_corner_depth(prev: &Lines, next: &Lines, join: &Join, l: usize, r: usize) -> usize {
+    let cross = prev.line_len / 4;
+    let n = prev.count;
+    let overlap = n - join.header - join.footer - join.shift;
+    let max = (overlap / 2).min(MAX_CORNER_DEPTH);
+    let (wl, wr) = (l.min(SIDE_CORNER_COLS), r.min(SIDE_CORNER_COLS));
+    let same = |p: usize| {
+        let (a, b) = (prev.line(p), next.line(p - join.shift));
+        let close = |x0: usize, x1: usize| {
+            a[x0 * 4..x1 * 4]
+                .iter()
+                .zip(&b[x0 * 4..x1 * 4])
+                .all(|(u, v)| u.abs_diff(*v) <= NOISE_TOLERANCE)
+        };
+        close(0, wl) && close(cross - wr, cross)
+    };
+    let (mut depth, mut run) = (0, 0);
+    for d in 0..max {
+        let p = n - join.footer - 1 - d;
+        if same(p) {
+            run += 1;
+            if run >= CORNER_END_RUN {
+                break;
+            }
+        } else {
+            run = 0;
+            depth = d + 1;
         }
     }
-
-    fn width(&self) -> usize {
-        self.l + self.r
-    }
-
-    /// `lines` (rows of `line_len` bytes, `header` rows first and `footer` rows last) with the
-    /// kept columns added at both sides. Returns the new width in px and the data.
-    fn widen(&self, lines: &[u8], line_len: usize, header: usize, footer: usize) -> (u32, Vec<u8>) {
-        let count = lines.len() / line_len;
-        let (lb, rb) = (self.l * 4, self.r * 4);
-        let mut out = Vec::with_capacity(count * (line_len + lb + rb));
-        for i in 0..count {
-            // The first frame's row for output row `i`.
-            let src = if i < header || self.rows <= header + footer {
-                i.min(self.rows - 1)
-            } else if i >= count - footer {
-                self.rows - (count - i)
-            } else {
-                (i).min(self.rows - footer - 1)
-            };
-            out.extend_from_slice(&self.left[src * lb..(src + 1) * lb]);
-            out.extend_from_slice(&lines[i * line_len..(i + 1) * line_len]);
-            out.extend_from_slice(&self.right[src * rb..(src + 1) * rb]);
-        }
-        (((line_len + lb + rb) / 4) as u32, out)
-    }
+    depth
 }
 
 /// Collects frames and builds the long image.
@@ -842,10 +882,10 @@ pub struct Stitcher {
     /// Pixels cut from the start and the end of every line, once the first pair of frames has
     /// joined.
     trim: Option<(usize, usize)>,
-    /// A vertical capture whose first pair needed static columns cut at its sides (a fixed
-    /// sidebar, a page's margin): the first frame's pixels of the cut columns, put back at the
-    /// finish (see [`KeptSides`]).
-    kept: Option<KeptSides>,
+    /// A vertical capture whose first pair needed static columns left out of the comparison
+    /// (a fixed sidebar, a page's margin): the image is composed from whole frames (see
+    /// [`FullSides`]).
+    full: Option<FullSides>,
     header: Vec<u8>,
     content: Vec<u8>,
     footer: Vec<u8>,
@@ -866,7 +906,7 @@ impl Stitcher {
             size: None,
             bands: None,
             trim: None,
-            kept: None,
+            full: None,
             header: Vec::new(),
             content: Vec::new(),
             footer: Vec::new(),
@@ -907,6 +947,13 @@ impl Stitcher {
                 _ => None,
             },
         }
+    }
+
+    /// Whether `frame` is not the size of the first one: the window was resized (or the capture
+    /// changed what it covers), so no join can be asked of it.
+    pub fn size_differs(&self, frame: &Frame) -> bool {
+        self.size
+            .is_some_and(|s| s != (frame.width(), frame.height()))
     }
 
     /// Why the last refused frame did not join, as text for the debug dump.
@@ -953,14 +1000,24 @@ impl Stitcher {
                 new_len: self.len as u32,
             };
         };
+        // The whole frame, for a vertical capture that may leave its static side columns out of
+        // the comparison (the first pair has not been looked at yet, or it has).
+        let whole = (self.dir == Direction::Vertical
+            && (self.trim.is_none() || self.full.is_some()))
+        .then(|| lines.clone());
         let (prev, lines) = self.apply_trim(prev, lines, hint);
-        let outcome = self.join(&prev, &lines, size, hint);
+        let mut full = self.full.take();
+        let pair = full.as_ref().zip(whole.as_ref());
+        let outcome = self.join(&prev, &lines, size, hint, pair);
+        let added = matches!(outcome, PushOutcome::Added { .. });
+        if let (Some(f), Some(w)) = (full.as_mut(), whole) {
+            if added {
+                f.prev = w;
+            }
+        }
+        self.full = full;
         // The newest accepted frame is the one the next frame is matched against.
-        self.prev = Some(if matches!(outcome, PushOutcome::Added { .. }) {
-            lines
-        } else {
-            prev
-        });
+        self.prev = Some(if added { lines } else { prev });
         outcome
     }
 
@@ -1012,13 +1069,15 @@ impl Stitcher {
             return (prev, lines);
         };
         self.trim = Some((l, r));
-        // Columns cut only so that the frames could join are content of a vertical capture
+        // Columns left out only so that the frames could join are content of a vertical capture
         // (a sidebar that stays, the white margin of a page: Chrome, macOS, Nov 15, 2026, the
-        // left 150 to 300 px of two captures were missing). They are put back at the finish.
+        // left 150 to 300 px of two captures were missing). They only mask the comparison; the
+        // image is composed from whole frames (see [`FullSides`]).
+        let cropped = (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
         if self.dir == Direction::Vertical {
-            self.kept = Some(KeptSides::new(&prev, l, r));
+            self.full = Some(FullSides { l, r, prev });
         }
-        (prev.cropped(l, cross - r), lines.cropped(l, cross - r))
+        cropped
     }
 
     fn join(
@@ -1027,7 +1086,14 @@ impl Stitcher {
         lines: &Lines,
         size: (u32, u32),
         hint: Option<u32>,
+        full: Option<(&FullSides, &Lines)>,
     ) -> PushOutcome {
+        // The rows the image is composed from: whole frames when static side columns were left
+        // out of the comparison, else the compared lines themselves.
+        let (src_prev, src) = match full {
+            Some((f, w)) => (&f.prev, w),
+            None => (prev, lines),
+        };
         if self.limit_hit || self.size != Some(size) {
             self.refusal = Some(format!(
                 "the frame is {}x{} px, the first was {:?}{}",
@@ -1044,7 +1110,7 @@ impl Stitcher {
         }
         let hint = hint.map(|h| h as usize);
         let n = lines.count;
-        let line_len = lines.line_len;
+        let line_len = src.line_len;
         let join = match find_join(prev, lines, hint, self.bands) {
             Ok(j) => j,
             Err(NoJoin::Same) => return PushOutcome::NoChange,
@@ -1071,22 +1137,24 @@ impl Stitcher {
         };
         if self.bands.is_none() {
             // The second frame fixes the bands; the content starts with the first frame's.
-            self.header = prev.range(0, join.header).to_vec();
-            self.content = prev.range(join.header, n - join.footer).to_vec();
+            self.header = src_prev.range(0, join.header).to_vec();
+            self.content = src_prev.range(join.header, n - join.footer).to_vec();
             self.bands = Some((join.header, join.footer));
         }
         let cw = n - join.header - join.footer;
         let have = join.header + self.content.len() / line_len;
         let total = have + join.shift + join.footer;
-        let room = self.room(line_len / 4 + self.kept.as_ref().map_or(0, KeptSides::width));
+        let room = self.room(line_len / 4);
         // The new content is the bottom `shift` lines of this frame's content area.
         let from = join.header + cw - join.shift;
         // The last `guard` lines of the content were not compared: this frame's lines replace them.
         // So do the lines above them that this frame shows differently (the window's rounded
         // corners and shadow at the bottom of the previous frame: grey notches at every seam).
+        let side = full.map_or(0, |(f, w)| side_corner_depth(&f.prev, w, &join, f.l, f.r));
         let guard = join
             .guard
             .max(corner_depth(prev, lines, &join))
+            .max(side)
             .min(cw - join.shift)
             .min(self.content.len() / line_len);
         let join = Join { guard, ..join };
@@ -1094,8 +1162,8 @@ impl Stitcher {
         if total <= room {
             self.content.truncate(keep);
             self.content
-                .extend_from_slice(lines.range(from - join.guard, from + join.shift));
-            self.footer = lines.range(n - join.footer, n).to_vec();
+                .extend_from_slice(src.range(from - join.guard, from + join.shift));
+            self.footer = src.range(n - join.footer, n).to_vec();
             self.len = total;
             self.frames += 1;
             return PushOutcome::Added {
@@ -1106,7 +1174,7 @@ impl Stitcher {
         let take = room.saturating_sub(have).min(join.shift);
         self.content.truncate(keep);
         self.content
-            .extend_from_slice(lines.range(from - join.guard, from + take));
+            .extend_from_slice(src.range(from - join.guard, from + take));
         self.footer.clear();
         self.len = have + take;
         self.limit_hit = true;
@@ -1136,7 +1204,9 @@ impl Stitcher {
                 usize::MAX,
             );
         }
-        let prev = self.prev.as_ref()?;
+        // The last accepted frame as it is stored: with its static side columns when the image is
+        // composed from whole frames.
+        let prev = self.full.as_ref().map(|f| &f.prev).or(self.prev.as_ref())?;
         let line_len = prev.line_len;
         // The lines were trimmed (a scrollbar, a border): the picture is as wide as they are.
         let w = (line_len / 4) as u32;
@@ -1167,7 +1237,10 @@ impl Stitcher {
 
     /// The image so far. Errors when no frame was pushed.
     pub fn finish(&self) -> Result<Stitched, CmError> {
-        let (Some(prev), Some(_)) = (&self.prev, self.size) else {
+        let (Some(prev), Some(_)) = (
+            self.full.as_ref().map(|f| &f.prev).or(self.prev.as_ref()),
+            self.size,
+        ) else {
             return Err(CmError::invalid_input("Long Shot has no frames"));
         };
         let line_len = prev.line_len;
@@ -1189,13 +1262,7 @@ impl Stitcher {
         };
         let count = lines.len() / line_len;
         let frame = match self.dir {
-            Direction::Vertical => match &self.kept {
-                Some(k) => {
-                    let (wide, data) = k.widen(&lines, line_len, header_len, footer_len);
-                    Frame::new(wide, count as u32, data)?
-                }
-                None => Frame::new(cross, count as u32, lines)?,
-            },
+            Direction::Vertical => Frame::new(cross, count as u32, lines)?,
             Direction::Horizontal => {
                 // Lines are columns of `h` pixels: transpose back.
                 let hh = cross as usize;

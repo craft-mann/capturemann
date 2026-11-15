@@ -25,6 +25,8 @@ struct Scripted {
     support: AutoScrollSupport,
     /// Window ids the run asked to bring to the front.
     raised: Arc<Mutex<Vec<u32>>>,
+    /// From this page position on, the frames are 4 px narrower (the window was resized).
+    narrow_from: Option<u32>,
 }
 
 impl Scripted {
@@ -34,13 +36,24 @@ impl Scripted {
             pos: Arc::default(),
             support: AutoScrollSupport::Available,
             raised: Arc::default(),
+            narrow_from: None,
         }
     }
 }
 
 impl FrameSource for Scripted {
     fn grab(&mut self) -> Result<Frame, CmError> {
-        Ok(self.page.frame_at(*self.pos.lock().unwrap()))
+        let pos = *self.pos.lock().unwrap();
+        let f = self.page.frame_at(pos);
+        if self.narrow_from.is_some_and(|n| pos >= n) {
+            let (w, h) = (f.width() as usize, f.height() as usize);
+            let mut data = Vec::new();
+            for y in 0..h {
+                data.extend_from_slice(&f.rgba()[y * w * 4..(y * w + w - 4) * 4]);
+            }
+            return Frame::new(w as u32 - 4, h as u32, data);
+        }
+        Ok(f)
     }
 }
 
@@ -180,8 +193,29 @@ async fn cap_6_ac4_max_px_stops_with_the_note_and_saves() {
     assert_eq!(out["height"], 700);
     assert_eq!(out["long_shot"]["end"], "limit_reached");
     let warnings = out["warnings"].to_string();
+    // LS-4: the caller's own limit is named, not the editor's.
     assert!(
-        warnings.contains("Reached the longest image CaptureMann can edit"),
+        warnings.contains("Reached the size limit of 700 px"),
+        "{warnings}"
+    );
+    assert!(!warnings.contains("longest image"), "{warnings}");
+    assert_eq!(out["long_shot"]["limit_px"], 700);
+}
+
+/// LS-2: a window that is resized during the run ends it as `window_changed` (not `no_overlap`),
+/// and the image up to there is stored.
+#[tokio::test]
+async fn ls_2_a_resized_window_ends_the_run_as_window_changed_and_saves() {
+    let mut sys = Scripted::new(SyntheticPage::new(24, 3000, 300));
+    sys.narrow_from = Some(300);
+    let (d, _c, _dir) = daemon(sys, Decision::Approve);
+    let out = call(&d, agent(), params(json!({}))).await.unwrap();
+    assert_eq!(out["long_shot"]["end"], "window_changed");
+    assert!(out["capture_id"].as_str().is_some());
+    assert!(out["height"].as_u64().unwrap() > 300);
+    let warnings = out["warnings"].to_string();
+    assert!(
+        warnings.contains("The window was moved or resized"),
         "{warnings}"
     );
 }

@@ -2684,6 +2684,12 @@ msgstr ""
 msgid "It never records what you type."
 msgstr ""
 
+msgid "It reached the size limit of 50 megapixels. Everything up to there is kept."
+msgstr ""
+
+msgid "It reached the size limit of {limit} px. Everything up to there is kept."
+msgstr ""
+
 msgid "It reached {limit} px, the longest image CaptureMann can edit. Everything up to there is kept."
 msgstr ""
 
@@ -6187,6 +6193,12 @@ msgid "The watermark could not be drawn"
 msgstr ""
 
 msgid "The window follows the cursor and only moves when the cursor leaves its middle 80%."
+msgstr ""
+
+msgid "The window was moved or resized. Everything up to there is kept: 1 frame, {size}."
+msgstr ""
+
+msgid "The window was moved or resized. Everything up to there is kept: {n} frames, {size}."
 msgstr ""
 
 msgid "The windows could not be listed."

@@ -355,11 +355,49 @@ pub fn done_toast(result: &Value, how: Ending) -> Option<ToastSpec> {
             ToastKind::Warning,
             tr!("Nothing scrolled: the area may be covered by another window or the page is not scrollable"),
         ),
-        "limit_reached" => open(
-            ToastSpec::new(ToastKind::Warning, tr!("Long Shot saved at the size limit")).body(tr!(
-                "It reached {limit} px, the longest image CaptureMann can edit. Everything up to there is kept.",
-                limit = thousands(u64::from(cm_capture::long_shot::MAX_LONG_SIDE))
-            )),
+        "limit_reached" => {
+            // The limit that was met: the person's own `max_px`, the 50 megapixel rule, or the
+            // longest image the editor handles (an answer without `limit_px` is the last).
+            let limit = ls.map_or(0, |l| u32_of(l, "limit_px"));
+            let body = match cm_capture::long_shot::limit_kind(
+                cm_capture::long_shot::Limits::with_max_px((limit > 0).then_some(limit)),
+                w.max(h),
+            ) {
+                _ if limit == 0 => None,
+                cm_capture::long_shot::LimitKind::MaxPx => Some(tr!(
+                    "It reached the size limit of {limit} px. Everything up to there is kept.",
+                    limit = thousands(u64::from(limit))
+                )),
+                cm_capture::long_shot::LimitKind::Pixels => Some(tr!(
+                    "It reached the size limit of 50 megapixels. Everything up to there is kept."
+                )),
+                cm_capture::long_shot::LimitKind::Editor => None,
+            };
+            open(
+                ToastSpec::new(ToastKind::Warning, tr!("Long Shot saved at the size limit")).body(
+                    body.unwrap_or_else(|| {
+                        tr!(
+                            "It reached {limit} px, the longest image CaptureMann can edit. Everything up to there is kept.",
+                            limit = thousands(u64::from(cm_capture::long_shot::MAX_LONG_SIDE))
+                        )
+                    }),
+                ),
+            )
+        }
+        // The window was moved or resized during the run: not a page that jumped.
+        "window_changed" => open(
+            ToastSpec::new(ToastKind::Warning, tr!("Long Shot saved")).body(if frames == 1 {
+                tr!(
+                    "The window was moved or resized. Everything up to there is kept: 1 frame, {size}.",
+                    size = size_text(w, h)
+                )
+            } else {
+                tr!(
+                    "The window was moved or resized. Everything up to there is kept: {n} frames, {size}.",
+                    n = frames,
+                    size = size_text(w, h)
+                )
+            }),
         ),
         "stopped_by_user" | "no_overlap" if how.esc => open(
             ToastSpec::new(ToastKind::Info, tr!("Long Shot saved")).body(if frames == 1 {
@@ -608,6 +646,48 @@ mod tests {
         // Esc while the last part was left out (the engine says no_overlap) is still Esc's.
         let t = done_toast(&answer("no_overlap"), esc).unwrap();
         assert!(t.body.as_deref().unwrap().starts_with("Stopped with Esc."));
+
+        // The window was moved or resized: its own words, and nothing about a page that jumped.
+        let t = done_toast(
+            &answer("window_changed"),
+            Ending {
+                auto: true,
+                esc: false,
+            },
+        )
+        .unwrap();
+        assert_eq!(t.kind, ToastKind::Warning);
+        assert_eq!(t.title, "Long Shot saved");
+        assert_eq!(
+            t.body.as_deref(),
+            Some("The window was moved or resized. Everything up to there is kept: 9 frames, 758 \u{d7} 7,320.")
+        );
+        assert_eq!(labels(&t), vec!["Open", "Copy"]);
+
+        // LS-4: the limit that was met is the one named. A user `max_px` ...
+        let with_limit = |limit: u32, w: u32, h: u32| {
+            done_toast(
+                &json!({"capture_id": "shot_1", "width": w, "height": h,
+                        "long_shot": {"end": "limit_reached", "frames": 9, "limit_px": limit}}),
+                Ending::default(),
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            with_limit(4000, 1540, 4000).body.as_deref(),
+            Some("It reached the size limit of 4,000 px. Everything up to there is kept.")
+        );
+        // ... the 50 megapixel rule (the image is shorter than the length limit) ...
+        assert_eq!(
+            with_limit(16384, 4000, 12500).body.as_deref(),
+            Some("It reached the size limit of 50 megapixels. Everything up to there is kept.")
+        );
+        // ... and only the product limit says "the longest image CaptureMann can edit".
+        assert!(with_limit(16384, 1540, 16384)
+            .body
+            .as_deref()
+            .unwrap()
+            .contains("the longest image CaptureMann can edit"));
 
         let t = done_toast(&answer("limit_reached"), Ending::default()).unwrap();
         assert_eq!(t.kind, ToastKind::Warning);
