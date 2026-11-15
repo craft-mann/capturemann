@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use cm_i18n::tr;
 use gpui::{
-    div, prelude::*, px, App, Context, Entity, FontWeight, Global, Render, Role, SharedString,
-    Window, WindowHandle,
+    div, prelude::*, px, App, Context, Entity, Global, Render, Role, SharedString, Window,
+    WindowHandle,
 };
 use serde_json::{json, Value};
 
@@ -22,8 +22,10 @@ use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
 use crate::ui::recording::{harden, panel_options, pointer_display, visible_part};
 
 /// The bar's size, points.
-pub const BAR_W: f64 = 470.0;
-pub const BAR_H: f64 = 64.0;
+/// The design's bar (S3) is about 524 px wide at 56 px high; the extra width keeps the labels of
+/// longer languages inside the bar.
+pub const BAR_W: f64 = 580.0;
+pub const BAR_H: f64 = 58.0;
 const MARGIN: f64 = 12.0;
 
 /// The open bar, if any (one guide records at a time).
@@ -368,6 +370,8 @@ fn hud_button(
         .aria_label(SharedString::from(label.clone()))
         .h(px(40.))
         .px(px(10.))
+        .flex_none()
+        .whitespace_nowrap()
         .flex()
         .items_center()
         .gap(px(6.))
@@ -415,17 +419,15 @@ impl Render for GuideHud {
                     .id("guide-hud-stop")
                     .role(Role::Button)
                     .aria_label(tr!("Stop"))
-                    .h(px(40.))
-                    .px(px(14.))
+                    .size(px(44.))
+                    .flex_none()
                     .flex()
                     .items_center()
-                    .rounded(px(10.))
+                    .justify_center()
+                    .rounded(px(12.))
                     .bg(rgba_of(t.rec))
-                    .text_color(rgba_of(t.on_rec))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_size(px(type_scale::UI))
                     .cursor_pointer()
-                    .child(tr!("Stop"))
+                    .child(div().size(px(14.)).rounded(px(3.)).bg(rgba_of(t.on_rec)))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.act("stop_guide", json!({}), cx);
                     })),
