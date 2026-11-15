@@ -624,15 +624,6 @@ pub(crate) fn apply_retype(
     else {
         return Ok(());
     };
-    let Some(r) = Region::outward(rect.to_array(), pm.width(), pm.height()) else {
-        return Ok(());
-    };
-    // The erase is padded; the new text stays clipped to the box itself.
-    paint_fill(
-        pm,
-        fill_region(*rect, pm.width(), pm.height()).unwrap_or(r),
-        fill,
-    );
     let style = TextStyle {
         px: *size as f32,
         color: *color,
@@ -642,6 +633,10 @@ pub(crate) fn apply_retype(
         center: false,
     };
     let Some(l) = text::layout(fonts, t, &style)? else {
+        // No text: the box is only erased.
+        if let Some(r) = fill_region(*rect, pm.width(), pm.height()) {
+            paint_fill(pm, r, fill);
+        }
         return Ok(());
     };
     let n = rect.normalized();
@@ -654,10 +649,28 @@ pub(crate) fn apply_retype(
     // Vertically centred on the middle of the capital letters, as step badges are.
     let px = *size as f32;
     let y = n.y + n.h / 2.0 + f64::from(0.364 * px) - f64::from(l.baseline);
+    let (bx, by) = (x.round() as i32 - l.pad, y.round() as i32 - l.pad);
+    // A box fitted to the ink of the old text is about as tall as its capitals, but the new
+    // text may carry marks above them (Vietnamese stacks two: Ế, Ộ) and tails below the baseline
+    // (g, y, ỵ). The erase and the clip grow vertically to the text's own height, by at most a
+    // third of the size on each side, so those parts are not cut off.
+    let max_grow = f64::from(px) / 3.0;
+    let top = (f64::from(by) + f64::from(l.pad) * 0.5).clamp(n.y - max_grow, n.y);
+    let bottom = (f64::from(by) + f64::from(l.pixmap.height()) - f64::from(l.pad) * 0.5)
+        .clamp(n.y + n.h, n.y + n.h + max_grow);
+    let grown = Rc::new(n.x, top, n.w, bottom - top);
+    let Some(r) = Region::outward(grown.to_array(), pm.width(), pm.height()) else {
+        return Ok(());
+    };
+    // The erase is padded; the new text stays clipped to the (grown) box.
+    paint_fill(
+        pm,
+        fill_region(grown, pm.width(), pm.height()).unwrap_or(r),
+        fill,
+    );
     let Some(mask) = region_mask(pm.width(), pm.height(), r) else {
         return Ok(());
     };
-    let (bx, by) = (x.round() as i32 - l.pad, y.round() as i32 - l.pad);
     let offsets: &[i32] = if *weight >= 600 {
         &[0, ((size * 0.035).round() as i32).max(1)]
     } else {

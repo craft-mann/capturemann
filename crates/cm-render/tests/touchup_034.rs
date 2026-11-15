@@ -965,3 +965,21 @@ fn ann9_tight_box_erases_a_one_pixel_glyph_top() {
     // Two pixels away is untouched.
     assert_eq!(out.get_pixel(30, 18).0, [255, 255, 255, 255]);
 }
+
+/// ANN-9: a box fitted to the capitals of the old text must not cut the marks above the
+/// capitals or the tails below the baseline of the new text (Vietnamese: Ế, Ộ, g, ỵ).
+#[test]
+fn ann_9_tall_marks_and_tails_are_not_clipped_by_a_tight_box() {
+    let base = white(300, 120);
+    // 26 px text in a box about as tall as its capitals.
+    let op = r##"{"id":"r","op":"retype","rect":[20,40,260,19],"fill":{"kind":"solid","colors":["#FFFFFF"]},"text":"Ế Ộ gỵ","size":26}"##;
+    let ops = parse_ops_str(&format!("[{op}]")).unwrap();
+    let out = render_annotations(&base, &ops).unwrap();
+    let dark_in =
+        |y0: u32, y1: u32| (y0..y1).any(|y| (0..300).any(|x| out.get_pixel(x, y).0[0] < 128));
+    assert!(dark_in(30, 40), "the marks above the box are drawn");
+    assert!(dark_in(59, 68), "the tails below the box are drawn");
+    // ...and nothing far outside the box (the growth is limited to a third of the size).
+    assert!(!dark_in(0, 28), "no ink far above the box");
+    assert!(!dark_in(70, 120), "no ink far below the box");
+}
