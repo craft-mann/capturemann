@@ -6,10 +6,25 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 ## [Unreleased]
 
 ### Added
+- **Long Shot (CAP-6, scrolling capture).** Capture a whole page or window as one picture: Auto scroll (macOS needs Accessibility) or Hand scroll, vertical or horizontal, from the overlay's mode bar, the sidebar tile, the launcher, the menu or a shortcut you set (none by default). A small HUD, a live side preview, a size limit and Esc keep what was captured; fixed headers, footers and toolbars are kept once; a run started by an agent or the CLI shows a passive HUD with Stop. `capturemann long-shot` and the Long Shot tools.
+- **Click Guide (GDE-1 to GDE-4).** Click through a task and CaptureMann writes the steps (a picture with a ring and a numbered badge, an OCR title, notes). It records clicks only, never keystrokes, and in 0.3.4 it does not mark or blur text, so check a guide before sharing it. Start on a display or on a chosen window; a bar with Stop, Pause, Note step and Undo step; edit, reorder, retake; export Markdown, HTML or PDF, or copy as rich text; a new `guide` capture kind in the Library; five tools for agents.
+- **Retype, Move area and Blueprint (ANN-9 to ANN-11)** as base edits under your other annotations: change text inside a screenshot (the box widens for a longer text; Vietnamese marks are not clipped), move or remove an area, replace text with placeholder bars. None of them is a redaction.
+- **Zoom Lens (ANN-8)**, a magnifier loupe (op `magnify`).
+- **Boards (BRD-1):** make a pair, strip, grid or free layout from 2 to 12 screenshots, with BEFORE and AFTER labels.
+- **Export selected as pictures (BLK-1):** size, JPEG or WebP, a name pattern, a watermark and Blueprint.
+- **Library selection:** hover a card and tick it; a bar offers Make a board, Export selected and Delete. Canvas text selection in the editor. The Text tool's default colour is chosen from the picture under the text (dark or light, with an outline on a busy picture), `annotate` does the same without a colour.
+- **Sidebar tiles** for Long Shot and Click Guide; the Agents & CLI icon shows whether MCP is ready (the MCP card is gone).
+- Vietnamese for every new string.
 - **CMYK and YCCK JPEG pictures import** (IMP-6.AC10 to AC12): they are converted to 8-bit sRGB with the embedded colour profile, or with the standard formula (honouring Adobe's inverted values) when there is none or it cannot be read; the row says "Converted" and, for an unreadable profile, "profile not read". 0.3.3 refused them as `jpeg_cmyk`.
 - **Open with for pictures** (IMP-6.AC13): CaptureMann is listed under Open with for PNG and JPEG files on macOS, Windows (per user, installer component) and Linux; it is never made the default.
 
+### Changed
+- The Published page is gone: Recordings has the Published and Needs attention filters, published cards and a Published card on the recording details page; old links open Recordings with Published on.
+- Default titles ("Screenshot ...", "Recording ...", "Click Guide ...") use your local time instead of UTC.
+
 ### Fixed
+- Copy as rich text reached the clipboard only in some builds; filter chips follow the page (Audio no longer lists Boards or Click Guides); deleting a capture whose upload waits for a Google sign-in is no longer blocked.
+- Zoom Lens edge colour fringe; a long library path fails fast with a clear message instead of hanging; `fetch-models.ps1` works on Windows PowerShell 5.1; `library list` prints `-` for a size-less guide.
 - Windows: the recording HUD (screen and audio) and the webcam bubble can be dragged. Since 0.2.9 the release text said they could, but the Windows window had no drag region, so the press did nothing (REC-5.AC18). macOS and Linux were not affected.
 
 ## [0.3.3] - 2026-11-13
