@@ -142,7 +142,7 @@ fn read_json_arg(cx: &mut Ctx<'_>, v: &str, what: &str) -> Result<Value, CliErro
     } else {
         v.to_owned()
     };
-    serde_json::from_str(&text)
+    serde_json::from_str(super::strip_bom(&text))
         .map_err(|e| CliError::invalid_input(format!("{what} is not valid JSON: {e}")))
 }
 
