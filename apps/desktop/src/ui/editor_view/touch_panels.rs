@@ -291,11 +291,6 @@ impl EditorView {
                 fill_row(t, info.fill_color, info.fill_kind),
             ));
         }
-        if info.too_wide {
-            rows.push(warning_note(tr!(
-                "The new text is wider than the box and will be cut. Widen the box or shorten the text."
-            )));
-        }
         if let Some(n) = &info.note {
             rows.push(warning_note(n.clone()));
         }
@@ -311,9 +306,6 @@ impl EditorView {
             )
             .into_any_element(),
         );
-        rows.push(warning_note(tr!(
-            "Not a redaction. To hide secrets, use Blur (B) or Pixelate (X)."
-        )));
         rows
     }
 

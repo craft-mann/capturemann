@@ -642,7 +642,7 @@ impl EditorState {
     /// Enter or a click elsewhere: the retype is stored (before the first non-base op), or
     /// nothing is stored when the text did not change or is empty.
     pub(super) fn finish_retype(&mut self, t: &TextEdit, original: Option<String>) -> Option<Edit> {
-        let kind = t.kind();
+        let kind = self.fit_retype(t.kind());
         match t.existing.clone() {
             Some(id) => {
                 let i = self.index_of(&id)?;
@@ -665,6 +665,33 @@ impl EditorState {
                 Some(self.insert_base_edit(kind))
             }
         }
+    }
+
+    /// A text wider than its box widens the box (the fill with it) instead of being cut: to the
+    /// right for left-aligned text, to the left for right-aligned, both ways for centred, kept
+    /// inside the picture (ANN-9).
+    fn fit_retype(&self, mut kind: OpKind) -> OpKind {
+        let Some((w, _)) = cm_render::touchup::retype_text_extent(&kind) else {
+            return kind;
+        };
+        let OpKind::Retype { rect, align, .. } = &mut kind else {
+            return kind;
+        };
+        let r = rect.normalized();
+        let max_w = f64::from(self.image.0);
+        let need = (w.ceil() + 2.0).min(max_w);
+        if need <= r.w || max_w <= 0.0 {
+            return kind;
+        }
+        let grow = need - r.w;
+        let left = match align {
+            TextAlign::Left => 0.0,
+            TextAlign::Right => grow,
+            _ => grow / 2.0,
+        };
+        let x = (r.x - left).clamp(0.0, (max_w - need).max(0.0));
+        *rect = Rc::new(x, r.y, need, r.h);
+        kind
     }
 
     /// What the Retype panel shows: the text being typed, the selected retype, or the tool's
@@ -1648,6 +1675,13 @@ mod tests {
         let Edit::Replace(ops) = e else { panic!() };
         assert!(
             matches!(&ops[0].kind, OpKind::Retype { weight: 700, text, .. } if text.starts_with("A much"))
+        );
+        let OpKind::Retype { rect, .. } = &ops[0].kind else {
+            panic!()
+        };
+        assert!(
+            rect.normalized().w > 40.0 && rect.normalized().x == 100.0,
+            "the box grew to the right to hold the text instead of cutting it"
         );
         let e = s.set_retype_align(TextAlign::Center);
         assert!(matches!(e, Some(Edit::Replace(_))));
