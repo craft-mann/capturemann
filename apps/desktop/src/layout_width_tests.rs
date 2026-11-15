@@ -358,8 +358,11 @@ fn toast_specs() -> Vec<(&'static str, crate::toast::ToastSpec)> {
     ]
 }
 
+/// The room of a row-2 dock tile's label, px (see the case that names it).
+const DOCK_ROW2_ROOM: f32 = (crate::theme::scale::SIDEBAR_W - 24. - 2. - 16. - 6.) / 2. - 2. - 8.;
+
 fn cases() -> Vec<Case> {
-    use crate::nav::{DockAction, NavItem};
+    use crate::nav::{DockAction, ExtraTile, NavItem};
     use crate::ui::settings::model::SettingsSection;
     let ui = type_scale::UI;
     let cap = type_scale::CAPTION;
@@ -660,6 +663,23 @@ fn cases() -> Vec<Case> {
             DockAction::TILES
                 .into_iter()
                 .map(|a| t(format!("DockAction::label({a:?})"), move || a.label())),
+        ),
+    );
+    // Capture dock row 2 (board S14): two tiles 6 px apart, 1 px border, 4 px side padding, the
+    // label on one line under a 16 px icon (an ellipsis cuts a longer one).
+    v.push(
+        Case::new(
+            "Capture dock tile, row 2 (Long Shot, Click Guide)",
+            "(248 - 24 - 2 - 16 - 6) / 2 - 2 border - 8 padding",
+            DOCK_ROW2_ROOM,
+            11.,
+            400,
+            one,
+        )
+        .texts(
+            ExtraTile::ALL
+                .into_iter()
+                .map(|a| t(format!("ExtraTile::label({a:?})"), move || a.label())),
         ),
     );
     // The Record row: border 2, padding 36, a 16 px icon and 8 px gaps (icon, label, spacer,
@@ -1660,6 +1680,32 @@ fn audio_sheet_height_estimates_hold_in_every_language() {
                 need.is_some_and(|n| n <= 2),
                 "{lang:?}: {hint:?} needs {need:?} lines, the sheet reserves 2"
             );
+        }
+    }
+}
+
+/// Board S14: the two row-2 tile labels leave room for a label 40 percent longer than English, and
+/// Vietnamese fits as it is (the pseudo-locale of the report is about 30 percent).
+#[test]
+fn row_two_dock_tile_labels_have_room_for_forty_percent_more() {
+    for tile in crate::nav::ExtraTile::ALL {
+        let en = with_language(Lang::En, || tile.label());
+        let px = width(&en, Face::of(false, 400), 11.);
+        assert!(
+            px * 1.4 <= DOCK_ROW2_ROOM,
+            "{en:?}: {px:.0} px x 1.4 > {DOCK_ROW2_ROOM:.0} px"
+        );
+        let vi = with_language(Lang::Vi, || tile.label());
+        let vi_px = width(&vi, Face::of(false, 400), 11.);
+        assert!(vi_px <= DOCK_ROW2_ROOM, "{vi:?}: {vi_px:.0} px");
+    }
+    // The tile tooltips are 200 px wide with 12 px padding and a border: the name stays on one
+    // line in English and Vietnamese.
+    for tile in crate::nav::ExtraTile::ALL {
+        for lang in [Lang::En, Lang::Vi] {
+            let name = with_language(lang, || tile.label());
+            let px = width(&name, Face::of(false, 600), 12.5);
+            assert!(px <= 200. - 24. - 2., "{name:?}: {px:.0} px");
         }
     }
 }

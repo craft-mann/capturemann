@@ -79,6 +79,19 @@ pub fn is_running(cx: &App) -> bool {
     cx.try_global::<Holder>().is_some_and(|h| h.0.is_some())
 }
 
+/// The sidebar tile of a running Long Shot: brings its HUD to the front.
+pub fn bring_to_front(cx: &mut App) {
+    let Some(hud) = cx
+        .try_global::<Holder>()
+        .and_then(|h| h.0.as_ref().map(|r| r.hud))
+    else {
+        return;
+    };
+    let _ = hud.update(cx, |_, window, cx| {
+        crate::surfaces::bring_to_front(cx, window, None, "long shot tile");
+    });
+}
+
 /// The hotkey id of the bare Esc key (the delay pill's key; one id for both).
 pub fn escape_hotkey_id() -> u32 {
     crate::ui::delay_pill::escape_hotkey_id()
@@ -282,6 +295,7 @@ fn open_windows(
         preview,
         model: model.clone(),
     })));
+    notify_studio(cx); // the sidebar tile shows the run
     poll(&model, cx);
 }
 
@@ -361,6 +375,14 @@ fn close_windows(cx: &mut App) {
         hud::clear_floating(cx);
     }
     cx.set_global(Holder(None));
+    notify_studio(cx);
+}
+
+/// Redraws the Studio, so the sidebar's Long Shot tile follows the run (board S14).
+fn notify_studio(cx: &mut App) {
+    if let Some(app) = cx.try_global::<app::AppHandle>().map(|h| h.0.clone()) {
+        app.update(cx, |_, cx| cx.notify());
+    }
 }
 
 /// What the capture call came back with: the daemon's answer and the CAP-4 finish (clipboard, folder).

@@ -175,7 +175,7 @@
 **User story.** As someone who documents or reports bugs, I want a whole web page, spreadsheet or chat thread as one image, so that I don't paste five screenshots in a row.
 
 **Description**
-- **Start:** a **Long Shot** mode in the capture overlay, a launcher command, and a configurable hotkey with no default. The user picks a window, then the scrollable area inside it (CaptureMann highlights the area under the pointer). A region drag works too.
+- **Start:** a **Long Shot** mode in the capture overlay, a launcher command, a tile in the sidebar's capture dock (second row, with Click Guide; design S14, built Nov 15, 2026: ready, hover with a tooltip, active while a run is open with the HUD brought to front on click, and a rail button), and a configurable hotkey with no default. The user picks a window, then the scrollable area inside it (CaptureMann highlights the area under the pointer). A region drag works too.
 - **Auto scroll** (macOS with Accessibility, Windows, X11):
   - CaptureMann scrolls by about 80 % of the area height each time, and waits until two frames 50 ms apart are the same (to a 150 ms limit).
   - It stops at the end (no change after a scroll), at the limit (the limits above), or when the user presses Esc or Stop. Stopping early keeps what has been captured. **Esc** is a global key for as long as any Long Shot runs (the window being scrolled has the focus and the HUD never takes it); it also stops a run started from the CLI or by an agent, which has no HUD.

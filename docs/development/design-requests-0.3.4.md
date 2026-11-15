@@ -5,7 +5,7 @@ existing design pack `specs/capturemann-0.3.4-design/`, boards S0 to S13). The i
 without a board, or the board and the build now disagree. For each: what exists, what to design, the
 states needed. Please follow the pack's tokens (40 px controls, 44 px HUD targets, `rec` red, Geist).
 
-## D1. Sidebar entry for Long Shot and Click Guide (open question)
+## D1. Sidebar entry for Long Shot and Click Guide (DESIGNED in S14, option b, and BUILT Nov 15, 2026)
 - Today: the sidebar has no tile for either. They start from the launcher, the tray, a hotkey (Long Shot,
   no default chord) and the library header ("New Click Guide", "Click Guide of a window…").
 - Decide and draw: (a) Long Shot only, (b) Long Shot + Click Guide, or (c) neither. Show the sidebar at
@@ -55,7 +55,7 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
 - Draw (S4 update): the panel without those notes; how the widened box looks while typing (the dashed
   edit outline grows live?); whether Move area and Blueprint keep the "Not a redaction" note.
 
-## D7. Agents & CLI status in the sidebar (MCP card removed)
+## D7. Agents & CLI status in the sidebar (MCP card removed) (DESIGNED in S14 and BUILT Nov 15, 2026)
 - Built: no card; the Agents & CLI icon is blue when MCP is ready and grey when offline, and its
   accessible label says the status ("MCP ready", "MCP offline", "Another app owns the socket").
 - Draw: the icon in rest, hover, active, ready, offline (three reasons), and a hover tooltip carrying the
@@ -71,3 +71,15 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
 - Vietnamese strings run about 20 to 40 % longer than English. Please state, for the Long Shot bar,
   Click Guide bar, library selection bar and the Make-a-board sheet, the maximum label length and the
   truncation or wrapping rule, so the layout tests can assert it.
+
+## Built from board S14 (Nov 15, 2026): D1 and D7
+- D1: second dock row with Long Shot and Click Guide tiles and the same two as rail buttons (`ui/sidebar.rs`
+  `extra_tile`, model in `nav.rs`: `ExtraTile`, `DockFacts`, `tile_state`, `tile_tip`). Differences from the board: the
+  Wayland sentence shows for any session with no click events (the engine only knows "no click events", Wayland is the
+  case that exists today); Long Shot is disabled only when there is no library (the launcher's reason), because no
+  engine rule is known that blocks it during a recording or a guide; the focus ring is two spread shadows (2 px text, 2 px gap).
+- D7: status shape at the icon's bottom-right (`StatusMark`: dot, ring, "!" badge), mist icon unless ready, a status
+  tooltip, and the accessible names "Agents & CLI, MCP ready / MCP offline / another app owns the socket". Missing library
+  and missing endpoint show "MCP offline" with their own reason, never "Another app owns the socket". The board's
+  "2 min ago" is not shown: the activity log's last entry has no time in `LastCall`.
+- Not seen on screen: tested with pure models and width tests only.

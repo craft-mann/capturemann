@@ -217,6 +217,45 @@ pub fn rec_dot(t: &Theme, size: f32) -> Div {
         .bg(rgba_of(t.rec))
 }
 
+/// The status shape of Agents & CLI (board S14, D7): a solid dot, a hollow ring or an amber "!"
+/// badge, so the colour is never the only cue. `ground` is the fill behind the shape (the sidebar,
+/// for the ring that overlaps the icon); `None` leaves a ring empty (a tooltip).
+pub fn status_mark(
+    t: &Theme,
+    mark: crate::agent_status::StatusMark,
+    size: f32,
+    ground: Option<Color>,
+) -> Div {
+    use crate::agent_status::StatusMark;
+    match mark {
+        StatusMark::Dot => dot(t.agent, size),
+        StatusMark::Ring => {
+            let d = div()
+                .size(px(size))
+                .flex_none()
+                .rounded(px(size / 2.))
+                .border_1()
+                .border_color(rgba_of(t.mist));
+            match ground {
+                Some(g) => d.bg(rgba_of(g)),
+                None => d,
+            }
+        }
+        StatusMark::Bang => div()
+            .size(px(size))
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(3.))
+            .bg(rgba_of(t.warning))
+            .text_color(rgba_of(t.ink))
+            .text_size(px((size * 0.8).max(8.)))
+            .font_weight(FontWeight::EXTRA_BOLD)
+            .child("!"),
+    }
+}
+
 /// A small status dot.
 pub fn dot(color: Color, size: f32) -> Div {
     div()
