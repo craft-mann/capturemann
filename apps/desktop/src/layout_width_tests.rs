@@ -26,6 +26,9 @@ use crate::theme::type_scale;
 enum Overflow {
     /// It wraps onto at most this many lines (1: it must fit on one line).
     Lines(usize),
+    /// One line; a longer label is cut with an ellipsis and the full text is the tooltip
+    /// (`truncate` in the control).
+    Ellipsis,
 }
 
 /// Where the width comes from.
@@ -142,6 +145,8 @@ fn measure(case: &Case, item: &Item, lang: Lang) -> Measure {
 enum Verdict {
     Fits,
     Wraps(usize),
+    /// Cut with an ellipsis (the control shrinks the label; the full text is its tooltip).
+    Truncates,
     Overflows,
 }
 
@@ -151,6 +156,7 @@ impl Verdict {
         match (case.overflow, m.lines) {
             (_, _) if fits => Verdict::Fits,
             (Overflow::Lines(max), Some(n)) if n <= max => Verdict::Wraps(n),
+            (Overflow::Ellipsis, _) => Verdict::Truncates,
             _ => Verdict::Overflows,
         }
     }
@@ -159,6 +165,7 @@ impl Verdict {
         match self {
             Verdict::Fits => "fits".into(),
             Verdict::Wraps(n) => format!("wraps ({n} lines)"),
+            Verdict::Truncates => "ellipsis".into(),
             Verdict::Overflows => "OVERFLOWS".into(),
         }
     }
@@ -726,8 +733,23 @@ fn cases() -> Vec<Case> {
         .texts(
             NavItem::ALL
                 .into_iter()
+                .filter(|n| *n != NavItem::Guides)
                 .map(|n| t(format!("NavItem::label({n:?})"), move || n.label())),
         ),
+    );
+    // The Click Guide name ("Hướng dẫn theo thao tác", 164 px) is longer than the room: the row's
+    // label shrinks with an ellipsis (`truncate` in `nav_row`) and the full name is the row's
+    // tooltip (`nav_entry`). It must still leave room for a few letters and the icon.
+    v.push(
+        Case::new(
+            "Sidebar nav row (Click Guides, shrinks with an ellipsis)",
+            "248 - 24 - 2 - 20 - 18 - 10 - 32 count",
+            nav_room - 32.,
+            ui,
+            500,
+            Overflow::Ellipsis,
+        )
+        .text("NavItem::label(Guides)", || NavItem::Guides.label()),
     );
     v.push(
         Case::new(
@@ -777,11 +799,11 @@ fn cases() -> Vec<Case> {
     v.push(
         Case::new(
             "Capture dock tile, row 2 (Long Shot, Click Guide)",
-            "(248 - 24 - 2 - 16 - 6) / 2 - 2 border - 8 padding",
+            "(248 - 24 - 2 - 16 - 6) / 2 - 2 border - 8 padding; two lines in a 54 px tile",
             DOCK_ROW2_ROOM,
             11.,
             400,
-            one,
+            Overflow::Lines(2),
         )
         .texts(
             ExtraTile::ALL
@@ -1803,8 +1825,13 @@ fn row_two_dock_tile_labels_have_room_for_forty_percent_more() {
             "{en:?}: {px:.0} px x 1.4 > {DOCK_ROW2_ROOM:.0} px"
         );
         let vi = with_language(Lang::Vi, || tile.label());
-        let vi_px = width(&vi, Face::of(false, 400), 11.);
-        assert!(vi_px <= DOCK_ROW2_ROOM, "{vi:?}: {vi_px:.0} px");
+        // Vietnamese may wrap onto two lines ("Hướng dẫn / theo thao tác"); 16 px icon, 3 px gap,
+        // two 11 px lines and the border fit the 54 px tile.
+        let vi_lines = lines(&vi, Face::of(false, 400), 11., DOCK_ROW2_ROOM);
+        assert!(
+            vi_lines.is_some_and(|n| n <= 2),
+            "{vi:?}: {vi_lines:?} lines"
+        );
     }
     // The tile tooltips are 200 px wide with 12 px padding and a border: the name stays on one
     // line in English and Vietnamese.

@@ -271,3 +271,134 @@ fn an_old_step_with_has_proposals_still_reads() {
         serde_json::from_str(r#"{"id":"step_1","type":"image","title":"t"}"#).unwrap();
     assert!(!none.has_proposals);
 }
+
+// ---- one crop for the whole guide (GDE-1, maintainer review Nov 15, 2026) ----------------------
+
+fn r4(r: cm_core::annotation::Rc) -> (f64, f64, f64, f64) {
+    (r.x, r.y, r.w, r.h)
+}
+
+#[test]
+fn the_guide_crop_is_the_padded_box_of_all_clicks_gde_1() {
+    use cm_library::guide::guide_crop_rect as rect;
+    let f = (3000, 2000);
+    // One click: the default focus size, as before (left edge, right edge, middle).
+    let left = rect(f, &[((100.0, 1000.0), 1.0)]).unwrap();
+    assert_eq!(r4(left), (0.0, 600.0, 1200.0, 800.0));
+    let right = rect(f, &[((2900.0, 1000.0), 1.0)]).unwrap();
+    assert_eq!(r4(right), (1800.0, 600.0, 1200.0, 800.0));
+    let mid = rect(f, &[((1500.0, 1000.0), 1.0)]).unwrap();
+    assert_eq!(r4(mid), (900.0, 600.0, 1200.0, 800.0));
+    // Clicks 100, 200 and 300 px from the left: 600 px of padding on each side, clamped.
+    let near = [
+        ((100.0, 1000.0), 1.0),
+        ((200.0, 1000.0), 1.0),
+        ((300.0, 1000.0), 1.0),
+    ];
+    assert_eq!(r4(rect(f, &near).unwrap()), (0.0, 600.0, 1400.0, 800.0));
+    // Clicks at both ends: the box is as wide as the frame but still short.
+    let ends = [((200.0, 1000.0), 1.0), ((2800.0, 1000.0), 1.0)];
+    assert_eq!(r4(rect(f, &ends).unwrap()), (0.0, 600.0, 3000.0, 800.0));
+    // Corners spread over the frame: more than 85 % of it, so no crop.
+    let wide = [((100.0, 100.0), 1.0), ((2900.0, 1900.0), 1.0)];
+    assert!(rect(f, &wide).is_none());
+    // A frame no larger than the default focus has nothing to crop; no clicks, no crop.
+    assert!(rect((1200, 800), &[((10.0, 10.0), 1.0)]).is_none());
+    assert!(rect(f, &[]).is_none());
+    // Retina: the padding is 600 x 400 logical points times the click's scale.
+    let retina = rect((6000, 4000), &[((3000.0, 2000.0), 2.0)]).unwrap();
+    assert_eq!(r4(retina), (1800.0, 1200.0, 2400.0, 1600.0));
+    // Different scales in one frame: each click pads by its own scale.
+    let mixed = [((1000.0, 1000.0), 1.0), ((3000.0, 2000.0), 2.0)];
+    let m = rect((6000, 4000), &mixed).unwrap();
+    assert_eq!(r4(m), (400.0, 600.0, 3800.0, 2200.0));
+    // Every click stays inside the box, whatever the edge.
+    for c in [(0.0, 0.0), (2999.0, 0.0), (0.0, 1999.0), (2999.0, 1999.0)] {
+        let r = rect(f, &[(c, 1.0)]).unwrap();
+        assert!(c.0 >= r.x && c.0 <= r.x + r.w && c.1 >= r.y && c.1 <= r.y + r.h);
+        assert!(r.x >= 0.0 && r.y >= 0.0 && r.x + r.w <= 3000.0 && r.y + r.h <= 2000.0);
+    }
+}
+
+fn visible(g: &GuideBundle, i: usize) -> Option<(f64, f64, f64, f64)> {
+    g.open_step(&g.steps()[i].id)
+        .unwrap()
+        .visible_rect()
+        .map(r4)
+}
+
+fn add_at(g: &mut GuideBundle, w: u32, h: u32, x: f64, y: f64, seed: u8) -> String {
+    g.add_click_step(
+        &png(w, h, seed),
+        click_scaled(x, y, 1.0),
+        "Click",
+        &Actor::User,
+        T0,
+    )
+    .unwrap()
+    .id
+}
+
+#[test]
+fn every_step_of_a_guide_shares_one_crop_and_it_follows_the_clicks_gde_1() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut g = GuideBundle::create(tmp.path(), "Shared", serde_json::json!({}), T0).unwrap();
+    // The reported guide: clicks near one side; each step used to centre on its own click.
+    for (i, x) in [100.0, 200.0, 300.0].into_iter().enumerate() {
+        add_at(&mut g, 3000, 2000, x, 1000.0, i as u8);
+    }
+    let first = visible(&g, 0).unwrap();
+    assert_eq!(first, (0.0, 600.0, 1400.0, 800.0));
+    assert_eq!(visible(&g, 1), Some(first));
+    assert_eq!(visible(&g, 2), Some(first));
+    // A fourth click far away: the earlier steps follow.
+    add_at(&mut g, 3000, 2000, 2800.0, 1000.0, 9);
+    let all = (0.0, 600.0, 3000.0, 800.0);
+    for i in 0..4 {
+        assert_eq!(visible(&g, i), Some(all), "step {i}");
+    }
+    // One step turns its crop off by hand; the others keep the guide crop.
+    let id1 = g.steps()[1].id.clone();
+    g.set_focus_crop(&id1, false, &Actor::User, T0).unwrap();
+    assert_eq!(visible(&g, 1), None);
+    assert_eq!(visible(&g, 0), Some(all));
+    g.set_focus_crop(&id1, true, &Actor::User, T0).unwrap();
+    assert_eq!(visible(&g, 1), Some(all));
+    // Deleting the far step shrinks the box again, in every step.
+    let last = g.steps()[3].id.clone();
+    g.delete_step(&last, &Actor::User, T0).unwrap();
+    for i in 0..3 {
+        assert_eq!(visible(&g, i), Some(first), "step {i}");
+    }
+    // Undo brings the far step and the wide box back.
+    g.undo(&Actor::User, T0).unwrap();
+    assert_eq!(visible(&g, 0), Some(all));
+    // Ring and badge stay in original-image coordinates, whatever the crop.
+    let b = g.open_step(&g.steps()[0].id).unwrap();
+    let ring = b
+        .ops()
+        .iter()
+        .find_map(|o| match &o.kind {
+            OpKind::Ellipse { rect, .. } => Some(*rect),
+            _ => None,
+        })
+        .unwrap();
+    assert!((ring.x + ring.w / 2.0 - 100.0).abs() < 1.0);
+    assert!((ring.y + ring.h / 2.0 - 1000.0).abs() < 1.0);
+}
+
+#[test]
+fn a_second_frame_size_is_its_own_group_and_a_retake_moves_a_step_gde_1() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut g = GuideBundle::create(tmp.path(), "Groups", serde_json::json!({}), T0).unwrap();
+    let a = add_at(&mut g, 3000, 2000, 500.0, 500.0, 1);
+    // The display changed: a smaller frame is its own group with its own rectangle.
+    add_at(&mut g, 2000, 1500, 1900.0, 1400.0, 2);
+    assert_eq!(visible(&g, 0), Some((0.0, 100.0, 1200.0, 800.0)));
+    assert_eq!(visible(&g, 1), Some((800.0, 700.0, 1200.0, 800.0)));
+    // Retaking A on the small display puts both clicks in one group: the box covers the frame.
+    g.retake_step(&a, &png(2000, 1500, 3), &Actor::User, T0)
+        .unwrap();
+    assert_eq!(visible(&g, 0), None);
+    assert_eq!(visible(&g, 1), None);
+}

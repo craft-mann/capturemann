@@ -98,7 +98,12 @@ bar (design S3). Mark them "not built" when running this script.
 4. Add a note step, retitle, delete a step, duplicate a step; each is one undo step, and a deleted
    step's picture comes back with undo.
 5. **Retake** replaces one step's frame with a fresh one of the followed target. **Focus crop**
-   toggles the crop around the click.
+   toggles the guide crop of that step. The crop is ONE rectangle for the whole guide (the box of
+   all click points of that frame size, padded by half the default focus size): record three
+   clicks in the same part of a window and one far away in the same window; every step shows the
+   same part of the window, so the framing does not jump from step to step, and the ring and
+   badge sit where each click was. Delete the far step: the other steps' crop tightens again.
+   Turn the crop off on one step: only that step shows the whole frame.
 
 ## 6. Export (GDE-3)
 

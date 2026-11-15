@@ -10521,7 +10521,7 @@ msgid "Click Guide"
 msgstr "Hướng dẫn theo thao tác"
 
 msgid "Click Guide did not start"
-msgstr "Không thể bắt đầu ghi hướng dẫn"
+msgstr "Hướng dẫn theo thao tác không bắt đầu được"
 
 msgid "Click Guide is not available here"
 msgstr "Hướng dẫn theo thao tác không khả dụng ở đây"
@@ -10533,7 +10533,7 @@ msgid "Click Guide needs Input Monitoring"
 msgstr "Hướng dẫn theo thao tác cần quyền Giám sát đầu vào"
 
 msgid "Click Guide of a window…"
-msgstr "Ghi hướng dẫn trong cửa sổ…"
+msgstr "Hướng dẫn theo thao tác cho một cửa sổ…"
 
 msgid "Click Guide only needs to know where you click. Nothing records until you grant access."
 msgstr "Hướng dẫn theo thao tác chỉ cần xác định vị trí bạn nhấp. Ứng dụng chỉ bắt đầu ghi sau khi bạn cấp quyền."
@@ -11341,7 +11341,7 @@ msgstr "LƯỚI"
 
 msgctxt "card badge"
 msgid "GUIDE"
-msgstr "HƯỚNG DẪN"
+msgstr "HƯỚNG DẪN THEO THAO TÁC"
 
 msgctxt "card badge"
 msgid "PAIR"
@@ -11473,7 +11473,7 @@ msgstr "Bo tròn"
 
 msgctxt "menu"
 msgid "Click Guide of a window…"
-msgstr "Ghi hướng dẫn trong cửa sổ…"
+msgstr "Hướng dẫn theo thao tác cho một cửa sổ…"
 
 msgctxt "menu"
 msgid "Long Shot"
@@ -11498,7 +11498,7 @@ msgstr "Nguồn"
 #, fuzzy
 msgctxt "navigation"
 msgid "Click Guides"
-msgstr "Hướng dẫn nhấp"
+msgstr "Hướng dẫn theo thao tác"
 
 msgctxt "page title"
 msgid "Click Guide"
@@ -11617,7 +11617,7 @@ msgstr "{name}, phím tắt {chord}"
 #, fuzzy
 msgctxt "capture dock"
 msgid "Click Guide"
-msgstr "Hướng dẫn"
+msgstr "Hướng dẫn theo thao tác"
 
 # NOTE: added with board S14 (sidebar tiles and agent status); owner review required
 #, fuzzy
@@ -11756,7 +11756,7 @@ msgstr "{window} đã đóng"
 #, fuzzy
 msgid "The Click Guide is paused. Your {n} step is kept."
 msgid_plural "The Click Guide is paused. Your {n} steps are kept."
-msgstr[0] "Hướng dẫn đã tạm dừng. {n} bước của bạn vẫn được giữ."
+msgstr[0] "Hướng dẫn theo thao tác đã tạm dừng. {n} bước của bạn vẫn được giữ."
 
 #, fuzzy
 msgctxt "window picker for a Click Guide"

@@ -41,7 +41,7 @@ use cm_core::annotation::{AnnotationOp, OpKind, Pt, Rc, StepStyle};
 use cm_core::{Actor, CmError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use time::OffsetDateTime;
@@ -220,6 +220,9 @@ pub struct GuideBundle {
     dir: PathBuf,
     manifest: GuideManifest,
     doc: GuideDoc,
+    /// Frame size (physical px) by step image folder, read lazily from the step bundles (not
+    /// stored: the guide crop needs it for every step on every change).
+    sizes: HashMap<String, (u32, u32)>,
 }
 
 /// The focus crop of a frame of `w` x `h` physical px around `click` (physical px): 1200 x 800
@@ -243,6 +246,44 @@ pub fn focus_rect(w: u32, h: u32, click: (f64, f64), scale: f64) -> Option<Rc> {
     Some(Rc::new(x, y, cw, ch))
 }
 
+/// A click point (physical px) and the display scale factor it was made at.
+pub type ClickAt = ((f64, f64), f64);
+
+/// The ONE crop of every image step of a guide whose frames are `frame` physical px (GDE-1,
+/// maintainer review Nov 15, 2026: a crop centred on each click made the framing jump between
+/// steps). `clicks` are the click points (physical px) with their display scale factors. The box
+/// is the bounding box of all click points padded by half the default focus size (600 x 400
+/// logical px times each click's scale) on every side, so it is never smaller than the default
+/// 1200 x 800 logical px; it is moved (not shrunk) to lie inside the frame. `None` when it covers
+/// more than 85 % of the frame (nothing worth cropping) or there are no clicks.
+pub fn guide_crop_rect(frame: (u32, u32), clicks: &[ClickAt]) -> Option<Rc> {
+    let (w, h) = (f64::from(frame.0), f64::from(frame.1));
+    if clicks.is_empty() || w < 1.0 || h < 1.0 {
+        return None;
+    }
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    for &((cx, cy), scale) in clicks {
+        let s = if scale.is_finite() && scale >= 1.0 {
+            scale
+        } else {
+            1.0
+        };
+        let (cx, cy) = (cx.clamp(0.0, w), cy.clamp(0.0, h));
+        let (px, py) = ((FOCUS_W * s / 2.0).round(), (FOCUS_H * s / 2.0).round());
+        x0 = x0.min(cx - px);
+        y0 = y0.min(cy - py);
+        x1 = x1.max(cx + px);
+        y1 = y1.max(cy + py);
+    }
+    let (bw, bh) = ((x1 - x0).min(w), (y1 - y0).min(h));
+    let x = x0.clamp(0.0, w - bw).round();
+    let y = y0.clamp(0.0, h - bh).round();
+    if bw * bh > 0.85 * w * h {
+        return None;
+    }
+    Some(Rc::new(x, y, bw.round(), bh.round()))
+}
+
 /// The badge and ring ops of a click on a frame of `w` x `h` (GDE-1): the hollow ring is centred
 /// on the click point, so the thing that was clicked stays visible inside it, and the numbered
 /// badge sits on the ring's upper-left (maintainer review of a real guide, Nov 14, 2026: a badge
@@ -252,8 +293,7 @@ pub fn click_ops(
     click: (f64, f64),
     frame: (u32, u32),
     style: StepStyle,
-    crop: bool,
-    scale: f64,
+    crop: Option<Rc>,
 ) -> Vec<AnnotationOp> {
     let long = f64::from(frame.0.max(frame.1));
     let size = (long * 0.02).clamp(36.0, 72.0).round();
@@ -285,10 +325,8 @@ pub fn click_ops(
             },
         ),
     ];
-    if crop {
-        if let Some(rect) = focus_rect(frame.0, frame.1, click, scale) {
-            ops.push(AnnotationOp::new("", OpKind::Crop { rect }));
-        }
+    if let Some(rect) = crop {
+        ops.push(AnnotationOp::new("", OpKind::Crop { rect }));
     }
     ops
 }
@@ -390,7 +428,12 @@ impl GuideBundle {
             redo: Vec::new(),
             extra: Map::new(),
         };
-        let mut g = GuideBundle { dir, manifest, doc };
+        let mut g = GuideBundle {
+            dir,
+            manifest,
+            doc,
+            sizes: HashMap::new(),
+        };
         let res = fs::create_dir_all(g.dir.join(STEPS_DIR))
             .map_err(|e| io_err("cannot create", &g.dir, &e))
             .and_then(|()| g.save());
@@ -423,6 +466,7 @@ impl GuideBundle {
             dir: dir.to_owned(),
             manifest,
             doc,
+            sizes: HashMap::new(),
         })
     }
 
@@ -620,6 +664,114 @@ impl GuideBundle {
         self.save()
     }
 
+    // ---- the guide crop (GDE-1) ----------------------------------------------------------
+
+    /// Frame size of the image folder `img` (cached).
+    fn frame_size(&mut self, img: &str) -> Option<(u32, u32)> {
+        if let Some(s) = self.sizes.get(img) {
+            return Some(*s);
+        }
+        let dir = self.dir.join(STEPS_DIR).join(img);
+        if !dir.is_dir() {
+            return None;
+        }
+        let b = ShotBundle::open(&dir).ok()?;
+        let z = b.manifest().original.size;
+        self.sizes.insert(img.to_owned(), (z.width, z.height));
+        Some((z.width, z.height))
+    }
+
+    /// Click points (physical px, with their display scale) of the image steps, by image folder.
+    fn image_clicks(&self) -> Vec<(String, ClickAt)> {
+        self.doc
+            .steps
+            .iter()
+            .filter_map(|s| {
+                let c = s.click.as_ref()?;
+                Some((s.image.clone()?, ((c.x, c.y), c.scale)))
+            })
+            .collect()
+    }
+
+    /// The click points of the image steps whose frame is `frame`.
+    fn group_clicks(&mut self, frame: (u32, u32)) -> Vec<ClickAt> {
+        self.image_clicks()
+            .into_iter()
+            .filter(|(img, _)| self.frame_size(img) == Some(frame))
+            .map(|(_, c)| c)
+            .collect()
+    }
+
+    /// The guide crop of every frame size in the guide: the click points of ALL image steps (not
+    /// only those whose crop is on) grouped by frame size, because steps with different frame
+    /// sizes (the display changed in between) cannot share one rectangle.
+    fn guide_rects(&mut self) -> HashMap<(u32, u32), Option<Rc>> {
+        let mut groups: HashMap<(u32, u32), Vec<ClickAt>> = HashMap::new();
+        for (img, c) in self.image_clicks() {
+            if let Some(size) = self.frame_size(&img) {
+                groups.entry(size).or_default().push(c);
+            }
+        }
+        groups
+            .into_iter()
+            .map(|(size, clicks)| (size, guide_crop_rect(size, &clicks)))
+            .collect()
+    }
+
+    /// Makes the `crop` op of every image step whose crop is on equal the guide crop of its
+    /// frame size; `only` limits it to one step. Old guides are not touched until an edit calls
+    /// this. Ring and badge ops are in original image coordinates and need no change: the crop
+    /// only chooses the visible part.
+    fn apply_guide_crop(
+        &mut self,
+        only: Option<&str>,
+        by: &Actor,
+        at: OffsetDateTime,
+    ) -> Result<(), CmError> {
+        let rects = self.guide_rects();
+        let steps: Vec<String> = self
+            .doc
+            .steps
+            .iter()
+            .filter(|s| s.focus_crop && only.is_none_or(|o| o == s.id))
+            .filter_map(|s| s.image.clone())
+            .collect();
+        for img in steps {
+            let Some(size) = self.frame_size(&img) else {
+                continue;
+            };
+            let want = rects.get(&size).copied().flatten();
+            let mut b = ShotBundle::open(&self.dir.join(STEPS_DIR).join(&img))?;
+            let have: Vec<(String, Rc)> = b
+                .ops()
+                .iter()
+                .filter_map(|o| match &o.kind {
+                    OpKind::Crop { rect } => Some((o.id.clone(), *rect)),
+                    _ => None,
+                })
+                .collect();
+            let same = match want {
+                Some(r) => have.len() == 1 && have[0].1 == r,
+                None => have.is_empty(),
+            };
+            if same {
+                continue;
+            }
+            for (id, _) in &have {
+                b.remove_op(id, by.clone(), at)?;
+            }
+            if let Some(rect) = want {
+                b.add_ops(
+                    vec![AnnotationOp::new("", OpKind::Crop { rect })],
+                    by.clone(),
+                    at,
+                )?;
+            }
+            b.save()?;
+        }
+        Ok(())
+    }
+
     // ---- recording (not undo steps: the user is clicking through a task) -----------------
 
     /// Adds an image step made by a click: its own screenshot bundle with the badge and ring
@@ -642,16 +794,22 @@ impl GuideBundle {
         let mut b = ShotBundle::create(&steps, &id, png, at)?;
         let size = b.manifest().original.size;
         let n = u32::try_from(self.doc.steps.len() + 1).unwrap_or(u32::MAX);
+        // The crop is on when the frame is larger than the default focus; its rectangle is the
+        // guide crop (all clicks of this frame size, this one included).
         let crop = focus_rect(size.width, size.height, (click.x, click.y), click.scale).is_some();
+        let frame = (size.width, size.height);
+        let mut clicks = self.group_clicks(frame);
+        let before = guide_crop_rect(frame, &clicks);
+        clicks.push(((click.x, click.y), click.scale));
+        let rect = guide_crop_rect(frame, &clicks);
         let res = b
             .add_ops(
                 click_ops(
                     n,
                     (click.x, click.y),
-                    (size.width, size.height),
+                    frame,
                     self.doc.numbering,
-                    crop,
-                    click.scale,
+                    if crop { rect } else { None },
                 ),
                 by.clone(),
                 at,
@@ -676,8 +834,15 @@ impl GuideBundle {
             has_proposals: false,
             extra: Map::new(),
         };
+        if let Some(name) = &step.image {
+            self.sizes.insert(name.clone(), frame);
+        }
         self.doc.steps.push(step.clone());
         self.save()?;
+        // A click outside the old box moves the rectangle of the earlier steps too.
+        if rect != before {
+            self.apply_guide_crop(None, by, at)?;
+        }
         Ok(step)
     }
 
@@ -701,11 +866,18 @@ impl GuideBundle {
     }
 
     /// HUD "Undo last step": drops the newest step and its image for good.
-    pub fn remove_last_step(&mut self) -> Result<Option<GuideStep>, CmError> {
+    pub fn remove_last_step(
+        &mut self,
+        by: &Actor,
+        at: OffsetDateTime,
+    ) -> Result<Option<GuideStep>, CmError> {
         let Some(s) = self.doc.steps.pop() else {
             return Ok(None);
         };
         self.save()?;
+        if s.click.is_some() {
+            self.apply_guide_crop(None, by, at)?;
+        }
         Ok(Some(s))
     }
 
@@ -796,7 +968,7 @@ impl GuideBundle {
         })
     }
 
-    /// Shows or hides the focus crop of an image step (a `crop` op in its bundle).
+    /// Shows or hides the guide crop on an image step (a `crop` op in its bundle).
     pub fn set_focus_crop(
         &mut self,
         id: &str,
@@ -804,34 +976,7 @@ impl GuideBundle {
         by: &Actor,
         at: OffsetDateTime,
     ) -> Result<(), CmError> {
-        let click = self.step(id)?.click.clone();
-        let dir = self.step_dir(id)?;
-        let mut b = ShotBundle::open(&dir)?;
-        let size = b.manifest().original.size;
-        let crops: Vec<String> = b
-            .ops()
-            .iter()
-            .filter(|o| matches!(o.kind, OpKind::Crop { .. }))
-            .map(|o| o.id.clone())
-            .collect();
-        if on {
-            let sc = click.as_ref().map_or(1.0, |c| c.scale);
-            let c = click.map_or((0.0, 0.0), |c| (c.x, c.y));
-            if let (true, Some(rect)) =
-                (crops.is_empty(), focus_rect(size.width, size.height, c, sc))
-            {
-                b.add_ops(
-                    vec![AnnotationOp::new("", OpKind::Crop { rect })],
-                    by.clone(),
-                    at,
-                )?;
-            }
-        } else {
-            for c in crops {
-                b.remove_op(&c, by.clone(), at)?;
-            }
-        }
-        b.save()?;
+        self.step_dir(id)?;
         self.change("focus_crop", by, at, |g| {
             let s = g
                 .doc
@@ -841,7 +986,21 @@ impl GuideBundle {
                 .expect("checked");
             s.focus_crop = on;
             Ok(())
-        })
+        })?;
+        if on {
+            return self.apply_guide_crop(Some(id), by, at);
+        }
+        let mut b = self.open_step(id)?;
+        let crops: Vec<String> = b
+            .ops()
+            .iter()
+            .filter(|o| matches!(o.kind, OpKind::Crop { .. }))
+            .map(|o| o.id.clone())
+            .collect();
+        for c in crops {
+            b.remove_op(&c, by.clone(), at)?;
+        }
+        b.save()
     }
 
     pub fn delete_step(&mut self, id: &str, by: &Actor, at: OffsetDateTime) -> Result<(), CmError> {
@@ -849,7 +1008,8 @@ impl GuideBundle {
         self.change("delete_step", by, at, |g| {
             g.doc.steps.retain(|s| s.id != id);
             Ok(())
-        })
+        })?;
+        self.apply_guide_crop(None, by, at)
     }
 
     /// Moves a step to `to` (0-based position in the new order).
@@ -1042,7 +1202,8 @@ impl GuideBundle {
             g.doc.steps = out;
             Ok(())
         })?;
-        self.reconcile()
+        self.reconcile()?;
+        self.apply_guide_crop(None, by, at)
     }
 
     /// Inserts a note step after `after` (or at the end).
@@ -1107,13 +1268,13 @@ impl GuideBundle {
             && focus_rect(size.width, size.height, (click.x, click.y), click.scale).is_some();
         let res = b
             .add_ops(
+                // The crop op is set by the guide crop below, once the new frame is the step's.
                 click_ops(
                     u32::try_from(pos + 1).unwrap_or(u32::MAX),
                     (click.x, click.y),
                     (size.width, size.height),
                     self.doc.numbering,
-                    crop,
-                    click.scale,
+                    None,
                 ),
                 by.clone(),
                 at,
@@ -1138,7 +1299,8 @@ impl GuideBundle {
             s.focus_crop = crop;
             s.has_proposals = false;
             Ok(())
-        })
+        })?;
+        self.apply_guide_crop(None, by, at)
     }
 
     // ---- undo and redo -------------------------------------------------------------------
@@ -1154,6 +1316,7 @@ impl GuideBundle {
         self.doc.restore(snap.state);
         self.save()?;
         self.renumber(by, at)?;
+        self.apply_guide_crop(None, by, at)?;
         Ok(Some(snap.name))
     }
 
@@ -1168,6 +1331,7 @@ impl GuideBundle {
         self.doc.restore(snap.state);
         self.save()?;
         self.renumber(by, at)?;
+        self.apply_guide_crop(None, by, at)?;
         Ok(Some(snap.name))
     }
 }

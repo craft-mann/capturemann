@@ -831,3 +831,53 @@ async fn gde_busy_is_said_before_any_dialog() {
     // (a guide with no step is discarded when it stops)
     assert_eq!(ok(&done)["state"], "discarded");
 }
+
+/// The crop rectangle of every image step of the guide folder, read from the step bundles.
+fn step_crops(folder: &std::path::Path) -> Vec<Option<[f64; 4]>> {
+    let g = cm_library::guide::GuideBundle::open(folder).unwrap();
+    g.steps()
+        .iter()
+        .map(|s| {
+            let b = g.open_step(&s.id).unwrap();
+            b.visible_rect().map(|r| [r.x, r.y, r.w, r.h])
+        })
+        .collect()
+}
+
+/// GDE-1 (maintainer review Nov 15, 2026): one crop for the whole guide, so the framing does not
+/// jump between steps; a later click outside the box moves the rectangle of the earlier steps.
+#[tokio::test]
+async fn gde_1_every_step_has_the_same_crop_and_a_far_click_recomputes_the_earlier_ones() {
+    let (b, dir) =
+        builder(cm_capture::fake::FakeBackend::new().with_display(1, 0, 0, 3000, 2000, 1.0));
+    let clicks = ScriptedClicks::new();
+    let daemon = b
+        .guide_clicks(clicks.clone())
+        .text_recognizer(Screen { with_email: false })
+        .confirmer(Arc::new(FixedConfirmer::new(Decision::Approve)))
+        .build();
+    let mut c = Client::connect(&daemon, "agent");
+    let id = start(&mut c).await;
+    for x in [100.0, 200.0, 300.0] {
+        assert!(clicks.click(x, 1000.0));
+    }
+    wait_steps(&mut c, &id, 3).await;
+    let folder = std::fs::read_dir(dir.path())
+        .unwrap()
+        .flatten()
+        .find(|e| e.path().extension().is_some_and(|x| x == "cmguide"))
+        .unwrap()
+        .path();
+    let narrow = step_crops(&folder);
+    assert_eq!(narrow.len(), 3);
+    assert_eq!(narrow[0], Some([0.0, 600.0, 1400.0, 800.0]), "{narrow:?}");
+    assert!(narrow.iter().all(|r| *r == narrow[0]), "{narrow:?}");
+    // A fourth click at the far side: the three earlier steps get the wider rectangle too.
+    assert!(clicks.click(2800.0, 1000.0));
+    wait_steps(&mut c, &id, 4).await;
+    let wide = step_crops(&folder);
+    assert_eq!(wide.len(), 4);
+    assert_eq!(wide[0], Some([0.0, 600.0, 3000.0, 800.0]), "{wide:?}");
+    assert!(wide.iter().all(|r| *r == wide[0]), "{wide:?}");
+    c.call("stop_guide", json!({"guide_id": id})).await;
+}

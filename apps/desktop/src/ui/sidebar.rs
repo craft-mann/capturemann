@@ -222,6 +222,10 @@ fn nav_entry(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>, e: &NavEntry) 
     );
     if e.item == nav::NavItem::Agents {
         row.tooltip(agents_tip(p)).into_any_element()
+    } else if e.item == nav::NavItem::Guides {
+        // The label shrinks with an ellipsis in a narrow sidebar: the full name is the tooltip.
+        row.tooltip(tip(e.item.label(), Vec::new()))
+            .into_any_element()
     } else {
         row.into_any_element()
     }
@@ -497,7 +501,15 @@ fn extra_tile(
     let d = if rail {
         d
     } else {
-        d.child(ellipsis_text(tile.label()))
+        // Two lines at most (Vietnamese "Hướng dẫn / theo thao tác"); the tooltip has the name.
+        d.child(
+            div()
+                .max_w_full()
+                .max_h(px(28.))
+                .overflow_hidden()
+                .text_center()
+                .child(tile.label()),
+        )
     };
     d.when(active, |d| {
         d.child(

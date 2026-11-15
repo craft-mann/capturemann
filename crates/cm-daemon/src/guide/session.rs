@@ -318,13 +318,16 @@ impl Worker {
                     let _ = reply.send(r);
                 }
                 Job::RemoveLast(reply) => {
-                    let r = self.guide.remove_last_step().map(|s| {
-                        if s.is_some() {
-                            self.steps.fetch_sub(1, Ordering::SeqCst);
-                        }
-                        self.last = None;
-                        json!({ "removed": s.map(|s| s.id) })
-                    });
+                    let r = self
+                        .guide
+                        .remove_last_step(&self.by, self.clock.now())
+                        .map(|s| {
+                            if s.is_some() {
+                                self.steps.fetch_sub(1, Ordering::SeqCst);
+                            }
+                            self.last = None;
+                            json!({ "removed": s.map(|s| s.id) })
+                        });
                     let _ = reply.send(r);
                 }
                 Job::Stop(reply) => {
