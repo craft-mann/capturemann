@@ -290,6 +290,8 @@ async fn frame_target_errors_and_policy() {
             "freeze_display",
             "release_frame",
             "window_thumbnail",
+            // CAP-6: the Long Shot HUD's state (pause, counts, preview picture), first-party only.
+            "long_shot_state",
             "discard_recording",
             "restart_recording",
             "skip_countdown"
