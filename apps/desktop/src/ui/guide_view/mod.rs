@@ -1035,6 +1035,8 @@ impl GuideView {
             col = col.child(
                 div()
                     .w_full()
+                    // Never shrunk by the scrolling column: it scrolls instead (QA G1).
+                    .flex_none()
                     .aspect_ratio(ratio)
                     .rounded(px(scale::RADIUS_MD))
                     .overflow_hidden()

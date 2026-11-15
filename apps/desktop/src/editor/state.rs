@@ -269,6 +269,26 @@ impl TextEdit {
         self.cursor = b;
     }
 
+    /// A triple click at char index `i`: the whole line (paragraph) there is selected (QA E1).
+    pub fn select_line_at(&mut self, i: usize) {
+        self.marked = None;
+        self.sel_all = false;
+        let chars: Vec<char> = self.text.chars().collect();
+        if chars.is_empty() {
+            return;
+        }
+        let i = i.min(chars.len() - 1);
+        let (mut a, mut b) = (i, i);
+        while a > 0 && chars[a - 1] != '\n' {
+            a -= 1;
+        }
+        while b < chars.len() && chars[b] != '\n' {
+            b += 1;
+        }
+        self.anchor = Some(a);
+        self.cursor = b;
+    }
+
     /// The characters that may still be added before the 2000 character limit.
     fn room(&self) -> usize {
         cm_core::annotation::MAX_TEXT_CHARS.saturating_sub(self.len())
@@ -1002,6 +1022,11 @@ impl EditorState {
 
     /// `tol` is the pointer tolerance in image px (about 6 logical px).
     pub fn pointer_down(&mut self, p: Pt, mods: Mods, clicks: usize, tol: f64) -> Vec<Edit> {
+        // The busy-background sheet sits over the canvas: a press under it is the sheet's.
+        if self.touch.busy_prompt.is_some() {
+            self.touch.sheet_press = true;
+            return Vec::new();
+        }
         // A press inside the text being edited places the caret and starts a selection; a
         // double click selects the word (ANN-1.AC9, AC11). Elsewhere it commits the text.
         if self.press_in_text(p, mods, clicks, tol) {
@@ -1274,6 +1299,9 @@ impl EditorState {
     }
 
     pub fn pointer_up(&mut self, p: Pt, mods: Mods, tol: f64) -> Vec<Edit> {
+        if std::mem::take(&mut self.touch.sheet_press) || self.touch.busy_prompt.is_some() {
+            return Vec::new();
+        }
         if std::mem::take(&mut self.text_drag) {
             self.pointer_move_text_end(p);
             return Vec::new();
@@ -2855,7 +2883,7 @@ mod tests {
                 at: Pt::new(130.0, 320.0),
                 text: "Click\nSave".into(),
                 size: 24.0,
-                color: Color::WHITE,
+                color: crate::editor::tools::PALETTE[6].1,
                 outline: None,
                 bg: None
             }

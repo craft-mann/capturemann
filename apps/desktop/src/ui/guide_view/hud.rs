@@ -42,6 +42,24 @@ struct Shown {
     steps: usize,
 }
 
+/// True when the poll shows that the guide this bar follows has ended (stopped from the CLI or an
+/// agent, discarded or cancelled): the bar closes whichever client stopped it. `state` is the
+/// reply's state (`None`: `get_guide` failed); `followed` is whether the bar already knows the
+/// guide's id (before that, a failed read is only the countdown starting).
+fn guide_has_ended(followed: bool, state: Option<&str>) -> bool {
+    match state {
+        Some("countdown" | "recording" | "paused") => false,
+        Some(_) => true,
+        None => followed,
+    }
+}
+
+/// A `stop_guide` that failed only because the guide is no longer recording (another client
+/// stopped it first): the bar closes without a toast.
+fn stop_means_already_ended(message: &str) -> bool {
+    message.contains("no Click Guide is recording") || message.contains("is not the one recording")
+}
+
 pub struct GuideHud {
     app: Entity<AppModel>,
     shown: Shown,
@@ -279,6 +297,7 @@ impl GuideHud {
             let Some(daemon) = backend.daemon.clone() else {
                 break;
             };
+            let id_known = id.is_some();
             let v = backend
                 .rt
                 .spawn(async move {
@@ -288,6 +307,14 @@ impl GuideHud {
                 .await
                 .ok()
                 .flatten();
+            let ended = guide_has_ended(
+                id_known,
+                v.as_ref().map(|v| v["state"].as_str().unwrap_or_default()),
+            );
+            if ended {
+                cx.update(close);
+                break;
+            }
             if let Some(v) = v {
                 let _ = this.update(cx, |this, cx| {
                     this.shown = Shown {
@@ -333,6 +360,7 @@ impl GuideHud {
             cx.update(|cx| {
                 close(cx);
                 match r {
+                    Ok(Err(e)) if stop_means_already_ended(&e) => {}
                     Ok(Ok(v)) if v["discarded"] == true => toast(
                         &app,
                         ToastSpec::new(ToastKind::Info, tr!("No steps were taken"))
@@ -539,5 +567,29 @@ mod tests {
             exclusion_in_os_space(&bar, &d, Some([0, 0, 100, 100])),
             [1.0, 2.0, 3.0, 4.0]
         );
+    }
+}
+
+#[cfg(test)]
+mod ended_tests {
+    use super::*;
+
+    #[test]
+    fn the_bar_closes_when_the_guide_ended_elsewhere() {
+        assert!(!guide_has_ended(false, None), "the countdown is starting");
+        assert!(!guide_has_ended(true, Some("recording")));
+        assert!(!guide_has_ended(true, Some("paused")));
+        assert!(!guide_has_ended(false, Some("countdown")));
+        assert!(guide_has_ended(true, Some("stopped")));
+        assert!(guide_has_ended(true, Some("discarded")));
+        assert!(guide_has_ended(true, None), "the guide is gone");
+    }
+
+    #[test]
+    fn stopping_an_ended_guide_is_quiet() {
+        assert!(stop_means_already_ended(
+            "invalid_input: no Click Guide is recording"
+        ));
+        assert!(!stop_means_already_ended("disk full"));
     }
 }

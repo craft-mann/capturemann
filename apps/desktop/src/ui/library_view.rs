@@ -474,6 +474,9 @@ impl LibraryView {
             return;
         }
         let app = self.app.clone();
+        // The sheet has its own copy of the shots: the selection is done (QA L1).
+        self.multi.clear();
+        cx.notify();
         cx.defer(move |cx| crate::ui::board_sheet::open(&app, shots, cx));
     }
 
@@ -1319,13 +1322,15 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
         t.border
     };
     let group = SharedString::from(format!("card-{ix}"));
-    let hover_border = rgba_of(t.line);
+    let hover_border = rgba_of(if multi_on { t.text } else { t.line });
     let frame = if item.kind == Kind::Audio {
         audio_frame(ctx, item, width, group.clone(), cx)
     } else {
         thumb_frame(ctx, item, width, group.clone(), cx)
     }
     .border_color(rgba_of(border))
+    // A selected card keeps its ring while the pointer is over it (it is over it right after the
+    // tick is clicked): the hover colour would paint the ring away (QA L3).
     .group_hover(group.clone(), move |s| s.border_color(hover_border));
     // IMP-5: an imported capture carries the badge, and a strip while its import still runs. A
     // running transcription shows the same strip on any capture (a recording or an audio capture
@@ -1800,9 +1805,8 @@ impl Render for LibraryView {
                 },
             )
         });
-        let sorts = SortKey::ALL.iter().map(|k| {
+        let sorts = SortKey::offered(self.state.filter).into_iter().map(|k| {
             let v = view.clone();
-            let k = *k;
             sort_segment(&t, k, self.state.sort == k, self.state.descending).on_click(
                 move |_, _, cx| {
                     v.update(cx, |this, cx| this.set_sort(k, cx)).ok();
@@ -2295,7 +2299,7 @@ impl LibraryView {
                         }
                     })
                     .child(
-                        action("bar-delete", tr!("Delete"), "trash-2", true, true).on_click(
+                        action("bar-delete", tr!("Delete"), "trash-2", true, false).on_click(
                             move |_, _, cx| {
                                 v3.update(cx, |this, cx| this.delete_selected(cx)).ok();
                             },

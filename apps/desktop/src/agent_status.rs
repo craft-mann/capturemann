@@ -21,6 +21,32 @@ pub enum OfflineReason {
     LibraryUnavailable,
     NoEndpoint,
     SocketOwned,
+    /// The folder of the socket could not be created or opened (permissions, a full disk).
+    SocketFolder,
+    /// The endpoint could not be opened for another reason.
+    EndpointFailed,
+}
+
+/// Why binding the IPC endpoint failed, as far as the line under "MCP offline" tells it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IpcFailure {
+    /// Another daemon already listens on it.
+    AlreadyServed,
+    /// The folder holding the socket could not be made or used.
+    Folder,
+    /// Anything else (a path that is too long, a file in the way).
+    Other,
+}
+
+impl IpcFailure {
+    pub fn of(e: &std::io::Error) -> IpcFailure {
+        use std::io::ErrorKind as K;
+        match e.kind() {
+            K::AddrInUse => IpcFailure::AlreadyServed,
+            K::InvalidInput | K::InvalidData => IpcFailure::Other,
+            _ => IpcFailure::Folder,
+        }
+    }
 }
 
 impl OfflineReason {
@@ -29,6 +55,8 @@ impl OfflineReason {
             OfflineReason::LibraryUnavailable => tr!("Library unavailable"),
             OfflineReason::NoEndpoint => tr!("No IPC endpoint"),
             OfflineReason::SocketOwned => tr!("Another app owns the socket"),
+            OfflineReason::SocketFolder => tr!("Could not create the socket folder"),
+            OfflineReason::EndpointFailed => tr!("Could not open the IPC endpoint"),
         }
     }
 }
@@ -72,20 +100,24 @@ impl McpStatus {
     }
 }
 
-/// `daemon_up`: the library opened so a daemon exists. `ipc_warning`: set when the endpoint
+/// `daemon_up`: the library opened so a daemon exists. `ipc_failure`: set when the endpoint
 /// could not be bound. `endpoint_configured`: the app was asked to serve one.
 pub fn derive(
     daemon_up: bool,
     endpoint_configured: bool,
-    ipc_warning: Option<&str>,
+    ipc_failure: Option<IpcFailure>,
     activity: &[ActivityEntry],
 ) -> McpStatus {
     let state = if !daemon_up {
         McpState::Offline(OfflineReason::LibraryUnavailable)
     } else if !endpoint_configured {
         McpState::Offline(OfflineReason::NoEndpoint)
-    } else if ipc_warning.is_some() {
-        McpState::Offline(OfflineReason::SocketOwned)
+    } else if let Some(f) = ipc_failure {
+        McpState::Offline(match f {
+            IpcFailure::AlreadyServed => OfflineReason::SocketOwned,
+            IpcFailure::Folder => OfflineReason::SocketFolder,
+            IpcFailure::Other => OfflineReason::EndpointFailed,
+        })
     } else {
         McpState::Ready
     };
@@ -186,10 +218,32 @@ mod tests {
     fn offline_reasons() {
         assert!(!derive(false, true, None, &[]).is_ready());
         assert!(!derive(true, false, None, &[]).is_ready());
-        let s = derive(true, true, Some("socket in use"), &[]);
+        let s = derive(true, true, Some(IpcFailure::AlreadyServed), &[]);
         assert_eq!(s.state, McpState::Offline(OfflineReason::SocketOwned));
         assert_eq!(s.title(), "MCP offline");
         assert_eq!(s.lines(), ["Another app owns the socket"]);
+        // QA A1: a folder that cannot be made is not "another app".
+        let s = derive(true, true, Some(IpcFailure::Folder), &[]);
+        assert_eq!(s.lines(), ["Could not create the socket folder"]);
+        let s = derive(true, true, Some(IpcFailure::Other), &[]);
+        assert_eq!(s.lines(), ["Could not open the IPC endpoint"]);
+    }
+
+    #[test]
+    fn ipc_errors_are_classified() {
+        use std::io::{Error, ErrorKind};
+        assert_eq!(
+            IpcFailure::of(&Error::new(ErrorKind::AddrInUse, "x")),
+            IpcFailure::AlreadyServed
+        );
+        assert_eq!(
+            IpcFailure::of(&Error::new(ErrorKind::PermissionDenied, "x")),
+            IpcFailure::Folder
+        );
+        assert_eq!(
+            IpcFailure::of(&Error::new(ErrorKind::InvalidInput, "x")),
+            IpcFailure::Other
+        );
     }
 
     #[test]

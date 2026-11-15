@@ -211,6 +211,12 @@ fn update(app: &Entity<AppModel>, cx: &mut App, f: impl FnOnce(&mut BulkSheet)) 
     });
 }
 
+/// The sheet's tallest size: 860 pt, and never more than the window leaves (24 pt each side), so
+/// the body scrolls and the footer stays in view (QA L2).
+fn sheet_max_h(viewport_h: f32) -> f32 {
+    (viewport_h - 48.0).clamp(240.0, 860.0)
+}
+
 impl Render for BulkSheetView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
@@ -238,7 +244,7 @@ impl Render for BulkSheetView {
             .role(Role::Dialog)
             .aria_label(SharedString::from(sheet.title()))
             .w(px(SHEET_W))
-            .max_h(px(860.))
+            .max_h(px(sheet_max_h(f32::from(window.viewport_size().height))))
             .flex()
             .flex_col()
             .rounded(px(18.))
@@ -249,6 +255,7 @@ impl Render for BulkSheetView {
             .occlude()
             .child(
                 div()
+                    .flex_none()
                     .px(px(24.))
                     .pt(px(22.))
                     .pb(px(14.))
@@ -320,7 +327,7 @@ impl Render for BulkSheetView {
                             .child(SharedString::from(e))
                     })),
             )
-            .child(footer);
+            .child(div().flex_none().child(footer));
         let key_app = app.clone();
         div()
             .id("bulk-scrim")
@@ -1161,5 +1168,17 @@ fn retry_skipped(app: &Entity<AppModel>, cx: &mut App) {
             cx.notify();
         });
         start(app, cx);
+    }
+}
+
+#[cfg(test)]
+mod sheet_height_tests {
+    use super::sheet_max_h;
+
+    #[test]
+    fn the_sheet_fits_the_window() {
+        assert_eq!(sheet_max_h(2000.0), 860.0);
+        assert_eq!(sheet_max_h(700.0), 652.0);
+        assert_eq!(sheet_max_h(100.0), 240.0);
     }
 }
