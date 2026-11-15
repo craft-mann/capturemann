@@ -87,6 +87,40 @@ fn toast(app: &Entity<AppModel>, spec: ToastSpec, cx: &mut App) {
 /// "New Click Guide": follows the display under the pointer, shows the bar and starts the guide
 /// (a 3 s countdown first). Nothing is recorded until the countdown ends; Stop during it cancels.
 pub fn start(app: &Entity<AppModel>, cx: &mut App) {
+    start_on(app, None, cx);
+}
+
+/// "Click Guide of a window": the same bar and countdown, following one window the person chose
+/// in the window picker; only clicks inside it become steps (the daemon filters them).
+pub fn start_window(app: &Entity<AppModel>, window_id: u32, cx: &mut App) {
+    start_on(app, Some(window_id), cx);
+}
+
+/// "Click Guide of a window...": the window picker (the screenshot's, with a "Start guide"
+/// button); the chosen window starts the guide through [`start_window`]. The permission gate
+/// is checked first, so no window is offered when the guide could not start anyway.
+pub fn pick_window(app: &Entity<AppModel>, cx: &mut App) {
+    if cx.try_global::<Holder>().is_some_and(|h| h.0.is_some()) {
+        return;
+    }
+    if let super::preflight::Gate::Unavailable(reason) = super::preflight::current() {
+        toast(
+            app,
+            ToastSpec::new(ToastKind::Warning, tr!("Click Guide is not available here"))
+                .body(reason),
+            cx,
+        );
+        return;
+    }
+    crate::ui::window_picker::open_for(app, crate::ui::window_picker::Purpose::ClickGuide, cx);
+}
+
+/// The `target` of `start_guide` for a chosen window.
+pub fn window_target(window_id: u32) -> Value {
+    json!({ "window_id": window_id })
+}
+
+fn start_on(app: &Entity<AppModel>, window_id: Option<u32>, cx: &mut App) {
     if cx.try_global::<Holder>().is_some_and(|h| h.0.is_some()) {
         return;
     }
@@ -104,7 +138,7 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     match super::preflight::current() {
         super::preflight::Gate::Ready => {}
         super::preflight::Gate::NeedsInputMonitoring => {
-            super::card::open(app, start, cx);
+            super::card::open(app, move |app, cx| start_on(app, window_id, cx), cx);
             return;
         }
         super::preflight::Gate::Unavailable(reason) => {
@@ -146,6 +180,14 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
         let started = backend2
             .rt
             .spawn(async move {
+                if let Some(id) = window_id {
+                    return Backend::call_coded(
+                        &daemon,
+                        "start_guide",
+                        json!({ "target": window_target(id), "countdown_s": 3 }),
+                    )
+                    .await;
+                }
                 let mut display_id = u64::from(gpui_id);
                 // GPUI's display id is the engine's only where they agree; the rectangles find
                 // the engine's id elsewhere (the same mapping as the delayed capture).
@@ -450,6 +492,12 @@ impl Render for GuideHud {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A window guide sends the window's id as the target, not a display (GDE-1).
+    #[test]
+    fn a_window_guide_targets_the_window() {
+        assert_eq!(window_target(42), json!({ "window_id": 42 }));
+    }
 
     /// GDE-1.AC2: on a 150 % Windows display the bar's rectangle is given in physical px, so a
     /// click on the bar is never a step; on macOS (no px rectangle) it stays in points.
