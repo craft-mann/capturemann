@@ -23,10 +23,14 @@ use crate::daemon::Inner;
 use crate::error::DaemonError;
 
 /// Bus event with the Long Shot's progress (`frames`, `len_px`, `max_len`, `header_px`,
-/// `footer_px`, `request_id`): the HUD counter and the side preview follow it.
+/// `footer_px`, `join_ok`, `request_id`): the HUD counter and the side preview follow it.
 pub const PROGRESS_EVENT: &str = "capture.long_shot.progress";
 /// Bus events around one Long Shot run (`request_id`, which may be null for a CLI or MCP call
-/// without one): the app grabs the Esc key while one runs, whoever started it.
+/// without one): the app grabs the Esc key while one runs, whoever started it. The started event
+/// also says who (`client`: the agent's name, null for a person or the CLI), how (`scroll`,
+/// `direction`) and where (`display_id`, `area` `[x, y, w, h]` physical px in that display's own
+/// frame and its `scale`, null when the target is not found), so the app can show a small
+/// passive HUD for a run it did not start itself (design S18).
 pub const STARTED_EVENT: &str = "capture.long_shot.started";
 pub const ENDED_EVENT: &str = "capture.long_shot.ended";
 
@@ -50,6 +54,9 @@ struct LongSnapshot {
     max_len: u32,
     header_px: u32,
     footer_px: u32,
+    /// The newest settled frame did not line up with the last one taken and was left out (Hand
+    /// scroll); cleared when a frame joins again.
+    join_failed: bool,
     preview: Option<(u32, u32, Vec<u8>)>,
 }
 
@@ -247,6 +254,65 @@ fn area_centre(capturer: &Capturer, target: cm_capture::CaptureTarget) -> Option
     }
 }
 
+/// The area of a Long Shot for the passive HUD: its display, the rectangle in that display's own
+/// physical px and the display's scale. `None` when the target is not listed.
+pub(crate) fn area_in_display(
+    capturer: &Capturer,
+    target: cm_capture::CaptureTarget,
+) -> Option<(u32, [i64; 4], f64)> {
+    use cm_capture::{CaptureTarget, RegionRect};
+    let targets = capturer.list_targets().ok()?;
+    let rect4 = |r: &PhysicalRect, ox: i32, oy: i32| {
+        [
+            i64::from(r.origin.x - ox),
+            i64::from(r.origin.y - oy),
+            i64::from(r.size.width),
+            i64::from(r.size.height),
+        ]
+    };
+    match target {
+        CaptureTarget::Display { display_id } => {
+            let d = targets.displays.iter().find(|d| d.id == display_id)?;
+            Some((
+                display_id,
+                [
+                    0,
+                    0,
+                    i64::from(d.bounds.size.width),
+                    i64::from(d.bounds.size.height),
+                ],
+                d.scale.get(),
+            ))
+        }
+        CaptureTarget::Window { window_id } => {
+            let w = targets.windows.iter().find(|w| w.id == window_id)?;
+            let d = targets
+                .displays
+                .iter()
+                .find(|d| Some(d.id) == w.display_id)?;
+            Some((
+                d.id,
+                rect4(&w.bounds, d.bounds.origin.x, d.bounds.origin.y),
+                d.scale.get(),
+            ))
+        }
+        CaptureTarget::Region { display_id, rect } => {
+            let d = targets.displays.iter().find(|d| d.id == display_id)?;
+            let s = d.scale.get();
+            let r = match rect {
+                RegionRect::Physical(r) => rect4(&r, 0, 0),
+                RegionRect::Logical(l) => [
+                    (l.origin.x * s).round() as i64,
+                    (l.origin.y * s).round() as i64,
+                    (l.size.width * s).round() as i64,
+                    (l.size.height * s).round() as i64,
+                ],
+            };
+            Some((display_id, r, s))
+        }
+    }
+}
+
 /// AC7: Hand scroll is refused for agents.
 pub(crate) fn refuse_hand_for_agent(p: &CaptureLongParams) -> Result<(), DaemonError> {
     if p.scroll == ScrollMode::Hand {
@@ -294,6 +360,7 @@ impl Inner {
             "max_len": s.max_len,
             "header_px": s.header_px,
             "footer_px": s.footer_px,
+            "join_ok": !s.join_failed,
         });
         if p.since_seq.is_none_or(|n| n < s.seq) {
             if let Some((w, h, png)) = &s.preview {
@@ -370,8 +437,31 @@ impl Inner {
         let state = request_id.as_deref().map(|id| self.long_states.start(id));
         let state_in = state.clone();
         // The app grabs Esc for as long as a Long Shot runs, even one it did not start.
-        self.events
-            .publish(STARTED_EVENT, json!({ "request_id": request_id_after }));
+        let area = {
+            let c = self.capturer.clone();
+            tokio::task::spawn_blocking(move || area_in_display(&c, target))
+                .await
+                .ok()
+                .flatten()
+        };
+        self.events.publish(
+            STARTED_EVENT,
+            json!({
+                "request_id": request_id_after,
+                "client": match actor {
+                    Actor::Agent(name) => json!(name),
+                    Actor::User => Value::Null,
+                },
+                "scroll": match scroll {
+                    ScrollMode::Auto => "auto",
+                    ScrollMode::Hand => "hand",
+                },
+                "direction": direction,
+                "display_id": area.map(|a| a.0),
+                "area": area.map(|a| a.1),
+                "scale": area.map(|a| a.2),
+            }),
+        );
         let out = self
             .store_capture_ex(actor, p.copy_to_clipboard, p.title, None, move || {
                 // The delay, in steps so Esc cancels it.
@@ -413,6 +503,7 @@ impl Inner {
                         g.max_len = pr.max_len;
                         g.header_px = pr.header_px;
                         g.footer_px = pr.footer_px;
+                        g.join_failed = !pr.last_join_ok;
                     }
                     events.publish(
                         PROGRESS_EVENT,
@@ -423,6 +514,7 @@ impl Inner {
                             "max_len": pr.max_len,
                             "header_px": pr.header_px,
                             "footer_px": pr.footer_px,
+                            "join_ok": pr.last_join_ok,
                         }),
                     );
                 };

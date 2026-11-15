@@ -10835,9 +10835,6 @@ msgstr "Ảnh xuất có sẵn chú thích và vùng làm mờ. Markdown dùng l
 msgid "Preview"
 msgstr "Xem trước"
 
-msgid "Reached the longest image CaptureMann can edit"
-msgstr "Đã đạt chiều dài tối đa của ảnh mà CaptureMann có thể chỉnh sửa"
-
 msgid "Read a Click Guide"
 msgstr "Đọc Hướng dẫn theo thao tác"
 
@@ -10949,9 +10946,6 @@ msgstr "Dừng"
 
 msgid "Stop a Click Guide"
 msgstr "Dừng Hướng dẫn theo thao tác"
-
-msgid "Stopped: the next part did not line up"
-msgstr "Đã dừng vì phần ảnh tiếp theo không khớp"
 
 msgid "Strip"
 msgstr "Dải"
@@ -11505,3 +11499,79 @@ msgstr "Chỉnh sửa nhanh"
 msgctxt "window picker for a Click Guide"
 msgid "Start guide"
 msgstr "Bắt đầu hướng dẫn"
+
+#, fuzzy
+msgid "Agent"
+msgstr "Agent"
+
+#, fuzzy
+msgid "Auto scroll stops here and keeps 1 frame. Try Hand scroll for pages that redraw while scrolling."
+msgstr "Cuộn tự động dừng tại đây và giữ lại 1 khung hình. Hãy thử Cuộn tay với các trang vẽ lại khi cuộn."
+
+#, fuzzy
+msgid "Auto scroll stops here and keeps {n} frames. Try Hand scroll for pages that redraw while scrolling."
+msgstr "Cuộn tự động dừng tại đây và giữ lại {n} khung hình. Hãy thử Cuộn tay với các trang vẽ lại khi cuộn."
+
+#, fuzzy
+msgid "End of page · press Stop"
+msgstr "Hết trang · nhấn Dừng"
+
+#, fuzzy
+msgid "Esc to stop"
+msgstr "Nhấn Esc để dừng"
+
+#, fuzzy
+msgid "It reached {limit} px, the longest image CaptureMann can edit. Everything up to there is kept."
+msgstr "Ảnh đã đạt {limit} px, chiều dài tối đa mà CaptureMann có thể chỉnh sửa. Mọi thứ đến đó đều được giữ lại."
+
+#, fuzzy
+msgid "Keep scrolling"
+msgstr "Tiếp tục cuộn"
+
+#, fuzzy
+msgid "Long Shot saved at the size limit"
+msgstr "Đã lưu Ảnh dài ở giới hạn kích thước"
+
+#, fuzzy
+msgid "Scroll back up a little"
+msgstr "Cuộn ngược lên một chút"
+
+#, fuzzy
+msgid "Scroll back up a little and keep going, or stop and keep the 1 frame so far."
+msgstr "Cuộn ngược lên một chút rồi tiếp tục, hoặc dừng và giữ lại 1 khung hình đã chụp."
+
+#, fuzzy
+msgid "Scroll back up a little and keep going, or stop and keep the {n} frames so far."
+msgstr "Cuộn ngược lên một chút rồi tiếp tục, hoặc dừng và giữ lại {n} khung hình đã chụp."
+
+#, fuzzy
+msgid "Started by an agent or the command line"
+msgstr "Do một agent hoặc dòng lệnh khởi chạy"
+
+#, fuzzy
+msgid "Stop and keep"
+msgstr "Dừng và giữ lại"
+
+#, fuzzy
+msgid "Stopped where the page jumped"
+msgstr "Đã dừng ở chỗ trang bị nhảy"
+
+#, fuzzy
+msgid "Stopped with Esc. Everything up to here is kept: 1 frame, {size}."
+msgstr "Đã dừng bằng Esc. Mọi thứ đến đây đều được giữ lại: 1 khung hình, {size}."
+
+#, fuzzy
+msgid "Stopped with Esc. Everything up to here is kept: {n} frames, {size}."
+msgstr "Đã dừng bằng Esc. Mọi thứ đến đây đều được giữ lại: {n} khung hình, {size}."
+
+#, fuzzy
+msgid "The last part didn’t line up"
+msgstr "Phần cuối không khớp"
+
+#, fuzzy
+msgid "Try Hand scroll"
+msgstr "Thử Cuộn tay"
+
+#, fuzzy
+msgid "to stop"
+msgstr "để dừng"

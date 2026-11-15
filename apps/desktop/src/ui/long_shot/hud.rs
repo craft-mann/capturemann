@@ -4,20 +4,26 @@
 //! daemon: Pause is `long_shot_state { paused }`, Stop is the daemon's cancel for the call's
 //! `request_id` (what was captured is kept).
 
+use std::time::Instant;
+
 use gpui::{
-    div, img, prelude::*, px, App, Context, DisplayId, Entity, FontWeight, Global, MouseButton,
-    ObjectFit, Render, Role, SharedString, Window, WindowHandle,
+    div, img, prelude::*, px, Animation, AnimationExt as _, App, Context, DisplayId, ElementId,
+    Entity, FontWeight, Global, MouseButton, ObjectFit, Render, Role, SharedString, Window,
+    WindowHandle,
 };
 use serde_json::json;
 
 use cm_i18n::tr;
 
-use super::geometry::HUD_W;
+use super::bar;
+use super::model::{Cue, Dot, SecondLine, COUNT_FADE};
 use super::LongModel;
 use crate::backend::Backend;
 use crate::recording::geometry::Rect;
+use crate::recording::hud_layout;
 use crate::theme::{type_scale, Theme};
-use crate::ui::components::{icon, rec_dot};
+use crate::ui::components::{dot, icon, keycap};
+use crate::ui::kit::{pill, Tone};
 use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
 use crate::ui::recording::{harden, panel_options};
 
@@ -91,12 +97,21 @@ impl LongHud {
     }
 
     fn stop(&mut self, cx: &mut Context<Self>) {
-        let (backend, id) = {
+        let (backend, id, passive) = {
             let m = self.model.read(cx);
-            (m.app.read(cx).backend.clone(), m.request_id.clone())
+            (
+                m.app.read(cx).backend.clone(),
+                m.request_id.clone(),
+                m.state.passive,
+            )
         };
         if let Some(d) = &backend.daemon {
-            d.cancel_delayed_capture(&id);
+            // A run an agent or the CLI started may have no request id: Stop ends them all.
+            if passive || id.is_empty() {
+                d.cancel_long_shots();
+            } else {
+                d.cancel_delayed_capture(&id);
+            }
         }
     }
 
@@ -179,28 +194,95 @@ fn hud_button(
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
 }
 
-impl Render for LongHud {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = Theme::overlay();
-        let (state, preview_button) = {
-            let m = self.model.read(cx);
-            (
-                (
-                    m.state.frames_text(),
-                    m.state.length_text(),
-                    m.state.paused,
-                    m.state.is_auto(),
-                    m.state.is_horizontal(),
-                ),
-                m.preview_button,
-            )
-        };
-        let (frames, length, paused, auto, horizontal) = state;
-        let mut bar = div()
+/// The frame count with its dot (S18): a new number fades in over 120 ms, no bounce (reduced
+/// motion: static); the 8 px dot after it is success while frames are being taken and warning
+/// when the last part did not line up. The slot stays when there is no dot, so the number does
+/// not move.
+fn count_row(t: &Theme, frames: String, n: u32, dot_state: Dot, reduced_motion: bool) -> gpui::Div {
+    let text = div()
+        .mono()
+        .whitespace_nowrap()
+        .text_size(px(15.))
+        .text_color(rgba_of(t.text))
+        .child(SharedString::from(frames));
+    let number = if reduced_motion {
+        text.into_any_element()
+    } else {
+        text.with_animation(
+            ElementId::Integer(u64::from(n)),
+            Animation::new(COUNT_FADE),
+            |el, delta| el.opacity(delta),
+        )
+        .into_any_element()
+    };
+    let colour = match dot_state {
+        Dot::Live => Some(t.success),
+        Dot::Warning => Some(t.warning),
+        Dot::Off => None,
+    };
+    div().flex().items_center().gap(px(8.)).child(number).child(
+        div()
+            .id("long-hud-dot")
+            .size(px(8.))
+            .flex_none()
+            .rounded(px(4.))
+            .when_some(colour, |d, c| d.bg(rgba_of(c))),
+    )
+}
+
+/// The second line under the count: the size in mono, or "Scroll back up a little" with an amber
+/// dot while the last part does not line up (S18).
+fn second_line(t: &Theme, line: SecondLine) -> gpui::AnyElement {
+    match line {
+        SecondLine::Size(text) => div()
+            .mono()
+            .whitespace_nowrap()
+            .text_size(px(11.))
+            .text_color(rgba_of(t.mist))
+            .child(SharedString::from(text))
+            .into_any_element(),
+        SecondLine::ScrollBack => div()
+            .id("long-hud-scroll-back")
+            .role(Role::Status)
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .whitespace_nowrap()
+            .text_size(px(11.))
+            .text_color(rgba_of(t.text_2))
+            .child(dot(t.warning, 8.))
+            .child(SharedString::from(tr!("Scroll back up a little")))
+            .into_any_element(),
+    }
+}
+
+/// The Stop button (a red square, 44 px).
+fn stop_button(t: &Theme, cx: &mut Context<LongHud>) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id("long-hud-stop")
+        .role(Role::Button)
+        .aria_label(tr!("Stop"))
+        .size(px(44.))
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .rounded(px(12.))
+        .bg(rgba_of(t.rec))
+        .cursor_pointer()
+        .child(div().size(px(14.)).rounded(px(3.)).bg(rgba_of(t.ink)))
+        .occlude()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
+}
+
+impl LongHud {
+    fn frame(&self, t: &Theme, w: f32, cx: &mut Context<Self>) -> gpui::Stateful<gpui::Div> {
+        div()
             .id("long-hud")
             .role(Role::Toolbar)
             .aria_label(tr!("Long Shot"))
-            .w(px(HUD_W as f32))
+            .w(px(w))
             .h(px(56.))
             .flex()
             .items_center()
@@ -217,58 +299,117 @@ impl Render for LongHud {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|_, _, window, _| window.start_window_move()),
-            );
-        bar = bar
-            .child(
-                div()
-                    .id("long-hud-stop")
-                    .role(Role::Button)
-                    .aria_label(tr!("Stop"))
-                    .size(px(44.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(12.))
-                    .bg(rgba_of(t.rec))
-                    .cursor_pointer()
-                    .child(div().size(px(14.)).rounded(px(3.)).bg(rgba_of(t.ink)))
-                    .occlude()
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .on_click(cx.listener(|this, _, _, cx| this.stop(cx))),
             )
+    }
+
+    /// The bar of a Long Shot an agent or the CLI started: Stop, the count and an Agent chip.
+    fn passive(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Stateful<gpui::Div> {
+        let now = Instant::now();
+        let (frames, n, dot_state, line, client, w) = {
+            let m = self.model.read(cx);
+            (
+                m.state.frames_text(),
+                m.state.frames,
+                m.state.dot(now),
+                m.state.second_line(),
+                m.state.client.clone(),
+                m.bar.width as f32,
+            )
+        };
+        let chip_label = match client {
+            Some(c) => tr!("Started by agent {client}", client = c),
+            None => tr!("Started by an agent or the command line"),
+        };
+        let reduced = crate::platform_window::reduce_motion();
+        self.frame(t, w, cx)
+            .child(stop_button(t, cx))
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .px(px(6.))
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(8.))
-                            .child(rec_dot(&t, 8.))
-                            .child(
-                                div()
-                                    .mono()
-                                    .text_size(px(15.))
-                                    .text_color(rgba_of(t.text))
-                                    .child(SharedString::from(frames)),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .mono()
-                            .text_size(px(11.))
-                            .text_color(rgba_of(t.mist))
-                            .child(SharedString::from(length)),
-                    ),
+                    .child(count_row(t, frames, n, dot_state, reduced))
+                    .child(second_line(t, line)),
             )
-            .child(div().w(px(1.)).h(px(28.)).bg(rgba_of(t.line)))
+            .child(
+                div()
+                    .id("long-hud-agent-chip")
+                    .role(Role::Status)
+                    .aria_label(SharedString::from(chip_label.clone()))
+                    .tooltip(crate::ui::tooltip::tip(chip_label, Vec::new()))
+                    .flex_none()
+                    .child(pill(
+                        t,
+                        Tone::Agent,
+                        Some(hud_layout::AGENT_ICON),
+                        bar::agent_chip_text(),
+                    )),
+            )
+    }
+}
+
+impl Render for LongHud {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let t = Theme::overlay();
+        if self.model.read(cx).state.passive {
+            return self.passive(&t, cx).into_any_element();
+        }
+        let now = Instant::now();
+        let (frames, n, dot_state, line, paused, auto, horizontal, plan, preview_button) = {
+            let m = self.model.read(cx);
+            (
+                m.state.frames_text(),
+                m.state.frames,
+                m.state.dot(now),
+                m.state.second_line(),
+                m.state.paused,
+                m.state.is_auto(),
+                m.state.is_horizontal(),
+                m.bar,
+                m.preview_button,
+            )
+        };
+        let reduced = crate::platform_window::reduce_motion();
+        let mode_text = if auto { tr!("Auto") } else { tr!("Hand") };
+        let mut counter = div()
+            .flex()
+            .flex_col()
+            .flex_none()
+            .px(px(6.))
+            .child(count_row(&t, frames, n, dot_state, reduced));
+        if plan.second_line {
+            counter = counter.child(second_line(&t, line));
+        }
+        let mut mode = div()
+            .id("long-hud-mode")
+            .role(Role::Status)
+            .aria_label(SharedString::from(mode_text.clone()))
+            .flex()
+            .flex_none()
+            .items_center()
+            .gap(px(6.))
+            .px(px(6.))
+            .text_size(px(type_scale::CAPTION))
+            .text_color(rgba_of(t.text_3))
+            .whitespace_nowrap()
+            .child(icon("chevrons-down", 14., t.text_3));
+        if plan.mode_label {
+            mode = mode.child(SharedString::from(mode_text));
+        } else {
+            // Collapsed to its icon: the full label stays as tooltip and accessible name.
+            mode = mode.tooltip(crate::ui::tooltip::tip(mode_text, Vec::new()));
+        }
+        let mut bar = self
+            .frame(&t, plan.width as f32, cx)
+            .child(stop_button(&t, cx))
+            .child(counter)
+            .child(div().w(px(1.)).h(px(28.)).flex_none().bg(rgba_of(t.line)))
             // The direction is chosen before Start (the stitcher works along one axis), so the
             // control is shown as a label of what this Long Shot does.
             .child(
                 div()
                     .flex()
+                    .flex_none()
                     .items_center()
                     .p(px(2.))
                     .gap(px(2.))
@@ -285,30 +426,37 @@ impl Render for LongHud {
                     if paused { "rec-play" } else { "rec-pause" },
                     if paused { tr!("Resume") } else { tr!("Pause") },
                 )
+                .flex_none()
                 .on_click(cx.listener(|this, _, _, cx| this.pause(cx))),
             )
-            .child(
+            .child(mode);
+        if plan.esc_hint {
+            // "Esc to stop": Esc ends the run and keeps every frame so far (S18).
+            bar = bar.child(
                 div()
+                    .id("long-hud-esc")
+                    .role(Role::Status)
+                    .aria_label(SharedString::from(tr!("Esc to stop")))
                     .flex()
+                    .flex_none()
                     .items_center()
                     .gap(px(6.))
-                    .px(px(6.))
+                    .pr(px(6.))
+                    .whitespace_nowrap()
                     .text_size(px(type_scale::CAPTION))
                     .text_color(rgba_of(t.text_3))
-                    .child(icon("chevrons-down", 14., t.text_3))
-                    .child(SharedString::from(if auto {
-                        tr!("Auto")
-                    } else {
-                        tr!("Hand")
-                    })),
+                    .child(keycap(&t, "Esc"))
+                    .child(SharedString::from(tr!("to stop"))),
             );
+        }
         if preview_button {
             bar = bar.child(
                 hud_button(&t, "long-hud-preview", "image", tr!("Preview"))
+                    .flex_none()
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_preview(cx))),
             );
         }
-        bar
+        bar.into_any_element()
     }
 }
 
@@ -327,6 +475,7 @@ impl Render for LongPreview {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::overlay();
         let st = &self.model.read(cx).state;
+        let cue = st.cue(Instant::now());
         let panel_w = f32::from(window.viewport_size().width);
         let inner_w = (panel_w - 24.0).max(40.0);
         let size_text = st.length_text();
@@ -336,6 +485,7 @@ impl Render for LongPreview {
             .overflow_hidden()
             .flex()
             .flex_col()
+            .relative()
             // The newest rows are at the bottom: the picture grows upwards out of the panel.
             .justify_end()
             .rounded(px(8.))
@@ -349,6 +499,45 @@ impl Render for LongPreview {
                     .h(px(inner_w.min(pw as f32) * ratio))
                     .flex_none()
                     .object_fit(ObjectFit::Fill),
+            );
+        }
+        // S18: "Keep scrolling" with a chevron over a fade at the bottom; at the end of the page
+        // (no new rows for a second) "End of page \u{b7} press Stop" instead.
+        if cue != Cue::Hidden {
+            let ink = rgba_of(t.ink);
+            let (text, glyph) = match cue {
+                Cue::EndOfPage => (tr!("End of page \u{b7} press Stop"), None),
+                _ => (tr!("Keep scrolling"), Some("chevron-down")),
+            };
+            stage = stage.child(
+                div()
+                    .id("long-preview-cue")
+                    .role(Role::Status)
+                    .absolute()
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .h(px(44.))
+                    .flex()
+                    .items_end()
+                    .justify_center()
+                    .pb(px(8.))
+                    .bg(gpui::linear_gradient(
+                        180.,
+                        gpui::linear_color_stop(gpui::Rgba { a: 0., ..ink }, 0.),
+                        gpui::linear_color_stop(gpui::Rgba { a: 0.9, ..ink }, 1.),
+                    ))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .whitespace_nowrap()
+                            .text_size(px(type_scale::CAPTION))
+                            .text_color(rgba_of(t.text_2))
+                            .when_some(glyph, |d, g| d.child(icon(g, 14., t.text_2)))
+                            .child(SharedString::from(text)),
+                    ),
             );
         }
         let tags = st.band_tags();

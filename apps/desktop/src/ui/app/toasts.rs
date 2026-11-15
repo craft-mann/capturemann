@@ -653,6 +653,10 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
         ToastAction::UploadFile(id, file) => {
             crate::ui::upload_ui::upload(app, Some(&id), Some(&file), cx)
         }
+        ToastAction::StopLongShot => {
+            crate::ui::long_shot::stop_all(app, cx);
+        }
+        ToastAction::TryHandScroll => crate::ui::long_shot::start(app, cx),
     }
 }
 

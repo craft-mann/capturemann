@@ -1,6 +1,6 @@
 # Long Shot: sending a failing pair (opt-in debug dump)
 
-When Long Shot says "Stopped: the next part did not line up" and you think it should not have, the engine can
+When Long Shot says "Stopped where the page jumped" (or its Hand scroll HUD says "Scroll back up a little") and you think it should not have, the engine can
 write the two frames it could not join. It is **off by default**, writes only to a folder you name, and nothing
 is ever uploaded.
 

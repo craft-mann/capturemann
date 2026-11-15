@@ -56,6 +56,9 @@ pub struct LongShotProgress {
     pub max_len: u32,
     pub header_px: u32,
     pub footer_px: u32,
+    /// `false` when the newest settled frame did not line up with the last one taken and was
+    /// left out (Hand scroll; the HUD says "Scroll back up a little" until a frame joins again).
+    pub last_join_ok: bool,
 }
 
 /// The end of a Long Shot: the image and why it ended.
@@ -73,6 +76,7 @@ fn progress(s: &Stitcher) -> LongShotProgress {
         max_len: s.max_len(),
         header_px,
         footer_px,
+        last_join_ok: true,
     }
 }
 
@@ -348,7 +352,9 @@ pub fn run_hand_ex(
         prev_poll = g.clone();
         if g == last_taken {
             // Back at the last good frame: nothing is left out any more.
-            refused = None;
+            if refused.take().is_some() {
+                on_progress(progress(&stitcher));
+            }
             bridge = None;
             moving_polls = 0;
             continue;
@@ -406,7 +412,11 @@ pub fn run_hand_ex(
                 }
                 last_taken = g;
             }
-            PushOutcome::NoChange => refused = None,
+            PushOutcome::NoChange => {
+                if refused.take().is_some() {
+                    on_progress(progress(&stitcher));
+                }
+            }
             PushOutcome::NoOverlap => {
                 super::debug::dump_refused(&last_taken, &g, stitcher.last_refusal(), "hand scroll");
                 if stitcher.frames() == 1 {
@@ -429,6 +439,11 @@ pub fn run_hand_ex(
                     first_refused = Some(g.clone());
                 }
                 refused = Some(g);
+                // Only a notice for the HUD: nothing was added.
+                on_progress(LongShotProgress {
+                    last_join_ok: false,
+                    ..progress(&stitcher)
+                });
             }
             PushOutcome::LimitReached { .. } => {
                 {

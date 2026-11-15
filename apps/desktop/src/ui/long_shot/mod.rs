@@ -8,16 +8,24 @@
 //! 3. One `capture_screenshot` call runs the whole Long Shot. The HUD polls `long_shot_state`
 //!    (counts and a small preview picture) and calls it to Pause; Stop is
 //!    `Daemon::cancel_delayed_capture` with the call's `request_id`: what was captured is kept.
-//! 4. The call returns the stored capture; the toast says how it ended.
+//! 4. The call returns the stored capture; the toast says how it ended (Esc, the size limit, a
+//!    page that jumped, S18).
+//!
+//! A Long Shot an agent or the CLI starts has no overlay: the daemon's `started` event carries
+//! its area and a small passive HUD (Stop, the count and an Agent chip) opens for it (S18).
 //!
 //! Everything that changes state goes through daemon actions.
 
+pub mod bar;
 pub mod geometry;
 mod hud;
 pub mod model;
+#[cfg(test)]
+mod width_tests;
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use cm_i18n::tr;
 use gpui::{App, AppContext as _, Entity, Global, WindowHandle};
@@ -50,6 +58,8 @@ pub struct LongModel {
     pub state: LongState,
     pub request_id: String,
     pub app: Entity<AppModel>,
+    /// What the HUD shows and how wide its window is (S20).
+    pub bar: bar::BarPlan,
     /// The HUD shows a Preview button (no room beside the area).
     pub preview_button: bool,
     /// Where the Preview button's floating panel goes, and the display it is on.
@@ -57,6 +67,17 @@ pub struct LongModel {
 }
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
+
+/// The request ids of the runs this app started (their HUD is the full one, not the passive one).
+static OWN_RUNS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Esc stopped the run (Stop on the HUD and Esc both end as `stopped_by_user`; the toast says
+/// "Stopped with Esc" only for the key).
+static STOPPED_WITH_ESC: AtomicBool = AtomicBool::new(false);
+
+fn own_runs() -> std::sync::MutexGuard<'static, Vec<String>> {
+    OWN_RUNS.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 fn new_request_id() -> String {
     let n = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -86,12 +107,115 @@ pub fn escape_hotkey_id() -> u32 {
 
 /// A daemon event about a Long Shot run: Esc is grabbed as a global key while one runs and let go
 /// when it ends. The window being scrolled has the focus, and the HUD never takes it, so no
-/// window of ours would see the key.
-pub fn on_event(name: &str, cx: &mut App) {
+/// window of ours would see the key. A run this app did not start (an agent's or the CLI's) gets
+/// the passive HUD (S18) and its progress.
+pub fn on_event(app: &Entity<AppModel>, name: &str, data: &Value, cx: &mut App) {
     match model::escape_for_event(name) {
-        Some(model::EscapeKey::Grab) => crate::ui::delay_pill::grab_escape(cx),
-        Some(model::EscapeKey::Release) => crate::ui::delay_pill::release_escape(cx),
+        Some(model::EscapeKey::Grab) => {
+            crate::ui::delay_pill::grab_escape(cx);
+            open_passive(app, data, cx);
+        }
+        Some(model::EscapeKey::Release) => {
+            crate::ui::delay_pill::release_escape(cx);
+            close_passive(cx);
+        }
         None => {}
+    }
+    if name == cm_daemon::long_shot_ops::PROGRESS_EVENT {
+        if let Some(m) = passive_model(cx) {
+            m.update(cx, |m, cx| {
+                m.state.apply_progress(data, Instant::now());
+                cx.notify();
+            });
+        }
+    }
+}
+
+/// The model of the passive HUD, if one is open.
+fn passive_model(cx: &App) -> Option<Entity<LongModel>> {
+    cx.try_global::<Holder>()
+        .and_then(|h| h.0.as_ref())
+        .map(|r| r.model.clone())
+        .filter(|m| m.read(cx).state.passive)
+}
+
+/// The passive HUD for a Long Shot this app did not start.
+fn open_passive(app: &Entity<AppModel>, data: &Value, cx: &mut App) {
+    let Some(run) = model::ForeignRun::from_event(data) else {
+        return;
+    };
+    if is_running(cx)
+        || run
+            .request_id
+            .as_ref()
+            .is_some_and(|id| own_runs().contains(id))
+    {
+        return;
+    }
+    let backend = app.read(cx).backend.clone();
+    let rt = backend.rt.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        return;
+    };
+    let app = app.clone();
+    cx.spawn(async move |cx| {
+        let listed = rt
+            .spawn(async move {
+                Backend::call(&daemon, "list_targets", json!({ "windows": false }))
+                    .await
+                    .map(|v| parse_engine_displays(&v))
+                    .unwrap_or_default()
+            })
+            .await
+            .unwrap_or_default();
+        cx.update(|cx| {
+            if is_running(cx) {
+                return;
+            }
+            let Some(area) = geometry::area_global_px(&listed, run.display_id, run.area)
+                .map(|g| geometry::area_in_points(g, run.scale))
+            else {
+                log::warn!("long shot: the area of a run started elsewhere is not on a listed display; no HUD");
+                return;
+            };
+            let Some(display) = display_for(cx, &area) else {
+                return;
+            };
+            let usable = visible_part(&display.1);
+            let texts = bar::BarTexts::longest();
+            let w = bar::passive_width(&texts, &bar::agent_chip_text()).min(bar::cap(usable.w));
+            let layout = geometry::layout(&usable, &area, w);
+            let state = LongState::passive(&run.scroll, &run.direction, run.client.clone());
+            let model = cx.new(|_| LongModel {
+                state,
+                request_id: run.request_id.clone().unwrap_or_default(),
+                app: app.clone(),
+                bar: bar::BarPlan {
+                    esc_hint: false,
+                    mode_label: false,
+                    second_line: true,
+                    width: w,
+                },
+                preview_button: false,
+                floating: (display.0, layout.hud),
+            });
+            let Some(hud) = hud::open_hud(&model, display, layout.hud, cx) else {
+                return;
+            };
+            cx.set_global(Holder(Some(Running {
+                hud,
+                preview: None,
+                model,
+            })));
+        });
+    })
+    .detach();
+}
+
+/// The run ended: the passive HUD (never the full one, which `finish` closes) goes.
+fn close_passive(cx: &mut App) {
+    if passive_model(cx).is_some() {
+        close_windows(cx);
     }
 }
 
@@ -99,6 +223,16 @@ pub fn on_event(name: &str, cx: &mut App) {
 /// (the CLI run has no HUD). What was captured is kept. Returns whether one was running, so the
 /// key falls through to the delay pill's handler otherwise.
 pub fn stop_running(app: &Entity<AppModel>, cx: &App) -> bool {
+    let stopped = stop_all(app, cx);
+    if stopped {
+        STOPPED_WITH_ESC.store(true, Ordering::SeqCst);
+    }
+    stopped
+}
+
+/// Ends every running Long Shot and keeps what was captured (Esc, "Stop and keep"). Returns
+/// whether one was running.
+pub fn stop_all(app: &Entity<AppModel>, cx: &App) -> bool {
     app.read(cx)
         .backend
         .daemon
@@ -195,6 +329,9 @@ fn begin(app: &Entity<AppModel>, pick: LongPick, cx: &mut App) {
     };
     let copy = capture_flow::take_copy(app, cx);
     let request_id = new_request_id();
+    own_runs().push(request_id.clone());
+    STOPPED_WITH_ESC.store(false, Ordering::SeqCst);
+    let (auto, rid_done) = (pick.scroll == "auto", request_id.clone());
     let app2 = app.clone();
     cx.spawn(async move |cx| {
         // The engine's own display list places the picked area in the desktop.
@@ -238,7 +375,14 @@ fn begin(app: &Entity<AppModel>, pick: LongPick, cx: &mut App) {
                 }
             })
             .await;
-        cx.update(|cx| finish(&app2, result, cx));
+        cx.update(|cx| {
+            own_runs().retain(|id| *id != rid_done);
+            let how = model::Ending {
+                auto,
+                esc: STOPPED_WITH_ESC.swap(false, Ordering::SeqCst),
+            };
+            finish(&app2, result, how, cx)
+        });
     })
     .detach();
 }
@@ -261,12 +405,18 @@ fn open_windows(
         return;
     };
     let usable = visible_part(&display.1);
-    let layout = geometry::layout(&usable, &area);
+    let plan = bar::plan(usable.w, &bar::BarTexts::longest(), {
+        // Whether the HUD carries the Preview button depends on the room beside the area, which
+        // does not depend on the HUD's width.
+        geometry::layout(&usable, &area, geometry::HUD_W).preview_button
+    });
+    let layout = geometry::layout(&usable, &area, plan.width);
     let floating = geometry::floating_preview(&usable, &area);
     let model = cx.new(|_| LongModel {
         state: LongState::new(&pick.scroll, &pick.direction),
         request_id: request_id.to_owned(),
         app: app.clone(),
+        bar: plan,
         preview_button: layout.preview_button,
         floating: (display.0, floating),
     });
@@ -323,6 +473,18 @@ fn poll(model: &Entity<LongModel>, cx: &mut App) {
             .update(cx, |m, _| m.state.apply(&answer))
             .ok()
             .flatten();
+        // Hand scroll: the last part did not line up. Say what to do, once per failure.
+        let warn = model
+            .update(cx, |m, _| {
+                m.state
+                    .take_join_warning()
+                    .then(|| (m.app.clone(), m.state.frames))
+            })
+            .ok()
+            .flatten();
+        if let Some((app, frames)) = warn {
+            cx.update(|cx| toast(&app, model::did_not_line_up_toast(frames), cx));
+        }
         if let Some(png) = png {
             let decoded = cx
                 .background_executor()
@@ -367,12 +529,17 @@ fn close_windows(cx: &mut App) {
 type Finished =
     Result<(Value, Result<crate::backend::AfterCapture, String>), crate::backend::CallError>;
 
-fn finish(app: &Entity<AppModel>, result: Result<Finished, tokio::task::JoinError>, cx: &mut App) {
+fn finish(
+    app: &Entity<AppModel>,
+    result: Result<Finished, tokio::task::JoinError>,
+    how: model::Ending,
+    cx: &mut App,
+) {
     close_windows(cx);
     free(app, cx);
     match result {
         Ok(Ok((v, done))) => {
-            let Some(spec) = model::done_toast(&v) else {
+            let Some(spec) = model::done_toast(&v, how) else {
                 toast(
                     app,
                     crate::flows::error_toast(

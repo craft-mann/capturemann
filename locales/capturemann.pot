@@ -336,6 +336,9 @@ msgstr ""
 msgid "Agenda"
 msgstr ""
 
+msgid "Agent"
+msgstr ""
+
 msgid "Agent clients"
 msgstr ""
 
@@ -550,6 +553,12 @@ msgid "Auto scroll"
 msgstr ""
 
 msgid "Auto scroll needs Accessibility"
+msgstr ""
+
+msgid "Auto scroll stops here and keeps 1 frame. Try Hand scroll for pages that redraw while scrolling."
+msgstr ""
+
+msgid "Auto scroll stops here and keeps {n} frames. Try Hand scroll for pages that redraw while scrolling."
 msgstr ""
 
 msgid "Auto-redact"
@@ -1962,6 +1971,9 @@ msgstr ""
 msgid "Ellipse {n}"
 msgstr ""
 
+msgid "End of page · press Stop"
+msgstr ""
+
 msgid "Engine loading the model…"
 msgstr ""
 
@@ -1978,6 +1990,9 @@ msgid "Enter an app’s bundle id, for example com.tinyspeck.slackmacgap."
 msgstr ""
 
 msgid "Enter the client’s name."
+msgstr ""
+
+msgid "Esc to stop"
 msgstr ""
 
 msgid "Estimate the size of an export"
@@ -2618,6 +2633,9 @@ msgstr ""
 msgid "It never records what you type."
 msgstr ""
 
+msgid "It reached {limit} px, the longest image CaptureMann can edit. Everything up to there is kept."
+msgstr ""
+
 msgid "Its own windows, toolbars and the webcam bubble preview"
 msgstr ""
 
@@ -2640,6 +2658,9 @@ msgid "Keep audio"
 msgstr ""
 
 msgid "Keep it"
+msgstr ""
+
+msgid "Keep scrolling"
 msgstr ""
 
 msgid "Keep size"
@@ -2860,6 +2881,9 @@ msgid "Long Shot needs a permission"
 msgstr ""
 
 msgid "Long Shot saved"
+msgstr ""
+
+msgid "Long Shot saved at the size limit"
 msgstr ""
 
 msgid "Long Shot: Auto scroll"
@@ -4161,9 +4185,6 @@ msgstr ""
 msgid "Re-generating replaces this transcript. Your caption edits are kept where the same words are heard again; the others are dropped. You can undo that from the editor."
 msgstr ""
 
-msgid "Reached the longest image CaptureMann can edit"
-msgstr ""
-
 msgid "Read a Click Guide"
 msgstr ""
 
@@ -4909,6 +4930,15 @@ msgstr ""
 msgid "Scroll at your own pace…"
 msgstr ""
 
+msgid "Scroll back up a little"
+msgstr ""
+
+msgid "Scroll back up a little and keep going, or stop and keep the 1 frame so far."
+msgstr ""
+
+msgid "Scroll back up a little and keep going, or stop and keep the {n} frames so far."
+msgstr ""
+
 msgid "Scrollable area"
 msgstr ""
 
@@ -5255,6 +5285,9 @@ msgstr ""
 msgid "Started by agent {client}"
 msgstr ""
 
+msgid "Started by an agent or the command line"
+msgstr ""
+
 msgid "Started by {client}"
 msgstr ""
 
@@ -5330,6 +5363,9 @@ msgstr ""
 msgid "Stop a recording"
 msgstr ""
 
+msgid "Stop and keep"
+msgstr ""
+
 msgid "Stop excluding {id}"
 msgstr ""
 
@@ -5339,7 +5375,13 @@ msgstr ""
 msgid "Stop recording"
 msgstr ""
 
-msgid "Stopped: the next part did not line up"
+msgid "Stopped where the page jumped"
+msgstr ""
+
+msgid "Stopped with Esc. Everything up to here is kept: 1 frame, {size}."
+msgstr ""
+
+msgid "Stopped with Esc. Everything up to here is kept: {n} frames, {size}."
 msgstr ""
 
 msgid "Stopping background work…"
@@ -5752,6 +5794,9 @@ msgid "The job failed"
 msgstr ""
 
 msgid "The language of menus, buttons and messages. Captions, titles and recordings stay as they are."
+msgstr ""
+
+msgid "The last part didn’t line up"
 msgstr ""
 
 msgid "The library couldn’t be opened, so there is nowhere to save captures."
@@ -6345,6 +6390,9 @@ msgid "Tray icon unavailable"
 msgstr ""
 
 msgid "Trim a recording"
+msgstr ""
+
+msgid "Try Hand scroll"
 msgstr ""
 
 msgid "Try again"
@@ -7226,6 +7274,9 @@ msgid "this recording has no exported MP4 yet"
 msgstr ""
 
 msgid "timed out after {secs} s"
+msgstr ""
+
+msgid "to stop"
 msgstr ""
 
 msgid "turned upright"

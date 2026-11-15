@@ -39,6 +39,18 @@ states needed. Please follow the pack's tokens (40 px controls, 44 px HUD target
   display (labels to icons, in which order).
 
 ## D5. Long Shot: Hand scroll with continuous scrolling, and how a run ends
+- **Designed and built (Nov 15, 2026), board S18** (`R034LongHand`, with S2 `R034LongRun`, S2b
+  `R034HudPlace`, S20 `R034Lengths`), **tested with fakes and on the display-free model, not seen on a
+  screen:** the frame counter fades each new number in over 120 ms (static with reduced motion), an 8 px
+  dot after it (success while frames are taken, warning when the last part did not line up), "Keep
+  scrolling" with a chevron over a fade at the bottom of the side preview and "End of page · press Stop"
+  once no new rows came for a second, the "Esc to stop" hint after the mode (first thing to give way on a
+  narrow display, then the mode label with its icon staying, then the second line; the HUD is at most
+  640 px and at most the display minus 48), "Scroll back up a little" with an amber dot as the second
+  line until a frame lines up again, the four end toasts with the board's words (Esc, size limit, a page
+  that jumped in Auto scroll, the live "did not line up" toast with Stop and keep), and the passive HUD
+  (Stop, the count, an Agent chip) for a Long Shot an agent or the CLI started. Differences from the
+  board are in `specs/features/01-screenshot.md` (CAP-6, "HUD while a Hand scroll runs").
 - Decision made in code: a frame is taken when the scrolled distance since the last frame reaches about
   a third of the area, or when the content has been still for about 150 ms.
 - Draw: the HUD and the side preview while a continuous scroll runs (frame counter ticking, a visible
