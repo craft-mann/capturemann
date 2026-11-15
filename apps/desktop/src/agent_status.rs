@@ -68,6 +68,24 @@ pub struct LastCall {
     pub decision: ActivityDecision,
 }
 
+/// The status shape beside the Agents & CLI icon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatusMark {
+    /// Ready: a solid agent-blue dot.
+    Dot,
+    /// Offline (no library, no endpoint): a hollow ring.
+    Ring,
+    /// Another app owns the socket: an amber "!" badge.
+    Bang,
+}
+
+/// What the Agents & CLI tooltip says under its name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusTip {
+    pub line: String,
+    pub detail: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct McpStatus {
     pub state: McpState,
@@ -84,6 +102,55 @@ impl McpStatus {
             tr!("MCP ready")
         } else {
             tr!("MCP offline")
+        }
+    }
+
+    /// The shape drawn at the Agents & CLI icon's bottom-right (board S14): colour is never the
+    /// only cue.
+    pub fn mark(&self) -> StatusMark {
+        match &self.state {
+            McpState::Ready => StatusMark::Dot,
+            McpState::Offline(OfflineReason::SocketOwned) => StatusMark::Bang,
+            McpState::Offline(_) => StatusMark::Ring,
+        }
+    }
+
+    /// The status in the accessible name after "Agents & CLI, ": "MCP ready", "MCP offline" or
+    /// "another app owns the socket". It names the real cause: a missing library is plain offline.
+    pub fn aria_status(&self) -> String {
+        match &self.state {
+            McpState::Offline(OfflineReason::SocketOwned) => {
+                tr!("another app owns the socket")
+            }
+            _ => self.title(),
+        }
+    }
+
+    /// The status tooltip: the status line, then what it means for agents (board S14).
+    pub fn tip(&self) -> StatusTip {
+        match &self.state {
+            McpState::Ready => StatusTip {
+                line: tr!("MCP ready \u{b7} stdio and socket"),
+                detail: self.last_call.iter().map(|c| tr!("Last call: {tool}", tool = c.tool)).collect(),
+            },
+            McpState::Offline(OfflineReason::SocketOwned) => StatusTip {
+                line: OfflineReason::SocketOwned.text(),
+                detail: vec![tr!(
+                    "Agents can\u{2019}t reach CaptureMann. Open Agents & CLI to see which app and how to fix it."
+                )],
+            },
+            McpState::Offline(OfflineReason::LibraryUnavailable) => StatusTip {
+                line: tr!("MCP offline \u{b7} {reason}", reason = OfflineReason::LibraryUnavailable.text()),
+                detail: vec![tr!(
+                    "CaptureMann has no library, so agents can\u{2019}t reach it. Open Agents & CLI for details."
+                )],
+            },
+            McpState::Offline(OfflineReason::NoEndpoint) => StatusTip {
+                line: tr!("MCP offline \u{b7} {reason}", reason = OfflineReason::NoEndpoint.text()),
+                detail: vec![tr!(
+                    "CaptureMann is not serving an agent endpoint, so agents can\u{2019}t reach it. Open Agents & CLI for details."
+                )],
+            },
         }
     }
 
@@ -244,6 +311,53 @@ mod tests {
             IpcFailure::of(&Error::new(ErrorKind::InvalidInput, "x")),
             IpcFailure::Other
         );
+    }
+
+    /// Board S14 (D7): the shape follows the real state, and the offline reasons stay apart.
+    #[test]
+    fn s14_status_shape_and_names_follow_the_cause() {
+        let ready = derive(true, true, None, &[]);
+        assert_eq!(ready.mark(), StatusMark::Dot);
+        assert_eq!(ready.aria_status(), "MCP ready");
+        assert_eq!(ready.tip().line, "MCP ready \u{b7} stdio and socket");
+
+        let socket = derive(true, true, Some("in use"), &[]);
+        assert_eq!(socket.mark(), StatusMark::Bang);
+        assert_eq!(socket.aria_status(), "another app owns the socket");
+        assert_eq!(socket.tip().line, "Another app owns the socket");
+        assert!(socket.tip().detail[0].starts_with("Agents can\u{2019}t reach CaptureMann."));
+
+        // A missing library or endpoint is plain offline and never blames another app.
+        for s in [
+            derive(false, true, None, &[]),
+            derive(true, false, None, &[]),
+        ] {
+            assert_eq!(s.mark(), StatusMark::Ring);
+            assert_eq!(s.aria_status(), "MCP offline");
+            let tip = s.tip();
+            assert!(tip.line.starts_with("MCP offline"), "{}", tip.line);
+            assert!(!tip.line.contains("Another app") && !tip.detail[0].contains("another app"));
+        }
+        assert_eq!(
+            derive(false, true, None, &[]).tip().line,
+            "MCP offline \u{b7} Library unavailable"
+        );
+        assert_eq!(
+            derive(true, false, None, &[]).tip().line,
+            "MCP offline \u{b7} No IPC endpoint"
+        );
+    }
+
+    #[test]
+    fn s14_ready_tooltip_names_the_last_call() {
+        let log = [entry(
+            "capture_screenshot",
+            "claude",
+            ActivityDecision::Approved,
+        )];
+        let s = derive(true, true, None, &log);
+        assert_eq!(s.tip().detail, ["Last call: capture_screenshot"]);
+        assert!(derive(true, true, None, &[]).tip().detail.is_empty());
     }
 
     #[test]

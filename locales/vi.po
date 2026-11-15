@@ -11514,3 +11514,80 @@ msgstr "Chỉnh sửa nhanh"
 msgctxt "window picker for a Click Guide"
 msgid "Start guide"
 msgstr "Bắt đầu hướng dẫn"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "A scrolling page as one image"
+msgstr "Một trang cuộn thành một ảnh"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "Agents can’t reach CaptureMann. Open Agents & CLI to see which app and how to fix it."
+msgstr "Tác nhân không kết nối được với CaptureMann. Mở Tác nhân & CLI để xem ứng dụng nào và cách khắc phục."
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "CaptureMann has no library, so agents can’t reach it. Open Agents & CLI for details."
+msgstr "CaptureMann không có thư viện nên tác nhân không kết nối được. Mở Tác nhân & CLI để xem chi tiết."
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "CaptureMann is not serving an agent endpoint, so agents can’t reach it. Open Agents & CLI for details."
+msgstr "CaptureMann chưa mở điểm kết nối cho tác nhân nên tác nhân không kết nối được. Mở Tác nhân & CLI để xem chi tiết."
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "MCP offline · {reason}"
+msgstr "MCP ngoại tuyến · {reason}"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "MCP ready · stdio and socket"
+msgstr "MCP sẵn sàng · stdio và socket"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "Not available on this desktop: Wayland gives CaptureMann no click events."
+msgstr "Không khả dụng trên màn hình nền này: Wayland không cho CaptureMann nhận sự kiện nhấp chuột."
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "Not available while a Long Shot or a recording is running."
+msgstr "Không khả dụng khi đang chụp dài hoặc đang quay."
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "Set a shortcut in Settings"
+msgstr "Đặt phím tắt trong Cài đặt"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "another app owns the socket"
+msgstr "một ứng dụng khác đang giữ socket"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "{name}, not available. {reason}"
+msgstr "{name}, không khả dụng. {reason}"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "{name}, running"
+msgstr "{name}, đang chạy"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgid "{name}, shortcut {chord}"
+msgstr "{name}, phím tắt {chord}"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgctxt "capture dock"
+msgid "Click Guide"
+msgstr "Hướng dẫn"
+
+# NOTE: added with board S14 (sidebar tiles and agent status); owner review required
+#, fuzzy
+msgctxt "capture dock"
+msgid "Long Shot"
+msgstr "Chụp dài"

@@ -189,8 +189,9 @@ fn start_on(app: &Entity<AppModel>, window_id: Option<u32>, cx: &mut App) {
     let Some(h) = h else { return };
     crate::surfaces::opened(crate::surfaces::Surface::GuideHud, h);
     cx.set_global(Holder(Some(h)));
-    // Clicks on the bar are not steps (the bar's own rectangle, in the OS's global space).
-    // (Windows reports clicks in physical px: the rectangle is converted with the display's scale.)
+    notify_studio(cx); // the sidebar tile shows the run
+                       // Clicks on the bar are not steps (the bar's own rectangle, in the OS's global space).
+                       // (Windows reports clicks in physical px: the rectangle is converted with the display's scale.)
     let display_px = crate::platform_window::gpui_monitor_rects_px()
         .and_then(|v| v.into_iter().find(|(id, _)| *id == gpui_id).map(|(_, r)| r));
     daemon.set_guide_exclusions(vec![exclusion_in_os_space(&rect, &display.1, display_px)]);
@@ -269,12 +270,35 @@ fn start_on(app: &Entity<AppModel>, window_id: Option<u32>, cx: &mut App) {
     .detach();
 }
 
+/// Whether the guide bar is open (the countdown or the run).
+pub fn is_running(cx: &App) -> bool {
+    cx.try_global::<Holder>().is_some_and(|h| h.0.is_some())
+}
+
+/// The sidebar tile of a running guide: brings the bar to the front.
+pub fn bring_to_front(cx: &mut App) {
+    let Some(hud) = cx.try_global::<Holder>().and_then(|h| h.0) else {
+        return;
+    };
+    let _ = hud.update(cx, |_, window, cx| {
+        crate::surfaces::bring_to_front(cx, window, None, "click guide tile");
+    });
+}
+
 /// Closes the bar.
 pub fn close(cx: &mut App) {
     if let Some(h) = cx.try_global::<Holder>().and_then(|h| h.0) {
         crate::surfaces::close(cx, h);
     }
     cx.set_global(Holder(None));
+    notify_studio(cx);
+}
+
+/// Redraws the Studio, so the sidebar's Click Guide tile follows the run (board S14).
+fn notify_studio(cx: &mut App) {
+    if let Some(app) = cx.try_global::<app::AppHandle>().map(|h| h.0.clone()) {
+        app.update(cx, |_, cx| cx.notify());
+    }
 }
 
 impl GuideHud {

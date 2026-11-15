@@ -29,6 +29,31 @@ use crate::ui::sidebar::{sidebar, SidebarProps};
 #[derive(Clone, Copy)]
 pub struct ThemeGlobal(pub Theme);
 
+/// What the sidebar's Long Shot and Click Guide tiles need (board S14): which capture runs and why
+/// one cannot start. The reasons are the launcher rows' (`recording_off`, `guide_off`).
+fn dock_facts(app: &Entity<AppModel>, cx: &App) -> crate::nav::DockFacts {
+    use std::sync::OnceLock;
+    // Whether the session delivers click events does not change while the app runs (Wayland or
+    // not); the macOS permission case is a card, not a reason (`preflight::disabled_reason`).
+    static NO_CLICKS: OnceLock<bool> = OnceLock::new();
+    let backend = app.read(cx).backend.clone();
+    crate::nav::DockFacts {
+        long_shot_running: crate::ui::long_shot::is_running(cx),
+        guide_running: crate::ui::guide_view::hud::is_running(cx),
+        recording_running: crate::ui::recording::is_active(app, cx),
+        capture_blocker: backend
+            .daemon
+            .is_none()
+            .then(|| cm_i18n::tr!("Library unavailable")),
+        guide_blocker: backend.recording_blocker().map(|b| match b {
+            crate::backend::RecordingBlocker::NotAvailableYet => cm_i18n::tr!("Not available yet"),
+            crate::backend::RecordingBlocker::NoLibrary => cm_i18n::tr!("Library unavailable"),
+        }),
+        no_click_events: *NO_CLICKS
+            .get_or_init(|| crate::ui::guide_view::preflight::disabled_reason().is_some()),
+    }
+}
+
 actions!(
     cm_desktop,
     [
@@ -316,6 +341,7 @@ impl Render for Studio {
                 .read(cx)
                 .audio_open(&self.app.read(cx).library_route);
         let status = agent_status_of(&self.app.read(cx).backend);
+        let dock = dock_facts(&self.app, cx);
         let sidebar = sidebar(
             &t,
             &SidebarProps {
@@ -327,6 +353,7 @@ impl Render for Studio {
                 library_route,
                 section,
                 audio_open,
+                dock,
             },
             &self.app,
             &self.settings,

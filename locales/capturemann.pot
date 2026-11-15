@@ -131,6 +131,9 @@ msgstr ""
 msgid "A report is written from the transcript. Transcribe the recording first."
 msgstr ""
 
+msgid "A scrolling page as one image"
+msgstr ""
+
 msgid "A sentence or two before step 1"
 msgstr ""
 
@@ -349,6 +352,9 @@ msgid "Agent permissions could not be restored: review them in Settings → Agen
 msgstr ""
 
 msgid "Agents & CLI"
+msgstr ""
+
+msgid "Agents can’t reach CaptureMann. Open Agents & CLI to see which app and how to fix it."
 msgstr ""
 
 #. FACT: owner review required
@@ -837,7 +843,13 @@ msgstr ""
 msgid "CaptureMann has no library to save the guide in."
 msgstr ""
 
+msgid "CaptureMann has no library, so agents can’t reach it. Open Agents & CLI for details."
+msgstr ""
+
 msgid "CaptureMann is already running"
+msgstr ""
+
+msgid "CaptureMann is not serving an agent endpoint, so agents can’t reach it. Open Agents & CLI for details."
 msgstr ""
 
 msgid "CaptureMann isn't allowed to read these files. Allow it in System Settings, Privacy & Security, Files and Folders."
@@ -2919,7 +2931,13 @@ msgstr ""
 msgid "MCP offline"
 msgstr ""
 
+msgid "MCP offline · {reason}"
+msgstr ""
+
 msgid "MCP ready"
+msgstr ""
+
+msgid "MCP ready · stdio and socket"
 msgstr ""
 
 msgid "Made for kids"
@@ -3516,6 +3534,12 @@ msgid "Not available on Linux: the desktop hands CaptureMann the whole picture, 
 msgstr ""
 
 msgid "Not available on this desktop"
+msgstr ""
+
+msgid "Not available on this desktop: Wayland gives CaptureMann no click events."
+msgstr ""
+
+msgid "Not available while a Long Shot or a recording is running."
 msgstr ""
 
 msgid "Not available yet"
@@ -4996,6 +5020,9 @@ msgid "Set In point"
 msgstr ""
 
 msgid "Set Out point"
+msgstr ""
+
+msgid "Set a shortcut in Settings"
 msgstr ""
 
 msgid "Set by your desktop: {keys}"
@@ -6994,6 +7021,9 @@ msgid_plural "and {n} more"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "another app owns the socket"
+msgstr ""
+
 msgid "cannot decode poster: {error}"
 msgstr ""
 
@@ -7486,6 +7516,9 @@ msgstr ""
 msgid "{name}, default channel, reconnect needed"
 msgstr ""
 
+msgid "{name}, not available. {reason}"
+msgstr ""
+
 msgid "{name}, not connected."
 msgstr ""
 
@@ -7499,6 +7532,12 @@ msgid "{name}, reconnect needed"
 msgstr ""
 
 msgid "{name}, required, {state}"
+msgstr ""
+
+msgid "{name}, running"
+msgstr ""
+
+msgid "{name}, shortcut {chord}"
 msgstr ""
 
 msgid "{name}, {file}, could not be recovered"
@@ -8699,7 +8738,15 @@ msgid "Capture"
 msgstr ""
 
 msgctxt "capture dock"
+msgid "Click Guide"
+msgstr ""
+
+msgctxt "capture dock"
 msgid "Display"
+msgstr ""
+
+msgctxt "capture dock"
+msgid "Long Shot"
 msgstr ""
 
 msgctxt "capture dock"

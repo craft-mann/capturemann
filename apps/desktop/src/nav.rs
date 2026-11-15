@@ -297,6 +297,8 @@ pub enum RailEntry {
     Region,
     /// The mic button: Record audio (VOC-1, Option-Shift-V).
     RecordAudio,
+    /// The second-row dock tiles as rail buttons (S14): Long Shot, then Click Guide.
+    Extra(ExtraTile),
     Divider,
     Nav(NavItem),
     Spacer,
@@ -310,6 +312,8 @@ pub fn rail_layout() -> Vec<RailEntry> {
         RailEntry::Record,
         RailEntry::Region,
         RailEntry::RecordAudio,
+        RailEntry::Extra(ExtraTile::LongShot),
+        RailEntry::Extra(ExtraTile::ClickGuide),
         RailEntry::Divider,
         RailEntry::Nav(NavItem::AllCaptures),
         RailEntry::Nav(NavItem::Recordings),
@@ -428,6 +432,185 @@ pub fn tile_keys(keys: &[String]) -> Vec<String> {
         keys.to_vec()
     } else {
         keys.last().cloned().into_iter().collect()
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// Second dock row: Long Shot and Click Guide (board S14, decision D1 option b)
+// ---------------------------------------------------------------------------------------
+
+/// The tiles under Region / Window / Display. Two per row, so a Vietnamese label has room.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ExtraTile {
+    LongShot,
+    ClickGuide,
+}
+
+impl ExtraTile {
+    pub const ALL: [ExtraTile; 2] = [ExtraTile::LongShot, ExtraTile::ClickGuide];
+
+    pub fn label(self) -> String {
+        match self {
+            ExtraTile::LongShot => tr_ctx!("capture dock", "Long Shot"),
+            ExtraTile::ClickGuide => tr_ctx!("capture dock", "Click Guide"),
+        }
+    }
+
+    pub fn icon(self) -> &'static str {
+        match self {
+            ExtraTile::LongShot => "long-shot",
+            ExtraTile::ClickGuide => "mouse-pointer-click",
+        }
+    }
+
+    pub fn id(self) -> &'static str {
+        match self {
+            ExtraTile::LongShot => "cap-long-shot",
+            ExtraTile::ClickGuide => "cap-click-guide",
+        }
+    }
+
+    /// The tooltip's one line of what the tile does.
+    pub fn blurb(self) -> String {
+        match self {
+            ExtraTile::LongShot => tr!("A scrolling page as one image"),
+            ExtraTile::ClickGuide => tr!("Click through a task, get the steps"),
+        }
+    }
+
+    /// The chord setting, when the action has one (a Click Guide has no shortcut yet).
+    pub fn shortcut(self) -> Option<ShortcutAction> {
+        match self {
+            ExtraTile::LongShot => Some(ShortcutAction::LongShot),
+            ExtraTile::ClickGuide => None,
+        }
+    }
+}
+
+/// What the dock knows about the two captures, gathered by the Studio each frame.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DockFacts {
+    pub long_shot_running: bool,
+    pub guide_running: bool,
+    pub recording_running: bool,
+    /// Why capturing cannot start at all (no library), worded for a tooltip.
+    pub capture_blocker: Option<String>,
+    /// Why a Click Guide cannot start in this build (no recorder yet, no library).
+    pub guide_blocker: Option<String>,
+    /// The session delivers no click events (Wayland, GDE-1.AC6).
+    pub no_click_events: bool,
+}
+
+/// One tile's state (board S14).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TileState {
+    Ready,
+    /// This capture is running: rec border and dot; a click brings its HUD to front.
+    Active,
+    /// Dimmed, not a Tab stop, still hoverable; the text is the reason.
+    Disabled(String),
+}
+
+impl TileState {
+    pub fn is_disabled(&self) -> bool {
+        matches!(self, TileState::Disabled(_))
+    }
+}
+
+/// The state of a tile. The reasons are the ones the launcher rows give (`guide_off`,
+/// `capture_off`) plus the two S14 sentences.
+pub fn tile_state(tile: ExtraTile, f: &DockFacts) -> TileState {
+    match tile {
+        ExtraTile::LongShot => {
+            if f.long_shot_running {
+                TileState::Active
+            } else if let Some(r) = &f.capture_blocker {
+                TileState::Disabled(r.clone())
+            } else {
+                TileState::Ready
+            }
+        }
+        ExtraTile::ClickGuide => {
+            if f.guide_running {
+                TileState::Active
+            } else if f.long_shot_running || f.recording_running {
+                TileState::Disabled(tr!(
+                    "Not available while a Long Shot or a recording is running."
+                ))
+            } else if let Some(r) = &f.guide_blocker {
+                TileState::Disabled(r.clone())
+            } else if f.no_click_events {
+                TileState::Disabled(tr!(
+                    "Not available on this desktop: Wayland gives CaptureMann no click events."
+                ))
+            } else {
+                TileState::Ready
+            }
+        }
+    }
+}
+
+/// The tooltip of a tile: the name, then either the reason (disabled) or one line of what it
+/// does and the chord or where to set one (board S14).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TileTip {
+    pub name: String,
+    pub line: String,
+    /// The chord as one string; `None` reads "Set a shortcut in Settings".
+    pub keys: Option<String>,
+    /// A disabled tile shows the reason only.
+    pub show_footer: bool,
+}
+
+impl TileTip {
+    /// The footer line: the chord, or the way to set one.
+    pub fn footer(&self) -> Option<String> {
+        self.show_footer.then(|| {
+            self.keys
+                .clone()
+                .unwrap_or_else(|| tr!("Set a shortcut in Settings"))
+        })
+    }
+}
+
+pub fn tile_tip(tile: ExtraTile, state: &TileState, keys: &[String]) -> TileTip {
+    match state {
+        TileState::Disabled(reason) => TileTip {
+            name: tile.label(),
+            line: reason.clone(),
+            keys: None,
+            show_footer: false,
+        },
+        _ => TileTip {
+            name: tile.label(),
+            line: tile.blurb(),
+            keys: (!keys.is_empty()).then(|| keys.join("")),
+            show_footer: true,
+        },
+    }
+}
+
+/// The accessible name of a tile: the label, the chord when there is one, and the state.
+pub fn tile_aria(tile: ExtraTile, state: &TileState, keys: &[String]) -> String {
+    let base = if keys.is_empty() {
+        tile.label()
+    } else {
+        tr!(
+            "{name}, shortcut {chord}",
+            name = tile.label(),
+            chord = keys.join("")
+        )
+    };
+    match state {
+        TileState::Ready => base,
+        TileState::Active => tr!("{name}, running", name = base),
+        TileState::Disabled(reason) => {
+            tr!(
+                "{name}, not available. {reason}",
+                name = base,
+                reason = reason
+            )
+        }
     }
 }
 
@@ -856,6 +1039,133 @@ mod tests {
         assert!(pos(RailEntry::Nav(NavItem::Agents)) < pos(RailEntry::Spacer));
         // Settings is pinned below the spacer.
         assert!(pos(RailEntry::Spacer) < pos(RailEntry::Nav(NavItem::Settings)));
+    }
+
+    #[test]
+    fn rail_has_the_two_extra_tiles_above_the_divider() {
+        let rail = rail_layout();
+        let pos = |e: RailEntry| rail.iter().position(|x| *x == e).unwrap();
+        let (l, g) = (
+            pos(RailEntry::Extra(ExtraTile::LongShot)),
+            pos(RailEntry::Extra(ExtraTile::ClickGuide)),
+        );
+        assert!(pos(RailEntry::RecordAudio) < l && l < g && g < pos(RailEntry::Divider));
+    }
+
+    fn facts() -> DockFacts {
+        DockFacts::default()
+    }
+
+    const BUSY: &str = "Not available while a Long Shot or a recording is running.";
+    const WAYLAND: &str =
+        "Not available on this desktop: Wayland gives CaptureMann no click events.";
+
+    #[test]
+    fn s14_tiles_are_ready_when_nothing_runs() {
+        for t in ExtraTile::ALL {
+            assert_eq!(tile_state(t, &facts()), TileState::Ready);
+        }
+    }
+
+    #[test]
+    fn s14_a_running_capture_marks_its_own_tile_active() {
+        let f = DockFacts {
+            long_shot_running: true,
+            ..facts()
+        };
+        assert_eq!(tile_state(ExtraTile::LongShot, &f), TileState::Active);
+        assert_eq!(
+            tile_state(ExtraTile::ClickGuide, &f),
+            TileState::Disabled(BUSY.into())
+        );
+        let g = DockFacts {
+            guide_running: true,
+            ..facts()
+        };
+        assert_eq!(tile_state(ExtraTile::ClickGuide, &g), TileState::Active);
+        assert_eq!(tile_state(ExtraTile::LongShot, &g), TileState::Ready);
+    }
+
+    #[test]
+    fn s14_a_recording_disables_click_guide_only() {
+        let f = DockFacts {
+            recording_running: true,
+            ..facts()
+        };
+        assert!(tile_state(ExtraTile::ClickGuide, &f).is_disabled());
+        assert_eq!(tile_state(ExtraTile::LongShot, &f), TileState::Ready);
+    }
+
+    #[test]
+    fn s14_wayland_has_its_own_reason_and_a_recording_wins_over_it() {
+        let f = DockFacts {
+            no_click_events: true,
+            ..facts()
+        };
+        assert_eq!(
+            tile_state(ExtraTile::ClickGuide, &f),
+            TileState::Disabled(WAYLAND.into())
+        );
+        let both = DockFacts {
+            recording_running: true,
+            ..f
+        };
+        assert_eq!(
+            tile_state(ExtraTile::ClickGuide, &both),
+            TileState::Disabled(BUSY.into())
+        );
+    }
+
+    #[test]
+    fn s14_the_library_reason_is_the_launchers() {
+        let f = DockFacts {
+            capture_blocker: Some("Library unavailable".into()),
+            guide_blocker: Some("Library unavailable".into()),
+            ..facts()
+        };
+        for t in ExtraTile::ALL {
+            assert_eq!(
+                tile_state(t, &f),
+                TileState::Disabled("Library unavailable".into())
+            );
+        }
+    }
+
+    #[test]
+    fn s14_tooltips_name_the_chord_or_where_to_set_one() {
+        let unset = tile_tip(ExtraTile::LongShot, &TileState::Ready, &[]);
+        assert_eq!(unset.line, "A scrolling page as one image");
+        assert_eq!(
+            unset.footer().as_deref(),
+            Some("Set a shortcut in Settings")
+        );
+        let keys = ["\u{2325}".to_owned(), "L".to_owned()];
+        let set = tile_tip(ExtraTile::LongShot, &TileState::Ready, &keys);
+        assert_eq!(set.footer().as_deref(), Some("\u{2325}L"));
+        // A disabled tile shows the reason and no footer.
+        let off = tile_tip(
+            ExtraTile::ClickGuide,
+            &TileState::Disabled("why".into()),
+            &[],
+        );
+        assert_eq!((off.line.as_str(), off.footer()), ("why", None));
+    }
+
+    #[test]
+    fn s14_accessible_names_carry_the_state() {
+        let guide = ExtraTile::ClickGuide;
+        assert_eq!(tile_aria(guide, &TileState::Ready, &[]), "Click Guide");
+        assert_eq!(
+            tile_aria(ExtraTile::LongShot, &TileState::Active, &[]),
+            "Long Shot, running"
+        );
+        assert_eq!(
+            tile_aria(guide, &TileState::Disabled("why".into()), &[]),
+            "Click Guide, not available. why"
+        );
+        assert!(ExtraTile::ALL
+            .iter()
+            .all(|t| !t.icon().is_empty() && !t.id().is_empty()));
     }
 
     #[test]

@@ -11,7 +11,9 @@ use gpui::{
 use cm_i18n::{tr, tr_ctx};
 
 use crate::agent_status::McpStatus;
-use crate::nav::{self, DockAction, NavCounts, NavEntry, RailEntry, SidebarMode};
+use crate::nav::{
+    self, DockAction, DockFacts, ExtraTile, NavCounts, NavEntry, RailEntry, SidebarMode, TileState,
+};
 use crate::overlay::CaptureMode;
 use crate::shortcuts::{Platform, ShortcutMap};
 use crate::theme::{scale, type_scale, Mode, Theme};
@@ -19,11 +21,11 @@ use crate::ui::app::{self, AppModel, Command, Route};
 use crate::ui::components::{
     badge, button_with_icon, ellipsis_text, icon, icon_button, icon_button_tinted, logo, ButtonKind,
 };
-use crate::ui::kit::{nav_row, nav_row_tinted};
+use crate::ui::kit::{nav_row, nav_row_tinted, NavExtras, NavStatus};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::settings::model::SettingsSection;
 use crate::ui::settings_view::SettingsView;
-use crate::ui::tooltip::tip;
+use crate::ui::tooltip::{rich_tip, tile_lines, tip, TipLine};
 
 /// Everything the sidebar reads, gathered by the Studio each frame.
 pub struct SidebarProps {
@@ -38,6 +40,8 @@ pub struct SidebarProps {
     pub section: SettingsSection,
     /// The recording editor shows an audio recording: Audio is the highlighted item, not Recordings.
     pub audio_open: bool,
+    /// What the second dock row (Long Shot, Click Guide) needs to know (board S14).
+    pub dock: DockFacts,
 }
 
 impl SidebarProps {
@@ -143,16 +147,44 @@ fn record_audio_button(
         .child(icon("mic", 18., t.rec_soft))
 }
 
-/// The Agents & CLI icon shows the MCP status: agent blue when the app serves the IPC endpoint,
-/// grey when nothing can connect. Other items keep the text colour.
+/// The Agents & CLI icon shows the MCP status: agent blue only when the app serves the IPC
+/// endpoint; offline and "another app owns the socket" use mist (board S14). Other items keep the
+/// text colour.
 fn item_tint(t: &Theme, p: &SidebarProps, item: nav::NavItem) -> Option<crate::theme::Color> {
     (item == nav::NavItem::Agents).then(|| {
         if p.status.is_ready() {
-            t.agent_text
+            if t.mode == Mode::Dark {
+                t.agent
+            } else {
+                t.agent_text
+            }
         } else {
             t.mist
         }
     })
+}
+
+/// The status shape and the accessible-name tail of the Agents & CLI row.
+fn item_status(p: &SidebarProps, item: nav::NavItem) -> Option<NavStatus> {
+    (item == nav::NavItem::Agents).then(|| NavStatus {
+        mark: p.status.mark(),
+        aria: p.status.aria_status(),
+    })
+}
+
+/// The Agents & CLI tooltip: the status line carries the state, so colour is not the only cue.
+fn agents_tip(p: &SidebarProps) -> impl Fn(&mut gpui::Window, &mut App) -> gpui::AnyView + 'static {
+    let tip = p.status.tip();
+    let mark = p.status.mark();
+    let mut lines = vec![TipLine::Status(tip.line, mark)];
+    lines.extend(tip.detail.into_iter().map(|d| {
+        if mark == crate::agent_status::StatusMark::Dot {
+            TipLine::Hint(d)
+        } else {
+            TipLine::Body(d)
+        }
+    }));
+    rich_tip(nav::NavItem::Agents.label(), lines, 280.)
 }
 
 fn nav_button(
@@ -160,7 +192,7 @@ fn nav_button(
     app: &Entity<AppModel>,
     e: &NavEntry,
     label: Option<String>,
-    tint: Option<crate::theme::Color>,
+    extras: NavExtras,
 ) -> Stateful<gpui::Div> {
     let route = e.item.route();
     let app = app.clone();
@@ -171,9 +203,28 @@ fn nav_button(
         label.unwrap_or_else(|| e.item.label()),
         e.count,
         e.active,
-        tint,
+        extras,
     )
     .on_click(move |_, _, cx| app::set_route(&app, route.clone(), cx))
+}
+
+/// One LIBRARY or INTELLIGENCE row; Agents & CLI also carries the status shape and tooltip.
+fn nav_entry(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>, e: &NavEntry) -> AnyElement {
+    let row = nav_button(
+        t,
+        app,
+        e,
+        None,
+        NavExtras {
+            tint: item_tint(t, p, e.item),
+            status: item_status(p, e.item),
+        },
+    );
+    if e.item == nav::NavItem::Agents {
+        row.tooltip(agents_tip(p)).into_any_element()
+    } else {
+        row.into_any_element()
+    }
 }
 
 fn group_label(t: &Theme, text: String) -> AnyElement {
@@ -328,7 +379,136 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .bg(rgba_of(t.surface_2))
         .child(record_row)
         .child(div().flex().gap(px(6.)).children(tiles))
+        // Row 2 (board S14): Long Shot and Click Guide, two to a row.
+        .child(
+            div().flex().gap(px(6.)).children(
+                ExtraTile::ALL
+                    .into_iter()
+                    .map(|tile| extra_tile(t, p, app, tile, false)),
+            ),
+        )
         .into_any_element()
+}
+
+// ---- the second dock row (board S14) ---------------------------------------------------------
+
+/// The hover border of a tile (kit `#3A3A42` on dark; the strong line on light).
+fn tile_hover_border(t: &Theme) -> crate::theme::Color {
+    if t.mode == Mode::Dark {
+        crate::theme::Color::rgb(0x3A3A42)
+    } else {
+        t.line
+    }
+}
+
+/// The keyboard focus ring of a tile: 2 px of `text` with a 2 px gap (DESIGN section 7), drawn as
+/// two spread-only shadows so nothing moves.
+fn tile_ring(t: &Theme, gap: crate::theme::Color) -> Vec<gpui::BoxShadow> {
+    let shadow = |color: crate::theme::Color, spread: f32| gpui::BoxShadow {
+        color: crate::ui::paint::hsla_of(color),
+        offset: gpui::point(px(0.), px(0.)),
+        blur_radius: px(0.),
+        spread_radius: px(spread),
+        inset: false,
+    };
+    vec![shadow(t.text, 4.), shadow(gap, 2.)]
+}
+
+/// A Long Shot or Click Guide tile: in the dock a 54 px tile with a 16 px icon and a label, in the
+/// rail a 44 px icon button. Ready starts the capture; while it runs the border is `rec` at 70 % with
+/// a 7 px rec dot at the top right and a click brings its HUD to front; disabled is dimmed, not a Tab
+/// stop, and still shows its reason as the tooltip.
+fn extra_tile(
+    t: &Theme,
+    p: &SidebarProps,
+    app: &Entity<AppModel>,
+    tile: ExtraTile,
+    rail: bool,
+) -> AnyElement {
+    let state = nav::tile_state(tile, &p.dock);
+    let keys = tile
+        .shortcut()
+        .map(|a| p.shortcuts.get(a).keycaps(p.platform))
+        .unwrap_or_default();
+    let tip_model = nav::tile_tip(tile, &state, &keys);
+    let tooltip = rich_tip(tip_model.name.clone(), tile_lines(&tip_model), 200.);
+    let active = state == TileState::Active;
+    let disabled = state.is_disabled();
+    let (hover_bg, hover_border, text) = (
+        rgba_of(t.raised),
+        rgba_of(tile_hover_border(t)),
+        rgba_of(t.text),
+    );
+    let ring = tile_ring(t, if rail { t.sidebar } else { t.surface_2 });
+    let app = app.clone();
+    let border = if active {
+        rgba_of(t.rec.with_alpha(70))
+    } else if rail {
+        rgba_of(crate::theme::Color(0))
+    } else {
+        rgba_of(t.border)
+    };
+    let d = div()
+        .id(tile.id())
+        .role(Role::Button)
+        .aria_label(SharedString::from(nav::tile_aria(tile, &state, &keys)))
+        .relative()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(if rail { scale::RADIUS_MD } else { 9. }))
+        .border_1()
+        .border_color(border)
+        .text_color(rgba_of(t.text_2))
+        .text_size(px(11.))
+        .tooltip(tooltip);
+    let d = if rail {
+        d.size(px(scale::TARGET)).flex_none()
+    } else {
+        d.flex_1()
+            .min_w(px(0.))
+            .h(px(54.))
+            .flex_col()
+            .gap(px(3.))
+            .px(px(4.))
+            .bg(rgba_of(t.surface))
+    };
+    let d = if disabled {
+        // Hoverable for the tooltip, but no pointer, no Tab stop and no click.
+        d.opacity(0.4)
+    } else {
+        d.focusable()
+            .tab_stop(true)
+            .cursor_pointer()
+            .hover(move |s| s.bg(hover_bg).border_color(hover_border).text_color(text))
+            .focus_visible(move |s| s.shadow(ring))
+            .on_click(move |_, _, cx| match (tile, active) {
+                (ExtraTile::LongShot, true) => crate::ui::long_shot::bring_to_front(cx),
+                (ExtraTile::ClickGuide, true) => crate::ui::guide_view::hud::bring_to_front(cx),
+                (ExtraTile::LongShot, false) => {
+                    app::handle_command(&app, app::Command::LongShot, cx)
+                }
+                (ExtraTile::ClickGuide, false) => {
+                    app::handle_command(&app, app::Command::NewClickGuide, cx)
+                }
+            })
+    };
+    let d = d.child(icon(tile.icon(), 16., t.text_2));
+    let d = if rail {
+        d
+    } else {
+        d.child(ellipsis_text(tile.label()))
+    };
+    d.when(active, |d| {
+        d.child(
+            div()
+                .absolute()
+                .top(px(6.))
+                .right(px(6.))
+                .child(crate::ui::components::rec_dot(t, 7.)),
+        )
+    })
+    .into_any_element()
 }
 
 fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElement> {
@@ -340,20 +520,20 @@ fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyEleme
     out.extend(
         nav::library_entries(&p.highlight(), &p.counts)
             .iter()
-            .map(|e| nav_button(t, app, e, None, item_tint(t, p, e.item)).into_any_element()),
+            .map(|e| nav_entry(t, p, app, e)),
     );
     out.push(group_label(t, tr_ctx!("sidebar group", "INTELLIGENCE")));
     out.extend(
         nav::intelligence_entries(&p.highlight(), &p.counts)
             .iter()
-            .map(|e| nav_button(t, app, e, None, item_tint(t, p, e.item)).into_any_element()),
+            .map(|e| nav_entry(t, p, app, e)),
     );
     out.push(div().flex_1().into_any_element());
     let settings = nav::entries(&p.highlight(), &p.counts)
         .into_iter()
         .find(|e| e.item == nav::NavItem::Settings)
         .expect("Settings is a nav item");
-    out.push(nav_button(t, app, &settings, None, None).into_any_element());
+    out.push(nav_button(t, app, &settings, None, NavExtras::default()).into_any_element());
     out
 }
 
@@ -445,23 +625,41 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                         tr!(
                             "{name}, {status}",
                             name = item.label(),
-                            status = p.status.title()
+                            status = p.status.aria_status()
                         )
                     }
                     None => item.label(),
                 };
-                icon_button_tinted(
+                let is_agents = item == nav::NavItem::Agents;
+                let button = icon_button_tinted(
                     t,
                     item.id(),
                     item.icon(),
                     label,
                     active,
-                    Some(Vec::new()),
+                    // The Agents & CLI tooltip is the rich status one below.
+                    (!is_agents).then(Vec::new),
                     item_tint(t, p, item),
                 )
-                .on_click(move |_, _, cx| app::set_route(&app, route.clone(), cx))
-                .into_any_element()
+                .on_click(move |_, _, cx| app::set_route(&app, route.clone(), cx));
+                if is_agents {
+                    // Same shape and tooltip as the sidebar row (board S14); the icon is centred in
+                    // the 44 px target, so its corner is 13 px in.
+                    let ground = if active { t.raised } else { t.sidebar };
+                    button
+                        .relative()
+                        .tooltip(agents_tip(p))
+                        .child(
+                            crate::ui::kit::status_badge(t, p.status.mark(), ground)
+                                .right(px(8.))
+                                .bottom(px(8.)),
+                        )
+                        .into_any_element()
+                } else {
+                    button.into_any_element()
+                }
             }
+            RailEntry::Extra(tile) => extra_tile(t, p, app, tile, true).into_any_element(),
             RailEntry::Spacer => div().flex_1().into_any_element(),
         })
         .collect()

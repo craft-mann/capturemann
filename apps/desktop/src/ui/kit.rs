@@ -258,7 +258,21 @@ pub fn nav_row(
     count: Option<usize>,
     active: bool,
 ) -> Stateful<Div> {
-    nav_row_tinted(t, id, glyph, label, count, active, None)
+    nav_row_tinted(t, id, glyph, label, count, active, NavExtras::default())
+}
+
+/// The Agents & CLI row's status (board S14): the shape at the icon's bottom-right and the status
+/// words that follow the label in the accessible name.
+pub struct NavStatus {
+    pub mark: crate::agent_status::StatusMark,
+    pub aria: String,
+}
+
+/// What sets a nav row apart: an icon colour and a status shape.
+#[derive(Default)]
+pub struct NavExtras {
+    pub tint: Option<Color>,
+    pub status: Option<NavStatus>,
 }
 
 /// [`nav_row`] with the icon in `tint` instead of the text colour (the Agents & CLI row shows
@@ -270,15 +284,19 @@ pub fn nav_row_tinted(
     label: impl Into<SharedString>,
     count: Option<usize>,
     active: bool,
-    tint: Option<Color>,
+    extras: NavExtras,
 ) -> Stateful<Div> {
+    let NavExtras { tint, status } = extras;
     let label: SharedString = label.into();
     let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
     let fg = if active { t.text } else { t.text_2 };
     div()
         .id(id)
         .role(Role::Button)
-        .aria_label(SharedString::from(nav_aria(&label, count)))
+        .aria_label(SharedString::from(match &status {
+            Some(s) => format!("{label}, {}", s.aria),
+            None => nav_aria(&label, count),
+        }))
         .aria_toggled(if active {
             Toggled::True
         } else {
@@ -302,7 +320,17 @@ pub fn nav_row_tinted(
         })
         .when(!active, |d| d.hover(move |s| s.bg(hover)))
         .focus_visible(move |s| s.border_color(focus))
-        .child(icon(glyph, icon_size::NAV, tint.unwrap_or(fg)))
+        .child(
+            div()
+                .relative()
+                .flex_none()
+                .child(icon(glyph, icon_size::NAV, tint.unwrap_or(fg)))
+                .children(
+                    status.map(|s| {
+                        status_badge(t, s.mark, if active { t.raised } else { t.sidebar })
+                    }),
+                ),
+        )
         .child(div().flex_1().truncate().child(label))
         .children(count.map(|n| {
             div()
@@ -340,6 +368,27 @@ pub fn stat_tile(t: &Theme, label: impl Into<SharedString>, value: impl Into<Sha
                 .text_color(rgba_of(t.mist))
                 .child(label.into()),
         )
+}
+
+/// The shape on an icon's bottom-right corner, with a 2 px halo in the ground colour (board S14).
+pub fn status_badge(t: &Theme, mark: crate::agent_status::StatusMark, ground: Color) -> Div {
+    let size = match mark {
+        crate::agent_status::StatusMark::Bang => 10.,
+        _ => 8.,
+    };
+    div()
+        .absolute()
+        .right(px(-5.))
+        .bottom(px(-5.))
+        .p(px(2.))
+        .rounded(px((size + 4.) / 2.))
+        .bg(rgba_of(ground))
+        .child(crate::ui::components::status_mark(
+            t,
+            mark,
+            size,
+            Some(ground),
+        ))
 }
 
 #[cfg(test)]
