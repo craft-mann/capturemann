@@ -780,20 +780,8 @@ fn static_strips(a: &Lines, b: &Lines) -> (usize, usize) {
     if cross < 32 || a.count != b.count {
         return (0, 0);
     }
-    let limit = ((a.count as f64 * STATIC_SHARE) as usize).max(2);
-    let mut bad = vec![0usize; cross];
-    for i in 0..a.count {
-        let (la, lb) = (a.line(i), b.line(i));
-        for (x, c) in bad.iter_mut().enumerate() {
-            let (p, q) = (&la[x * 4..x * 4 + 4], &lb[x * 4..x * 4 + 4]);
-            if p.iter()
-                .zip(q)
-                .any(|(u, v)| u.abs_diff(*v) > NOISE_TOLERANCE)
-            {
-                *c += 1;
-            }
-        }
-    }
+    let bad = changed_columns(a, b);
+    let limit = static_limit(a.count);
     let is_static = |x: usize| bad[x] <= limit;
     let l = (0..cross).take_while(|&x| is_static(x)).count();
     if l == cross {
@@ -808,6 +796,87 @@ fn static_strips(a: &Lines, b: &Lines) -> (usize, usize) {
     }
     (l, r)
 }
+
+/// How many lines differ (beyond the noise) in each column between two frames of the same size.
+fn changed_columns(a: &Lines, b: &Lines) -> Vec<usize> {
+    let cross = a.line_len / 4;
+    let mut bad = vec![0usize; cross];
+    for i in 0..a.count {
+        let (la, lb) = (a.line(i), b.line(i));
+        for (x, c) in bad.iter_mut().enumerate() {
+            let (p, q) = (&la[x * 4..x * 4 + 4], &lb[x * 4..x * 4 + 4]);
+            if p.iter()
+                .zip(q)
+                .any(|(u, v)| u.abs_diff(*v) > NOISE_TOLERANCE)
+            {
+                *c += 1;
+            }
+        }
+    }
+    bad
+}
+
+fn static_limit(count: usize) -> usize {
+    ((count as f64 * STATIC_SHARE) as usize).max(2)
+}
+
+/// The columns a join of two vertical frames has to leave out of the comparison when the page
+/// has fixed side content (a sidebar, a panel, a margin), as candidate masks `(left, right)`,
+/// the most likely first. A fixed bar matches at any shift, so no shift can be told from it.
+///
+/// What [`static_strips`] cannot see: a scrollbar (or a window border) at the very end of the
+/// frame, outside the bar, moves while the page scrolls, so the unbroken run of unchanging
+/// columns from that end is 0 and the bar behind it was not found (Windows, Edge, a page with
+/// fixed bars on both sides: the left one was found and the right one made every join fail, QA
+/// pass 6). Here each end may start with a stretch of moving columns (at most as wide as the
+/// widest edge strip) before the run of unchanging columns, and the mask covers both. A bar
+/// that casts a shadow over the scrolling page has columns next to it that change: the masks
+/// are also tried a little wider (`SHADOW_STEPS`). At least [`MIN_COMPARED_COLS`] columns must
+/// stay in the comparison, else there is no mask (everything is compared).
+fn masked_sides(a: &Lines, b: &Lines) -> Vec<(usize, usize)> {
+    let cross = a.line_len / 4;
+    if cross < 2 * MIN_COMPARED_COLS || a.count != b.count {
+        return Vec::new();
+    }
+    let bad = changed_columns(a, b);
+    let limit = static_limit(a.count);
+    let is_static = |x: usize| bad[x] <= limit;
+    // The end's mask: moving columns up to `gap_max`, then a run of unchanging ones of at least
+    // `MIN_BAR_COLS` (unless there is no gap, when any run counts). `None` when there is none.
+    let side = |from_end: bool, gap_max: usize| -> Option<usize> {
+        let at = |k: usize| if from_end { cross - 1 - k } else { k };
+        let mut gap = 0;
+        while gap < gap_max && gap < cross && !is_static(at(gap)) {
+            gap += 1;
+        }
+        let run = (gap..cross).take_while(|&k| is_static(at(k))).count();
+        let min = if gap == 0 { 1 } else { MIN_BAR_COLS };
+        (run >= min && gap < gap_max).then_some(gap + run)
+    };
+    let (l, r) = (side(false, MAX_LEFT_STRIP), side(true, MAX_RIGHT_STRIP));
+    let mut out = Vec::new();
+    for ext in SHADOW_STEPS {
+        let l = l.map(|l| l + ext).unwrap_or(0);
+        let r = r.map(|r| r + ext).unwrap_or(0);
+        if (l, r) == (0, 0) || cross.saturating_sub(l + r) < MIN_COMPARED_COLS {
+            continue;
+        }
+        if !out.contains(&(l, r)) {
+            out.push((l, r));
+        }
+    }
+    out
+}
+
+/// Fewest columns that stay in the comparison when static side columns are masked: a join over
+/// fewer is a guess (a few columns of text match many shifts).
+const MIN_COMPARED_COLS: usize = 24;
+/// A run of unchanging columns behind a stretch of moving ones must be at least this wide to
+/// be a bar (not a few columns of a flat page that happen to stay).
+const MIN_BAR_COLS: usize = 8;
+/// Extra columns tried next to a bar for its shadow or border, which blend with what scrolls
+/// under them.
+const SHADOW_STEPS: [usize; 4] = [0, 4, 12, 32];
 
 /// The share of the lines in which a row (column) of a static strip may differ between two
 /// frames (a blinking caret, a loading spinner in the toolbar).
@@ -1127,16 +1196,31 @@ impl Stitcher {
             self.trim = Some((l, r));
             return (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
         }
-        let (sl, sr) = static_strips(&prev, &lines);
-        if (sl, sr) == (0, 0) {
-            return (prev, lines);
-        }
-        let (p0, n0) = (prev.cropped(sl, cross - sr), lines.cropped(sl, cross - sr));
-        let (l, r) = if find_join(&p0, &n0, hint, None).is_ok() {
-            (sl, sr)
-        } else if let Some((l, r)) = edge_trim(&p0, &n0, hint) {
-            (sl + l, sr + r)
+        // A vertical capture masks its fixed side content (a scrollbar may stand outside it, a
+        // shadow beside it: see `masked_sides`); a horizontal one cuts the static rows.
+        let candidates = if self.dir == Direction::Vertical {
+            masked_sides(&prev, &lines)
         } else {
+            let (sl, sr) = static_strips(&prev, &lines);
+            if (sl, sr) == (0, 0) {
+                Vec::new()
+            } else {
+                vec![(sl, sr)]
+            }
+        };
+        let mut found = None;
+        for (sl, sr) in candidates {
+            let (p0, n0) = (prev.cropped(sl, cross - sr), lines.cropped(sl, cross - sr));
+            if find_join(&p0, &n0, hint, None).is_ok() {
+                found = Some((sl, sr));
+            } else if let Some((l, r)) = edge_trim(&p0, &n0, hint) {
+                found = Some((sl + l, sr + r));
+            }
+            if found.is_some() {
+                break;
+            }
+        }
+        let Some((l, r)) = found else {
             return (prev, lines);
         };
         self.trim = Some((l, r));

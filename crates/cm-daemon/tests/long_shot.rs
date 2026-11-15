@@ -462,3 +462,149 @@ async fn cap_6_started_event_says_who_how_and_where_for_the_passive_hud() {
     assert!(!progress.is_empty());
     assert!(progress.iter().all(|p| p["join_ok"] == true));
 }
+
+/// Windows QA pass 6: a second Long Shot, or a Click Guide, while a Long Shot runs is refused with
+/// `busy` before any dialog (the dialog opened over the page being captured and the first run
+/// ended `no_overlap` after one frame). Hand and Auto alike, from an agent or a person.
+#[tokio::test]
+async fn ls_busy_is_said_before_any_dialog() {
+    let page = SyntheticPage::new(24, 6000, 300);
+    let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
+    let (b, _dir) = builder(desktop());
+    let d = b
+        .confirmer(confirmer.clone())
+        .long_shot_system(Slow(Scripted::new(page)))
+        .build();
+    let d2 = d.clone();
+    let run =
+        tokio::spawn(
+            async move { call(&d2, Actor::User, params(json!({"request_id": "ls-1"}))).await },
+        );
+    for _ in 0..300 {
+        if state(&d, json!({})).await["running"] == true {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    // A second Long Shot from an agent: busy, no dialog.
+    let e = call(&d, agent(), params(json!({"scroll": "auto"})))
+        .await
+        .unwrap_err();
+    assert_eq!(e.code().unwrap(), ErrorCode::Busy);
+    assert!(
+        e.to_string().contains("A Long Shot is already running"),
+        "{e}"
+    );
+    // ... and from the person; a guide from either.
+    let e = call(&d, Actor::User, params(json!({}))).await.unwrap_err();
+    assert_eq!(e.code().unwrap(), ErrorCode::Busy);
+    for who in [agent(), Actor::User] {
+        let e = d
+            .execute_method(
+                who,
+                0,
+                "start_guide",
+                &json!({"target": {"display_id": 1}, "countdown_s": 0}),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(e.code().unwrap(), ErrorCode::Busy);
+        assert!(
+            e.to_string().contains("Long Shot is already running"),
+            "{e}"
+        );
+    }
+    assert!(confirmer.shown().is_empty(), "no dialog was shown");
+    // The first run was not disturbed.
+    assert!(d.cancel_delayed_capture("ls-1"));
+    let out = run.await.unwrap().unwrap();
+    assert_eq!(out["long_shot"]["end"], "stopped_by_user");
+    // After it, a new one is accepted.
+    let again = call(&d, Actor::User, params(json!({"max_px": 600}))).await;
+    assert!(again.is_ok(), "{again:?}");
+}
+
+/// A console window the wheel cannot move: the daemon passes the window id to the system, and
+/// the run asks the scroller for its last resort, which moves the page; the run goes on.
+#[tokio::test]
+async fn win_6_the_scroller_gets_the_window_id_and_its_last_resort_is_asked() {
+    #[derive(Clone)]
+    struct Deaf {
+        inner: Scripted,
+        wheel_works: Arc<Mutex<bool>>,
+        asked_for: Arc<Mutex<Vec<Option<u32>>>>,
+    }
+    impl Scroller for Deaf {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            if *self.wheel_works.lock().unwrap() {
+                self.inner.scroll(d, amount_px)?;
+            }
+            Ok(())
+        }
+        fn last_resort(&mut self, d: Direction, amount_px: u32) -> Result<bool, CmError> {
+            let mut w = self.wheel_works.lock().unwrap();
+            if *w {
+                return Ok(false);
+            }
+            *w = true;
+            drop(w);
+            self.inner.scroll(d, amount_px)?;
+            Ok(true)
+        }
+    }
+    impl LongShotSystem for Deaf {
+        fn frames(&self, c: Arc<Capturer>, t: CaptureTarget) -> Box<dyn FrameSource + Send> {
+            self.inner.frames(c, t)
+        }
+        fn scroller(
+            &self,
+            anchor: Option<(i32, i32)>,
+        ) -> Result<Box<dyn Scroller + Send>, CmError> {
+            self.scroller_for(anchor, None)
+        }
+        fn scroller_for(
+            &self,
+            _anchor: Option<(i32, i32)>,
+            window_id: Option<u32>,
+        ) -> Result<Box<dyn Scroller + Send>, CmError> {
+            self.asked_for.lock().unwrap().push(window_id);
+            Ok(Box::new(self.clone()))
+        }
+        fn auto_scroll(&self) -> AutoScrollSupport {
+            AutoScrollSupport::Available
+        }
+    }
+    let page = SyntheticPage::new(24, 900, 300);
+    let sys = Deaf {
+        inner: Scripted::new(page.clone()),
+        wheel_works: Arc::default(),
+        asked_for: Arc::default(),
+    };
+    let asked = sys.asked_for.clone();
+    let (b, _dir) = builder(desktop());
+    let d = b.long_shot_system(sys).build();
+    let out = call(&d, Actor::User, params(json!({}))).await.unwrap();
+    assert_eq!(out["long_shot"]["end"], "reached_end", "{out}");
+    assert_eq!(out["height"], page.expected().height());
+    assert_eq!(asked.lock().unwrap()[0], Some(1), "the window target's id");
+}
+
+/// The error of a window that is gone names it by its title when the title was known.
+#[test]
+fn win_6_a_missing_window_is_named_by_its_title() {
+    use cm_daemon::long_shot_ops::name_missing_window;
+    let e = CmError::not_found("Window 6882546 not found");
+    let named = name_missing_window(e.clone(), 6882546, Some("Release notes - Edge"));
+    assert_eq!(
+        named.to_string(),
+        "The window \"Release notes - Edge\" is no longer available"
+    );
+    assert_eq!(named.code(), ErrorCode::NotFound);
+    // The translatable id and its parameter come with it.
+    let parts = named.message_parts().unwrap();
+    assert_eq!(parts.id, "window_gone");
+    // No title known, or another error: unchanged.
+    assert_eq!(name_missing_window(e.clone(), 6882546, None), e);
+    let other = CmError::invalid_input("Window is minimized");
+    assert_eq!(name_missing_window(other.clone(), 1, Some("x")), other);
+}

@@ -777,3 +777,57 @@ async fn cg_10_a_slow_worker_does_not_queue_every_frame() {
     );
     assert_eq!(dropped[0]["data"]["code"], "busy");
 }
+
+/// Windows QA pass 6: a second Click Guide, or a Long Shot, while a guide records is refused with
+/// `busy` BEFORE any confirmation dialog (it opened over the page that was being captured).
+#[tokio::test]
+async fn gde_busy_is_said_before_any_dialog() {
+    let (b, _dir) = builder(desktop());
+    let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
+    let d = b
+        .guide_clicks(ScriptedClicks::new())
+        .text_recognizer(Screen { with_email: false })
+        .confirmer(confirmer.clone())
+        .build();
+    let mut c = Client::connect(&d, "agent");
+    let id = start(&mut c).await;
+    let shown = confirmer.shown().len();
+    // A second guide from an agent.
+    let r = c
+        .call(
+            "start_guide",
+            json!({"target": {"display_id": 1}, "countdown_s": 0}),
+        )
+        .await;
+    assert_eq!(code(&r), "busy", "{r}");
+    assert!(
+        r["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("already recording"),
+        "{r}"
+    );
+    // A Long Shot from an agent (Auto scroll would ask), and from the person.
+    let r = c
+        .call(
+            "capture_screenshot",
+            json!({"mode": "long", "target": {"display_id": 1}}),
+        )
+        .await;
+    assert_eq!(code(&r), "busy", "{r}");
+    assert_eq!(confirmer.shown().len(), shown, "no dialog was shown");
+    let e = d
+        .execute_method(
+            cm_core::Actor::User,
+            0,
+            "capture_screenshot",
+            &json!({"mode": "long", "target": {"display_id": 1}}),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(e.code().unwrap(), cm_core::ErrorCode::Busy);
+    // The guide itself is still recording.
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    // (a guide with no step is discarded when it stops)
+    assert_eq!(ok(&done)["state"], "discarded");
+}

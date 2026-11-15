@@ -106,6 +106,11 @@ impl GuideRuntime {
         self.active.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Whether a Click Guide is recording right now.
+    pub(crate) fn is_recording(&self) -> bool {
+        self.lock().is_some()
+    }
+
     pub(crate) fn set_exclusions(&self, rects: Vec<[f64; 4]>) {
         *self
             .exclusions

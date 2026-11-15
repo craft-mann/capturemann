@@ -22,7 +22,7 @@ use cm_core::CmError;
 
 pub use crate::sys::long_scroll::{
     accessibility_trusted, auto_scroll_support, platform_scroller, platform_scroller_at,
-    raise_window, request_accessibility, AutoScrollSupport,
+    platform_scroller_for, raise_window, request_accessibility, AutoScrollSupport,
 };
 pub use run::{
     run_auto, run_auto_ex, run_hand, run_hand_ex, LongShotConfig, LongShotProgress, LongShotResult,
@@ -61,6 +61,16 @@ pub trait Scroller {
     /// scroller cannot (nothing was done). Used once after a join failed: the content may have
     /// moved past the overlap, and half a step back gives the stitcher another try.
     fn scroll_back(&mut self, _direction: Direction, _amount_px: u32) -> Result<bool, CmError> {
+        Ok(false)
+    }
+
+    /// A per-target last resort, asked after every other try moved nothing (the wheel, at
+    /// every point): another way to scroll the target, which then also becomes the way later
+    /// `scroll` and `scroll_back` calls use. Each call tries the next way; `Ok(false)` when
+    /// there is none left (and for every scroller that has none, which is the default). Only
+    /// the Windows scroller of a classic console window (`ConsoleWindowClass`) or Windows
+    /// Terminal has ways: a window message with a whole wheel notch, then the Page Down key.
+    fn last_resort(&mut self, _direction: Direction, _amount_px: u32) -> Result<bool, CmError> {
         Ok(false)
     }
 }

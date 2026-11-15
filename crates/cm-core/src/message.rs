@@ -184,6 +184,12 @@ pub const TEMPLATES: &[Template] = &[
         ErrorCode::NotFound,
         "Window {id} not found",
     ),
+    // A window that was there when a run began and is gone (or hidden) now, named by its title.
+    t(
+        "window_gone",
+        ErrorCode::NotFound,
+        "The window \"{title}\" is no longer available",
+    ),
     t(
         "window_minimized",
         ErrorCode::InvalidInput,

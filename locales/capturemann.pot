@@ -6222,6 +6222,9 @@ msgstr ""
 msgid "The watermark could not be drawn"
 msgstr ""
 
+msgid "The window \"{title}\" is no longer available"
+msgstr ""
+
 msgid "The window follows the cursor and only moves when the cursor leaves its middle 80%."
 msgstr ""
 

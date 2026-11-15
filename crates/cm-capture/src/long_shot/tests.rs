@@ -1919,3 +1919,199 @@ fn ls_9_a_frame_that_settles_late_is_waited_for() {
     assert!(late.settled);
     assert_eq!(late.frame.pixel(0, 0), Some([9, 9, 9, 9]));
 }
+
+// ---- Windows QA pass 6: a page with fixed bars on BOTH sides ended `no_overlap` after 1 frame ----
+
+/// One fixed-bar page: bars of `left` and `right` columns (the bar columns hold the same pixels
+/// in every frame; with `period` they repeat every that many rows, like a list of identical
+/// entries), `shadow` columns next to each bar that blend the bar's shadow with whatever scrolls
+/// under it, and a classic scrollbar of `sb` columns at the very edge of the window whose thumb
+/// moves with the page (Edge on Windows draws one while the page scrolls).
+fn bars_case(w: u32, h: u32, left: u32, right: u32, sb: u32, period: Option<u32>, shadow: u32) {
+    let tag = format!("w {w} left {left} right {right} sb {sb} period {period:?} shadow {shadow}");
+    let page = SyntheticPage::new(w, 1500, h);
+    let view = page.clone().view();
+    let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+    let bar_end = w - sb;
+    let mut src = Overlaid {
+        view: view.clone(),
+        pos: pos.clone(),
+        over: move |p: u32, w: u32, h: u32, d: &mut [u8]| {
+            for y in 0..h {
+                let yy = period.map_or(y, |n| y % n);
+                for x in 0..w {
+                    let i = ((y * w + x) * 4) as usize;
+                    if x >= bar_end {
+                        // The scrollbar: a static track and a thumb that moves.
+                        let top = (p / 6) % (h - 80);
+                        let on = y >= top && y < top + 80;
+                        let v = if on {
+                            90u8.wrapping_add((p & 31) as u8)
+                        } else {
+                            235
+                        };
+                        d[i..i + 4].copy_from_slice(&[v, v, v, 255]);
+                    } else if x < left || x >= bar_end - right {
+                        let k = if x < left {
+                            x
+                        } else {
+                            x - (bar_end - right) + 1000
+                        };
+                        let v = k.wrapping_mul(7919) ^ yy.wrapping_mul(104_729);
+                        d[i..i + 4].copy_from_slice(&[
+                            v as u8,
+                            (v >> 8) as u8,
+                            (v >> 16) as u8 | 1,
+                            255,
+                        ]);
+                    } else if (left..left + shadow).contains(&x)
+                        || (bar_end - right - shadow..bar_end - right).contains(&x)
+                    {
+                        // A shadow: the page, darkened (the page's own pixel is part of it).
+                        for c in 0..3 {
+                            d[i + c] = d[i + c] / 2 + 20;
+                        }
+                    }
+                }
+            }
+        },
+    };
+    let mut sc = Tracking { view, pos };
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::ReachedEnd, "{tag}");
+    let want = page.expected();
+    let got = &r.image.frame;
+    assert_eq!(got.height(), want.height(), "{tag}");
+    // The page columns between the bars (and their shadows) are the page, every row once.
+    let (x0, x1) = (left + shadow, bar_end - right - shadow);
+    for y in 0..got.height() {
+        for x in x0..x1 {
+            assert_eq!(got.pixel(x, y), want.pixel(x, y), "{tag}: at {x},{y}");
+        }
+    }
+}
+
+/// The real Windows case: bars of 180 and 140 px in a 1082 px window, with the scrollbar at the
+/// edge. The scrollbar sits at the outer end of the right bar, so the unbroken run of unchanging
+/// columns from the right end was 0 and only the left bar was found; the right bar then made
+/// every join fail and the first pair ended the run.
+#[test]
+fn win_6_fixed_bars_on_both_sides_with_a_scrollbar_join() {
+    bars_case(300, 300, 60, 45, 12, None, 0);
+}
+
+#[test]
+fn win_6_fixed_bar_on_one_side_with_a_scrollbar_joins() {
+    bars_case(300, 300, 60, 0, 12, None, 0);
+    bars_case(300, 300, 0, 60, 12, None, 0);
+    bars_case(300, 300, 0, 60, 0, None, 0);
+}
+
+#[test]
+fn win_6_bars_that_take_most_of_the_width_join() {
+    for (l, r) in [(75u32, 75u32), (100, 100), (110, 90), (140, 0)] {
+        bars_case(300, 300, l, r, 12, None, 0);
+    }
+}
+
+#[test]
+fn win_6_bars_with_repeating_rows_join() {
+    bars_case(300, 300, 60, 45, 12, Some(20), 0);
+    bars_case(300, 300, 60, 45, 0, Some(7), 0);
+}
+
+#[test]
+fn win_6_bars_with_a_shadow_edge_join() {
+    bars_case(300, 300, 60, 45, 12, None, 6);
+    bars_case(300, 300, 60, 45, 0, None, 10);
+}
+
+// ---- Windows QA pass 6: a classic console window ended `nothing_scrolled` ----
+
+/// A console window that takes no wheel at all (what conhost did for the sub-notch events and the
+/// pointer-based wheel) but answers the scroller's other ways: `ways[0]` is the first
+/// `last_resort`, `ways[1]` the second. Later `scroll` and `scroll_back` calls use the way that
+/// worked.
+struct Console {
+    view: fake::PageView,
+    /// Which `last_resort` call (1-based) makes the console move; 0 never.
+    works_at: u32,
+    asked: u32,
+    /// Calls of `scroll` that were sent by the wheel and ignored.
+    ignored: u32,
+}
+
+impl Scroller for Console {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        if self.works_at > 0 && self.asked >= self.works_at {
+            return self.view.scroll(d, amount_px);
+        }
+        self.ignored += 1;
+        Ok(())
+    }
+
+    fn scroll_back(&mut self, d: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.view.scroll_back(d, amount_px)
+    }
+
+    fn last_resort(&mut self, d: Direction, amount_px: u32) -> Result<bool, CmError> {
+        if self.asked >= 2 {
+            return Ok(false);
+        }
+        self.asked += 1;
+        if self.works_at > 0 && self.asked >= self.works_at {
+            self.view.scroll(d, amount_px)?;
+        }
+        Ok(true)
+    }
+}
+
+/// The wheel moved nothing at every point: the scroller's next way is tried, and the one that
+/// works is used from then on.
+#[test]
+fn win_6_console_that_ignores_the_wheel_is_scrolled_by_the_next_way() {
+    for works_at in [1u32, 2] {
+        let page = SyntheticPage::new(40, 5 * 300, 300);
+        let view = page.clone().view();
+        let mut src = view.clone();
+        let mut sc = Console {
+            view,
+            works_at,
+            asked: 0,
+            ignored: 0,
+        };
+        let r = auto_with(&mut src, &mut sc);
+        assert_eq!(r.end, EndReason::ReachedEnd, "way {works_at}");
+        assert_eq!(r.image.frame, page.expected(), "way {works_at}");
+        assert_eq!(
+            sc.asked, works_at,
+            "way {works_at}: no more ways than needed"
+        );
+    }
+}
+
+/// A target with no other way (every scroller but the Windows console one) still ends
+/// `nothing_scrolled`, and every way is tried first.
+#[test]
+fn win_6_a_window_that_never_scrolls_ends_nothing_scrolled_after_every_way() {
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let mut src = view.clone();
+    let mut sc = Console {
+        view,
+        works_at: 0,
+        asked: 0,
+        ignored: 0,
+    };
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::NothingScrolled);
+    assert_eq!(sc.asked, 2);
+}

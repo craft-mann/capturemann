@@ -469,6 +469,10 @@ fn translated(p: &MessageParts) -> Option<String> {
         ),
         "display_not_found" => tr!("Display {id} not found", id = g("id")),
         "window_not_found" => tr!("Window {id} not found", id = g("id")),
+        "window_gone" => tr!(
+            "The window \"{title}\" is no longer available",
+            title = g("title")
+        ),
         "window_minimized" => tr!("Window is minimized"),
         "recording_folder_moved" => tr!(
             "The recording folder `{path}` was moved or deleted",

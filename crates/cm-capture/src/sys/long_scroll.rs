@@ -61,6 +61,17 @@ pub fn raise_window(window_id: u32) -> bool {
     }
 }
 
+/// Window classes of a Windows console: the classic console host (cmd.exe, PowerShell, WSL in
+/// their own window) and Windows Terminal. They are the targets that get the per-target
+/// fallbacks of [`Scroller::last_resort`] (a wheel message, then Page Down).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn is_console_class(class: &str) -> bool {
+    matches!(
+        class,
+        "ConsoleWindowClass" | "CASCADIA_HOSTING_WINDOW_CLASS"
+    )
+}
+
 /// The scroller of this system, or why there is none.
 pub fn platform_scroller() -> Result<Box<dyn Scroller + Send>, CmError> {
     platform_scroller_at(None)
@@ -71,8 +82,18 @@ pub fn platform_scroller() -> Result<Box<dyn Scroller + Send>, CmError> {
 pub fn platform_scroller_at(
     anchor: Option<(i32, i32)>,
 ) -> Result<Box<dyn Scroller + Send>, CmError> {
+    platform_scroller_for(anchor, None)
+}
+
+/// Like [`platform_scroller_at`] for a window target (`window_id`): on Windows a console window
+/// gets the fallbacks of [`Scroller::last_resort`]; every other target, and every other system,
+/// stays on the wheel alone.
+pub fn platform_scroller_for(
+    anchor: Option<(i32, i32)>,
+    window_id: Option<u32>,
+) -> Result<Box<dyn Scroller + Send>, CmError> {
     match imp::support() {
-        AutoScrollSupport::Available => imp::scroller(anchor),
+        AutoScrollSupport::Available => imp::scroller(anchor, window_id),
         AutoScrollSupport::NeedsAccessibility => Err(CmError::permission_missing(
             cm_core::Permission::Accessibility,
             "Allow Accessibility to scroll for you",
@@ -311,7 +332,10 @@ mod imp {
         }
     }
 
-    pub fn scroller(anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
+    pub fn scroller(
+        anchor: Option<(i32, i32)>,
+        _window_id: Option<u32>,
+    ) -> Result<Box<dyn Scroller + Send>, CmError> {
         let (anchor, scale) = match anchor.map(anchor_to_points) {
             Some((p, s)) => (Some(p), s),
             None => (None, 1.0),
@@ -331,18 +355,26 @@ pub(crate) fn notches_for(amount_px: u32, px_per_notch: u32) -> u32 {
     ((f64::from(amount_px) / f64::from(px_per_notch.max(1))).round() as u32).max(1)
 }
 
-/// `SendInput` wheel deltas for `amount_px`: 120 units are one notch (`WHEEL_DELTA`); the value
-/// is split into events of at most `max_event` units, and a part of a notch is sent as such
-/// (smooth-scrolling apps take it, the others round it).
+/// `SendInput` wheel deltas for `amount_px`: 120 units are one notch (`WHEEL_DELTA`). Always
+/// whole notches, at least one for any amount: a classic console window (conhost) scrolls three
+/// lines per notch and ignores a part of a notch, so the 96 units that were the end of a 480 px
+/// request did nothing there, and a first step of a few px did nothing at all (Windows QA pass
+/// 6: `nothing_scrolled`). The value is split into events of at most `max_event` units (rounded
+/// down to whole notches, at least one). The driver measures the distance that really moved
+/// from the joins, so rounding the request costs nothing.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn wheel_deltas(amount_px: u32, px_per_notch: u32, max_event: u32) -> Vec<u32> {
-    let total = (f64::from(amount_px) * 120.0 / f64::from(px_per_notch.max(1))).round() as u32;
-    let max_event = max_event.max(1);
+    const NOTCH: u32 = 120;
+    if amount_px == 0 {
+        return Vec::new();
+    }
+    let notches = ((f64::from(amount_px) / f64::from(px_per_notch.max(1))).round() as u32).max(1);
+    let per_event = (max_event / NOTCH).max(1);
     let mut out = Vec::new();
-    let mut left = total;
+    let mut left = notches;
     while left > 0 {
-        let part = left.min(max_event);
-        out.push(part);
+        let part = left.min(per_event);
+        out.push(part * NOTCH);
         left -= part;
     }
     out
@@ -369,7 +401,10 @@ mod imp {
         }
     }
 
-    pub fn scroller(anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
+    pub fn scroller(
+        anchor: Option<(i32, i32)>,
+        _window_id: Option<u32>,
+    ) -> Result<Box<dyn Scroller + Send>, CmError> {
         super::super::x11_scroll::scroller(anchor)
     }
 }
@@ -378,10 +413,13 @@ mod imp {
 mod imp {
     use super::*;
     use std::mem::size_of;
+    use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
     use windows::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_WHEEL, MOUSEINPUT,
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
+        KEYEVENTF_KEYUP, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_WHEEL, MOUSEINPUT, VIRTUAL_KEY, VK_NEXT,
+        VK_PRIOR,
     };
-    use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
+    use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, SetCursorPos, WM_MOUSEWHEEL};
 
     /// What one notch (120 units) is taken to move, in physical px. Chrome moves about 100 px
     /// at 100 % scale, classic apps three lines (about 48 px): the driver measures the real
@@ -401,22 +439,66 @@ mod imp {
         AutoScrollSupport::Available
     }
 
+    /// How the scroller moves the content. The wheel (`SendInput`) is the default; a console
+    /// window that did not move for it is tried with `WM_MOUSEWHEEL` posted to the window itself
+    /// (it needs no pointer over it), then with the Page Down and Page Up keys.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Way {
+        Wheel,
+        Message,
+        PageKeys,
+    }
+
     struct WinScroller {
         anchor: Option<(i32, i32)>,
+        /// The window target when it is a console window (see [`is_console_class`]): the only
+        /// target with fallbacks.
+        console: Option<u32>,
+        way: Way,
     }
 
     impl Scroller for WinScroller {
         fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError> {
-            self.wheel(direction, amount_px, true)
+            self.go(direction, amount_px, true)
         }
 
         fn scroll_back(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
-            self.wheel(direction, amount_px, false)?;
+            self.go(direction, amount_px, false)?;
+            Ok(true)
+        }
+
+        fn last_resort(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
+            let Some(id) = self.console else {
+                return Ok(false);
+            };
+            self.way = match self.way {
+                Way::Wheel => Way::Message,
+                Way::Message if direction == Direction::Vertical => Way::PageKeys,
+                _ => return Ok(false),
+            };
+            if self.way == Way::PageKeys {
+                // The keys go to the window in front.
+                let _ = super::super::win_window::raise(id);
+            }
+            self.go(direction, amount_px, true)?;
             Ok(true)
         }
     }
 
     impl WinScroller {
+        fn go(
+            &mut self,
+            direction: Direction,
+            amount_px: u32,
+            forward: bool,
+        ) -> Result<(), CmError> {
+            match self.way {
+                Way::Wheel => self.wheel(direction, amount_px, forward),
+                Way::Message => self.message(direction, amount_px, forward),
+                Way::PageKeys => self.keys(forward),
+            }
+        }
+
         /// `forward`: the content moves down or to the right; otherwise up or left.
         fn wheel(
             &mut self,
@@ -434,40 +516,120 @@ mod imp {
                 Direction::Horizontal => MOUSEEVENTF_HWHEEL,
             };
             for delta in wheel_deltas(amount_px, PX_PER_NOTCH, MAX_EVENT) {
-                // Vertical: a negative delta scrolls the content down (forward). Horizontal: a
-                // positive delta scrolls it to the right (forward).
-                let signed = match (direction, forward) {
-                    (Direction::Vertical, true) | (Direction::Horizontal, false) => -(delta as i32),
-                    (Direction::Vertical, false) | (Direction::Horizontal, true) => delta as i32,
-                };
                 let input = INPUT {
                     r#type: INPUT_MOUSE,
                     Anonymous: INPUT_0 {
                         mi: MOUSEINPUT {
                             dx: 0,
                             dy: 0,
-                            mouseData: signed as u32,
+                            mouseData: signed(direction, forward, delta) as u32,
                             dwFlags: flag,
                             time: 0,
                             dwExtraInfo: 0,
                         },
                     },
                 };
-                // SAFETY: one fully initialised INPUT and its true size.
-                let sent = unsafe { SendInput(&[input], size_of::<INPUT>() as i32) };
-                if sent != 1 {
-                    return Err(CmError::internal(
-                        "Windows did not accept the scroll (the screen may be locked or a program with higher rights is in front)",
-                    ));
-                }
+                send(&[input])?;
                 std::thread::sleep(EVENT_GAP);
             }
             Ok(())
         }
+
+        /// `WM_MOUSEWHEEL` posted to the console window (vertical only; the console has no
+        /// sideways scrolling).
+        fn message(
+            &mut self,
+            direction: Direction,
+            amount_px: u32,
+            forward: bool,
+        ) -> Result<(), CmError> {
+            let (Some(id), Direction::Vertical) = (self.console, direction) else {
+                return Ok(());
+            };
+            let hwnd = HWND(id as usize as *mut std::ffi::c_void);
+            let (x, y) = self.anchor.unwrap_or((0, 0));
+            // The low word of `lparam` is x and the high word y, in screen px; the high word of
+            // `wparam` is the wheel delta (a signed 16 bit value), the low word the key state.
+            let lparam = ((y as u16 as usize) << 16) | (x as u16 as usize);
+            for delta in wheel_deltas(amount_px, PX_PER_NOTCH, MAX_EVENT) {
+                let d = signed(direction, forward, delta) as i16 as u16 as usize;
+                // SAFETY: a plain message post with integer arguments; a stale window handle
+                // makes it fail, which is reported.
+                unsafe {
+                    PostMessageW(
+                        Some(hwnd),
+                        WM_MOUSEWHEEL,
+                        WPARAM(d << 16),
+                        LPARAM(lparam as isize),
+                    )
+                }
+                .map_err(|_| CmError::internal("the console window did not take the scroll"))?;
+                std::thread::sleep(EVENT_GAP);
+            }
+            Ok(())
+        }
+
+        /// Page Down (forward) or Page Up to the window in front, one key press per request.
+        fn keys(&mut self, forward: bool) -> Result<(), CmError> {
+            let vk = if forward { VK_NEXT } else { VK_PRIOR };
+            send(&[key(vk, false), key(vk, true)])?;
+            std::thread::sleep(EVENT_GAP);
+            Ok(())
+        }
     }
 
-    pub fn scroller(anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
-        Ok(Box::new(WinScroller { anchor }))
+    /// Vertical: a negative delta scrolls the content down (forward). Horizontal: a positive
+    /// delta scrolls it to the right (forward).
+    fn signed(direction: Direction, forward: bool, delta: u32) -> i32 {
+        match (direction, forward) {
+            (Direction::Vertical, true) | (Direction::Horizontal, false) => -(delta as i32),
+            (Direction::Vertical, false) | (Direction::Horizontal, true) => delta as i32,
+        }
+    }
+
+    fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
+        // Page Up and Page Down are extended keys (the grey ones next to the arrows).
+        let mut flags = KEYEVENTF_EXTENDEDKEY;
+        if up {
+            flags |= KEYEVENTF_KEYUP;
+        }
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: 0,
+                    dwFlags: flags,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }
+    }
+
+    fn send(inputs: &[INPUT]) -> Result<(), CmError> {
+        // SAFETY: fully initialised INPUTs and their true size.
+        let sent = unsafe { SendInput(inputs, size_of::<INPUT>() as i32) };
+        if sent as usize != inputs.len() {
+            return Err(CmError::internal(
+                "Windows did not accept the scroll (the screen may be locked or a program with higher rights is in front)",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn scroller(
+        anchor: Option<(i32, i32)>,
+        window_id: Option<u32>,
+    ) -> Result<Box<dyn Scroller + Send>, CmError> {
+        let console = window_id.filter(|&id| {
+            super::super::win_window::class_name(id).is_some_and(|c| is_console_class(&c))
+        });
+        Ok(Box::new(WinScroller {
+            anchor,
+            console,
+            way: Way::Wheel,
+        }))
     }
 }
 
@@ -485,7 +647,10 @@ mod imp {
         AutoScrollSupport::NotBuilt
     }
 
-    pub fn scroller(_anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
+    pub fn scroller(
+        _anchor: Option<(i32, i32)>,
+        _window_id: Option<u32>,
+    ) -> Result<Box<dyn Scroller + Send>, CmError> {
         Err(CmError::not_implemented("Auto scroll on this system"))
     }
 }
@@ -503,11 +668,53 @@ mod tests {
     }
 
     #[test]
-    fn wheel_deltas_sum_to_the_request_in_small_events() {
-        // 480 px at 100 px per notch is 4.8 notches = 576 units, in events of at most 240.
+    fn wheel_deltas_are_whole_notches_in_small_events() {
+        // 480 px at 100 px per notch is 4.8 notches: 5 notches, in events of at most 240 units.
         let d = wheel_deltas(480, 100, 240);
-        assert_eq!(d, vec![240, 240, 96]);
-        assert_eq!(d.iter().sum::<u32>(), 576);
+        assert_eq!(d, vec![240, 240, 120]);
         assert!(wheel_deltas(0, 100, 240).is_empty());
+    }
+
+    /// A classic console window ignores a wheel event of less than one notch: no event is ever
+    /// smaller than 120 units or a part of a notch, however small the request.
+    #[test]
+    fn wheel_deltas_never_send_a_part_of_a_notch() {
+        for amount in [1u32, 5, 49, 50, 99, 100, 130, 224, 480, 777, 1000, 12_345] {
+            for max_event in [1u32, 120, 200, 240, 500] {
+                let d = wheel_deltas(amount, 100, max_event);
+                assert!(!d.is_empty(), "{amount} px");
+                assert!(
+                    d.iter().all(|u| u % 120 == 0 && *u >= 120),
+                    "{amount}: {d:?}"
+                );
+                assert!(
+                    d.iter().all(|u| *u <= max_event.max(120)),
+                    "{amount}: {d:?}"
+                );
+            }
+        }
+        assert_eq!(wheel_deltas(5, 100, 240), vec![120]);
+    }
+
+    /// A wheel that ignores a delta below one notch (the console host) still moves for every
+    /// request the scroller makes.
+    #[test]
+    fn a_scroller_that_ignores_parts_of_a_notch_still_moves() {
+        for amount in 1u32..400 {
+            let moved: u32 = wheel_deltas(amount, 100, 240)
+                .into_iter()
+                .filter(|u| *u >= 120)
+                .sum();
+            assert!(moved > 0, "{amount} px moved nothing");
+        }
+    }
+
+    #[test]
+    fn console_classes_are_the_only_ones_with_fallbacks() {
+        assert!(is_console_class("ConsoleWindowClass"));
+        assert!(is_console_class("CASCADIA_HOSTING_WINDOW_CLASS"));
+        assert!(!is_console_class("Chrome_WidgetWin_1"));
+        assert!(!is_console_class("Notepad"));
+        assert!(!is_console_class(""));
     }
 }

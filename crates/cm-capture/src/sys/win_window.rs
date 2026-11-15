@@ -27,9 +27,9 @@ use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, EnumChildWindows, GetForegroundWindow, GetWindowLongW, GetWindowRect,
-    GetWindowThreadProcessId, IsIconic, IsWindow, SetForegroundWindow, ShowWindow, GWL_EXSTYLE,
-    SW_RESTORE,
+    BringWindowToTop, EnumChildWindows, GetClassNameW, GetForegroundWindow, GetWindowLongW,
+    GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindow, SetForegroundWindow, ShowWindow,
+    GWL_EXSTYLE, SW_RESTORE,
 };
 
 use super::win_names::{choose_app_name, crop_box, is_frame_host, visible_xywh};
@@ -109,6 +109,16 @@ pub fn raise(id: u32) -> bool {
         }
         ok || GetForegroundWindow() == hwnd
     }
+}
+
+/// The window class of the window (`ConsoleWindowClass` for a classic console, `Chrome_WidgetWin_1`
+/// for a browser). `None` when the window is gone.
+pub fn class_name(id: u32) -> Option<String> {
+    let hwnd = HWND(id as usize as *mut c_void);
+    let mut buf = [0u16; 256];
+    // SAFETY: the call writes at most `buf.len()` UTF-16 units into the buffer.
+    let n = unsafe { GetClassNameW(hwnd, &mut buf) };
+    (n > 0).then(|| String::from_utf16_lossy(&buf[..n as usize]))
 }
 
 /// Makes this process per-monitor DPI aware (once). A process without a DPI manifest (the headless daemon,

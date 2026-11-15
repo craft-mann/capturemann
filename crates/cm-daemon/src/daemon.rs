@@ -146,6 +146,15 @@ impl DelayedCaptures {
         self.cancel_where(|rid, _| pred(rid))
     }
 
+    /// Whether a Long Shot is running (registered, not yet finished).
+    pub(crate) fn long_running(&self) -> bool {
+        self.map
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .values()
+            .any(|(_, _, long)| *long)
+    }
+
     /// Cancels the running Long Shots (all of them, with or without a `request_id`).
     fn cancel_long(&self) -> usize {
         self.cancel_where(|_, long| long)
@@ -1055,6 +1064,10 @@ impl Daemon {
         if let (Some(_), Action::CaptureLong(p)) = (&agent, &action) {
             crate::long_shot_ops::refuse_hand_for_agent(p)?;
         }
+        // A second Long Shot or Click Guide, or one while the other runs, is refused with `busy`
+        // before any dialog: a confirmation opened over the page that is being captured ended
+        // the first run (Windows QA pass 6).
+        self.inner.refuse_when_capture_is_busy(&action)?;
         let tier = if agent.is_some() {
             if matches!(&action, Action::CaptureLong(p) if p.moves_the_screen()) {
                 Tier::Confirm

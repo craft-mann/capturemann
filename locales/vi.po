@@ -3795,6 +3795,11 @@ msgstr "Cửa sổ {id}"
 msgid "Window {id} not found"
 msgstr "Không tìm thấy cửa sổ {id}"
 
+# FACT: owner review required
+#, fuzzy
+msgid "The window \"{title}\" is no longer available"
+msgstr "Cửa sổ \"{title}\" không còn nữa"
+
 msgid "Window {window_id}"
 msgstr "Cửa sổ {window_id}"
 

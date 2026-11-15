@@ -287,6 +287,17 @@ pub fn run_auto_ex(
                     break;
                 }
             }
+            // The wheel moved nothing at any point: the scroller may know another way for this
+            // target (a classic console window ignores what a browser takes). Each call tries
+            // the next way, and the one that works stays the scroller's way.
+            while outcome == PushOutcome::NoChange
+                && !stop()
+                && scroller.last_resort(cfg.direction, step)?
+            {
+                sleeper.sleep(LATE_SCROLL_WAIT);
+                next = settle_frame(src, sleeper, cfg.settle)?;
+                outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+            }
             if outcome == PushOutcome::NoChange {
                 break stopped_or(stop, EndReason::NothingScrolled);
             }

@@ -18,7 +18,7 @@ use cm_core::{Actor, CmError, PhysicalPoint, PhysicalRect, PhysicalSize};
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use crate::action::{CaptureLongParams, ScrollMode};
+use crate::action::{Action, CaptureLongParams, ScrollMode};
 use crate::daemon::Inner;
 use crate::error::DaemonError;
 
@@ -107,6 +107,15 @@ pub trait LongShotSystem: Send + Sync {
     /// `anchor`: a point of the area in global physical px, where the pointer is put before each
     /// scroll (a wheel event goes to the window under the pointer).
     fn scroller(&self, anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError>;
+    /// [`LongShotSystem::scroller`] for a window target: a console window gets the scroller's
+    /// per-target fallbacks (`window_id`); the default knows none.
+    fn scroller_for(
+        &self,
+        anchor: Option<(i32, i32)>,
+        _window_id: Option<u32>,
+    ) -> Result<Box<dyn Scroller + Send>, CmError> {
+        self.scroller(anchor)
+    }
     fn auto_scroll(&self) -> AutoScrollSupport;
     /// Brings the window to the front before Auto scroll's first step, so that the wheel reaches
     /// it and not a window that covers it. `true` when it is in front afterwards; the default is
@@ -170,12 +179,69 @@ impl LongShotSystem for RealLongShot {
         long_shot::platform_scroller_at(anchor)
     }
 
+    fn scroller_for(
+        &self,
+        anchor: Option<(i32, i32)>,
+        window_id: Option<u32>,
+    ) -> Result<Box<dyn Scroller + Send>, CmError> {
+        long_shot::platform_scroller_for(anchor, window_id)
+    }
+
     fn auto_scroll(&self) -> AutoScrollSupport {
         long_shot::auto_scroll_support()
     }
 
     fn raise_window(&self, window_id: u32) -> bool {
         long_shot::raise_window(window_id)
+    }
+}
+
+/// The title of the window target, when it is listed now.
+fn window_title(capturer: &Capturer, target: cm_capture::CaptureTarget) -> Option<String> {
+    let cm_capture::CaptureTarget::Window { window_id } = target else {
+        return None;
+    };
+    let targets = capturer.list_targets().ok()?;
+    targets
+        .windows
+        .iter()
+        .find(|w| w.id == window_id)
+        .map(|w| w.title.trim().to_owned())
+        .filter(|t| !t.is_empty())
+}
+
+/// The error of a window that cannot be found, with its title when it was known at the start:
+/// `The window "Title" is no longer available` instead of `Window 6882546 not found` (a number
+/// means nothing to a person; Windows QA pass 6).
+pub fn name_missing_window(e: CmError, window_id: u32, title: Option<&str>) -> CmError {
+    match title {
+        Some(t)
+            if e.code() == cm_core::ErrorCode::NotFound
+                && e.to_string() == format!("Window {window_id} not found") =>
+        {
+            CmError::not_found(format!("The window \"{t}\" is no longer available"))
+        }
+        _ => e,
+    }
+}
+
+/// Frames of a window target whose "not found" names the window by its title.
+struct NamedWindow {
+    inner: Box<dyn FrameSource + Send>,
+    window_id: Option<u32>,
+    title: Option<String>,
+}
+
+impl FrameSource for NamedWindow {
+    fn grab(&mut self) -> Result<Frame, CmError> {
+        self.inner.grab().map_err(|e| match self.window_id {
+            Some(id) => name_missing_window(e, id, self.title.as_deref()),
+            None => e,
+        })
+    }
+
+    fn target_changed(&mut self) -> bool {
+        self.inner.target_changed()
     }
 }
 
@@ -315,16 +381,23 @@ pub(crate) fn scroll_points(area: PhysicalRect, own: &[PhysicalRect]) -> Vec<(i3
 /// next one when the run asks for another point (the first step moved nothing).
 struct MultiPointScroller {
     system: Arc<dyn LongShotSystem>,
+    /// The window target (its class decides which fallbacks the scroller has).
+    window_id: Option<u32>,
     points: Vec<(i32, i32)>,
     at: usize,
     current: Box<dyn Scroller + Send>,
 }
 
 impl MultiPointScroller {
-    fn new(system: Arc<dyn LongShotSystem>, points: Vec<(i32, i32)>) -> Result<Self, CmError> {
-        let current = system.scroller(points.first().copied())?;
+    fn new(
+        system: Arc<dyn LongShotSystem>,
+        window_id: Option<u32>,
+        points: Vec<(i32, i32)>,
+    ) -> Result<Self, CmError> {
+        let current = system.scroller_for(points.first().copied(), window_id)?;
         Ok(MultiPointScroller {
             system,
+            window_id,
             points,
             at: 0,
             current,
@@ -341,11 +414,18 @@ impl Scroller for MultiPointScroller {
         self.current.scroll_back(direction, amount_px)
     }
 
+    fn last_resort(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.current.last_resort(direction, amount_px)
+    }
+
     fn next_point(&mut self) -> bool {
         if self.at + 1 >= self.points.len() {
             return false;
         }
-        match self.system.scroller(Some(self.points[self.at + 1])) {
+        match self
+            .system
+            .scroller_for(Some(self.points[self.at + 1]), self.window_id)
+        {
             Ok(s) => {
                 self.at += 1;
                 self.current = s;
@@ -414,6 +494,32 @@ pub(crate) fn area_in_display(
         }
     }
 }
+
+impl crate::daemon::Inner {
+    /// `busy` for a request that would start a Long Shot or a Click Guide while one of them is
+    /// running. Asked before the confirmation gate, so no dialog opens over what is captured.
+    pub(crate) fn refuse_when_capture_is_busy(&self, action: &Action) -> Result<(), DaemonError> {
+        let starts_long = matches!(action, Action::CaptureLong(_));
+        let starts_guide = matches!(
+            action,
+            Action::Guide(g) if matches!(g.op, crate::guide::GuideOp::Start { .. })
+        );
+        if !starts_long && !starts_guide {
+            return Ok(());
+        }
+        if self.delayed.long_running() {
+            return Err(CmError::busy(BUSY_LONG_SHOT).into());
+        }
+        if self.guide.is_recording() {
+            return Err(CmError::busy(BUSY_GUIDE).into());
+        }
+        Ok(())
+    }
+}
+
+/// What `busy` says when a Long Shot or a Click Guide is already running.
+pub(crate) const BUSY_LONG_SHOT: &str = "A Long Shot is already running. Stop it first.";
+pub(crate) const BUSY_GUIDE: &str = "A Click Guide is already recording. Stop it first.";
 
 /// AC7: Hand scroll is refused for agents.
 pub(crate) fn refuse_hand_for_agent(p: &CaptureLongParams) -> Result<(), DaemonError> {
@@ -542,12 +648,14 @@ impl Inner {
         let state = request_id.as_deref().map(|id| self.long_states.start(id));
         let state_in = state.clone();
         // The app grabs Esc for as long as a Long Shot runs, even one it did not start.
-        let area = {
+        let (area, window_title) = {
             let c = self.capturer.clone();
-            tokio::task::spawn_blocking(move || area_in_display(&c, target))
-                .await
-                .ok()
-                .flatten()
+            tokio::task::spawn_blocking(move || {
+                (area_in_display(&c, target), window_title(&c, target))
+            })
+            .await
+            .ok()
+            .unwrap_or((None, None))
         };
         self.events.publish(
             STARTED_EVENT,
@@ -588,7 +696,14 @@ impl Inner {
                     }
                     std::thread::sleep(std::time::Duration::from_millis(400));
                 }
-                let mut frames = system.frames(capturer, target);
+                let mut frames: Box<dyn FrameSource + Send> = Box::new(NamedWindow {
+                    inner: system.frames(capturer, target),
+                    window_id: match target {
+                        cm_capture::CaptureTarget::Window { window_id } => Some(window_id),
+                        _ => None,
+                    },
+                    title: window_title,
+                });
                 let cfg = LongShotConfig {
                     direction,
                     limits: Limits::with_max_px(max_px),
@@ -647,7 +762,12 @@ impl Inner {
                             }
                             None => Vec::new(),
                         };
-                        let mut scroller = MultiPointScroller::new(system.clone(), points)?;
+                        let window_id = match target {
+                            cm_capture::CaptureTarget::Window { window_id } => Some(window_id),
+                            _ => None,
+                        };
+                        let mut scroller =
+                            MultiPointScroller::new(system.clone(), window_id, points)?;
                         long_shot::run_auto_ex(
                             frames.as_mut(),
                             &mut scroller,
@@ -817,7 +937,7 @@ mod point_tests {
     fn ls_flaky_the_scroller_moves_to_the_next_point_when_asked() {
         let log = Log::default();
         let points = vec![(1, 1), (2, 2), (3, 3)];
-        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), points).unwrap();
+        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), None, points).unwrap();
         s.scroll(Direction::Vertical, 10).unwrap();
         assert!(s.next_point());
         s.scroll(Direction::Vertical, 10).unwrap();
@@ -834,7 +954,7 @@ mod point_tests {
     #[test]
     fn ls_flaky_no_points_means_no_anchor_and_no_next_point() {
         let log = Log::default();
-        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), Vec::new()).unwrap();
+        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), None, Vec::new()).unwrap();
         s.scroll(Direction::Vertical, 10).unwrap();
         assert!(!s.next_point());
         assert_eq!(*log.lock().unwrap(), vec![None]);
