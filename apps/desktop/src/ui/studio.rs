@@ -286,7 +286,7 @@ pub fn agent_status_of(backend: &Backend) -> McpStatus {
     agent_status::derive(
         backend.daemon.is_some(),
         backend.endpoint.is_some(),
-        backend.ipc_warning.as_deref(),
+        backend.ipc_failure,
         &activity,
     )
 }

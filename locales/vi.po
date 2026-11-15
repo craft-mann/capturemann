@@ -842,6 +842,14 @@ msgstr "Sao chép liên kết khi tải lên xong"
 msgid "Corner radius"
 msgstr "Bán kính góc"
 
+#, fuzzy
+msgid "Could not create the socket folder"
+msgstr "Không tạo được thư mục của ổ cắm IPC"
+
+#, fuzzy
+msgid "Could not open the IPC endpoint"
+msgstr "Không mở được điểm cuối IPC"
+
 msgid "Could not reach the server: {error} Check your connection and try again."
 msgstr "Không thể kết nối với máy chủ: {error} Hãy kiểm tra kết nối và thử lại."
 
@@ -11454,9 +11462,10 @@ msgctxt "move area"
 msgid "Source"
 msgstr "Nguồn"
 
+#, fuzzy
 msgctxt "navigation"
 msgid "Click Guides"
-msgstr "Hướng dẫn theo thao tác"
+msgstr "Hướng dẫn nhấp"
 
 msgctxt "page title"
 msgid "Click Guide"

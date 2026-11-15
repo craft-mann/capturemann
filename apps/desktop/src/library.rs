@@ -384,6 +384,17 @@ impl SortKey {
         SortKey::Size,
     ];
 
+    /// The orders a page offers: pictures and guides have no length, so Duration is only on the
+    /// pages that can hold a recording (QA L4).
+    pub fn offered(page: Filter) -> Vec<SortKey> {
+        SortKey::ALL
+            .into_iter()
+            .filter(|k| {
+                *k != SortKey::Duration || !matches!(page, Filter::Screenshots | Filter::Guides)
+            })
+            .collect()
+    }
+
     pub fn label(self) -> String {
         match self {
             SortKey::Date => tr_ctx!("sort key", "Date"),
@@ -532,6 +543,10 @@ impl LibraryState {
     /// never keeps hiding captures.
     pub fn drop_inapplicable_chips(&mut self) {
         let page = self.filter;
+        if !SortKey::offered(page).contains(&self.sort) {
+            self.sort = SortKey::Date;
+            self.descending = SortKey::Date.default_descending();
+        }
         if !Chip::Imported.applies_to(page) {
             self.imported_only = false;
         }
@@ -946,6 +961,21 @@ mod tests {
     /// LIB-1: the Uploaded and Published chips toggle, one at a time, and keep the page's kind
     /// (the sidebar sets it); the daemon gets `kind` and `status` for the query. The kind chips are
     /// gone (OD-16).
+    /// QA L4: no Duration order on the Screenshots or Click Guides page, and a Duration sort
+    /// falls back to Date when the page changes to one of them.
+    #[test]
+    fn duration_sort_is_not_offered_for_pictures() {
+        assert!(!SortKey::offered(Filter::Screenshots).contains(&SortKey::Duration));
+        assert!(!SortKey::offered(Filter::Guides).contains(&SortKey::Duration));
+        assert!(SortKey::offered(Filter::Recordings).contains(&SortKey::Duration));
+        assert!(SortKey::offered(Filter::All).contains(&SortKey::Duration));
+        let mut s = LibraryState::new(LibraryStatus::Ready);
+        s.sort = SortKey::Duration;
+        s.filter = Filter::Screenshots;
+        s.drop_inapplicable_chips();
+        assert_eq!(s.sort, SortKey::Date);
+    }
+
     #[test]
     fn lib1_remote_chips_toggle_and_keep_the_kind() {
         let mut s = LibraryState::new(LibraryStatus::Ready);

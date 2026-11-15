@@ -224,6 +224,13 @@ impl EditorView {
                     .bg(rgba_of(t.field))
                     .text_size(px(type_scale::UI))
                     .text_color(rgba_of(if info.text.is_empty() { t.mist } else { t.text }))
+                    // A click on the field edits the text, as the callout's does (QA E4).
+                    .when(info.has_op && !info.editing, |d| {
+                        let hover = rgba_of(t.raised);
+                        d.cursor_text()
+                            .hover(move |s| s.bg(hover))
+                            .on_click(self.doc_action(|d, cx| d.edit_selected_text(cx)))
+                    })
                     .child(SharedString::from(shown)),
             ),
         );
@@ -737,6 +744,7 @@ impl EditorView {
         };
         div()
             .id("editor-busy-scrim")
+            .occlude()
             .absolute()
             .size_full()
             .flex()

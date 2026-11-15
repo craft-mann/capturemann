@@ -67,7 +67,8 @@ pub fn permission_icon(id: Id) -> &'static str {
         Id::ScreenRecording => "monitor",
         Id::Microphone => "mic",
         Id::Camera => "camera",
-        Id::InputMonitoring | Id::Accessibility => "keyboard",
+        Id::InputMonitoring => "keyboard",
+        Id::Accessibility => "accessibility",
     }
 }
 
@@ -629,5 +630,20 @@ pub fn setup_hint(snap: &Snapshot, all_set: bool) -> String {
         tr!("Checking\u{2026}")
     } else {
         tr!("Screen Recording is required for screenshots and recording. The others are optional.")
+    }
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::*;
+
+    /// QA: the Accessibility card has its own icon, and every icon is a registered asset.
+    #[test]
+    fn accessibility_has_its_own_icon() {
+        assert_ne!(
+            permission_icon(Id::Accessibility),
+            permission_icon(Id::InputMonitoring)
+        );
+        assert_eq!(permission_icon(Id::Accessibility), "accessibility");
     }
 }

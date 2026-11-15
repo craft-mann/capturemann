@@ -42,6 +42,8 @@ pub struct Touch {
     pub measuring: bool,
     /// "This area has an image or a control in it, so the fill may show" is on screen.
     pub busy_prompt: Option<BusyPrompt>,
+    /// A press landed while the busy sheet was open: its release must not reach the canvas.
+    pub sheet_press: bool,
     /// The chosen Move area source.
     pub mv: Option<MovePending>,
     pub mv_drag: Option<MoveDrag>,
@@ -66,6 +68,7 @@ impl Touch {
             request: None,
             measuring: false,
             busy_prompt: None,
+            sheet_press: false,
             mv: None,
             mv_drag: None,
             snap_on: true,
@@ -1173,7 +1176,9 @@ impl EditorState {
         let Some(t) = self.text.as_mut() else {
             return false;
         };
-        if clicks >= 2 {
+        if clicks >= 3 {
+            t.select_line_at(i);
+        } else if clicks == 2 {
             t.select_word_at(i);
         } else {
             t.press_at(i, mods.shift);
@@ -1567,6 +1572,47 @@ mod tests {
         s.text.as_mut().unwrap().text.clear();
         assert!(s.finish_text().is_none());
         assert!(s.ops.is_empty());
+    }
+
+    /// A press and its release under the busy sheet never reach the canvas (QA pass 2, E3).
+    #[test]
+    fn busy_sheet_swallows_canvas_pointer() {
+        let mut s = st();
+        retype_ready(&mut s, vec![line(10.0, 10.0, 60.0, "Save")]);
+        drag(&mut s, (12.0, 12.0), (12.0, 12.0));
+        let req = s.take_measure_request().unwrap();
+        s.touch_measured(req, Ok(measured(true)));
+        assert!(s.touch.busy_prompt.is_some());
+        let m = NONE;
+        assert!(s.pointer_down(Pt::new(12.0, 12.0), m, 1, 4.0).is_empty());
+        s.busy_choice(false);
+        assert!(s.pointer_up(Pt::new(12.0, 12.0), m, 4.0).is_empty());
+        assert!(s.text.is_none() && s.ops.is_empty() && !s.touch.sheet_press);
+        // The next press works again.
+        s.pointer_down(Pt::new(12.0, 12.0), m, 1, 4.0);
+        assert!(!s.touch.sheet_press);
+    }
+
+    /// QA E4: the panel's Text field edits a stored retype: `edit_selected_text` opens its text.
+    #[test]
+    fn panel_text_field_edits_a_stored_retype() {
+        let mut s = st();
+        retype_ready(&mut s, vec![line(10.0, 10.0, 60.0, "Save")]);
+        drag(&mut s, (12.0, 12.0), (12.0, 12.0));
+        let req = s.take_measure_request().unwrap();
+        s.touch_measured(req, Ok(measured(false)));
+        type_text(&mut s, "Keep");
+        assert!(s.finish_text().is_some());
+        assert!(s.text.is_none());
+        let id = s.ops.last().unwrap().id.clone();
+        s.selected = Some(id);
+        s.edit_selected_text();
+        assert!(
+            s.text.is_some(),
+            "the panel click opens the text for typing"
+        );
+        type_text(&mut s, "!");
+        assert!(s.text.as_ref().unwrap().text.ends_with('!'));
     }
 
     /// ANN-9.AC3: a busy background warns before the op is created; Cancel stores nothing and
@@ -2037,6 +2083,19 @@ mod tests {
         assert_eq!(t.selected_text().as_deref(), Some("  "));
         t.select_word_at(4);
         assert_eq!(t.selected_text().as_deref(), Some(","));
+    }
+
+    /// QA E1: a triple click selects the whole line, not past a line break.
+    #[test]
+    fn triple_click_selects_the_line() {
+        let mut t = text_edit("one two\nthree four");
+        t.select_line_at(2);
+        assert_eq!(t.selected_text().as_deref(), Some("one two"));
+        t.select_line_at(10);
+        assert_eq!(t.selected_text().as_deref(), Some("three four"));
+        let mut t = text_edit("single line");
+        t.select_line_at(4);
+        assert_eq!(t.selected_text().as_deref(), Some("single line"));
     }
 
     /// ANN-1.AC10: Shift+Right extends by one character; Cmd/Ctrl+A selects all; copy gives the

@@ -1356,6 +1356,12 @@ msgstr ""
 msgid "Corner radius"
 msgstr ""
 
+msgid "Could not create the socket folder"
+msgstr ""
+
+msgid "Could not open the IPC endpoint"
+msgstr ""
+
 msgid "Could not reach the server: {error} Check your connection and try again."
 msgstr ""
 

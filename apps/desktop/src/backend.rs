@@ -229,6 +229,8 @@ pub struct Backend {
     pub overlay: OverlayLauncher,
     /// Set when the IPC endpoint could not be served (another daemon owns it).
     pub ipc_warning: Option<String>,
+    /// Why the endpoint could not be served, for the sidebar card's line.
+    pub ipc_failure: Option<crate::agent_status::IpcFailure>,
     pub endpoint: Option<Endpoint>,
     clipboard: Arc<dyn Clipboard>,
     /// Recordings a crash left behind that this start recovered (REC-8); the app tells the user.
@@ -262,6 +264,7 @@ impl Backend {
             Library::open_or_create(p)
         });
         let mut ipc_warning = None;
+        let mut ipc_failure = None;
         let mut recovered = Vec::new();
         let recording_enabled = recording_enabled_for(&cfg.recording, recording_supported());
         let daemon = opened.library.map(|lib| {
@@ -357,6 +360,7 @@ impl Backend {
                         });
                     }
                     Err(e) => {
+                        ipc_failure = Some(crate::agent_status::IpcFailure::of(&e));
                         ipc_warning = Some(tr!(
                             "The CLI and MCP server can\u{2019}t connect to this app: {e}",
                             e = e
@@ -377,6 +381,7 @@ impl Backend {
                 cfg.endpoint.as_ref().map(|e| e.describe().into()),
             ),
             ipc_warning,
+            ipc_failure,
             endpoint: cfg.endpoint,
             clipboard,
             recovered,
@@ -1137,6 +1142,10 @@ mod tests {
             DenyAll,
         );
         assert!(second.ipc_warning.is_some());
+        assert_eq!(
+            second.ipc_failure,
+            Some(crate::agent_status::IpcFailure::AlreadyServed)
+        );
         assert!(second.daemon.is_some());
     }
 
