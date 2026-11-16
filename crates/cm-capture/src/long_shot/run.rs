@@ -184,6 +184,7 @@ pub fn run_auto_ex(
     sleeper.sleep(FIRST_FRAME_WARMUP);
     let first = settle_frame(src, sleeper, cfg.settle)?;
     stitcher.push(&first.frame, None);
+    super::debug::trace(&first.frame, "first frame");
     {
         on_progress(progress(&stitcher));
         on_stitch(&stitcher);
@@ -219,6 +220,14 @@ pub fn run_auto_ex(
         scroller.scroll(cfg.direction, step)?;
         let mut next = settled!('run, settle_frame(src, sleeper, cfg.settle));
         let mut outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+        super::debug::trace(
+            &next.frame,
+            &format!(
+                "step {step} (expected shift {}, frames {}) -> {outcome:?}",
+                expected(step, gain),
+                stitcher.frames()
+            ),
+        );
         // The first pair that does not join: the screen may still be changing for another
         // reason than the scroll (a window coming to the front, a dialog fading out). Looked at
         // again, waiting longer each time, before the run is given up.
@@ -232,6 +241,10 @@ pub fn run_auto_ex(
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
             next = settled!('run, settle_frame(src, sleeper, cfg.settle));
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+            super::debug::trace(
+                &next.frame,
+                &format!("first pair looked at again ({retry}) -> {outcome:?}"),
+            );
         }
         // A later pair that does not join: scroll back by half a step and look again before the
         // run is given up (the scroller moved more than asked, or the overlap that is left is
@@ -251,8 +264,11 @@ pub fn run_auto_ex(
         let mut at_last = false;
         // What the next scroll back asks: half a step, or what the last forward try moved.
         let mut back_amt = ((f64::from(step) * BACK_SHARE) as u32).max(1);
+        // The first pair too (Windows, Edge, Nov 16, 2026: a request of 234 px moved 600, past
+        // all but a sliver of the first frame, and every real page ended after one frame): a
+        // scroll back lands on a known place as soon as it joins the first frame or equals it.
         while outcome == PushOutcome::NoOverlap
-            && stitcher.frames() > 1
+            && stitcher.frames() >= 1
             && retry < NO_OVERLAP_RETRIES + 2 * SMALLER_STEPS
             && !stop()
             && !window_changed(src, &stitcher, &next.frame)
@@ -272,6 +288,10 @@ pub fn run_auto_ex(
                 sleeper.sleep(LATE_SCROLL_WAIT);
                 next = settled!('run, settle_frame(src, sleeper, cfg.settle));
                 outcome = stitcher.push(&next.frame, Some(expected(fwd, gain)));
+                super::debug::trace(
+                    &next.frame,
+                    &format!("smaller step {fwd} (try {smaller}) -> {outcome:?}"),
+                );
                 continue;
             }
             // Two scroll backs of half a step each, then (after a smaller step that failed) one
@@ -289,6 +309,10 @@ pub fn run_auto_ex(
             // No expected shift: how far the scroll-back moved is no better known than how far
             // the step did, and a wrong prior would pick one of several alike overlaps.
             outcome = stitcher.push(&next.frame, None);
+            super::debug::trace(
+                &next.frame,
+                &format!("scrolled back by {back_amt} (retry {retry}) -> {outcome:?}"),
+            );
             // Back where the last frame was taken is not the end of the content: the position
             // is known again, and the step is tried smaller.
             if outcome == PushOutcome::NoChange {

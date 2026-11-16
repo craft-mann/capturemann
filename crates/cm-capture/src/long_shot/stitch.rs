@@ -124,9 +124,14 @@ pub enum LimitKind {
     Editor,
 }
 
+/// Rows an image may be short of the length limit and still have stopped at it.
+const LIMIT_SLACK_PX: u32 = 64;
+
 /// The limit behind a stop at `len` px along the scroll direction.
 pub fn limit_kind(limits: Limits, len: u32) -> LimitKind {
-    if len < limits.max_len {
+    // An image a few rows short of the length limit stopped at it (a real Edge run: 1048x16383
+    // said "50 megapixels" for a 17 MP image).
+    if len.saturating_add(LIMIT_SLACK_PX) < limits.max_len {
         LimitKind::Pixels
     } else if limits.max_len < MAX_LONG_SIDE {
         LimitKind::MaxPx

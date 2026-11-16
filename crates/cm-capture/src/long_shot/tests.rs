@@ -147,7 +147,10 @@ fn cap_6_stop_keeps_the_frames_so_far() {
     )
     .unwrap();
     assert_eq!(r.end, EndReason::StoppedByUser);
-    assert_eq!(r.image.frames, 4);
+    // The run asks `stop` more often than once a frame (after each join, while it looks again at
+    // the same place), so how many frames fit in three calls is not the point: what was taken is
+    // kept, row for row.
+    assert!(r.image.frames >= 2, "{} frames", r.image.frames);
     let kept = r.image.frame.height();
     assert_eq!(r.image.frame, page.expected_range(0, kept));
 }
@@ -1369,8 +1372,14 @@ fn ls_4_the_limit_note_names_the_limit_that_was_met() {
         EndReason::LimitReached.note_for(wide, 12_500).unwrap(),
         "Reached the size limit of 50 megapixels"
     );
-    // Only the product limit is "the longest image CaptureMann can edit".
+    // Only the product limit is "the longest image CaptureMann can edit"; an image a row or two
+    // short of it stopped there (Edge, 1048x16383, was called a 50 megapixel stop).
     assert_eq!(limit_kind(wide, MAX_LONG_SIDE), LimitKind::Editor);
+    assert_eq!(limit_kind(wide, MAX_LONG_SIDE - 1), LimitKind::Editor);
+    assert_eq!(
+        limit_kind(Limits::with_max_px(Some(1000)), 999),
+        LimitKind::MaxPx
+    );
     assert_eq!(
         EndReason::LimitReached
             .note_for(wide, MAX_LONG_SIDE)
@@ -2714,4 +2723,90 @@ fn ls_seam_a_band_that_is_drawn_late_is_in_the_image() {
     let r = auto_with(&mut src, &mut sc);
     assert_eq!(r.end, EndReason::ReachedEnd);
     assert_eq!(r.image.frame, page.expected());
+}
+
+// ---- Real sites, Windows Edge, Nov 16, 2026 (lsreal): one frame, `no_overlap`, on every page ----
+
+/// The page position a [`Overlaid`] source is told by [`FirstBig`].
+type PosCell = std::rc::Rc<std::cell::Cell<u32>>;
+
+/// A wheel whose first step moves `first` times what was asked (Edge on Windows at 150 %: a
+/// request of 234 px moved 600) and later ones `later` times, and that scrolls back by the same
+/// gain as it scrolls forward, in whole notches of `notch` px at least.
+struct FirstBig {
+    view: fake::PageView,
+    pos: PosCell,
+    first: f64,
+    later: f64,
+    scrolls: u32,
+    notch: u32,
+}
+
+impl FirstBig {
+    fn moved(&self, amount_px: u32, gain: f64) -> u32 {
+        (((f64::from(amount_px) * gain) / f64::from(self.notch)).round() as u32).max(1) * self.notch
+    }
+}
+
+impl Scroller for FirstBig {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.scrolls += 1;
+        let gain = if self.scrolls == 1 {
+            self.first
+        } else {
+            self.later
+        };
+        let by = self.moved(amount_px, gain);
+        self.view.scroll(d, by)?;
+        self.pos.set(self.pos.get() + by);
+        Ok(())
+    }
+    fn scroll_back(&mut self, _: Direction, amount_px: u32) -> Result<bool, CmError> {
+        let by = self.moved(amount_px, self.later);
+        self.view.back(by);
+        self.pos.set(self.pos.get().saturating_sub(by));
+        Ok(true)
+    }
+}
+
+/// The first pair: the wheel moved the page 2.5 times as far as asked, so only a sliver of the
+/// first frame is left, and the lower half of the browser's toolbar (a focus ring on a button)
+/// changed with the scroll. The pair does not join: the overlap is too short to rest a join on
+/// (the ring's rows differ in it). The driver scrolls back, as it does for a later pair, and the
+/// join is found at the shift that leaves an overlap. (Windows, Edge, Wikipedia, YouTube,
+/// docs.rs, paulgraham.com: `no_overlap` after the first frame, 3 of 3 runs, with a pair 600 px
+/// apart in a 708 px content area.)
+#[test]
+fn lsreal_a_first_step_that_overshoots_is_scrolled_back_and_joined() {
+    let ring = |pos: u32, w: u32, _h: u32, data: &mut [u8]| {
+        if pos > 0 {
+            for y in 20..40 {
+                for x in (w / 2)..(w / 2 + 40) {
+                    let i = ((y * w + x) * 4) as usize;
+                    data[i..i + 4].copy_from_slice(&[30, 30, 120, 255]);
+                }
+            }
+        }
+    };
+    for first in [2.0, 2.5, 3.0] {
+        let page = SyntheticPage::new(300, 3000, 300).with_bands(40, 0);
+        let view = page.clone().view();
+        let pos = PosCell::default();
+        let mut src = Overlaid {
+            view: view.clone(),
+            pos: pos.clone(),
+            over: ring,
+        };
+        let mut sc = FirstBig {
+            view,
+            pos,
+            first,
+            later: 1.5,
+            scrolls: 0,
+            notch: 15,
+        };
+        let r = auto_with(&mut src, &mut sc);
+        assert_eq!(r.end, EndReason::ReachedEnd, "first {first}");
+        assert_eq!(r.image.frame, page.expected(), "first {first}");
+    }
 }
