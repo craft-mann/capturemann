@@ -333,6 +333,9 @@ const VOLATILE_SHARE: f64 = 0.01;
 /// scrollbar with its edge (34 px at 200 % scale, and more with a border) at most.
 const MAX_LEFT_STRIP: usize = 48;
 const MAX_RIGHT_STRIP: usize = 64;
+/// Rows in which more columns than both edge strips can hold (plus this many) differ do not count
+/// for the edge strips.
+const WIDER_THAN_EDGES: usize = 16;
 /// A strip of moving columns may have gaps of this many columns (a scrollbar's thumb, its arrows
 /// and its border are not one block).
 const STRIP_GAP: usize = 16;
@@ -395,6 +398,19 @@ fn find_join(
     hint: Option<usize>,
     bands: Option<(usize, usize)>,
 ) -> Result<Join, NoJoin> {
+    find_join_opt(a, b, hint, bands, true)
+}
+
+/// [`find_join`]; `robust` false leaves out the last look (stretches of lines that differ), which
+/// would take a moving scrollbar's thumb for such a stretch: the first pair asks for the edges
+/// first (see `Stitcher::apply_trim`).
+fn find_join_opt(
+    a: &Lines,
+    b: &Lines,
+    hint: Option<usize>,
+    bands: Option<(usize, usize)>,
+    robust: bool,
+) -> Result<Join, NoJoin> {
     match find_join_with(a, b, hint, bands, 0) {
         Err(NoJoin::NoOverlap(strict)) => {
             // Narrow lines have no room for a tolerance.
@@ -403,16 +419,267 @@ fn find_join(
             }
             let max_px = ((a.line_len / 4) as f64 * LENIENT_SHARE) as usize;
             match find_join_with(a, b, hint, bands, max_px.max(LENIENT_MIN_PX)) {
-                Err(NoJoin::NoOverlap(lenient)) => Err(NoJoin::NoOverlap(format!(
-                    "{strict}; with up to {} differing pixels per line allowed: {lenient}",
-                    max_px.max(LENIENT_MIN_PX)
-                ))),
+                Err(NoJoin::NoOverlap(lenient)) => {
+                    // A translucent sticky header and a floating button change whole stretches
+                    // of lines, which no per-line tolerance covers: a last look that lets such
+                    // stretches differ when everything else matches exactly.
+                    if !robust {
+                        return Err(NoJoin::NoOverlap(format!(
+                            "{strict}; with up to {} differing pixels per line allowed: {lenient}",
+                            max_px.max(LENIENT_MIN_PX)
+                        )));
+                    }
+                    if same_but_for_a_region(a, b) {
+                        return Err(NoJoin::Same);
+                    }
+                    match find_join_robust(a, b, hint, bands) {
+                        Err(NoJoin::NoOverlap(robust)) => Err(NoJoin::NoOverlap(format!(
+                            "{strict}; with up to {} differing pixels per line allowed: {lenient}; with stretches of lines left out: {robust}",
+                            max_px.max(LENIENT_MIN_PX)
+                        ))),
+                        other => other,
+                    }
+                }
                 other => other,
             }
         }
         other => other,
     }
 }
+
+/// Most of the compared lines of a robust match that may differ.
+const ROBUST_BAD_SHARE: f64 = 0.5;
+/// Most separate stretches of differing lines (a translucent header, a floating button, a
+/// scrollbar thumb).
+const ROBUST_MAX_RUNS: usize = 3;
+/// Lines that carry ink (not one flat colour) that must match exactly, and at least this many
+/// times as many as the ink lines that differ.
+const ROBUST_MIN_INK: usize = 40;
+const ROBUST_INK_RATIO: usize = 1;
+
+/// Whether a line is of one colour only (a blank stretch of page: it matches at every shift and
+/// proves nothing).
+fn flat(l: &[u8]) -> bool {
+    let (first, rest) = l.split_at(4.min(l.len()));
+    rest.as_chunks::<4>().0.iter().all(|p| p == first)
+}
+
+/// The last look at two frames that did not join: a sticky header that is opaque in one frame and
+/// frosted over the scrolled page in the next (its rows differ in every frame pair), and a floating
+/// button (scroll to top, chat) at one corner, each change **whole stretches of lines** by more
+/// than a few pixels, so no per-line tolerance holds them (a real page, https://www.carchargeos.com,
+/// Linux, Nov 16, 2026: `no_overlap` after the first frame).
+///
+/// A shift is believed when the lines that differ are few (at most [`ROBUST_BAD_SHARE`] of the
+/// compared ones, in at most [`ROBUST_MAX_RUNS`] stretches) and every other line matches exactly,
+/// over at least [`ROBUST_MIN_INK`] lines that carry ink, and over at least twice as many of those
+/// as the ones that differ. Lines of one colour prove nothing and do not count. The best shift
+/// has to beat the next clearly (or be the one nearest the expected step), else it is refused:
+/// frames that only look alike (a list whose rows differ by a few pixels, a page that jumped)
+/// have almost no exact lines carrying ink.
+fn find_join_robust(
+    a: &Lines,
+    b: &Lines,
+    hint: Option<usize>,
+    bands: Option<(usize, usize)>,
+) -> Result<Join, NoJoin> {
+    let n = a.count;
+    if a.data == b.data {
+        return Err(NoJoin::Same);
+    }
+    let (header, footer) = match bands {
+        Some((h, f)) => {
+            if (0..h).any(|i| !a.same_line_tol(b, i, 0))
+                || (n - f..n).any(|i| !a.same_line_tol(b, i, 0))
+            {
+                return Err(NoJoin::NoOverlap("a fixed band changed".into()));
+            }
+            (h, f)
+        }
+        None => {
+            let mut h = 0;
+            while h < n && a.same_line_tol(b, h, 0) {
+                h += 1;
+            }
+            let mut f = 0;
+            while f < n - h && a.same_line_tol(b, n - 1 - f, 0) {
+                f += 1;
+            }
+            if (h + f) as f64 > MAX_BAND_SHARE * n as f64 {
+                (0, 0)
+            } else {
+                (h, f)
+            }
+        }
+    };
+    let cw = n - header - footer;
+    let min_ov = MIN_OVERLAP_LINES.max((cw as f64 * MIN_OVERLAP_SHARE) as usize);
+    if cw <= min_ov {
+        return Err(NoJoin::NoOverlap(
+            "too little content between the bands".into(),
+        ));
+    }
+    // (shift, ink lines that match, ink lines that differ)
+    let mut found: Vec<(usize, usize, usize)> = Vec::new();
+    for s in 1..=(cw - min_ov) {
+        let overlap = cw - s;
+        let g = GUARD.min(overlap / 3);
+        let compared = overlap - 2 * g;
+        if compared < ROBUST_MIN_INK {
+            break;
+        }
+        let allowed = (compared as f64 * ROBUST_BAD_SHARE) as usize;
+        // Lines that differ before the first one that matches are the top of the next frame
+        // (a sticky header drawn over the page): they are left out and not counted, as the
+        // overlap of a long step may be little more than the header.
+        let (mut bad, mut runs, mut prev_bad, mut lead) = (0usize, 0usize, false, true);
+        let (mut ink_ok, mut ink_bad) = (0usize, 0usize);
+        let mut ok = true;
+        for i in g..overlap - g {
+            let (ia, ib) = (header + s + i, header + i);
+            let inked = !flat(a.line(ia)) || !flat(b.line(ib));
+            if a.near(ia, b, ib) {
+                // A flat line (blank page) matches at any shift and does not end the header.
+                if inked {
+                    lead = false;
+                }
+                prev_bad = false;
+                if inked {
+                    ink_ok += 1;
+                }
+            } else if lead {
+                prev_bad = true;
+            } else {
+                bad += 1;
+                if !prev_bad {
+                    runs += 1;
+                }
+                prev_bad = true;
+                if inked {
+                    ink_bad += 1;
+                }
+                if bad > allowed || runs > ROBUST_MAX_RUNS {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if ok && ink_ok >= ROBUST_MIN_INK && ink_ok >= ROBUST_INK_RATIO * ink_bad {
+            found.push((s, ink_ok, ink_bad));
+        }
+    }
+    if found.is_empty() {
+        return Err(NoJoin::NoOverlap(
+            "no shift matches even with stretches of lines left out".into(),
+        ));
+    }
+    found.sort_by_key(|c| std::cmp::Reverse(c.1));
+    let top = found[0];
+    let clear = found.get(1).is_none_or(|next| top.1 >= 2 * next.1);
+    let shift = if clear {
+        top.0
+    } else if let Some(h) = hint {
+        // Several shifts fit about as well (repeating content): the expected step may choose,
+        // when exactly one candidate lies within a quarter of it.
+        let wide = (cw / 20).max(2).max(h / 4);
+        let mut near = found.iter().filter(|c| c.0.abs_diff(h) <= wide);
+        match (near.next(), near.next()) {
+            (Some(c), None) => c.0,
+            _ => {
+                return Err(NoJoin::NoOverlap(
+                    "several shifts match with stretches left out and the step names none".into(),
+                ))
+            }
+        }
+    } else {
+        return Err(NoJoin::NoOverlap(
+            "several shifts match with stretches left out and no step is known".into(),
+        ));
+    };
+    Ok(Join {
+        shift,
+        guard: GUARD.min((cw - shift) / 3),
+        header,
+        footer,
+    })
+}
+
+/// Rows between two differing stretches that still count as one.
+const RUN_GAP: usize = 8;
+/// Most separate stretches of differing lines a floating region may make (a card, a status bar).
+const MAX_REGION_RUNS: usize = 3;
+
+/// How many separate stretches the `true` entries form, stretches less than [`RUN_GAP`] apart
+/// counting as one. Floating elements make few; content that only looks alike (a list, numbered
+/// lines) makes one per line or per cell.
+fn stretches(flags: &[bool]) -> usize {
+    let (mut runs, mut since) = (0usize, usize::MAX);
+    for &f in flags {
+        if f {
+            if since == usize::MAX || since > RUN_GAP {
+                runs += 1;
+            }
+            since = 0;
+        } else if since != usize::MAX {
+            since += 1;
+        }
+    }
+    runs
+}
+
+/// A column that differs in at least this share of the lines belongs to the region.
+const REGION_COLUMN_SHARE: f64 = 0.01;
+/// Lines that may still differ outside those columns (the antialiased edge of a status text).
+const REGION_LEFT_SHARE: f64 = 0.06;
+/// Most of the lines that may differ for [`same_but_for_a_region`].
+const REGION_MAX_LINES: f64 = 0.6;
+
+/// Two frames of the same scroll position that differ only in a region: a link preview or a
+/// status bar that the pointer opened (Firefox shows the address of the link under the pointer
+/// at the bottom left, Wikipedia a card over a third of the page). Not a scroll: the lines that
+/// differ are at most [`REGION_MAX_LINES`] of them (a scrolled region differs in all), in at most
+/// [`MASK_MAX_COLUMNS`] of the columns, and outside those columns every line is the same.
+fn same_but_for_a_region(a: &Lines, b: &Lines) -> bool {
+    let cross = a.line_len / 4;
+    if cross < 256 || a.count != b.count {
+        return false;
+    }
+    let differs = |ia: usize, ib: usize, x: usize| {
+        a.line(ia)[x * 4..x * 4 + 4]
+            .iter()
+            .zip(&b.line(ib)[x * 4..x * 4 + 4])
+            .any(|(u, v)| u.abs_diff(*v) > NOISE_TOLERANCE)
+    };
+    let mut bad = vec![0usize; cross];
+    let mut rows_differing = 0usize;
+    let flags: Vec<bool> = (0..a.count).map(|i| !a.near(i, b, i)).collect();
+    if stretches(&flags) > MAX_REGION_RUNS {
+        return false;
+    }
+    for (i, _) in flags.iter().enumerate().filter(|(_, &f)| f) {
+        rows_differing += 1;
+        for (x, c) in bad.iter_mut().enumerate() {
+            if differs(i, i, x) {
+                *c += 1;
+            }
+        }
+    }
+    if rows_differing as f64 > REGION_MAX_LINES * a.count as f64 {
+        return false;
+    }
+    let limit = ((a.count as f64 * REGION_COLUMN_SHARE) as usize).max(3);
+    let masked: Vec<bool> = bad.iter().map(|&c| c > limit).collect();
+    if masked.iter().filter(|&&m| m).count() as f64 > MASK_MAX_COLUMNS * cross as f64 {
+        return false;
+    }
+    let left = (0..a.count)
+        .filter(|&i| !a.near(i, b, i) && (0..cross).any(|x| !masked[x] && differs(i, i, x)))
+        .count();
+    left as f64 <= REGION_LEFT_SHARE * a.count as f64
+}
+
+/// At most this share of the columns may belong to the region (see [`same_but_for_a_region`]).
+const MASK_MAX_COLUMNS: f64 = 0.7;
 
 /// Most candidates whose overlaps are compared pixel by pixel (see [`best_by_difference`]).
 const MAX_SCORED_CANDIDATES: usize = 4096;
@@ -737,12 +1004,35 @@ fn edge_strips(a: &Lines, b: &Lines, core: &Join, max: (usize, usize)) -> Option
     let overlap_rows =
         (core.guard..overlap - core.guard).map(|i| (core.header + core.shift + i, core.header + i));
     let rows: Vec<(usize, usize)> = band_rows.map(|i| (i, i)).chain(overlap_rows).collect();
+    // A row in which more columns differ than the two strips can hold is a stretch that changes as a whole (a translucent
+    // sticky header that is frosted over the scrolled page, a floating banner), not a moving
+    // edge: it would make every column look volatile and the strips as wide as they can be, so
+    // it is left out of the tally.
+    let rows: Vec<(usize, usize)> = rows
+        .into_iter()
+        .filter(|&(ia, ib)| {
+            let (la, lb) = (a.line(ia), b.line(ib));
+            let differing = (0..cross)
+                .filter(|&x| {
+                    la[x * 4..x * 4 + 4]
+                        .iter()
+                        .zip(&lb[x * 4..x * 4 + 4])
+                        .any(|(u, v)| u.abs_diff(*v) > NOISE_TOLERANCE)
+                })
+                .count();
+            differing <= max.0 + max.1 + WIDER_THAN_EDGES
+        })
+        .collect();
     let limit = (rows.len() as f64 * VOLATILE_SHARE) as usize;
     let mut bad = vec![0usize; cross];
     for (ia, ib) in rows {
         let (la, lb) = (a.line(ia), b.line(ib));
         for (x, c) in bad.iter_mut().enumerate() {
-            if la[x * 4..x * 4 + 4] != lb[x * 4..x * 4 + 4] {
+            if la[x * 4..x * 4 + 4]
+                .iter()
+                .zip(&lb[x * 4..x * 4 + 4])
+                .any(|(u, v)| u.abs_diff(*v) > NOISE_TOLERANCE)
+            {
                 *c += 1;
             }
         }
@@ -1202,7 +1492,7 @@ impl Stitcher {
             return (prev, lines);
         }
         let hint = hint.map(|h| h as usize);
-        match find_join(&prev, &lines, hint, None) {
+        match find_join_opt(&prev, &lines, hint, None, false) {
             Ok(_) => {
                 self.trim = Some((0, 0));
                 return (prev, lines);
@@ -1242,6 +1532,11 @@ impl Stitcher {
             }
         }
         let Some((l, r)) = found else {
+            // No edge or side column explains it: the whole width, with stretches of lines that
+            // differ (a translucent header, a floating button) left out of the comparison.
+            if find_join(&prev, &lines, hint, None).is_ok() {
+                self.trim = Some((0, 0));
+            }
             return (prev, lines);
         };
         self.trim = Some((l, r));
