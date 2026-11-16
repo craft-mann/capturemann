@@ -904,7 +904,7 @@ fn vi_1_the_click_guide_start_dialog_is_worded_from_the_catalogue() {
     let rows = |kind: &str| confirm_rows(kind, &details, &typed);
     with_language(Lang::Vi, || {
         let s = confirm_summary("start_guide", &typed, &english);
-        assert!(s.starts_with("Bắt đầu Hướng dẫn theo thao tác"), "{s}");
+        assert!(s.starts_with("Bắt đầu Hướng dẫn thao tác"), "{s}");
         let rows = rows("start_guide");
         let all = format!("{rows:?}");
         for english_word in ["Records", "Target", "Countdown", "mouse clicks only"] {

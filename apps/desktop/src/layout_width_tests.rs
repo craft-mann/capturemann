@@ -737,7 +737,7 @@ fn cases() -> Vec<Case> {
                 .map(|n| t(format!("NavItem::label({n:?})"), move || n.label())),
         ),
     );
-    // The Click Guide name ("Hướng dẫn theo thao tác", 164 px) is longer than the room: the row's
+    // The Click Guide name ("Hướng dẫn thao tác", 164 px) is longer than the room: the row's
     // label shrinks with an ellipsis (`truncate` in `nav_row`) and the full name is the row's
     // tooltip (`nav_entry`). It must still leave room for a few letters and the icon.
     v.push(

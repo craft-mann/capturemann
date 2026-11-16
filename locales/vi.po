@@ -10518,28 +10518,28 @@ msgid "Clear selection"
 msgstr "Bỏ chọn"
 
 msgid "Click Guide"
-msgstr "Hướng dẫn theo thao tác"
+msgstr "Hướng dẫn thao tác"
 
 msgid "Click Guide did not start"
-msgstr "Hướng dẫn theo thao tác không bắt đầu được"
+msgstr "Hướng dẫn thao tác không bắt đầu được"
 
 msgid "Click Guide is not available here"
-msgstr "Hướng dẫn theo thao tác không khả dụng ở đây"
+msgstr "Hướng dẫn thao tác không khả dụng ở đây"
 
 msgid "Click Guide is unavailable"
-msgstr "Hướng dẫn theo thao tác không khả dụng"
+msgstr "Hướng dẫn thao tác không khả dụng"
 
 msgid "Click Guide needs Input Monitoring"
-msgstr "Hướng dẫn theo thao tác cần quyền Giám sát đầu vào"
+msgstr "Hướng dẫn thao tác cần quyền Giám sát đầu vào"
 
 msgid "Click Guide of a window…"
-msgstr "Hướng dẫn theo thao tác cho một cửa sổ…"
+msgstr "Hướng dẫn thao tác cho một cửa sổ…"
 
 msgid "Click Guide only needs to know where you click. Nothing records until you grant access."
-msgstr "Hướng dẫn theo thao tác chỉ cần xác định vị trí bạn nhấp. Ứng dụng chỉ bắt đầu ghi sau khi bạn cấp quyền."
+msgstr "Hướng dẫn thao tác chỉ cần xác định vị trí bạn nhấp. Ứng dụng chỉ bắt đầu ghi sau khi bạn cấp quyền."
 
 msgid "Click Guide · clicks only"
-msgstr "Hướng dẫn theo thao tác · chỉ ghi thao tác nhấp chuột"
+msgstr "Hướng dẫn thao tác · chỉ ghi thao tác nhấp chuột"
 
 msgid "Click a line on the image to keep its real text."
 msgstr "Nhấp vào một dòng trên ảnh để giữ lại văn bản gốc."
@@ -10616,7 +10616,7 @@ msgid "Each change is one undo step. Copy text will read only the kept lines."
 msgstr "Có thể hoàn tác từng thay đổi. Tính năng Sao chép văn bản chỉ đọc những dòng được giữ lại."
 
 msgid "Edit a Click Guide"
-msgstr "Sửa Hướng dẫn theo thao tác"
+msgstr "Sửa Hướng dẫn thao tác"
 
 msgid "Edit image"
 msgstr "Sửa ảnh"
@@ -10634,7 +10634,7 @@ msgid "Export PDF"
 msgstr "Xuất PDF"
 
 msgid "Export a Click Guide"
-msgstr "Xuất Hướng dẫn theo thao tác"
+msgstr "Xuất Hướng dẫn thao tác"
 
 msgid "Export cancelled. The files already written are in the folder."
 msgstr "Đã huỷ xuất. Các tệp đã ghi nằm trong thư mục."
@@ -10808,7 +10808,7 @@ msgid "Never larger than the original unless you allow it"
 msgstr "Kích thước tối đa bằng ảnh gốc, trừ khi bạn cho phép phóng lớn"
 
 msgid "New Click Guide"
-msgstr "Hướng dẫn theo thao tác mới"
+msgstr "Hướng dẫn thao tác mới"
 
 msgid "New board"
 msgstr "Bảng ảnh mới"
@@ -10820,7 +10820,7 @@ msgid "New note step"
 msgstr "Bước ghi chú mới"
 
 msgid "No Click Guides yet"
-msgstr "Chưa có Hướng dẫn theo thao tác nào"
+msgstr "Chưa có Hướng dẫn thao tác nào"
 
 msgid "No picture yet"
 msgstr "Chưa có ảnh"
@@ -10896,7 +10896,7 @@ msgid "Preview"
 msgstr "Xem trước"
 
 msgid "Read a Click Guide"
-msgstr "Đọc Hướng dẫn theo thao tác"
+msgstr "Đọc Hướng dẫn thao tác"
 
 msgid "Reconnect"
 msgstr "Kết nối lại"
@@ -10962,7 +10962,7 @@ msgid "Start Long Shot"
 msgstr "Bắt đầu Chụp dài"
 
 msgid "Start a Click Guide"
-msgstr "Bắt đầu Hướng dẫn theo thao tác"
+msgstr "Bắt đầu Hướng dẫn thao tác"
 
 msgid "Start a guide"
 msgstr "Bắt đầu một hướng dẫn"
@@ -10992,7 +10992,7 @@ msgid "Stop"
 msgstr "Dừng"
 
 msgid "Stop a Click Guide"
-msgstr "Dừng Hướng dẫn theo thao tác"
+msgstr "Dừng Hướng dẫn thao tác"
 
 msgid "Strip"
 msgstr "Dải"
@@ -11317,15 +11317,15 @@ msgstr "Khung"
 
 msgctxt "breadcrumb"
 msgid "Click Guide /"
-msgstr "Hướng dẫn theo thao tác /"
+msgstr "Hướng dẫn thao tác /"
 
 msgctxt "breadcrumb"
 msgid "Click Guides /"
-msgstr "Hướng dẫn theo thao tác /"
+msgstr "Hướng dẫn thao tác /"
 
 msgctxt "capture kind"
 msgid "Click Guide"
-msgstr "Hướng dẫn theo thao tác"
+msgstr "Hướng dẫn thao tác"
 
 msgctxt "card badge"
 msgid "BOARD"
@@ -11393,7 +11393,7 @@ msgstr "Bảng ảnh"
 
 msgctxt "filter chip"
 msgid "Click Guides"
-msgstr "Hướng dẫn theo thao tác"
+msgstr "Hướng dẫn thao tác"
 
 msgctxt "font weight"
 msgid "Bold"
@@ -11473,7 +11473,7 @@ msgstr "Bo tròn"
 
 msgctxt "menu"
 msgid "Click Guide of a window…"
-msgstr "Hướng dẫn theo thao tác cho một cửa sổ…"
+msgstr "Hướng dẫn thao tác cho một cửa sổ…"
 
 msgctxt "menu"
 msgid "Long Shot"
@@ -11481,7 +11481,7 @@ msgstr "Chụp dài"
 
 msgctxt "menu"
 msgid "New Click Guide"
-msgstr "Hướng dẫn theo thao tác mới"
+msgstr "Hướng dẫn thao tác mới"
 
 msgctxt "move area"
 msgid "Moved to"
@@ -11498,11 +11498,11 @@ msgstr "Nguồn"
 #, fuzzy
 msgctxt "navigation"
 msgid "Click Guides"
-msgstr "Hướng dẫn theo thao tác"
+msgstr "Hướng dẫn thao tác"
 
 msgctxt "page title"
 msgid "Click Guide"
-msgstr "Hướng dẫn theo thao tác"
+msgstr "Hướng dẫn thao tác"
 
 msgctxt "panel badge"
 msgid "New in 0.3.4"
@@ -11617,7 +11617,7 @@ msgstr "{name}, phím tắt {chord}"
 #, fuzzy
 msgctxt "capture dock"
 msgid "Click Guide"
-msgstr "Hướng dẫn theo thao tác"
+msgstr "Hướng dẫn thao tác"
 
 # NOTE: added with board S14 (sidebar tiles and agent status); owner review required
 #, fuzzy
@@ -11756,7 +11756,7 @@ msgstr "{window} đã đóng"
 #, fuzzy
 msgid "The Click Guide is paused. Your {n} step is kept."
 msgid_plural "The Click Guide is paused. Your {n} steps are kept."
-msgstr[0] "Hướng dẫn theo thao tác đã tạm dừng. {n} bước của bạn vẫn được giữ."
+msgstr[0] "Hướng dẫn thao tác đã tạm dừng. {n} bước của bạn vẫn được giữ."
 
 #, fuzzy
 msgctxt "window picker for a Click Guide"
@@ -11867,11 +11867,11 @@ msgstr "Ghi lại"
 
 #, fuzzy
 msgid "Start a Click Guide: CaptureMann will take a screenshot of each mouse click (clicks only; keystrokes are never recorded)"
-msgstr "Bắt đầu Hướng dẫn theo thao tác: CaptureMann sẽ chụp ảnh màn hình sau mỗi lần nhấp chuột (chỉ ghi các lần nhấp; không bao giờ ghi phím bấm)"
+msgstr "Bắt đầu Hướng dẫn thao tác: CaptureMann sẽ chụp ảnh màn hình sau mỗi lần nhấp chuột (chỉ ghi các lần nhấp; không bao giờ ghi phím bấm)"
 
 #, fuzzy
 msgid "Start a Click Guide?"
-msgstr "Bắt đầu Hướng dẫn theo thao tác?"
+msgstr "Bắt đầu Hướng dẫn thao tác?"
 
 #, fuzzy
 msgid "Start a new guide to keep going."
