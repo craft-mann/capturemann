@@ -141,3 +141,48 @@ and has not run. No real screen was used, so none of these is called verified.
 Not confirmed: that Page Down gives a join on a console (it moves a whole page, so the overlap may be too small and the
 run then ends `no_overlap` with the frames kept); that `WM_MOUSEWHEEL` posted to conhost scrolls it; that the sidebar
 page of the real run is the scrollbar case (a dump with `CM_LONG_SHOT_DEBUG_DIR` of the refused first pair would tell).
+
+## Real sites on Windows (Edge), lsreal, Nov 16, 2026
+
+Real runs on the lab laptop (Windows 11, 150 %, Edge in a guest profile, `long_shot_hand --auto`, whole window), the frames of every step
+kept with the new **frame trace** and read offline with `long_shot_stitch` and `long_shot_pair`. The first time
+the five pages were run in a window of 1632x1097 px they all stitched; in a window of 1064x782 px (the size of the
+pass-8 runs) four of five ended after one frame, and that is what the causes below are about.
+
+New tools for such runs:
+
+| What | How |
+| --- | --- |
+| Frame trace (Auto scroll only) | `CM_LONG_SHOT_TRACE_DIR=<dir>`: every frame the run looks at is written as `trace-NNN.png`, one line per frame in `trace.txt` says what was asked and what the stitcher answered. A run can then be replayed frame by frame offline: copy the frames that were `Added` into a folder, then `LS_HINT=<expected shift> LS_TRUST=<steady distance> cargo run -p cm-capture --example long_shot_stitch -- <folder> out.png` |
+| Refusal dump | `CM_LONG_SHOT_DEBUG_DIR` now also writes the pair **the step made** before the ladder moves the page again (the pair dumped when the run ends is the last one the ladder looked at, often a frame equal to the last one), and up to 60 sets per process (was 12: the pass-8 runs of Wikipedia and docs.rs were the 13th and 14th refusals of a long-lived `cm-desktop`) |
+| One pair | `cargo run --release -p cm-capture --example long_shot_pair -- last.png next.png <header> <footer> <left trim> <right trim>` (`LS_TOL=<n>` per-channel tolerance): for every shift, the share of overlapping rows that differ and of inked rows that match, and the runs of rows that differ at the best shift |
+
+| Finding | Cause | Fix | Test |
+| --- | --- | --- | --- |
+| Wikipedia, YouTube, docs.rs, paulgraham.com: `no_overlap` after 1 frame, 3 of 3 (pass 8) | **Edge's wheel moved the page 600 px for a request of 234 px** (whole notches of 300 px at this window size; the request is 30 % of the area, so the first step has no learned distance). The pair has 108 lines in common, the lower half of the browser toolbar differs (a focus ring) and the overlap holds too few lines with ink. The first pair had no way back: the scroll-back ladder was for later pairs only | The first pair gets the scroll-back ladder too (back by half a step, equal to the first frame means the step is tried halved) | `lsreal_a_first_step_that_overshoots_is_scrolled_back_and_joined` (fails with `NoOverlap` for a wheel that moves 2.5 times what is asked) |
+| After that rescue the next step overshoots again (YouTube) | The join found after a scroll back taught nothing, so the next request was sized for a wheel that moves what is asked | A rescue raises the learned distance to the net distance it saw (never lowers it) | not reproduced by the fake (the test above passes with or without it); seen in the real traces: 424 px asked after the rescue, 165 after |
+| paulgraham.com: `reached_end` after 12 frames of a page of more than 16,000 px (silent loss) | `same_but_for_a_region` called a scroll of 300 px "the same frame": a narrow column of text with wide blank gaps differs in two stretches of rows and only in the columns of the text, like a link preview card | A region is believed only when most of the inked rows are equal unshifted (a card leaves the page as it was, a scroll moves every inked row) | `lsreal_a_scroll_of_a_sparse_page_is_not_one_position_with_a_region` (fails with the share set to 0) |
+| The end of a page believed after one step that moved nothing | A lost wheel event ends the run at once | After a step that moved nothing on a page that had scrolled, one more step is made before `reached_end` | `lsreal_one_lost_wheel_step_is_not_the_end_of_the_page` (fails without it, partial image) |
+| carchargeos.com in the small window: 8 frames, then `no_overlap` | A pair of two frames 300 px apart (the smallest wheel step) with a translucent sticky header over the top and cards that reveal themselves at the bottom of the first frame: few lines in common, in clean stretches | The shift the step names is looked at on 20 inked lines when it is the only one that fits near the step (a quarter either way), what differs may be up to 65 % of the lines and 4 inked lines per matching one, and blank lines that match between differing ones do not end a stretch (a card's text lines) | `lsreal_a_short_match_is_believed_only_at_the_shift_the_step_names`, `lsreal_lines_that_differ_with_blank_lines_between_them_are_one_stretch` (both fail without) |
+| the same page, 19 frames | The same pair with a steady wheel (the last three joins moved the content by exactly 300 px) and 7 lines of its own: the vertical borders of the cards match at every shift, so the usual look cannot tell 300 from 298 | `Stitcher::trust_hint(distance)`: when the last three joins moved the same distance (within 1 %), a pair that does not join is looked at once more for the shift whose inked lines match there and **not 8 px to either side** (at least 6 of them, twice as many as at any shift that is not just beside it, over the whole range, and within 2 px of the usual distance) | `lsreal_a_steady_wheel_names_the_shift_of_a_pair_with_little_in_common` (a distance the content did not move by is refused: the borders match there too), `lsreal_a_wheel_that_moved_the_same_distance_three_times_is_steady` |
+| "Reached the size limit of 50 megapixels" for 1048x16383 | `limit_kind` called an image 1 row short of 16,384 px a 50 megapixel stop | an image within 64 rows of the length limit stopped at it | `ls_4_the_limit_note_names_the_limit_that_was_met` (extended) |
+| `cap_6_stop_keeps_the_frames_so_far` failed on main | counted calls of `stop`, which the run now asks more often (after each join, while it looks again at the same place) | asserts what matters: what was taken is kept, row for row | the test itself |
+
+Not fixed, and why:
+
+- **YouTube in the small window (2 frames).** After the tab bar becomes sticky a pair 300 px apart has no exact shift: the card thumbnails
+  and the text under them are 1 to 3 px off from the first frame's, not by one rigid shift (the best shift leaves 78 % of the rows differing,
+  also with 24 per channel of tolerance). A scroll back lands 1 px away from the last frame. Probably a layout shift of the page (images
+  loading, sticky chips), which no per-line comparison joins. In a 1632x1097 px window (an Edge profile with the sync dialog over the page) YouTube stitched (31 frames); in a 1614x1011 px guest window it ended after 2 frames like the small one.
+- **carchargeos.com in the small window, after 19 frames** (6182 px): a pair with a frosted header over a dark image, the next heading
+  not yet drawn at the bottom of the first frame and little else in common: 5 lines of its own, fewer than the 6 the trusted look
+  needs. The run ends `no_overlap`, frames kept.
+- The fixed left and right sidebars with a scrollbar fixture, and the classic console, were not run (time).
+- A guest Edge profile is needed for such runs (`--guest`): a profile that Edge signs in to the Windows account shows a modal "We are now syncing" dialog over the page, dims every frame and blocks the wheel in a small window (`nothing_scrolled`). Move the console window of the harness out of the way too (it covered the page).
+
+## Real sites on Linux (Firefox, X11), lsreal
+
+| Finding | Cause | Fix | Test |
+| --- | --- | --- | --- |
+| Wikipedia: `no_overlap` after 7 to 10 frames (about 4600 px) | The run trims the scroll bar's edge columns (trim 0, 4) after its first pair. The page's contents list and appearance panel become fixed later; their lines are at other rows in every shifted overlap. The side-column mask (`join_masked`) only worked for a run with no trim or a whole-width trim, so this run never tried it. At the shift of the true join the middle column matches exactly (0 rows differ with 250 px masked each side) | `join_masked_trimmed`: the columns that stay put in the pair are left out of the comparison only (`mask_extra`), the rows are still composed from the trimmed frames (the image keeps its width; the panels show once per slice) | `lsreal_panels_that_stay_put_are_left_out_of_the_comparison_of_a_trimmed_run` (fails with `NoOverlap` without it) |
+

@@ -124,9 +124,14 @@ pub enum LimitKind {
     Editor,
 }
 
+/// Rows an image may be short of the length limit and still have stopped at it.
+const LIMIT_SLACK_PX: u32 = 64;
+
 /// The limit behind a stop at `len` px along the scroll direction.
 pub fn limit_kind(limits: Limits, len: u32) -> LimitKind {
-    if len < limits.max_len {
+    // An image a few rows short of the length limit stopped at it (a real Edge run: 1048x16383
+    // said "50 megapixels" for a 17 MP image).
+    if len.saturating_add(LIMIT_SLACK_PX) < limits.max_len {
         LimitKind::Pixels
     } else if limits.max_len < MAX_LONG_SIDE {
         LimitKind::MaxPx
@@ -435,7 +440,27 @@ fn find_join_opt(
                     if same_but_for_a_region(a, b) {
                         return Err(NoJoin::Same);
                     }
-                    match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK) {
+                    let robust_result =
+                        match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK, Prior::Off) {
+                            // A shift the step names, on fewer lines (see `ROBUST_HINTED_MIN_INK`).
+                            Err(NoJoin::NoOverlap(why)) => match hint {
+                                Some(_) => find_join_robust(
+                                    a,
+                                    b,
+                                    hint,
+                                    bands,
+                                    ROBUST_HINTED_MIN_INK,
+                                    Prior::Near,
+                                )
+                                .map_err(|e| match e {
+                                    NoJoin::NoOverlap(_) => NoJoin::NoOverlap(why),
+                                    other => other,
+                                }),
+                                None => Err(NoJoin::NoOverlap(why)),
+                            },
+                            other => other,
+                        };
+                    match robust_result {
                         Err(NoJoin::NoOverlap(robust)) => {
                             // A column that scrolls by another amount than the text (a table
                             // beside it at a fraction of a pixel, a card the pointer opened):
@@ -458,6 +483,20 @@ fn find_join_opt(
     }
 }
 
+/// What the step says about where the join is, for [`find_join_robust`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Prior {
+    /// Nothing is assumed.
+    Off,
+    /// The step is a guess within a quarter either way: the shift is looked for there only, on
+    /// fewer lines (see `ROBUST_HINTED_MIN_INK`).
+    Near,
+    /// The wheel has moved the same distance for the last few steps (see
+    /// `Stitcher::trust_hint`): the hint is that distance and the shift is looked for within a
+    /// couple of px of it.
+    Trusted,
+}
+
 /// Most of the compared lines of a robust match that may differ.
 const ROBUST_BAD_SHARE: f64 = 0.5;
 /// Most separate stretches of differing lines (a translucent header, a floating button, a
@@ -466,6 +505,22 @@ const ROBUST_MAX_RUNS: usize = 3;
 /// Lines that carry ink (not one flat colour) that must match exactly, and at least this many
 /// times as many as the ink lines that differ.
 const ROBUST_MIN_INK: usize = 40;
+/// Ink lines that must match when the step names the shift (the learned wheel distance times the
+/// asked step): the shift is looked for only near it and must be the only one that fits. For a
+/// pair with little left in common: a translucent header at the top, a card that reveals itself
+/// as it scrolls into view at the bottom, a few lines of text between (a real page, Windows
+/// Edge, carchargeos.com, Nov 16, 2026: 85 matching rows of 354).
+const ROBUST_HINTED_MIN_INK: usize = 20;
+/// With a trusted distance, the shifts looked at are within this many px of it.
+const TRUSTED_WIDE_PX: usize = 2;
+/// ... and the inked lines that tell a shift from the one this many px beside it, at least this
+/// many of them.
+const TRUSTED_NEIGHBOUR_PX: usize = 8;
+const TRUSTED_MIN_DISTINCT: usize = 6;
+/// Share of the compared lines that may differ when the step names the shift.
+const ROBUST_HINTED_BAD_SHARE: f64 = 0.65;
+/// Most inked lines that may differ per inked line that matches, when the step names the shift.
+const ROBUST_HINTED_BAD_PER_OK: usize = 4;
 const ROBUST_INK_RATIO: usize = 1;
 
 /// Whether a line is of one colour only (a blank stretch of page: it matches at every shift and
@@ -494,7 +549,9 @@ fn find_join_robust(
     hint: Option<usize>,
     bands: Option<(usize, usize)>,
     min_ink: usize,
+    prior: Prior,
 ) -> Result<Join, NoJoin> {
+    let near_hint = prior != Prior::Off;
     let n = a.count;
     if a.data == b.data {
         return Err(NoJoin::Same);
@@ -533,14 +590,27 @@ fn find_join_robust(
     }
     // (shift, ink lines that match, ink lines that differ)
     let mut found: Vec<(usize, usize, usize)> = Vec::new();
-    for s in 1..=(cw - min_ov) {
+    // Only the shifts the step names: a quarter of it either way, as the tie-break below does.
+    let window = match (prior, hint) {
+        (Prior::Near, Some(h)) => {
+            let wide = (cw / 20).max(2).max(h / 4);
+            h.saturating_sub(wide).max(1)..=(h + wide).min(cw - min_ov)
+        }
+        _ => 1..=(cw - min_ov),
+    };
+    for s in window {
         let overlap = cw - s;
         let g = GUARD.min(overlap / 3);
         let compared = overlap - 2 * g;
         if compared < min_ink {
             break;
         }
-        let allowed = (compared as f64 * ROBUST_BAD_SHARE) as usize;
+        let share = if near_hint {
+            ROBUST_HINTED_BAD_SHARE
+        } else {
+            ROBUST_BAD_SHARE
+        };
+        let allowed = (compared as f64 * share) as usize;
         // Lines that differ before the first one that matches are the top of the next frame
         // (a sticky header drawn over the page): they are left out and not counted, as the
         // overlap of a long step may be little more than the header.
@@ -555,7 +625,12 @@ fn find_join_robust(
                 if inked {
                     lead = false;
                 }
-                prev_bad = false;
+                // When the step names the shift, a blank line that matches between differing
+                // ones does not end the stretch (a card still drawing: its text lines differ,
+                // the gaps between them are blank in both).
+                if inked || !near_hint {
+                    prev_bad = false;
+                }
                 if inked {
                     ink_ok += 1;
                 }
@@ -576,7 +651,17 @@ fn find_join_robust(
                 }
             }
         }
-        if ok && ink_ok >= min_ink && ink_ok >= ROBUST_INK_RATIO * ink_bad {
+        // The step names the shift: what differs may outweigh what matches (a header and a
+        // card still drawing are most of a short overlap), but not by more than 4 to 1.
+        let outweighed = if prior == Prior::Trusted {
+            // The lines of the shift's own are what counts (below), not how many differ.
+            false
+        } else if near_hint {
+            ink_ok * ROBUST_HINTED_BAD_PER_OK < ink_bad
+        } else {
+            ink_ok < ROBUST_INK_RATIO * ink_bad
+        };
+        if ok && ink_ok >= min_ink && !outweighed {
             found.push((s, ink_ok, ink_bad));
         }
     }
@@ -584,6 +669,49 @@ fn find_join_robust(
         return Err(NoJoin::NoOverlap(
             "no shift matches even with stretches of lines left out".into(),
         ));
+    }
+    if prior == Prior::Trusted {
+        // Lines that match at every shift (a vertical edge, a card's border) prove nothing, so
+        // the shift is believed only on the inked lines that match there and not a few px to
+        // either side: the lines that tell this shift from its neighbours.
+        let distinct = |s: usize| -> usize {
+            let overlap = cw - s;
+            let g = GUARD.min(overlap / 3);
+            let end = n - footer;
+            (g..overlap - g)
+                .filter(|&i| {
+                    let (ia, ib) = (header + s + i, header + i);
+                    let at = |ia: usize| ia < end && a.near(ia, b, ib);
+                    (!flat(a.line(ia)) || !flat(b.line(ib)))
+                        && at(ia)
+                        && !at(ia + TRUSTED_NEIGHBOUR_PX)
+                        && !at(ia.wrapping_sub(TRUSTED_NEIGHBOUR_PX))
+                })
+                .count()
+        };
+        let mut scored: Vec<(usize, usize)> = found.iter().map(|c| (distinct(c.0), c.0)).collect();
+        scored.sort_unstable_by_key(|c| std::cmp::Reverse(*c));
+        let (lines, shift) = scored[0];
+        // The distance the wheel always moved by, and the shift with the most lines of its own
+        // anywhere (the whole range is looked at: a page that repeats every so many px would
+        // match at the usual distance whatever the wheel did this time), clearly more of them
+        // than any shift that is not just beside it.
+        let near_usual = hint.is_some_and(|d| shift.abs_diff(d) <= TRUSTED_WIDE_PX);
+        let clear = scored
+            .iter()
+            .filter(|c| c.1.abs_diff(shift) > TRUSTED_NEIGHBOUR_PX + 2)
+            .all(|c| lines >= 2 * c.0);
+        if lines < TRUSTED_MIN_DISTINCT || !near_usual || !clear {
+            return Err(NoJoin::NoOverlap(
+                "no shift has lines of its own at the distance the wheel always moves by".into(),
+            ));
+        }
+        return Ok(Join {
+            shift,
+            guard: GUARD.min((cw - shift) / 3),
+            header,
+            footer,
+        });
     }
     found.sort_by_key(|c| std::cmp::Reverse(c.1));
     let top = found[0];
@@ -665,7 +793,7 @@ fn find_join_banded(
         if (moving as f64) < BANDED_MIN_MOVING * (n - header - footer) as f64 {
             continue;
         }
-        if let Ok(j) = find_join_robust(&ac, &bc, hint, bands, BANDED_MIN_INK) {
+        if let Ok(j) = find_join_robust(&ac, &bc, hint, bands, BANDED_MIN_INK, Prior::Off) {
             // The lines the shift was believed on have to differ from each other: rows that
             // repeat (a list of alike rows, tinted stripes) match at many shifts, and the band
             // of columns that leaves out what tells them apart cannot say which is the true one.
@@ -714,6 +842,9 @@ const REGION_COLUMN_SHARE: f64 = 0.01;
 const REGION_LEFT_SHARE: f64 = 0.06;
 /// Most of the lines that may differ for [`same_but_for_a_region`].
 const REGION_MAX_LINES: f64 = 0.6;
+/// Share of the lines that carry ink in either frame that must be equal, unshifted, for two frames
+/// to be one position drawn differently in a region (see [`same_but_for_a_region`]).
+const REGION_MIN_INKED_EQUAL: f64 = 0.5;
 
 /// Two frames of the same scroll position that differ only in a region: a link preview or a
 /// status bar that the pointer opened (Firefox shows the address of the link under the pointer
@@ -746,6 +877,24 @@ fn same_but_for_a_region(a: &Lines, b: &Lines) -> bool {
         }
     }
     if rows_differing as f64 > REGION_MAX_LINES * a.count as f64 {
+        return false;
+    }
+    // A scroll moves the inked rows: few of them are the same unshifted. A card or a status bar
+    // leaves the page as it was, so most of its inked rows are equal. (A narrow column of text
+    // with wide blank gaps differs in few stretches and few columns too, and was called the same
+    // frame after a scroll: paulgraham.com, Windows Edge, Nov 16, 2026, `reached_end` after 12
+    // frames of a page of more than 16,000 px.)
+    let (mut inked, mut inked_equal) = (0usize, 0usize);
+    for i in 0..a.count {
+        if flat(a.line(i)) && flat(b.line(i)) {
+            continue;
+        }
+        inked += 1;
+        if a.near(i, b, i) {
+            inked_equal += 1;
+        }
+    }
+    if (inked_equal as f64) < REGION_MIN_INKED_EQUAL * inked as f64 {
         return false;
     }
     let limit = ((a.count as f64 * REGION_COLUMN_SHARE) as usize).max(3);
@@ -1365,6 +1514,14 @@ pub struct Stitcher {
     /// The rows the last joined frame put into the content: `(first row of the frame, one past
     /// the last)`, for [`Stitcher::refresh_last`].
     last_add: Option<(usize, usize)>,
+    /// The distance the wheel has moved the content every time for the last few steps (see
+    /// [`Stitcher::trust_hint`]).
+    trust_hint: Option<usize>,
+    /// Columns at the two ends of the trimmed frames that are left out of the comparison only,
+    /// the rows of the image still being composed from the trimmed frames (side panels that stay
+    /// put once the page is scrolled further than the first pair was: Wikipedia's contents list
+    /// and appearance panel, Linux Firefox, Nov 16, 2026; see `join_masked_trimmed`).
+    mask_extra: Option<(usize, usize)>,
 }
 
 #[cfg(test)]
@@ -1372,6 +1529,12 @@ impl Stitcher {
     /// Test only: the state a run is in after a first pair that joined on the whole width.
     pub(super) fn assume_whole_width(&mut self) {
         self.trim = Some((0, 0));
+    }
+
+    /// Test only: the state a run is in after a first pair that joined with `l` and `r` columns
+    /// cut at the two ends of every frame.
+    pub(super) fn assume_trim(&mut self, l: usize, r: usize) {
+        self.trim = Some((l, r));
     }
 }
 
@@ -1393,7 +1556,17 @@ impl Stitcher {
             limit_hit: false,
             refusal: None,
             last_add: None,
+            trust_hint: None,
+            mask_extra: None,
         }
+    }
+
+    /// Says that the wheel has moved the content by exactly `distance` px at each of the last few
+    /// steps (a browser scrolls whole notches of a fixed size, whatever is asked). A pair that
+    /// does not join otherwise is then looked at once more, at the shifts within a couple of px of
+    /// that distance, on fewer matching lines. Stays as set until it is set again.
+    pub fn trust_hint(&mut self, distance: Option<u32>) {
+        self.trust_hint = distance.map(|d| d as usize);
     }
 
     /// The lines `frame` is on from the last accepted one when it would join it (and is not the
@@ -1544,7 +1717,17 @@ impl Stitcher {
         let (prev, lines) = self.apply_trim(prev, lines, hint);
         let mut full = self.full.take();
         let pair = full.as_ref().zip(whole.as_ref());
-        let outcome = self.join(&prev, &lines, size, hint, pair);
+        let outcome = match (self.mask_extra, &full) {
+            (Some((l, r)), None) => self.join_with_mask(&prev, &lines, (l, r), size, hint),
+            _ => self.join(&prev, &lines, size, hint, pair),
+        };
+        if outcome == PushOutcome::NoOverlap && full.is_none() && self.mask_extra.is_none() {
+            if let Some((o, mask)) = self.join_masked_trimmed(&prev, &lines, size, hint) {
+                self.mask_extra = Some(mask);
+                self.prev = Some(lines);
+                return o;
+            }
+        }
         // A join that fails after the first pair: an overlay scrollbar that was not there in the
         // first pair (or that was narrower) draws a thumb over the outermost columns, which then
         // differ in every line it covers, in the content and in the fixed bands alike (QA macOS
@@ -1602,6 +1785,87 @@ impl Stitcher {
         // The newest accepted frame is the one the next frame is matched against.
         self.prev = Some(if added { lines } else { prev });
         outcome
+    }
+
+    /// Whether the last refusal says that several shifts match or the overlap is too little or too
+    /// alike: such a pair is not made joinable by leaving columns out, which only makes it more
+    /// alike (see `join_masked`).
+    fn refusal_is_ambiguous(&self) -> bool {
+        self.refusal.as_deref().is_some_and(|r| {
+            [
+                "shifts match",
+                "shifts explain",
+                "several shifts",
+                "far from the expected",
+                "only look alike",
+            ]
+            .iter()
+            .any(|k| r.contains(k))
+        })
+    }
+
+    /// [`Stitcher::join`] on the trimmed frames with `mask` columns at the two ends left out of the
+    /// comparison; the rows are composed from the trimmed frames.
+    fn join_with_mask(
+        &mut self,
+        prev: &Lines,
+        lines: &Lines,
+        mask: (usize, usize),
+        size: (u32, u32),
+        hint: Option<u32>,
+    ) -> PushOutcome {
+        let cross = lines.line_len / 4;
+        let (l, r) = mask;
+        if prev.line_len != lines.line_len || cross.saturating_sub(l + r) < MIN_COMPARED_COLS {
+            return PushOutcome::NoOverlap;
+        }
+        let (pc, nc) = (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
+        let fs = FullSides {
+            l,
+            r,
+            prev: prev.clone(),
+        };
+        self.join(&pc, &nc, size, hint, Some((&fs, lines)))
+    }
+
+    /// [`Stitcher::push`]'s look at a pair that did not join when the run trims the edge columns
+    /// of its frames (a scroll bar): columns that stay put in this pair (a contents list and a
+    /// panel that the page pinned after the first pair was looked at, the overlay scrollbar's
+    /// edges) are left out of the comparison, and the rows are still composed from the trimmed
+    /// frames, whose width the image so far has. Returns the outcome with the mask when the pair
+    /// joined; the mask is then kept for the pairs after it.
+    fn join_masked_trimmed(
+        &mut self,
+        prev: &Lines,
+        lines: &Lines,
+        size: (u32, u32),
+        hint: Option<u32>,
+    ) -> Option<(PushOutcome, (usize, usize))> {
+        let cross = lines.line_len / 4;
+        let trimmed = matches!(self.trim, Some((l, r)) if (l, r) != (0, 0));
+        if self.dir != Direction::Vertical
+            || !trimmed
+            || self.limit_hit
+            || self.size != Some(size)
+            || prev.line_len != lines.line_len
+            || cross < 4 * (OVERLAY_EDGE_LEFT + 16)
+        {
+            return None;
+        }
+        let mut masks = vec![(OVERLAY_EDGE_LEFT, OVERLAY_EDGE_RIGHT)];
+        if !self.refusal_is_ambiguous() {
+            masks.extend(masked_sides(prev, lines));
+        }
+        for mask in masks {
+            let o = self.join_with_mask(prev, lines, mask, size, hint);
+            if matches!(
+                o,
+                PushOutcome::Added { .. } | PushOutcome::LimitReached { .. }
+            ) {
+                return Some((o, mask));
+            }
+        }
+        None
     }
 
     /// [`Stitcher::push`]'s second look at a pair that did not join: with at least
@@ -1793,7 +2057,19 @@ impl Stitcher {
         let hint = hint.map(|h| h as usize);
         let n = lines.count;
         let line_len = src.line_len;
-        let join = match find_join(prev, lines, hint, self.bands) {
+        let found = match (find_join(prev, lines, hint, self.bands), self.trust_hint) {
+            (Err(NoJoin::NoOverlap(why)), Some(d)) => find_join_robust(
+                prev,
+                lines,
+                Some(d),
+                self.bands,
+                ROBUST_HINTED_MIN_INK,
+                Prior::Trusted,
+            )
+            .map_err(|_| NoJoin::NoOverlap(why)),
+            (other, _) => other,
+        };
+        let join = match found {
             Ok(j) => j,
             Err(NoJoin::Same) => return PushOutcome::NoChange,
             Err(NoJoin::NoOverlap(why)) => {
@@ -2037,4 +2313,42 @@ fn box_rows<'a>(
 /// `box_rows` over one contiguous RGBA buffer.
 fn box_scale(rgba: &[u8], w: usize, h: usize, scale: f64, max_h: usize) -> Option<Frame> {
     box_rows(&|i| &rgba[i * w * 4..(i + 1) * w * 4], h, w, scale, max_h)
+}
+
+#[cfg(test)]
+mod region_tests {
+    use super::*;
+
+    /// Short paragraphs in a narrow column with wide blank gaps, the page at `pos`.
+    fn sparse(pos: usize, status_bar: bool) -> Frame {
+        let (w, h) = (600usize, 300usize);
+        let mut data = Vec::with_capacity(w * h * 4);
+        for i in 0..h {
+            let y = pos + i;
+            let mut line = vec![255u8; w * 4];
+            if y % 200 < 60 {
+                for x in 100..340 {
+                    let v = ((y * 31 + x * 17) ^ (x >> 1)) % 251;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[v as u8, (v / 2) as u8, 20, 255]);
+                }
+            }
+            if status_bar && i >= 280 {
+                for x in 0..200 {
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[10, 10, 10, 255]);
+                }
+            }
+            data.extend_from_slice(&line);
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    }
+
+    /// Windows Edge, paulgraham.com (Nov 16, 2026): a scroll of 200 px on a sparse text page
+    /// differs in two stretches of rows and in the columns of the text only, like a card; it is
+    /// not "the same frame". A status bar over the same position still is.
+    #[test]
+    fn lsreal_a_scroll_of_a_sparse_page_is_not_one_position_with_a_region() {
+        let at = |pos, bar| Lines::from_frame(&sparse(pos, bar), Direction::Vertical);
+        assert!(!same_but_for_a_region(&at(0, false), &at(200, false)));
+        assert!(same_but_for_a_region(&at(0, false), &at(0, true)));
+    }
 }

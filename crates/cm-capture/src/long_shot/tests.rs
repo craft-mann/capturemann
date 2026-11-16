@@ -147,7 +147,10 @@ fn cap_6_stop_keeps_the_frames_so_far() {
     )
     .unwrap();
     assert_eq!(r.end, EndReason::StoppedByUser);
-    assert_eq!(r.image.frames, 4);
+    // The run asks `stop` more often than once a frame (after each join, while it looks again at
+    // the same place), so how many frames fit in three calls is not the point: what was taken is
+    // kept, row for row.
+    assert!(r.image.frames >= 2, "{} frames", r.image.frames);
     let kept = r.image.frame.height();
     assert_eq!(r.image.frame, page.expected_range(0, kept));
 }
@@ -1369,8 +1372,14 @@ fn ls_4_the_limit_note_names_the_limit_that_was_met() {
         EndReason::LimitReached.note_for(wide, 12_500).unwrap(),
         "Reached the size limit of 50 megapixels"
     );
-    // Only the product limit is "the longest image CaptureMann can edit".
+    // Only the product limit is "the longest image CaptureMann can edit"; an image a row or two
+    // short of it stopped there (Edge, 1048x16383, was called a 50 megapixel stop).
     assert_eq!(limit_kind(wide, MAX_LONG_SIDE), LimitKind::Editor);
+    assert_eq!(limit_kind(wide, MAX_LONG_SIDE - 1), LimitKind::Editor);
+    assert_eq!(
+        limit_kind(Limits::with_max_px(Some(1000)), 999),
+        LimitKind::MaxPx
+    );
     assert_eq!(
         EndReason::LimitReached
             .note_for(wide, MAX_LONG_SIDE)
@@ -2714,4 +2723,401 @@ fn ls_seam_a_band_that_is_drawn_late_is_in_the_image() {
     let r = auto_with(&mut src, &mut sc);
     assert_eq!(r.end, EndReason::ReachedEnd);
     assert_eq!(r.image.frame, page.expected());
+}
+
+// ---- Real sites, Windows Edge, Nov 16, 2026 (lsreal): one frame, `no_overlap`, on every page ----
+
+/// The page position a [`Overlaid`] source is told by [`FirstBig`].
+type PosCell = std::rc::Rc<std::cell::Cell<u32>>;
+
+/// A wheel whose first step moves `first` times what was asked (Edge on Windows at 150 %: a
+/// request of 234 px moved 600) and later ones `later` times, and that scrolls back by the same
+/// gain as it scrolls forward, in whole notches of `notch` px at least.
+struct FirstBig {
+    view: fake::PageView,
+    pos: PosCell,
+    first: f64,
+    later: f64,
+    scrolls: u32,
+    notch: u32,
+    backs: u32,
+}
+
+impl FirstBig {
+    fn moved(&self, amount_px: u32, gain: f64) -> u32 {
+        (((f64::from(amount_px) * gain) / f64::from(self.notch)).round() as u32).max(1) * self.notch
+    }
+}
+
+impl Scroller for FirstBig {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.scrolls += 1;
+        let gain = if self.scrolls == 1 {
+            self.first
+        } else {
+            self.later
+        };
+        let by = self.moved(amount_px, gain);
+        self.view.scroll(d, by)?;
+        self.pos.set(self.pos.get() + by);
+        Ok(())
+    }
+    fn scroll_back(&mut self, _: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.backs += 1;
+        let by = self.moved(amount_px, self.later);
+        self.view.back(by);
+        self.pos.set(self.pos.get().saturating_sub(by));
+        Ok(true)
+    }
+}
+
+/// The first pair: the wheel moved the page 2.5 times as far as asked, so only a sliver of the
+/// first frame is left, and the lower half of the browser's toolbar (a focus ring on a button)
+/// changed with the scroll. The pair does not join: the overlap is too short to rest a join on
+/// (the ring's rows differ in it). The driver scrolls back, as it does for a later pair, and the
+/// join is found at the shift that leaves an overlap. (Windows, Edge, Wikipedia, YouTube,
+/// docs.rs, paulgraham.com: `no_overlap` after the first frame, 3 of 3 runs, with a pair 600 px
+/// apart in a 708 px content area.)
+#[test]
+fn lsreal_a_first_step_that_overshoots_is_scrolled_back_and_joined() {
+    let ring = |pos: u32, w: u32, _h: u32, data: &mut [u8]| {
+        if pos > 0 {
+            for y in 20..40 {
+                for x in (w / 2)..(w / 2 + 40) {
+                    let i = ((y * w + x) * 4) as usize;
+                    data[i..i + 4].copy_from_slice(&[30, 30, 120, 255]);
+                }
+            }
+        }
+    };
+    for first in [2.0, 2.5, 3.0] {
+        let page = SyntheticPage::new(300, 3000, 300).with_bands(40, 0);
+        let view = page.clone().view();
+        let pos = PosCell::default();
+        let mut src = Overlaid {
+            view: view.clone(),
+            pos: pos.clone(),
+            over: ring,
+        };
+        let mut sc = FirstBig {
+            view,
+            pos,
+            first,
+            later: 1.5,
+            scrolls: 0,
+            notch: 15,
+            backs: 0,
+        };
+        let r = auto_with(&mut src, &mut sc);
+        assert_eq!(r.end, EndReason::ReachedEnd, "first {first}");
+        assert_eq!(r.image.frame, page.expected(), "first {first}");
+        // The rescue of the first pair taught that the wheel moves more than asked, so the
+        // steps after it do not overshoot again.
+        assert!(sc.backs <= 3, "first {first}: {} scroll backs", sc.backs);
+    }
+}
+
+/// A pair with little left in common: a translucent sticky header over the top of the next frame,
+/// and, at the bottom of the first, content that had not been drawn yet (a card that reveals
+/// itself as it scrolls into view), so that only a short stretch of the overlap matches. A real
+/// page, Windows Edge, carchargeos.com, Nov 16, 2026: 85 matching rows of 354, below the 40 inked
+/// lines a join needs. The shift the step names is believed on 20 lines when it is the only one
+/// that fits near the step; a step that names another place is not.
+#[test]
+fn lsreal_a_short_match_is_believed_only_at_the_shift_the_step_names() {
+    let page = SyntheticPage::new(300, 3000, 400)
+        .with_bands(30, 0)
+        .with_frosted_header(60);
+    let first = {
+        let f = page.frame_at(0);
+        let (w, h) = (f.width() as usize, f.height() as usize);
+        let mut data = f.rgba().to_vec();
+        // Rows 320 to 400 not drawn yet: one flat colour.
+        for y in 320..h {
+            for x in 0..w {
+                let i = (y * w + x) * 4;
+                data[i..i + 4].copy_from_slice(&[250, 250, 252, 255]);
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let next = page.frame_at(200);
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&first, None);
+    let got = s.push(&next, Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
+    // The same pair with a step that names another place is never believed.
+    for wrong in [60, 380] {
+        let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+        s.push(&first, None);
+        assert_eq!(
+            s.push(&next, Some(wrong)),
+            PushOutcome::NoOverlap,
+            "{wrong}"
+        );
+    }
+}
+
+/// A page of short paragraphs in a narrow column with wide blank gaps (paulgraham.com, Windows
+/// Edge, Nov 16, 2026): two frames 300 px apart differ in a few stretches of rows and in the
+/// columns of the text only, which is also what a hover card or a status bar looks like at one
+/// scroll position. The pair was called "the same frame", the run ended `reached_end` after 12
+/// frames of a page of more than 16,000 px, and nothing said that the end was not the end. A
+/// pair whose rows mostly differ because the inked rows moved is a scroll, not a region.
+#[test]
+fn lsreal_a_sparse_text_page_that_scrolled_is_not_the_same_frame() {
+    let (w, h) = (600usize, 300usize);
+    let row = |y: usize| -> Vec<u8> {
+        let mut line = vec![255u8; w * 4];
+        if y % 200 < 60 {
+            for x in 100..340 {
+                let v = ((y * 31 + x * 17) ^ (x >> 1)) % 251;
+                let i = x * 4;
+                line[i..i + 4].copy_from_slice(&[v as u8, (v / 2) as u8, 20, 255]);
+            }
+        }
+        line
+    };
+    // A floating button in the bottom right corner whose pixels follow the position (a shadow
+    // over what scrolls under it): it keeps the exact look from matching.
+    let frame_at = |pos: usize| {
+        let mut data: Vec<u8> = (0..h).flat_map(|i| row(pos + i)).collect();
+        for y in 262..h {
+            for x in 540..590 {
+                let i = (y * w + x) * 4;
+                let v = ((pos * 7 + y * 3 + x) % 200) as u8;
+                data[i..i + 4].copy_from_slice(&[v, v, 200, 255]);
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&frame_at(0), None);
+    let got = s.push(&frame_at(200), Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
+    // The same position with a status bar drawn over the bottom rows is still the same frame.
+    let mut bar = frame_at(0).rgba().to_vec();
+    for y in 280..300 {
+        for x in 0..200 {
+            let i = (y * w + x) * 4;
+            bar[i..i + 4].copy_from_slice(&[10, 10, 10, 255]);
+        }
+    }
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&frame_at(0), None);
+    let bar = Frame::new(w as u32, h as u32, bar).unwrap();
+    assert_eq!(s.push(&bar, Some(200)), PushOutcome::NoChange);
+}
+
+/// A wheel event that is lost in the middle of a page (a step that moved nothing) is not the end
+/// of the content: the end is believed after one more step. (Windows, Edge, paulgraham.com,
+/// Nov 16, 2026: `reached_end` after 12 frames of a page of more than 16,000 px.)
+#[test]
+fn lsreal_one_lost_wheel_step_is_not_the_end_of_the_page() {
+    struct Lossy {
+        view: fake::PageView,
+        calls: u32,
+        lose: u32,
+    }
+    impl Scroller for Lossy {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.calls += 1;
+            if self.calls == self.lose {
+                return Ok(());
+            }
+            self.view.scroll(d, amount_px)
+        }
+    }
+    for lose in [3, 5, 8] {
+        let page = SyntheticPage::new(40, 12 * 300, 300);
+        let view = page.clone().view();
+        let mut src = view.clone();
+        let mut sc = Lossy {
+            view,
+            calls: 0,
+            lose,
+        };
+        let r = auto_with(&mut src, &mut sc);
+        assert_eq!(r.end, EndReason::ReachedEnd, "lose {lose}");
+        assert_eq!(r.image.frame, page.expected(), "lose {lose}");
+    }
+}
+
+/// As above, with the text lines of the card that was still drawing separated by blank lines that
+/// match (a card's text lines are not one block): the blank lines between do not end the
+/// stretch of lines that differ.
+#[test]
+fn lsreal_lines_that_differ_with_blank_lines_between_them_are_one_stretch() {
+    let page = SyntheticPage::new(300, 3000, 400)
+        .with_bands(30, 0)
+        .with_frosted_header(60);
+    let flat = [250u8, 250, 252, 255];
+    let first = {
+        let f = page.frame_at(0);
+        let (w, h) = (f.width() as usize, f.height() as usize);
+        let mut data = f.rgba().to_vec();
+        for y in 320..h {
+            for x in 0..w {
+                let i = (y * w + x) * 4;
+                data[i..i + 4].copy_from_slice(&flat);
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let next = {
+        let f = page.frame_at(200);
+        let (w, h) = (f.width() as usize, f.height() as usize);
+        let mut data = f.rgba().to_vec();
+        // Where the first frame has nothing yet, the card's text lines: three lines of text,
+        // three blank ones (the same as the first frame's), and so on.
+        for y in 120..h {
+            if (y / 3) % 2 == 0 {
+                for x in 0..w {
+                    let i = (y * w + x) * 4;
+                    data[i..i + 4].copy_from_slice(&flat);
+                }
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&first, None);
+    let got = s.push(&next, Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
+}
+
+/// A page of cards (vertical borders on every line, short text blocks every 25 lines) whose next
+/// frame has a translucent header over its top and whose first frame had not drawn the bottom
+/// cards yet. The borders match at every shift, so on a few text lines the join cannot be told
+/// from its neighbours by the usual look. When the wheel has moved the content by exactly 250 px at
+/// each of the last steps, the shift 250 is believed on the lines of its own; a distance the
+/// content did not move by is not (the borders match there as well). A real page, Windows Edge,
+/// carchargeos.com, Nov 16, 2026: 7 lines of its own, the wheel's notches 300 px each time.
+#[test]
+fn lsreal_a_steady_wheel_names_the_shift_of_a_pair_with_little_in_common() {
+    let (w, h) = (600usize, 400usize);
+    let frame_at = |pos: usize, unrevealed_from: usize| {
+        let mut data = Vec::with_capacity(w * h * 4);
+        for i in 0..h {
+            let y = pos + i;
+            let mut line = vec![250u8; w * 4];
+            // Card borders: the same on every line.
+            for x in [50usize, 51, 548, 549] {
+                line[x * 4..x * 4 + 4].copy_from_slice(&[120, 120, 130, 255]);
+            }
+            // Text lines of a card, every 25 lines, four lines tall.
+            if y % 25 < 4 && i < unrevealed_from {
+                for x in 100..400 {
+                    let v = ((y * 31 + x * 17) ^ (x >> 1)) % 251;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[v as u8, (v / 2) as u8, 20, 255]);
+                }
+            }
+            // A translucent header over the top of every later frame: another look each time.
+            if pos > 0 && i < 40 {
+                for x in 0..w {
+                    let v = ((pos * 13 + i * 7 + x * 3) % 90) as u8;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[160 + v, 160 + v, 170, 255]);
+                }
+            }
+            // A floating button at the bottom right whose shadow follows the position.
+            if i >= h - 30 {
+                for x in 520..580 {
+                    let v = ((pos * 5 + i * 3 + x) % 100) as u8;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[30, 60 + v, 200, 255]);
+                }
+            }
+            data.extend_from_slice(&line);
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let first = frame_at(0, 330);
+    let next = frame_at(250, h);
+    for (distance, joins) in [(Some(250), true), (Some(180), false), (None, false)] {
+        let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+        s.push(&first, None);
+        s.trust_hint(distance);
+        let got = s.push(&next, Some(250));
+        if joins {
+            assert_eq!(
+                got,
+                PushOutcome::Added { new_len: 250 },
+                "{:?}",
+                s.last_refusal()
+            );
+        } else {
+            assert_eq!(got, PushOutcome::NoOverlap, "{distance:?}");
+        }
+    }
+}
+
+/// Side panels that stay put (Wikipedia's contents list and appearance panel, Linux Firefox, Nov 16,
+/// 2026: `no_overlap` at 7 to 10 frames, the panels' text at other rows in every shifted overlap).
+/// The run trimmed the scrollbar's edge columns after its first pair, which joined without
+/// the panels being in the way; a later pair has them, with list items and gaps between them (many
+/// stretches of lines that differ), and the trimmed run refused it. The columns of the panels are
+/// left out of the comparison only; the rows are composed from the trimmed frames as before, so
+/// the image keeps its width, and the columns between the panels are the page row for row.
+#[test]
+fn lsreal_panels_that_stay_put_are_left_out_of_the_comparison_of_a_trimmed_run() {
+    let page = SyntheticPage::new(420, 4000, 300).with_scrollbar(14);
+    let framed = |pos: u32| {
+        let f = page.frame_at(pos);
+        let (w, h) = (f.width(), f.height());
+        let mut data = f.rgba().to_vec();
+        for y in 0..h {
+            // List items ten lines tall with ten blank lines between them, the same in every
+            // frame (fixed to the window).
+            for x in (0..90).chain(w - 100..w - 14) {
+                let v = ((y / 20 * 37 + y * 29 + x * 11) % 200) as u8;
+                let i = ((y * w + x) * 4) as usize;
+                let px = if y % 20 < 10 {
+                    [40 + v / 2, 40, 90 + v / 2, 255]
+                } else {
+                    [250, 250, 250, 255]
+                };
+                data[i..i + 4].copy_from_slice(&px);
+            }
+        }
+        Frame::new(w, h, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&framed(1000), None);
+    s.assume_trim(0, 14);
+    let got = s.push(&framed(1200), Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
+    let got = s.push(&framed(1410), Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 210 },
+        "{:?}",
+        s.last_refusal()
+    );
+    let image = s.finish().unwrap().frame;
+    let want = page.expected_range(1000, 1000 + 300 + 200 + 210);
+    assert_eq!(image.height(), want.height());
+    for y in 0..image.height() {
+        for x in 100..(want.width() - 114) {
+            assert_eq!(image.pixel(x, y), want.pixel(x, y), "({x}, {y})");
+        }
+    }
 }

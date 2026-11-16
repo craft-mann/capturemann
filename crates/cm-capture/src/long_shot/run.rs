@@ -108,6 +108,19 @@ fn progress(s: &Stitcher) -> LongShotProgress {
     }
 }
 
+/// The distance the last three joins all moved the content by (within 1 %), if they did: a browser
+/// that scrolls whole notches of a fixed size does, whatever is asked. Then a pair with little in
+/// common is looked at near that distance (see `Stitcher::trust_hint`).
+fn steady_distance(seen: &[f64]) -> Option<u32> {
+    const STEADY_JOINS: usize = 3;
+    const STEADY_SPREAD: f64 = 0.01;
+    let last = seen.len().checked_sub(STEADY_JOINS).map(|i| &seen[i..])?;
+    let (lo, hi) = last
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)));
+    (hi - lo <= STEADY_SPREAD * hi).then_some(hi.round() as u32)
+}
+
 /// The shift expected from asking for `step`, given what a step has moved so far.
 fn expected(step: u32, gain: f64) -> u32 {
     ((f64::from(step) * gain).round() as u32).max(1)
@@ -184,6 +197,7 @@ pub fn run_auto_ex(
     sleeper.sleep(FIRST_FRAME_WARMUP);
     let first = settle_frame(src, sleeper, cfg.settle)?;
     stitcher.push(&first.frame, None);
+    super::debug::trace(&first.frame, "first frame");
     {
         on_progress(progress(&stitcher));
         on_stitch(&stitcher);
@@ -195,6 +209,9 @@ pub fn run_auto_ex(
     // expected shift of a step, which breaks ties between equally good overlaps.
     let mut gain = 1.0f64;
     let mut learned = 0u32;
+    // The distance the last joins moved the content, to see whether the wheel moves the same
+    // every time (see `Stitcher::trust_hint`).
+    let mut seen_recent: Vec<f64> = Vec::new();
     // Share of the content a step asks for. It shrinks every time a step needed the scroll-back
     // ladder: a wheel that moves more for a big request than for the small first one (macOS
     // Chrome, Nov 16, 2026: 480 px moved 480, 1140 px moved about 1355) overshoots the overlap
@@ -218,7 +235,17 @@ pub fn run_auto_ex(
         }
         scroller.scroll(cfg.direction, step)?;
         let mut next = settled!('run, settle_frame(src, sleeper, cfg.settle));
+        stitcher.trust_hint(steady_distance(&seen_recent));
         let mut outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+        stitcher.trust_hint(None);
+        super::debug::trace(
+            &next.frame,
+            &format!(
+                "step {step} (expected shift {}, frames {}) -> {outcome:?}",
+                expected(step, gain),
+                stitcher.frames()
+            ),
+        );
         // The first pair that does not join: the screen may still be changing for another
         // reason than the scroll (a window coming to the front, a dialog fading out). Looked at
         // again, waiting longer each time, before the run is given up.
@@ -232,6 +259,10 @@ pub fn run_auto_ex(
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
             next = settled!('run, settle_frame(src, sleeper, cfg.settle));
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+            super::debug::trace(
+                &next.frame,
+                &format!("first pair looked at again ({retry}) -> {outcome:?}"),
+            );
         }
         // A later pair that does not join: scroll back by half a step and look again before the
         // run is given up (the scroller moved more than asked, or the overlap that is left is
@@ -243,6 +274,22 @@ pub fn run_auto_ex(
         // is known again, and the content moved further than a step can safely ask: the step is
         // sent again halved, up to `SMALLER_STEPS` times, and the distance it teaches counts from
         // that position.
+        if outcome == PushOutcome::NoOverlap && !window_changed(src, &stitcher, &next.frame) {
+            // The pair the step made, before the ladder moves the page again: the pair that is
+            // dumped when the run ends is the last one the ladder looked at, often a frame equal
+            // to the last (Windows, Edge, Nov 16, 2026: the refused frame of a dump was
+            // pixel-identical to the last one and said nothing about the failing step).
+            super::debug::dump_refused(
+                &last_ok,
+                &next.frame,
+                stitcher.last_refusal(),
+                &format!(
+                    "auto scroll, the pair the step of {step} px made (expected shift {}, {} frames so far)",
+                    expected(step, gain),
+                    stitcher.frames()
+                ),
+            );
+        }
         let mut asked = step;
         let mut back_total = 0u32;
         let mut retry = 0;
@@ -251,8 +298,11 @@ pub fn run_auto_ex(
         let mut at_last = false;
         // What the next scroll back asks: half a step, or what the last forward try moved.
         let mut back_amt = ((f64::from(step) * BACK_SHARE) as u32).max(1);
+        // The first pair too (Windows, Edge, Nov 16, 2026: a request of 234 px moved 600, past
+        // all but a sliver of the first frame, and every real page ended after one frame): a
+        // scroll back lands on a known place as soon as it joins the first frame or equals it.
         while outcome == PushOutcome::NoOverlap
-            && stitcher.frames() > 1
+            && stitcher.frames() >= 1
             && retry < NO_OVERLAP_RETRIES + 2 * SMALLER_STEPS
             && !stop()
             && !window_changed(src, &stitcher, &next.frame)
@@ -272,6 +322,10 @@ pub fn run_auto_ex(
                 sleeper.sleep(LATE_SCROLL_WAIT);
                 next = settled!('run, settle_frame(src, sleeper, cfg.settle));
                 outcome = stitcher.push(&next.frame, Some(expected(fwd, gain)));
+                super::debug::trace(
+                    &next.frame,
+                    &format!("smaller step {fwd} (try {smaller}) -> {outcome:?}"),
+                );
                 continue;
             }
             // Two scroll backs of half a step each, then (after a smaller step that failed) one
@@ -289,6 +343,10 @@ pub fn run_auto_ex(
             // No expected shift: how far the scroll-back moved is no better known than how far
             // the step did, and a wrong prior would pick one of several alike overlaps.
             outcome = stitcher.push(&next.frame, None);
+            super::debug::trace(
+                &next.frame,
+                &format!("scrolled back by {back_amt} (retry {retry}) -> {outcome:?}"),
+            );
             // Back where the last frame was taken is not the end of the content: the position
             // is known again, and the step is tried smaller.
             if outcome == PushOutcome::NoChange {
@@ -307,6 +365,20 @@ pub fn run_auto_ex(
             sleeper.sleep(LATE_SCROLL_WAIT);
             next = settled!('run, settle_frame(src, sleeper, cfg.settle));
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+        }
+        // The end of the content is believed after a second scroll: a wheel event can be lost
+        // (the window lost the pointer for a moment, a page was busy), and one step that moved
+        // nothing ended a page of more than 16,000 px after 12 frames (Windows, Edge,
+        // paulgraham.com, Nov 16, 2026). The page's real end moves nothing again.
+        if outcome == PushOutcome::NoChange && stitcher.frames() > 1 && !stop() {
+            scroller.scroll(cfg.direction, step)?;
+            sleeper.sleep(LATE_SCROLL_WAIT);
+            next = settled!('run, settle_frame(src, sleeper, cfg.settle));
+            outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+            super::debug::trace(
+                &next.frame,
+                &format!("the end looked at after one more step of {step} -> {outcome:?}"),
+            );
         }
         if outcome == PushOutcome::NoChange && stitcher.frames() == 1 {
             // The first scroll moved nothing. A fresh window can ignore the wheel for a moment
@@ -484,6 +556,16 @@ pub fn run_auto_ex(
                     share =
                         (share * OVERSHOOT_SHARE_FACTOR).max(MIN_STEP_SHARE.min(cfg.step_fraction));
                 }
+                if back_total > 0 {
+                    // A join found after scrolling back teaches the distance only roughly (the
+                    // scroll back is no better known than the step that overshot), but it says
+                    // the wheel moves at least this much per px asked, net of what was taken
+                    // back: the next step must not be sized as if it moved less (Windows, Edge:
+                    // after the first pair was rescued the next request moved past the overlap
+                    // again, YouTube ended `no_overlap` after 2 frames).
+                    let seen = (f64::from(new_len) / f64::from(asked)).clamp(0.25, 4.0);
+                    gain = gain.max(seen);
+                }
                 if back_total == 0 {
                     let seen = (f64::from(new_len) / f64::from(asked)).clamp(0.25, 4.0);
                     gain = if learned == 0 {
@@ -492,6 +574,7 @@ pub fn run_auto_ex(
                         (gain + seen) / 2.0
                     };
                     learned += 1;
+                    seen_recent.push(f64::from(new_len));
                 }
                 let moved_per_asked = gain;
                 // 80 % of what actually scrolls: the area without the fixed bands.
@@ -745,4 +828,19 @@ pub fn run_hand_ex(
         image: stitcher.finish()?,
         end,
     })
+}
+
+#[cfg(test)]
+mod steady_tests {
+    use super::steady_distance;
+
+    #[test]
+    fn lsreal_a_wheel_that_moved_the_same_distance_three_times_is_steady() {
+        assert_eq!(steady_distance(&[300.0, 300.0, 300.0]), Some(300));
+        assert_eq!(steady_distance(&[450.0, 300.0, 300.0, 300.0]), Some(300));
+        assert_eq!(steady_distance(&[300.0, 300.0]), None);
+        assert_eq!(steady_distance(&[300.0, 150.0, 300.0]), None);
+        assert_eq!(steady_distance(&[300.0, 300.0, 303.5]), None);
+        assert_eq!(steady_distance(&[]), None);
+    }
 }
