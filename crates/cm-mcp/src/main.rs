@@ -18,8 +18,34 @@ fn usage() -> ExitCode {
     ExitCode::from(2)
 }
 
-#[tokio::main]
-async fn main() -> ExitCode {
+/// The server runs on a worker thread of a runtime with 8 MB stacks and not on the main thread:
+/// a debug build of the 89-tool server overflowed the 1 MB main-thread stack of Windows
+/// (`thread 'main' has overflowed its stack`, CI, Nov 16, 2026), and polling the future on the
+/// main thread keeps it on that stack.
+fn main() -> ExitCode {
+    let rt = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(8 * 1024 * 1024)
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("cm-mcp: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    rt.block_on(async {
+        match tokio::spawn(run()).await {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("cm-mcp: {e}");
+                ExitCode::FAILURE
+            }
+        }
+    })
+}
+
+async fn run() -> ExitCode {
     let mut endpoint = Endpoint::from_env_or_default();
     let mut http = false;
     let mut port: u16 = 0;

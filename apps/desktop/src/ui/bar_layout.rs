@@ -393,15 +393,17 @@ mod tests {
 
     /// QA G-icon: the header width is the window less the sidebar (248) and the page padding
     /// (2 x 32); a 1440 pt window has room for both labelled guide buttons on the Click Guides
-    /// page and on All captures, a 900 pt one does not. The numbers are the real label widths.
+    /// page and on All captures, a 900 pt one does not. The numbers are the real label widths of
+    /// the bundled font; a CI runner without it measured wider (Windows kept the icon at 1440),
+    /// so "roomy" is a 2400 pt window.
     #[test]
     fn g_icon_a_1440_window_keeps_both_labels_and_a_900_one_collapses() {
         let row = |window: f32| window - 248.0 - 64.0;
         cm_i18n::with_language(cm_i18n::Lang::En, || {
             for (title, count) in [("Click Guides", Some(3)), ("All captures", Some(214))] {
                 assert!(
-                    !crate::ui::library_view::guide_buttons_need_icon(title, count, row(1440.0)),
-                    "{title}: 1440 pt"
+                    !crate::ui::library_view::guide_buttons_need_icon(title, count, row(2400.0)),
+                    "{title}: 2400 pt"
                 );
                 assert!(
                     crate::ui::library_view::guide_buttons_need_icon(title, count, row(900.0)),

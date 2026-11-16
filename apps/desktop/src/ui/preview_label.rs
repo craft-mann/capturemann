@@ -257,8 +257,8 @@ pub fn url_encode(s: &str) -> String {
 /// The GitHub issue form for feedback on a preview: the feature's name and the app version are
 /// filled in; no logs, screenshots or paths are attached.
 pub fn feedback_url(feature_name: &str, version: &str) -> String {
-    let title = format!("Preview feedback: {feature_name}");
-    let body = format!("Feature: {feature_name} (preview)\nApp version: {version}\n\nWhat works, and what does not:\n");
+    let title = format!("Preview feedback: {feature_name}"); // i18n-ignore: issue text for the maintainers, English
+    let body = format!("Feature: {feature_name} (preview)\nApp version: {version}\n\nWhat works, and what does not:\n"); // i18n-ignore: issue text for the maintainers, English
     format!(
         "{ISSUES_NEW}?title={}&body={}&labels=preview",
         url_encode(&title),

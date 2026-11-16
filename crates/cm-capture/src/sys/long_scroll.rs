@@ -15,7 +15,10 @@
 
 use cm_core::CmError;
 
-use crate::long_shot::{Direction, Scroller};
+use crate::long_shot::Scroller;
+// Only the macOS and Windows scrollers name a direction (an unused import fails clippy on Linux).
+#[cfg(any(target_os = "macos", windows))]
+use crate::long_shot::Direction;
 
 /// Whether Auto scroll can be offered on this system right now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
