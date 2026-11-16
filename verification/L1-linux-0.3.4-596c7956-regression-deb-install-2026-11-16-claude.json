@@ -1,0 +1,85 @@
+{
+  "cases": [
+    {
+      "area": "linux",
+      "duration_ms": 11358,
+      "evidence": [
+        "/home/trung/lab/capturemann_0.3.4_amd64.deb version 0.3.4",
+        "/opt/capturemann/lib/capturemann/capturemann --version: capturemann 0.3.4",
+        "documents checked in /usr/share/doc/capturemann"
+      ],
+      "id": "linux.deb_install",
+      "message": "",
+      "needs": [
+        "installer"
+      ],
+      "specs": [
+        "PKG-deb",
+        "packaging/linux/build-deb.sh"
+      ],
+      "status": "PASS",
+      "tier": "full",
+      "title": "the .deb installs, its programs find their libraries and run, remove and purge leave nothing"
+    }
+  ],
+  "run": {
+    "commit": "596c7956",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-16T14:28:44Z",
+    "flags": "--tier full --out /home/trung/lab/regress-out/20261116T142828Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen --only linux.deb_install --installer /home/trung/lab/capturemann_0.3.4_amd64.deb --commit 596c7956",
+    "gpu": "Intel Corporation WhiskeyLake-U GT2 [UHD Graphics 620]",
+    "hashes": [
+      [
+        "capturemann",
+        "0c29e0307e59be6f1b016a5b4d02ab6f486a904f091f471b1e8c5d8c02982b07"
+      ],
+      [
+        "cm-mcp",
+        "f153a8b4cd736364478b6279145011aa1119e7f3e88e5925612d9b0fd591998b"
+      ],
+      [
+        "cm-daemon",
+        "6deecf3392ba649c459a544d6e4750792c233b42a1628a9ceb0b2d7d6a886dc7"
+      ],
+      [
+        "cm-desktop",
+        "dd79a10d73fda9fc973ea484ccd80e63044a5eaa04b4ef033d420491a7236d11"
+      ],
+      [
+        "cm-overlay",
+        "b76dce3f8e5fb5db71eadb4880568ca710dd950f52b5859276efb3151ac0553a"
+      ],
+      [
+        "ffmpeg",
+        "6899a667eaea231e9a3512112d31b7e70373537ac132ebec91e57b09e015a1d4"
+      ],
+      [
+        "ffprobe",
+        "2ac4f2794ce5f7f231a3459644fbaac5a28d0a9cd7a2c21e24fe35356429527e"
+      ],
+      [
+        "llama-server",
+        "e18b9918b4fe200ca481fed4878d234933cf6604dbcd899f77983ebb714f8c49"
+      ],
+      [
+        "capturemann_0.3.4_amd64.deb",
+        "2dac7de94cd4654c431ba577a22ecd8fa6471126cfa9aa88b632c849b7b5bcb4"
+      ]
+    ],
+    "os": "Linux 7.0.0-43-generic x86_64",
+    "package_dir": "/home/trung/.local/lib/capturemann",
+    "platform": "linux",
+    "started": "2026-11-16T14:28:28Z",
+    "tier": "full",
+    "verdict": "PARTIAL",
+    "version": "0.3.4",
+    "who": "cm-regress via regress.sh"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 0,
+    "pass": 1,
+    "skip": 0,
+    "total": 1
+  }
+}
