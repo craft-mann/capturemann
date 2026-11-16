@@ -3,7 +3,7 @@
 //! background sheet. Layout and wording follow the 0.3.4 design spec (boards S4 to S7); the
 //! behaviour is in `crate::editor::state::touch`. Not looked at on a screen yet.
 
-use super::panels::{info_note, new_pill};
+use super::panels::info_note;
 use super::*;
 use crate::editor::state::touch::{BlueprintInfo, FieldClick, LensInfo, MoveInfo, RetypeInfo};
 use crate::editor::tools::WEIGHTS;
@@ -657,8 +657,7 @@ impl EditorView {
                                             .text_size(px(type_scale::BODY))
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child(SharedString::from(tr!("Blueprint"))),
-                                    )
-                                    .child(new_pill(t)),
+                                    ),
                             )
                             .child(
                                 div()
