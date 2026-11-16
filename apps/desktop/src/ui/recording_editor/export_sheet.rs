@@ -549,6 +549,7 @@ impl RecordingEditor {
                 .items_center()
                 .justify_center()
                 .bg(rgba_of(t.modal_scrim))
+                .occlude()
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(|this, _, _, cx| {

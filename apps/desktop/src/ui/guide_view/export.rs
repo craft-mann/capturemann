@@ -382,6 +382,8 @@ pub fn sheet(t: &Theme, ex: &ExportState, cx: &mut Context<GuideView>) -> gpui::
         .items_center()
         .justify_center()
         .bg(rgba_of(t.modal_scrim))
+        // The scrim takes hover and clicks, so the guide editor behind stays still.
+        .occlude()
         .child(card)
         .into_any_element()
 }

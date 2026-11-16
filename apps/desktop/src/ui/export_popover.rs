@@ -1089,6 +1089,7 @@ impl Render for ExportPopoverView {
                 .items_center()
                 .justify_center()
                 .bg(rgba_of(t.modal_scrim))
+                .occlude()
                 .child(panel)
                 .into_any_element()
         } else {
