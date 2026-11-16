@@ -128,9 +128,9 @@ fn width(
         parts.push(PAUSE);
     }
     if esc_hint {
-        parts.push(
-            KEYCAP_PAD + est("Esc", 12.0, true) + HINT_GAP + est(&t.esc, 12.0, false) + HINT_PAD,
-        );
+        // i18n-ignore: the name of the Esc key
+        let esc = est("Esc", 12.0, true);
+        parts.push(KEYCAP_PAD + esc + HINT_GAP + est(&t.esc, 12.0, false) + HINT_PAD);
     }
     FRAME + parts.iter().sum::<f64>() + GAP * (parts.len() - 1) as f64
 }

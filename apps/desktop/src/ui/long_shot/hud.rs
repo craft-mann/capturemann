@@ -445,7 +445,7 @@ impl Render for LongHud {
                     .whitespace_nowrap()
                     .text_size(px(type_scale::CAPTION))
                     .text_color(rgba_of(t.text_3))
-                    .child(keycap(&t, "Esc"))
+                    .child(keycap(&t, "Esc")) // i18n-ignore: the name of the Esc key
                     .child(SharedString::from(tr!("to stop"))),
             );
         }

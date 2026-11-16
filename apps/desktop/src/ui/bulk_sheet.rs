@@ -847,6 +847,7 @@ fn run_panel(t: &Theme, _s: &BulkSheet, run: &Run, _app: &Entity<AppModel>) -> A
                     .child(
                         div()
                             .flex_1()
+                            .min_w(px(0.))
                             .text_color(rgba_of(t.warning))
                             .child(SharedString::from(reason_text(&k.reason))),
                     )

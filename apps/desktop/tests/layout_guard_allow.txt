@@ -10,7 +10,6 @@ L1|src/ui/launcher_window.rs|div().flex_1().child("CaptureMann")  # untranslated
 
 # Badges drawn over a thumbnail: absolute, content-sized, a word or a platform name.
 L2|src/ui/library_view.rs|label  # REC / SHOT badge on a thumbnail, content-sized
-L2|src/ui/published_view.rs|SharedString::from(platform.to_owned())  # platform name chip on a poster
 
 # The 60 fps self-test bar is content-sized: the window follows the bar, not the other way round.
 L2|src/ui/recording/hud.rs|SharedString::from(label)  # self-test status, mono, sized to its text
@@ -20,3 +19,15 @@ L2|src/ui/recording_editor/panels.rs|tr_ctx!("breadcrumb", "Recordings")  # one 
 
 # The zoom region label inside the zoom lane is "1.5x" style numbers; the block is overflow_hidden.
 L2|src/ui/recording_editor/view_cards.rs|SharedString::from(label)  # zoom factor, clipped by its block
+
+# 0.3.4: labels in rows whose other side is content-sized, a short word or a platform name; the row
+# is as wide as its content or its parent truncates it (checked in the layout width tests s17_* / s20_*).
+L2|src/ui/editor_view/touch_panels.rs|tr_ctx!("lens setting", "Connector")  # row label beside a switch, justify_between
+L2|src/ui/editor_view/touch_panels.rs|tr_ctx!("lens setting", "Zoom badge")  # row label beside a switch, justify_between
+L2|src/ui/guide_view/export.rs|SharedString::from(label)  # checkbox label on its own row
+L2|src/ui/guide_view/hud.rs|text  # bar text: the bar measures it and collapses by rule (s17_*)
+L2|src/ui/library_view.rs|SharedString::from(crate::published::platform_pill(r))  # platform name on a thumbnail pill, content-sized
+L2|src/ui/library_view.rs|SharedString::from(tr!("Upload waiting for sign-in"))  # chip over a card, content-sized
+L2|src/ui/library_view.rs|tr!("Reconnect")  # menu item, the menu is as wide as its widest item
+L2|src/ui/library_view.rs|tr!("Cancel upload")  # menu item, the menu is as wide as its widest item
+L2|src/ui/recording/details.rs|SharedString::from(state.text)  # one-line status in a content-sized row

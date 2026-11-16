@@ -1252,7 +1252,7 @@ impl GuideView {
                     .items_center()
                     .gap(px(10.))
                     .child(badge(t, SharedString::from(s.label.clone())))
-                    .child(div().flex_1().child(self.step_title.clone())),
+                    .child(div().flex_1().min_w(px(0.)).child(self.step_title.clone())),
             )
             .child(self.step_note.clone());
         if let Some((_, im)) = self

@@ -516,6 +516,7 @@ impl EditorView {
                 .child(
                     div()
                         .flex_1()
+                        .min_w(px(0.))
                         .h(px(scale::CONTROL_H))
                         .flex()
                         .items_center()
