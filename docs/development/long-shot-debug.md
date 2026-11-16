@@ -173,8 +173,16 @@ Not fixed, and why:
 - **YouTube in the small window (2 frames).** After the tab bar becomes sticky a pair 300 px apart has no exact shift: the card thumbnails
   and the text under them are 1 to 3 px off from the first frame's, not by one rigid shift (the best shift leaves 78 % of the rows differing,
   also with 24 per channel of tolerance). A scroll back lands 1 px away from the last frame. Probably a layout shift of the page (images
-  loading, sticky chips), which no per-line comparison joins. In the big window YouTube stitched (31 frames, header 204).
+  loading, sticky chips), which no per-line comparison joins. In a 1632x1097 px window (an Edge profile with the sync dialog over the page) YouTube stitched (31 frames); in a 1614x1011 px guest window it ended after 2 frames like the small one.
 - **carchargeos.com in the small window, after 19 frames** (6182 px): a pair with a frosted header over a dark image, the next heading
   not yet drawn at the bottom of the first frame and little else in common: 5 lines of its own, fewer than the 6 the trusted look
   needs. The run ends `no_overlap`, frames kept.
 - The fixed left and right sidebars with a scrollbar fixture, and the classic console, were not run (time).
+- A guest Edge profile is needed for such runs (`--guest`): a profile that Edge signs in to the Windows account shows a modal "We are now syncing" dialog over the page, dims every frame and blocks the wheel in a small window (`nothing_scrolled`). Move the console window of the harness out of the way too (it covered the page).
+
+## Real sites on Linux (Firefox, X11), lsreal
+
+| Finding | Cause | Fix | Test |
+| --- | --- | --- | --- |
+| Wikipedia: `no_overlap` after 7 to 10 frames (about 4600 px) | The run trims the scroll bar's edge columns (trim 0, 4) after its first pair. The page's contents list and appearance panel become fixed later; their lines are at other rows in every shifted overlap. The side-column mask (`join_masked`) only worked for a run with no trim or a whole-width trim, so this run never tried it. At the shift of the true join the middle column matches exactly (0 rows differ with 250 px masked each side) | `join_masked_trimmed`: the columns that stay put in the pair are left out of the comparison only (`mask_extra`), the rows are still composed from the trimmed frames (the image keeps its width; the panels show once per slice) | `lsreal_panels_that_stay_put_are_left_out_of_the_comparison_of_a_trimmed_run` (fails with `NoOverlap` without it) |
+
