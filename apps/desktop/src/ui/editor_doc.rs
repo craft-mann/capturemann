@@ -1338,7 +1338,12 @@ impl EditorDoc {
                 crate::ui::field_style::canvas::is_light_image(lum)
             })
         };
-        let text = self.state.text.clone().map(|t| {
+        let retype_x = self.state.retype_edit_origin_x();
+        let text = self.state.text.clone().map(|mut t| {
+            // A retype is drawn from the widened, aligned box, not from the recognized box.
+            if let Some(x) = retype_x {
+                t.at.x = x;
+            }
             let m = &mut self.state.metrics;
             let lh = m.line_height(t.size);
             let byte = t

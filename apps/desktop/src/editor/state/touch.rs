@@ -697,7 +697,7 @@ impl EditorState {
     /// A text wider than its box widens the box (the fill with it) instead of being cut: to the
     /// right for left-aligned text, to the left for right-aligned, both ways for centred, kept
     /// inside the picture (ANN-9).
-    fn fit_retype(&self, mut kind: OpKind) -> OpKind {
+    pub(super) fn fit_retype(&self, mut kind: OpKind) -> OpKind {
         let Some((w, _)) = cm_render::touchup::retype_text_extent(&kind) else {
             return kind;
         };
@@ -719,6 +719,27 @@ impl EditorState {
         let x = (r.x - left).clamp(0.0, (max_w - need).max(0.0));
         *rect = Rc::new(x, r.y, need, r.h);
         kind
+    }
+
+    /// Where the text of the retype being typed starts (image px, the x the renderer lays it
+    /// out from): it follows the widened box and the alignment, so the caret and the selection
+    /// sit on the drawn text, not on the unwidened box. `None` when no retype is open.
+    pub fn retype_edit_origin_x(&self) -> Option<f64> {
+        let t = self.text.as_ref()?;
+        if !matches!(t.target, TextTarget::Retype { .. }) {
+            return None;
+        }
+        let kind = self.fit_retype(t.kind());
+        let w = cm_render::touchup::retype_text_extent(&kind).map_or(0.0, |(w, _)| w);
+        let OpKind::Retype { rect, align, .. } = &kind else {
+            return None;
+        };
+        let n = rect.normalized();
+        Some(match align {
+            TextAlign::Left => n.x,
+            TextAlign::Center => n.x + (n.w - w) / 2.0,
+            TextAlign::Right => n.x + n.w - w,
+        })
     }
 
     /// What the Retype panel shows: the text being typed, the selected retype, or the tool's
@@ -1548,6 +1569,61 @@ mod tests {
         assert_eq!(fill.colors[0], Color::rgb(0xF0, 0xF0, 0xF0));
         assert_eq!(*weight, 400);
         assert!(s.selected.is_some());
+    }
+
+    /// ANN-9 (0.3.4 QA): while typing, a text wider than the recognized box is drawn whole (the
+    /// box widens live as the commit does), and the caret position the overlay computes
+    /// (`retype_edit_origin_x` + the editor's measure) lands on the last drawn pixel of the text,
+    /// for left, centred and right alignment and for Vietnamese.
+    #[test]
+    fn ann_9_live_preview_is_not_cut_at_the_box_and_the_caret_is_at_the_drawn_end() {
+        for text in [
+            "Databricks Lakehouse Platform (sold by Databricks Inc.)",
+            "Nền tảng Lakehouse Databricks (do Databricks Inc. bán) Ếộ",
+        ] {
+            for align in [TextAlign::Left, TextAlign::Center, TextAlign::Right] {
+                let mut s = EditorState::new((1000, 100), Vec::new(), Styles::default());
+                s.set_tool(Tool::Retype);
+                let kind = OpKind::Retype {
+                    rect: Rc::new(300.0, 40.0, 150.0, 18.0),
+                    fill: Fill::solid(Color::WHITE),
+                    text: String::new(),
+                    size: 14.0,
+                    color: Color::BLACK,
+                    weight: 400,
+                    align,
+                };
+                s.text = Some(EditorState::retype_edit(kind, None, Some("x".into())));
+                type_text(&mut s, text);
+                let ops = s.render_ops();
+                let base =
+                    image::RgbaImage::from_pixel(1000, 100, image::Rgba([255, 255, 255, 255]));
+                let out = cm_render::render_annotations(&base, &ops).unwrap();
+                let (mut x0, mut x1) = (u32::MAX, 0u32);
+                for (x, _, p) in out.enumerate_pixels() {
+                    if p.0[0] < 160 {
+                        x0 = x0.min(x);
+                        x1 = x1.max(x + 1);
+                    }
+                }
+                assert!(x1 > x0, "text is drawn");
+                let drawn = f64::from(x1 - x0);
+                let mut m = crate::editor::TextMetrics::default();
+                let b = m.measure(text, 14.0);
+                assert!(
+                    (drawn - b.w).abs() <= 6.0,
+                    "{align:?}: whole text drawn ({drawn} vs {})",
+                    b.w
+                );
+                assert!(drawn > 150.0, "wider than the old box");
+                let origin = s.retype_edit_origin_x().unwrap();
+                let caret = origin + b.dx + b.w;
+                assert!(
+                    (caret - f64::from(x1)).abs() <= 6.0,
+                    "{align:?}: caret {caret} vs drawn end {x1}"
+                );
+            }
+        }
     }
 
     /// QA E4: a click on the panel's Text field (a plain box) must give typing back to the

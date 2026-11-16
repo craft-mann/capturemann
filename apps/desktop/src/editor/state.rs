@@ -814,7 +814,7 @@ impl EditorState {
                 Some(t) if t.existing.as_deref() == Some(o.id.as_str()) => {
                     replaced = true;
                     if !t.text.is_empty() || t.shows_when_empty() {
-                        out.push(AnnotationOp::new(o.id.clone(), t.kind()));
+                        out.push(AnnotationOp::new(o.id.clone(), self.draft_kind(t)));
                     }
                 }
                 _ => out.push(o.clone()),
@@ -822,7 +822,7 @@ impl EditorState {
         }
         if let Some(t) = editing {
             if !replaced && (!t.text.is_empty() || t.shows_when_empty()) {
-                out.push(AnnotationOp::new("~draft", t.kind()));
+                out.push(AnnotationOp::new("~draft", self.draft_kind(t)));
             }
         }
         // Zoom Lens drag, Move area drag and Blueprint drafts go through the real renderer, so
@@ -831,6 +831,15 @@ impl EditorState {
         // Base edits first, whatever drafted them (stable: their own order is kept).
         cm_core::annotation::sort_base_edits_first(&mut out);
         out
+    }
+
+    /// The op the preview draws for the text being typed: a retype is widened to its text, as
+    /// the commit does, so the live picture is never cut at the old box (ANN-9).
+    fn draft_kind(&self, t: &TextEdit) -> OpKind {
+        match t.target {
+            TextTarget::Retype { .. } => self.fit_retype(t.kind()),
+            _ => t.kind(),
+        }
     }
 
     pub fn step_count(&self) -> usize {
