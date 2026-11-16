@@ -159,6 +159,75 @@ mod tests {
         }
     }
 
+    /// Every character the overlay can be asked to draw in Vietnamese: all of `locales/vi.po`
+    /// (the overlay's strings come from that catalogue). A missing glyph is drawn as an empty box.
+    fn vi_po_chars() -> std::collections::BTreeSet<char> {
+        let po = include_str!("../../../locales/vi.po");
+        let mut out = std::collections::BTreeSet::new();
+        for line in po.lines() {
+            let line = line.trim();
+            let body = line.strip_prefix("msgstr").unwrap_or(line).trim();
+            if !body.starts_with('"') || body.len() < 2 {
+                continue;
+            }
+            let inner = &body[1..body.len() - 1];
+            let mut it = inner.chars();
+            while let Some(c) = it.next() {
+                if c == '\\' {
+                    it.next();
+                } else {
+                    out.insert(c);
+                }
+            }
+        }
+        out
+    }
+
+    fn has_glyph(f: &Face, c: char) -> bool {
+        f.font.glyph_id(c).0 != 0
+    }
+
+    /// Vietnamese letters (all of Latin Extended Additional used by Vietnamese) are drawn by both
+    /// faces, not as empty boxes.
+    #[test]
+    fn vietnamese_has_real_glyphs() {
+        let t = TextPainter::new().unwrap();
+        let chars = vi_po_chars();
+        assert!(chars.contains(&'ệ'), "vi.po was not read");
+        let mut missing = Vec::new();
+        for &c in &chars {
+            // U+232B (the editor's Delete hint) is only drawn by the desktop app, which has
+            // system font fallback; no overlay surface uses it.
+            if c.is_control() || c == '\u{a0}' || c == '\u{232b}' {
+                continue;
+            }
+            for (name, f) in [("ui", &t.ui), ("mono", &t.mono)] {
+                if !has_glyph(f, c) {
+                    missing.push(format!("{name}:{c}:U+{:04X}", c as u32));
+                }
+            }
+        }
+        assert!(missing.is_empty(), "no glyph for {missing:?}");
+        for c in "ạảấầẩẫậắặẹẻếềểệỉịọỏốồổộớờởợụủứừửữựỳỵỷỹươĂÂÊÔƯĐ".chars()
+        {
+            assert!(has_glyph(&t.ui, c) && has_glyph(&t.mono, c), "{c}");
+        }
+        // Measure agrees with the font: a Vietnamese letter has a width.
+        assert!(t.measure("Chụp dài", 12.0) > t.measure("Chup", 12.0));
+    }
+
+    /// Basic Latin, digits and the symbols the overlay draws.
+    #[test]
+    fn latin_digits_and_symbols_are_covered() {
+        let t = TextPainter::new().unwrap();
+        for c in (' '..='~').chain("×·…→←↑↓–—•°±÷‘’“”«»".chars()) {
+            assert!(has_glyph(&t.ui, c), "ui lacks {c} U+{:04X}", c as u32);
+        }
+        for c in (' '..='~').chain("×·…–—".chars()) {
+            assert!(has_glyph(&t.mono, c), "mono lacks {c} U+{:04X}", c as u32);
+        }
+    }
+
     #[test]
     fn drawing_text_puts_ink_on_the_canvas() {
         let t = TextPainter::new().unwrap();
