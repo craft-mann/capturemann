@@ -108,6 +108,19 @@ fn progress(s: &Stitcher) -> LongShotProgress {
     }
 }
 
+/// The distance the last three joins all moved the content by (within 1 %), if they did: a browser
+/// that scrolls whole notches of a fixed size does, whatever is asked. Then a pair with little in
+/// common is looked at near that distance (see `Stitcher::trust_hint`).
+fn steady_distance(seen: &[f64]) -> Option<u32> {
+    const STEADY_JOINS: usize = 3;
+    const STEADY_SPREAD: f64 = 0.01;
+    let last = seen.len().checked_sub(STEADY_JOINS).map(|i| &seen[i..])?;
+    let (lo, hi) = last
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)));
+    (hi - lo <= STEADY_SPREAD * hi).then_some(hi.round() as u32)
+}
+
 /// The shift expected from asking for `step`, given what a step has moved so far.
 fn expected(step: u32, gain: f64) -> u32 {
     ((f64::from(step) * gain).round() as u32).max(1)
@@ -196,6 +209,9 @@ pub fn run_auto_ex(
     // expected shift of a step, which breaks ties between equally good overlaps.
     let mut gain = 1.0f64;
     let mut learned = 0u32;
+    // The distance the last joins moved the content, to see whether the wheel moves the same
+    // every time (see `Stitcher::trust_hint`).
+    let mut seen_recent: Vec<f64> = Vec::new();
     // Share of the content a step asks for. It shrinks every time a step needed the scroll-back
     // ladder: a wheel that moves more for a big request than for the small first one (macOS
     // Chrome, Nov 16, 2026: 480 px moved 480, 1140 px moved about 1355) overshoots the overlap
@@ -219,7 +235,9 @@ pub fn run_auto_ex(
         }
         scroller.scroll(cfg.direction, step)?;
         let mut next = settled!('run, settle_frame(src, sleeper, cfg.settle));
+        stitcher.trust_hint(steady_distance(&seen_recent));
         let mut outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+        stitcher.trust_hint(None);
         super::debug::trace(
             &next.frame,
             &format!(
@@ -556,6 +574,7 @@ pub fn run_auto_ex(
                         (gain + seen) / 2.0
                     };
                     learned += 1;
+                    seen_recent.push(f64::from(new_len));
                 }
                 let moved_per_asked = gain;
                 // 80 % of what actually scrolls: the area without the fixed bands.
@@ -809,4 +828,19 @@ pub fn run_hand_ex(
         image: stitcher.finish()?,
         end,
     })
+}
+
+#[cfg(test)]
+mod steady_tests {
+    use super::steady_distance;
+
+    #[test]
+    fn lsreal_a_wheel_that_moved_the_same_distance_three_times_is_steady() {
+        assert_eq!(steady_distance(&[300.0, 300.0, 300.0]), Some(300));
+        assert_eq!(steady_distance(&[450.0, 300.0, 300.0, 300.0]), Some(300));
+        assert_eq!(steady_distance(&[300.0, 300.0]), None);
+        assert_eq!(steady_distance(&[300.0, 150.0, 300.0]), None);
+        assert_eq!(steady_distance(&[300.0, 300.0, 303.5]), None);
+        assert_eq!(steady_distance(&[]), None);
+    }
 }

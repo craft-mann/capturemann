@@ -441,16 +441,21 @@ fn find_join_opt(
                         return Err(NoJoin::Same);
                     }
                     let robust_result =
-                        match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK, false) {
+                        match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK, Prior::Off) {
                             // A shift the step names, on fewer lines (see `ROBUST_HINTED_MIN_INK`).
                             Err(NoJoin::NoOverlap(why)) => match hint {
-                                Some(_) => {
-                                    find_join_robust(a, b, hint, bands, ROBUST_HINTED_MIN_INK, true)
-                                        .map_err(|e| match e {
-                                            NoJoin::NoOverlap(_) => NoJoin::NoOverlap(why),
-                                            other => other,
-                                        })
-                                }
+                                Some(_) => find_join_robust(
+                                    a,
+                                    b,
+                                    hint,
+                                    bands,
+                                    ROBUST_HINTED_MIN_INK,
+                                    Prior::Near,
+                                )
+                                .map_err(|e| match e {
+                                    NoJoin::NoOverlap(_) => NoJoin::NoOverlap(why),
+                                    other => other,
+                                }),
                                 None => Err(NoJoin::NoOverlap(why)),
                             },
                             other => other,
@@ -478,6 +483,20 @@ fn find_join_opt(
     }
 }
 
+/// What the step says about where the join is, for [`find_join_robust`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Prior {
+    /// Nothing is assumed.
+    Off,
+    /// The step is a guess within a quarter either way: the shift is looked for there only, on
+    /// fewer lines (see `ROBUST_HINTED_MIN_INK`).
+    Near,
+    /// The wheel has moved the same distance for the last few steps (see
+    /// `Stitcher::trust_hint`): the hint is that distance and the shift is looked for within a
+    /// couple of px of it.
+    Trusted,
+}
+
 /// Most of the compared lines of a robust match that may differ.
 const ROBUST_BAD_SHARE: f64 = 0.5;
 /// Most separate stretches of differing lines (a translucent header, a floating button, a
@@ -492,6 +511,14 @@ const ROBUST_MIN_INK: usize = 40;
 /// as it scrolls into view at the bottom, a few lines of text between (a real page, Windows
 /// Edge, carchargeos.com, Nov 16, 2026: 85 matching rows of 354).
 const ROBUST_HINTED_MIN_INK: usize = 20;
+/// With a trusted distance, the shifts looked at are within this many px of it.
+const TRUSTED_WIDE_PX: usize = 2;
+/// ... and the inked lines that tell a shift from the one this many px beside it, at least this
+/// many of them.
+const TRUSTED_NEIGHBOUR_PX: usize = 8;
+const TRUSTED_MIN_DISTINCT: usize = 6;
+/// Share of the compared lines that may differ when the step names the shift.
+const ROBUST_HINTED_BAD_SHARE: f64 = 0.65;
 /// Most inked lines that may differ per inked line that matches, when the step names the shift.
 const ROBUST_HINTED_BAD_PER_OK: usize = 4;
 const ROBUST_INK_RATIO: usize = 1;
@@ -522,8 +549,9 @@ fn find_join_robust(
     hint: Option<usize>,
     bands: Option<(usize, usize)>,
     min_ink: usize,
-    near_hint: bool,
+    prior: Prior,
 ) -> Result<Join, NoJoin> {
+    let near_hint = prior != Prior::Off;
     let n = a.count;
     if a.data == b.data {
         return Err(NoJoin::Same);
@@ -563,10 +591,13 @@ fn find_join_robust(
     // (shift, ink lines that match, ink lines that differ)
     let mut found: Vec<(usize, usize, usize)> = Vec::new();
     // Only the shifts the step names: a quarter of it either way, as the tie-break below does.
-    let window = match (near_hint, hint) {
-        (true, Some(h)) => {
+    let window = match (prior, hint) {
+        (Prior::Near, Some(h)) => {
             let wide = (cw / 20).max(2).max(h / 4);
             h.saturating_sub(wide).max(1)..=(h + wide).min(cw - min_ov)
+        }
+        (Prior::Trusted, Some(h)) => {
+            h.saturating_sub(TRUSTED_WIDE_PX).max(1)..=(h + TRUSTED_WIDE_PX).min(cw - min_ov)
         }
         _ => 1..=(cw - min_ov),
     };
@@ -577,7 +608,12 @@ fn find_join_robust(
         if compared < min_ink {
             break;
         }
-        let allowed = (compared as f64 * ROBUST_BAD_SHARE) as usize;
+        let share = if near_hint {
+            ROBUST_HINTED_BAD_SHARE
+        } else {
+            ROBUST_BAD_SHARE
+        };
+        let allowed = (compared as f64 * share) as usize;
         // Lines that differ before the first one that matches are the top of the next frame
         // (a sticky header drawn over the page): they are left out and not counted, as the
         // overlap of a long step may be little more than the header.
@@ -633,6 +669,42 @@ fn find_join_robust(
         return Err(NoJoin::NoOverlap(
             "no shift matches even with stretches of lines left out".into(),
         ));
+    }
+    if prior == Prior::Trusted {
+        // Lines that match at every shift (a vertical edge, a card's border) prove nothing, so
+        // the shift is believed only on the inked lines that match there and not a few px to
+        // either side: the lines that tell this shift from its neighbours.
+        let distinct = |s: usize| -> usize {
+            let overlap = cw - s;
+            let g = GUARD.min(overlap / 3);
+            let end = n - footer;
+            (g..overlap - g)
+                .filter(|&i| {
+                    let (ia, ib) = (header + s + i, header + i);
+                    let at = |ia: usize| ia < end && a.near(ia, b, ib);
+                    (!flat(a.line(ia)) || !flat(b.line(ib)))
+                        && at(ia)
+                        && !at(ia + TRUSTED_NEIGHBOUR_PX)
+                        && !at(ia.wrapping_sub(TRUSTED_NEIGHBOUR_PX))
+                })
+                .count()
+        };
+        let mut scored: Vec<(usize, usize)> = found.iter().map(|c| (distinct(c.0), c.0)).collect();
+        scored.sort_unstable_by_key(|c| std::cmp::Reverse(*c));
+        let (lines, shift) = scored[0];
+        // Clearly more of them than the next shift has.
+        let clear = scored.get(1).is_none_or(|next| lines >= 2 * next.0);
+        if lines < TRUSTED_MIN_DISTINCT || !clear {
+            return Err(NoJoin::NoOverlap(
+                "no shift near the trusted distance has lines of its own".into(),
+            ));
+        }
+        return Ok(Join {
+            shift,
+            guard: GUARD.min((cw - shift) / 3),
+            header,
+            footer,
+        });
     }
     found.sort_by_key(|c| std::cmp::Reverse(c.1));
     let top = found[0];
@@ -714,7 +786,7 @@ fn find_join_banded(
         if (moving as f64) < BANDED_MIN_MOVING * (n - header - footer) as f64 {
             continue;
         }
-        if let Ok(j) = find_join_robust(&ac, &bc, hint, bands, BANDED_MIN_INK, false) {
+        if let Ok(j) = find_join_robust(&ac, &bc, hint, bands, BANDED_MIN_INK, Prior::Off) {
             // The lines the shift was believed on have to differ from each other: rows that
             // repeat (a list of alike rows, tinted stripes) match at many shifts, and the band
             // of columns that leaves out what tells them apart cannot say which is the true one.
@@ -1435,6 +1507,9 @@ pub struct Stitcher {
     /// The rows the last joined frame put into the content: `(first row of the frame, one past
     /// the last)`, for [`Stitcher::refresh_last`].
     last_add: Option<(usize, usize)>,
+    /// The distance the wheel has moved the content every time for the last few steps (see
+    /// [`Stitcher::trust_hint`]).
+    trust_hint: Option<usize>,
 }
 
 #[cfg(test)]
@@ -1463,7 +1538,16 @@ impl Stitcher {
             limit_hit: false,
             refusal: None,
             last_add: None,
+            trust_hint: None,
         }
+    }
+
+    /// Says that the wheel has moved the content by exactly `distance` px at each of the last few
+    /// steps (a browser scrolls whole notches of a fixed size, whatever is asked). A pair that
+    /// does not join otherwise is then looked at once more, at the shifts within a couple of px of
+    /// that distance, on fewer matching lines. Stays as set until it is set again.
+    pub fn trust_hint(&mut self, distance: Option<u32>) {
+        self.trust_hint = distance.map(|d| d as usize);
     }
 
     /// The lines `frame` is on from the last accepted one when it would join it (and is not the
@@ -1863,7 +1947,19 @@ impl Stitcher {
         let hint = hint.map(|h| h as usize);
         let n = lines.count;
         let line_len = src.line_len;
-        let join = match find_join(prev, lines, hint, self.bands) {
+        let found = match (find_join(prev, lines, hint, self.bands), self.trust_hint) {
+            (Err(NoJoin::NoOverlap(why)), Some(d)) => find_join_robust(
+                prev,
+                lines,
+                Some(d),
+                self.bands,
+                ROBUST_HINTED_MIN_INK,
+                Prior::Trusted,
+            )
+            .map_err(|_| NoJoin::NoOverlap(why)),
+            (other, _) => other,
+        };
+        let join = match found {
             Ok(j) => j,
             Err(NoJoin::Same) => return PushOutcome::NoChange,
             Err(NoJoin::NoOverlap(why)) => {

@@ -48,6 +48,7 @@ fn main() {
     for f in &files {
         let frame = load(f);
         let hint = std::env::var("LS_HINT").ok().and_then(|h| h.parse().ok());
+        stitcher.trust_hint(std::env::var("LS_TRUST").ok().and_then(|v| v.parse().ok()));
         let outcome = stitcher.push(&frame, hint);
         if let Some(r) = stitcher.last_refusal() {
             println!("  refusal: {r}");

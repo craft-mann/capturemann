@@ -3000,3 +3000,67 @@ fn lsreal_lines_that_differ_with_blank_lines_between_them_are_one_stretch() {
         s.last_refusal()
     );
 }
+
+/// A page of cards (vertical borders on every line, short text blocks every 25 lines) whose next
+/// frame has a translucent header over its top and whose first frame had not drawn the bottom
+/// cards yet. The borders match at every shift, so on a few text lines the join cannot be told
+/// from its neighbours by the usual look. When the wheel has moved the content by exactly 250 px at
+/// each of the last steps, the shift 250 is believed on the lines of its own; a distance the
+/// content did not move by is not (the borders match there as well). A real page, Windows Edge,
+/// carchargeos.com, Nov 16, 2026: 7 lines of its own, the wheel's notches 300 px each time.
+#[test]
+fn lsreal_a_steady_wheel_names_the_shift_of_a_pair_with_little_in_common() {
+    let (w, h) = (600usize, 400usize);
+    let frame_at = |pos: usize, unrevealed_from: usize| {
+        let mut data = Vec::with_capacity(w * h * 4);
+        for i in 0..h {
+            let y = pos + i;
+            let mut line = vec![250u8; w * 4];
+            // Card borders: the same on every line.
+            for x in [50usize, 51, 548, 549] {
+                line[x * 4..x * 4 + 4].copy_from_slice(&[120, 120, 130, 255]);
+            }
+            // Text lines of a card, every 25 lines, four lines tall.
+            if y % 25 < 4 && i < unrevealed_from {
+                for x in 100..400 {
+                    let v = ((y * 31 + x * 17) ^ (x >> 1)) % 251;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[v as u8, (v / 2) as u8, 20, 255]);
+                }
+            }
+            // A translucent header over the top of every later frame: another look each time.
+            if pos > 0 && i < 40 {
+                for x in 0..w {
+                    let v = ((pos * 13 + i * 7 + x * 3) % 90) as u8;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[160 + v, 160 + v, 170, 255]);
+                }
+            }
+            // A floating button at the bottom right whose shadow follows the position.
+            if i >= h - 30 {
+                for x in 520..580 {
+                    let v = ((pos * 5 + i * 3 + x) % 100) as u8;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[30, 60 + v, 200, 255]);
+                }
+            }
+            data.extend_from_slice(&line);
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let first = frame_at(0, 330);
+    let next = frame_at(250, h);
+    for (distance, joins) in [(Some(250), true), (Some(180), false), (None, false)] {
+        let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+        s.push(&first, None);
+        s.trust_hint(distance);
+        let got = s.push(&next, Some(250));
+        if joins {
+            assert_eq!(
+                got,
+                PushOutcome::Added { new_len: 250 },
+                "{:?}",
+                s.last_refusal()
+            );
+        } else {
+            assert_eq!(got, PushOutcome::NoOverlap, "{distance:?}");
+        }
+    }
+}
