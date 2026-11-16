@@ -572,14 +572,51 @@ pub fn tile_tip(tile: ExtraTile, state: &TileState, keys: &[String]) -> TileTip 
     }
 }
 
-/// The accessible name of a tile: the label, the chord when there is one, and the state.
+/// Rows of a row-2 dock tile, px (CG-11, QA pass 7): the border, the 16 px icon, a 3 px gap and a
+/// label box of two 13 px lines (Vietnamese "Hướng dẫn thao tác" wraps to two), then with a chord
+/// a 3 px gap and the 15 px keycaps. The Preview tag is a corner tag and adds no row.
+pub mod tile_metrics {
+    pub const BORDER: f32 = 2.0;
+    pub const ICON: f32 = 16.0;
+    pub const GAP: f32 = 3.0;
+    pub const LABEL_LINE: f32 = 13.0;
+    pub const LABEL_LINES: f32 = 2.0;
+    pub const KEYCAPS: f32 = 15.0;
+    /// The tile's height without and with a chord (the board's 54 and 70 px).
+    pub const MIN_HEIGHT: f32 = 54.0;
+    pub const MIN_HEIGHT_KEYS: f32 = 70.0;
+
+    /// What the rows need.
+    pub fn content(with_keys: bool) -> f32 {
+        let base = BORDER + ICON + GAP + LABEL_LINE * LABEL_LINES;
+        if with_keys {
+            base + GAP + KEYCAPS
+        } else {
+            base
+        }
+    }
+
+    /// The tile's height: the board's, never less than the rows need.
+    pub fn height(with_keys: bool) -> f32 {
+        let board = if with_keys {
+            MIN_HEIGHT_KEYS
+        } else {
+            MIN_HEIGHT
+        };
+        board.max(content(with_keys))
+    }
+}
+
+/// The accessible name of a tile: the label, "preview", the chord when there is one, and the
+/// state.
 pub fn tile_aria(tile: ExtraTile, state: &TileState, keys: &[String]) -> String {
+    let named = tr!("{name}, preview", name = tile.label());
     let base = if keys.is_empty() {
-        tile.label()
+        named
     } else {
         tr!(
             "{name}, shortcut {chord}",
-            name = tile.label(),
+            name = named,
             chord = keys.join("")
         )
     };
@@ -1112,17 +1149,28 @@ mod tests {
         assert_eq!((off.line.as_str(), off.footer()), ("why", None));
     }
 
+    /// CG-11: the two label lines, the icon and the keycaps fit the tile in both rows.
+    #[test]
+    fn dock_tile_height_holds_two_label_lines_and_the_keycaps() {
+        use tile_metrics::*;
+        assert!(content(false) <= height(false) && content(true) <= height(true));
+        assert_eq!((height(false), height(true)), (54.0, 70.0));
+    }
+
     #[test]
     fn s14_accessible_names_carry_the_state() {
         let guide = ExtraTile::ClickGuide;
-        assert_eq!(tile_aria(guide, &TileState::Ready, &[]), "Click Guide");
+        assert_eq!(
+            tile_aria(guide, &TileState::Ready, &[]),
+            "Click Guide, preview"
+        );
         assert_eq!(
             tile_aria(ExtraTile::LongShot, &TileState::Active, &[]),
-            "Long Shot, running"
+            "Long Shot, preview, running"
         );
         assert_eq!(
             tile_aria(guide, &TileState::Disabled("why".into()), &[]),
-            "Click Guide, not available. why"
+            "Click Guide, preview, not available. why"
         );
         assert!(ExtraTile::ALL
             .iter()

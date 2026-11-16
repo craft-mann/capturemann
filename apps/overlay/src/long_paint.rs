@@ -4,7 +4,7 @@
 
 use crate::canvas::{Canvas, IRect};
 use crate::icons::{self, Icon};
-use crate::long_bar::{BarLayout, Entry, Item};
+use crate::long_bar::{BarLayout, BarMode, Entry, Item};
 use crate::paint::{dev, panel, tokens, Scene};
 
 /// What the painter needs of the bar.
@@ -49,6 +49,71 @@ pub fn draw(canvas: &mut Canvas<'_>, scene: &Scene<'_>, long: &LongScene<'_>) {
     for d in &l.dividers {
         canvas.fill_rect(d.0, tokens::LINE, 255);
     }
+    // Design S24: the XS Preview tag above the top-right corner of the Long Shot and Click Guide
+    // buttons. It is drawn last so the button's rectangle and label keep their size.
+    for e in &l.entries {
+        if matches!(
+            e.item,
+            Item::Mode(BarMode::LongShot) | Item::Mode(BarMode::ClickGuide)
+        ) {
+            preview_tag(canvas, scene, e.rect);
+        }
+    }
+}
+
+/// The XS Preview tag's colours (dark theme; the overlay is always dark): `preview.border`,
+/// `preview.text`.
+const PREVIEW_BORDER: u32 = 0x0055_555C;
+const PREVIEW_TEXT: u32 = 0x00C9_C9CF;
+/// The tag: 14 px high, 5 px padding, 9 px text (design S24, size XS).
+pub const TAG_H: f64 = 14.0;
+pub const TAG_PAD: f64 = 5.0;
+pub const TAG_TEXT_PX: f64 = 9.0;
+
+/// Where the tag goes: its right edge 2 px past the button's right edge, its bottom 4 px inside
+/// the button's top edge. `text_w` is the label's width in device px.
+pub fn preview_tag_rect(button: IRect, text_w: i32, scale: f64) -> IRect {
+    let h = dev(TAG_H, scale);
+    let w = text_w + 2 * dev(TAG_PAD, scale) + 2 * dev(1.0, scale);
+    IRect::new(
+        button.x + button.w + dev(2.0, scale) - w,
+        button.y + dev(4.0, scale) - h,
+        w,
+        h,
+    )
+}
+
+fn preview_tag(canvas: &mut Canvas<'_>, scene: &Scene<'_>, button: IRect) {
+    let s = scene.scale;
+    let px = (TAG_TEXT_PX * s) as f32;
+    let label = cm_i18n::tr_ctx!("preview label", "Preview");
+    let tw = scene.text.measure(&label, px);
+    let r = preview_tag_rect(button, tw.ceil() as i32, s);
+    let radius = r.h as f32 / 2.0;
+    // The ground first (it hides the bar's border under the tag), then a dashed 1 px outline:
+    // a solid ring whose top and bottom edges get 2 px gaps every 4 px.
+    canvas.fill_rrect(r, radius, PREVIEW_BORDER, 255);
+    canvas.fill_rrect(r.grow(-dev(1.0, s)), radius - 1.0, tokens::SURFACE, 255);
+    let (step, gap, one) = (dev(4.0, s), dev(2.0, s), dev(1.0, s));
+    let mut x = r.x + r.h / 2;
+    while x + gap < r.x + r.w - r.h / 2 {
+        canvas.fill_rect(IRect::new(x, r.y, gap, one), tokens::SURFACE, 255);
+        canvas.fill_rect(
+            IRect::new(x, r.y + r.h - one, gap, one),
+            tokens::SURFACE,
+            255,
+        );
+        x += step;
+    }
+    let th = scene.text.line_height(px);
+    scene.text.draw(
+        canvas,
+        r.x as f32 + (r.w as f32 - tw) / 2.0,
+        r.y as f32 + (r.h as f32 - th) / 2.0,
+        &label,
+        px,
+        PREVIEW_TEXT,
+    );
 }
 
 /// The small Enter keycap after Start: an outlined box with the return icon.
@@ -119,4 +184,23 @@ fn button(canvas: &mut Canvas<'_>, scene: &Scene<'_>, e: &Entry, in_card: bool) 
         x += icon_w;
     }
     scene.text.draw(canvas, x, y, &e.label, px, label);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Design S24: the tag is 14 px high, ends 2 px past the button's right edge and sits above
+    /// its top-right corner without covering the label row.
+    #[test]
+    fn the_preview_tag_sits_above_the_buttons_top_right_corner() {
+        let button = IRect::new(100, 200, 120, 40);
+        let r = preview_tag_rect(button, 36, 1.0);
+        assert_eq!(r.h, 14);
+        assert_eq!(r.x + r.w, 100 + 120 + 2);
+        assert!(r.y < button.y && r.y + r.h <= button.y + 4);
+        // At 2x everything doubles; the tag stays inside the same corner.
+        let r2 = preview_tag_rect(IRect::new(200, 400, 240, 80), 72, 2.0);
+        assert_eq!((r2.h, r2.x + r2.w), (28, 200 + 240 + 4));
+    }
 }

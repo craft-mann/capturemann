@@ -313,6 +313,59 @@ async fn bad_region_and_usage_errors_exit_2() {
     assert_eq!(cli(&r, &["--version"]).await.code, 0);
 }
 
+/// S24: the commands and flags of a Preview feature say `[preview]` in `--help`, from the
+/// feature registry; nothing else does.
+#[tokio::test]
+async fn help_marks_the_preview_features() {
+    let r = rig();
+    let top = cli(&r, &["--help"]).await;
+    let guide_line = top
+        .out
+        .lines()
+        .find(|l| l.trim_start().starts_with("guide"))
+        .unwrap();
+    assert!(guide_line.contains("[preview]"), "{guide_line}");
+    for l in top
+        .out
+        .lines()
+        .filter(|l| l.trim_start().starts_with("library"))
+    {
+        assert!(!l.contains("[preview]"), "{l}");
+    }
+    let sub = cli(&r, &["guide", "start", "--help"]).await;
+    assert!(sub.out.contains("[preview]"), "{}", sub.out);
+    let shot = cli(&r, &["capture", "screenshot", "--help"]).await;
+    let long_help = shot.out.split("--long").nth(1).unwrap();
+    assert!(
+        long_help.lines().take(3).any(|l| l.contains("[preview]")),
+        "{}",
+        shot.out
+    );
+    let target = shot.out.split("--display").nth(1).unwrap();
+    assert!(!target.lines().take(2).any(|l| l.contains("[preview]")));
+    // Every name the registry gives exists as a command or an argument.
+    let cmd = cm_cli::command();
+    for f in cm_core::features::FEATURES {
+        for c in f.cli_commands {
+            assert!(cmd.find_subcommand(c).is_some(), "{c}");
+        }
+        for (path, arg) in f.cli_args {
+            let mut c = &cmd;
+            for part in path.split(' ') {
+                c = c.find_subcommand(part).unwrap_or_else(|| panic!("{path}"));
+            }
+            assert!(c.get_arguments().any(|a| a.get_id() == arg), "{path} {arg}");
+        }
+    }
+}
+
+/// S24: `feature_disabled` exits 4 (the code of a user setting that blocks the call).
+#[test]
+fn feature_disabled_exits_4() {
+    assert_eq!(cm_core::ErrorCode::FeatureDisabled.exit_code(), 4);
+    assert_eq!(cm_cli::exit_code_for("feature_disabled"), 4);
+}
+
 /// ANN-1/ANN-3: annotate (inline, file, stdin), get, undo, redo; each is one revision.
 #[tokio::test]
 async fn annotate_get_undo_redo_roundtrip() {

@@ -261,8 +261,22 @@ impl Command {
     }
 
     /// LNC-1.AC10: accessible name = title, hint and shortcut.
+    /// The preview feature this command starts, when it is one (design S24).
+    pub fn preview_feature(&self) -> Option<crate::ui::preview_label::PreviewFeature> {
+        use crate::ui::preview_label::PreviewFeature;
+        match self.id {
+            CommandId::LongShot => Some(PreviewFeature::LongShot),
+            CommandId::NewClickGuide => Some(PreviewFeature::ClickGuide),
+            _ => None,
+        }
+    }
+
     pub fn accessible_name(&self, platform: Platform) -> String {
-        let title = &self.title;
+        let title = &if self.preview_feature().is_some() {
+            tr!("{title}, preview", title = self.title)
+        } else {
+            self.title.clone()
+        };
         let hint = self.hint_text();
         if self.is_enabled() && !self.shortcut.is_empty() {
             let shortcut = shortcut_text(&self.shortcut, platform);

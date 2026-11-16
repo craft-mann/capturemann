@@ -917,6 +917,25 @@ pub(crate) fn selection_texts(n: u64) -> (String, [String; 3]) {
     )
 }
 
+/// Why Make a board is off: `shots` screenshots among `n` selected (a board takes 2 to 12
+/// screenshots and nothing else). `None` when it is on.
+pub(crate) fn board_disabled_reason(shots: usize, n: usize) -> Option<String> {
+    if shots != n {
+        Some(tr!(
+            "A board takes screenshots only. Deselect the recordings and audio."
+        ))
+    } else if shots < 2 {
+        Some(tr!("Select at least 2 screenshots to make a board."))
+    } else if shots > 12 {
+        Some(tr!(
+            "A board holds up to 12 screenshots; {n} are selected.",
+            n = shots
+        ))
+    } else {
+        None
+    }
+}
+
 /// The 1 px ring a hovered card gets (design S15), outside its border.
 const HOVER_RING: Color = Color::rgb(0x3A3A42);
 
@@ -2019,10 +2038,17 @@ impl Render for LibraryView {
         // ---- title row: the page title, its real count, the search field ---------------------
         let icon_only = {
             let row_w = f32::from(window.viewport_size().width) - SIDEBAR_WIDTH - PAGE_PADDING * 2.;
+            // The Click Guides title carries the M Preview label (design S24): its room is taken
+            // from the row.
+            let tag_w = if matches!(route, Route::Guides) {
+                crate::ui::preview_label::width(crate::ui::preview_label::Size::M) as f64 + 12.0
+            } else {
+                0.0
+            };
             guide_buttons_need_icon(
                 &nav::page_heading(&route).1,
                 nav::route_count(&route, &counts),
-                row_w,
+                row_w - tag_w as f32,
             )
         };
         let view = cx.entity().downgrade();
@@ -2050,6 +2076,16 @@ impl Render for LibraryView {
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(title),
                     )
+                    // Design S24: one M label per page, after the title.
+                    .children(matches!(route, Route::Guides).then(|| {
+                        crate::ui::preview_label::label(
+                            &t,
+                            crate::ui::preview_label::Size::M,
+                            crate::ui::preview_label::PreviewFeature::ClickGuide,
+                            None,
+                            Some(self.app.clone()),
+                        )
+                    }))
                     .children(nav::route_count(&route, &counts).map(|n| {
                         // S22: "6 of 61 \u{b7} published" while a published filter is on.
                         let note = self.state.count_note(Some(n));
@@ -2595,7 +2631,10 @@ impl LibraryView {
                                 v1.update(cx, |this, cx| this.make_board(cx)).ok();
                             })
                         } else {
-                            b
+                            match board_disabled_reason(shots, n) {
+                                Some(why) => b.tooltip(tip(why, Vec::new())),
+                                None => b,
+                            }
                         }
                     })
                     .child({
@@ -2934,6 +2973,22 @@ fn empty_state(
         })
         .children(action)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod board_reason_tests {
+    use super::board_disabled_reason;
+
+    #[test]
+    fn the_board_button_says_why_it_is_off() {
+        assert!(board_disabled_reason(2, 2).is_none());
+        assert!(board_disabled_reason(12, 12).is_none());
+        assert!(board_disabled_reason(1, 1).unwrap().contains("at least 2"));
+        assert!(board_disabled_reason(13, 13).unwrap().contains("13"));
+        assert!(board_disabled_reason(3, 4)
+            .unwrap()
+            .contains("screenshots only"));
+    }
 }
 
 #[cfg(test)]

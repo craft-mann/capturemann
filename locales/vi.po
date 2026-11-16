@@ -10167,11 +10167,6 @@ msgid "Bubble"
 msgstr "Bong bóng"
 
 #, fuzzy
-msgctxt "panel badge"
-msgid "New in 0.3.3"
-msgstr "Mới trong 0.3.3"
-
-#, fuzzy
 msgctxt "spotlight outside"
 msgid "Blur"
 msgstr "Làm mờ"
@@ -11205,9 +11200,10 @@ msgstr "{n} khung hình"
 msgid "{n} of {max}"
 msgstr "{n} trên {max}"
 
-msgid "{n} screenshot, drag order = list order"
-msgid_plural "{n} screenshots, drag order = list order"
-msgstr[0] "{n} ảnh chụp màn hình · kéo để đổi thứ tự trong danh sách"
+#, fuzzy
+msgid "{n} screenshot, use the arrows to change the order"
+msgid_plural "{n} screenshots, use the arrows to change the order"
+msgstr[0] "{n} ảnh chụp màn hình · dùng mũi tên để đổi thứ tự"
 
 msgid "{n} selected"
 msgid_plural "{n} selected"
@@ -11503,10 +11499,6 @@ msgstr "Hướng dẫn thao tác"
 msgctxt "page title"
 msgid "Click Guide"
 msgstr "Hướng dẫn thao tác"
-
-msgctxt "panel badge"
-msgid "New in 0.3.4"
-msgstr "Mới trong 0.3.4"
 
 msgctxt "shortcut"
 msgid "Long Shot"
@@ -11904,3 +11896,146 @@ msgstr "{agent} muốn chạy “{title}”. Thao tác này luôn hỏi bạn tr
 #, fuzzy
 msgid "{n} steps left"
 msgstr "Còn {n} bước"
+
+#, fuzzy
+msgid "A board takes screenshots only. Deselect the recordings and audio."
+msgstr "Bảng ảnh chỉ nhận ảnh chụp màn hình. Hãy bỏ chọn bản ghi hình và âm thanh."
+
+#, fuzzy
+msgid "Select at least 2 screenshots to make a board."
+msgstr "Hãy chọn ít nhất 2 ảnh chụp màn hình để tạo bảng ảnh."
+
+#, fuzzy
+msgid "A board holds up to 12 screenshots; {n} are selected."
+msgstr "Bảng ảnh chứa tối đa 12 ảnh chụp màn hình; bạn đã chọn {n}."
+
+#, fuzzy
+msgid "The file name pattern has a mistake: use only the keys below, each between braces."
+msgstr "Mẫu tên tệp có lỗi: chỉ dùng các khóa bên dưới, mỗi khóa đặt trong dấu ngoặc nhọn."
+
+# NOTE: added with board S24 (Preview label, Settings > Previews); owner review required
+#, fuzzy
+msgctxt "previews page"
+msgid "Capture a scrolling page as one image."
+msgstr "Chụp một trang cuộn thành một ảnh."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Feedback"
+msgstr "Góp ý"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "New features that are ready to use but may still change. Turning one off hides its buttons and menus; anything you made with it stays in your library."
+msgstr "Tính năng mới, dùng được ngay nhưng có thể còn thay đổi. Tắt một tính năng sẽ ẩn các nút và menu của nó; những gì bạn đã tạo vẫn nằm trong thư viện."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Preview"
+msgstr "Xem trước"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Previews"
+msgstr "Xem trước tính năng"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Previews are on by default."
+msgstr "Các bản xem trước được bật sẵn."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Send feedback about {feature}"
+msgstr "Gửi góp ý về {feature}"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Send general feedback"
+msgstr "Gửi góp ý chung"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Turn your clicks into a numbered guide."
+msgstr "Biến các cú nhấp chuột của bạn thành hướng dẫn có đánh số."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "{feature}, preview"
+msgstr "{feature}, bản xem trước"
+
+msgid "Click through a task once; each click becomes a numbered step. Clicks only, never keystrokes."
+msgstr "Nhấp qua một tác vụ một lần; mỗi lần nhấp trở thành một bước có số. Chỉ ghi lần nhấp, không bao giờ ghi phím gõ."
+
+#, fuzzy
+msgid "Got it"
+msgstr "Đã hiểu"
+
+#, fuzzy
+msgid "It works and it is ready to use, but how it looks and behaves may still change in the next releases."
+msgstr "Tính năng hoạt động và sẵn sàng dùng, nhưng giao diện và cách hoạt động có thể còn thay đổi ở các bản sau."
+
+#, fuzzy
+msgid "New and still changing. Your files are safe and stay readable. Click to send feedback."
+msgstr "Tính năng mới và còn thay đổi. Tệp của bạn an toàn và vẫn đọc được. Nhấp để gửi phản hồi."
+
+#, fuzzy
+msgid "Pick a window or an area, then scroll; the pictures are joined into one tall image."
+msgstr "Chọn một cửa sổ hoặc một vùng rồi cuộn; các ảnh được ghép thành một ảnh dài."
+
+#, fuzzy
+msgid "Preview. New and still changing."
+msgstr "Xem trước. Tính năng mới và còn thay đổi."
+
+#, fuzzy
+msgid "Preview: new and still changing."
+msgstr "Xem trước: tính năng mới và còn thay đổi."
+
+#, fuzzy
+msgid "Saving your Long Shot or guide…"
+msgstr "Đang lưu Ảnh dài hoặc hướng dẫn của bạn…"
+
+#, fuzzy
+msgid "Send feedback"
+msgstr "Gửi phản hồi"
+
+#, fuzzy
+msgid "Tell us what works and what doesn’t."
+msgstr "Cho chúng tôi biết điều gì dùng được và điều gì chưa."
+
+#, fuzzy
+msgid "Turn off in Settings › Previews"
+msgstr "Tắt trong Cài đặt › Xem trước"
+
+#, fuzzy
+msgid "What you captured so far is kept."
+msgstr "Phần bạn đã chụp được giữ lại."
+
+#, fuzzy
+msgid "Your Click Guides are normal guides and stay readable."
+msgstr "Các Hướng dẫn thao tác của bạn là hướng dẫn bình thường và vẫn đọc được."
+
+#, fuzzy
+msgid "Your Long Shots are normal screenshots and stay readable."
+msgstr "Các Ảnh dài của bạn là ảnh chụp bình thường và vẫn đọc được."
+
+#, fuzzy
+msgid "{name} is in preview"
+msgstr "{name} đang ở bản xem trước"
+
+#, fuzzy
+msgid "{name}, preview"
+msgstr "{name}, bản xem trước"
+
+#, fuzzy
+msgid "{title} (Preview)"
+msgstr "{title} (Xem trước)"
+
+#, fuzzy
+msgid "{title}, preview"
+msgstr "{title}, bản xem trước"
+
+#, fuzzy
+msgctxt "preview label"
+msgid "Preview"
+msgstr "Xem trước"

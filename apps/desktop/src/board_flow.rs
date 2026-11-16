@@ -403,10 +403,10 @@ impl BoardSheet {
             columns: None,
             gap: defaults.gap,
             margin: defaults.margin,
-            background: BgChoice::White,
+            background: BgChoice::LightGrey,
             tint: "#DCE6F5".to_owned(),
-            radius: 0,
-            shadow: false,
+            radius: defaults.radius,
+            shadow: defaults.shadow,
             captions: false,
             title: String::new(),
             free: Vec::new(),
@@ -695,6 +695,14 @@ mod tests {
     }
 
     #[test]
+    fn a_new_board_starts_with_the_designed_look() {
+        let s = BoardSheet::new(vec![src("a", 400, 200), src("b", 300, 300)]);
+        assert_eq!((s.margin, s.gap, s.radius), (40, 24, 12));
+        assert!(s.shadow);
+        assert_eq!(s.background, BgChoice::LightGrey);
+    }
+
+    #[test]
     fn two_pictures_start_as_a_pair_with_labels() {
         let s = BoardSheet::new(vec![src("a", 400, 200), src("b", 300, 300)]);
         assert_eq!(s.layout, LayoutKind::Pair);
@@ -708,7 +716,7 @@ mod tests {
         let r = s.request().unwrap();
         assert_eq!(r["layout"]["kind"], "pair");
         assert_eq!(r["options"]["before_after"], true);
-        assert_eq!(r["options"]["background"], "white");
+        assert_eq!(r["options"]["background"], "light_grey");
         assert_eq!(r["capture_ids"], json!(["a", "b"]));
     }
 

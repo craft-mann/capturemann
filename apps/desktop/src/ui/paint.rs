@@ -649,6 +649,10 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/moon.svg"),
     ),
     (
+        "icons/flask-conical.svg",
+        include_str!("../../assets/icons/flask-conical.svg"),
+    ),
+    (
         "icons/mouse-pointer-click.svg",
         include_str!("../../assets/icons/mouse-pointer-click.svg"),
     ),

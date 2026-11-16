@@ -509,6 +509,20 @@ pub fn page_toolbar_actions(
     title: SharedString,
     actions: Vec<AnyElement>,
 ) -> Stateful<Div> {
+    page_toolbar_tagged(t, id, aria, crumb, title, None, actions)
+}
+
+/// [`page_toolbar_actions`] with an optional tag after the title (the M Preview label, design
+/// S24; one label per page).
+pub fn page_toolbar_tagged(
+    t: &Theme,
+    id: &'static str,
+    aria: impl Into<SharedString>,
+    crumb: impl IntoElement,
+    title: SharedString,
+    tag: Option<AnyElement>,
+    actions: Vec<AnyElement>,
+) -> Stateful<Div> {
     div()
         .id(id)
         .role(Role::Toolbar)
@@ -533,15 +547,23 @@ pub fn page_toolbar_actions(
                 .child(crumb)
                 .child(
                     div()
-                        .id(SharedString::from(format!("{id}-title")))
-                        .role(Role::Heading)
-                        .aria_level(1)
-                        .aria_label(title.clone())
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_size(px(type_scale::TITLE))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(title),
+                        .flex()
+                        .items_center()
+                        .gap(px(10.))
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("{id}-title")))
+                                .role(Role::Heading)
+                                .aria_level(1)
+                                .aria_label(title.clone())
+                                .min_w(px(0.))
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_size(px(type_scale::TITLE))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child(title),
+                        )
+                        .when_some(tag, |d, badge| d.child(div().flex_none().child(badge))),
                 ),
         )
         .when(!actions.is_empty(), |d| {

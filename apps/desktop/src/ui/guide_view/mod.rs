@@ -24,9 +24,7 @@ use cm_i18n::{tr, tr_ctx, trn};
 use crate::backend::Backend;
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::{self, AppModel, Route};
-use crate::ui::components::{
-    badge, button_with_icon, crumb_link, icon, icon_button, page_toolbar_actions, ButtonKind,
-};
+use crate::ui::components::{badge, button_with_icon, crumb_link, icon, icon_button, ButtonKind};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::studio::ThemeGlobal;
 use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
@@ -871,12 +869,21 @@ impl Render for GuideView {
             .on_click(cx.listener(|this, _, _, cx| export::open(this, cx)))
             .into_any_element(),
         );
-        let toolbar = page_toolbar_actions(
+        // Design S24: the M Preview label after the title (one per page).
+        let tag = crate::ui::preview_label::label(
+            &t,
+            crate::ui::preview_label::Size::M,
+            crate::ui::preview_label::PreviewFeature::ClickGuide,
+            None,
+            Some(self.app.clone()),
+        );
+        let toolbar = crate::ui::components::page_toolbar_tagged(
             &t,
             "guide-toolbar",
             tr!("Click Guide"),
             crumb,
             SharedString::from(heading),
+            Some(tag),
             actions,
         );
 

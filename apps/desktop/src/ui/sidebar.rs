@@ -23,6 +23,7 @@ use crate::ui::components::{
 };
 use crate::ui::kit::{nav_row, nav_row_tinted, NavExtras, NavStatus};
 use crate::ui::paint::{rgba_of, TextExt};
+use crate::ui::preview_label::{PreviewFeature, Size as PreviewSize};
 use crate::ui::settings::model::SettingsSection;
 use crate::ui::settings_view::SettingsView;
 use crate::ui::tooltip::{rich_tip, tile_lines, tip, TipLine};
@@ -447,7 +448,12 @@ fn extra_tile(
             .is_some_and(|a| !p.shortcuts.get(a).keycaps(p.platform).is_empty())
     });
     let tip_model = nav::tile_tip(tile, &state, &keys);
-    let tooltip = rich_tip(tip_model.name.clone(), tile_lines(&tip_model), 200.);
+    let mut lines = tile_lines(&tip_model);
+    if rail && !disabled_state(&state) {
+        // The rail has no room for the tag: the tooltip says it (design S24).
+        lines.insert(1, TipLine::Hint(crate::ui::preview_label::rail_hint()));
+    }
+    let tooltip = rich_tip(tip_model.name.clone(), lines, 200.);
     let active = state == TileState::Active;
     let disabled = state.is_disabled();
     let (hover_bg, hover_border, text) = (
@@ -456,6 +462,7 @@ fn extra_tile(
         rgba_of(t.text),
     );
     let ring = tile_ring(t, if rail { t.sidebar } else { t.surface_2 });
+    let app_for_label = app.clone();
     let app = app.clone();
     let border = if active {
         rgba_of(t.rec.with_alpha(70))
@@ -483,7 +490,7 @@ fn extra_tile(
     } else {
         d.flex_1()
             .min_w(px(0.))
-            .h(px(if row_has_keys { 70. } else { 54. }))
+            .h(px(nav::tile_metrics::height(row_has_keys)))
             .flex_col()
             .gap(px(3.))
             .px(px(4.))
@@ -513,23 +520,48 @@ fn extra_tile(
     let d = if rail {
         d
     } else {
-        // Two lines at most (Vietnamese "Hướng dẫn / theo thao tác"); the tooltip has the name.
+        // Two lines at most (Vietnamese "Hướng dẫn / thao tác"); the tooltip has the name. The
+        // box is two 13 px lines high, so the second line is never cut (CG-11).
         d.child(
             div()
                 .max_w_full()
-                .max_h(px(28.))
+                .h(px(
+                    nav::tile_metrics::LABEL_LINE * nav::tile_metrics::LABEL_LINES
+                ))
+                .flex()
+                .items_center()
+                .justify_center()
                 .overflow_hidden()
                 .text_center()
+                .line_height(px(nav::tile_metrics::LABEL_LINE))
                 .child(tile.label()),
         )
         .when(!keys.is_empty(), |d| d.child(keycap_row(t, &keys)))
     };
+    // The Preview tag (design S24): XS, on the tile's top-right corner, straddling its border.
+    // The run's red dot moves to the top-left so the two never meet. In the rail the tile is an
+    // icon button: the tooltip and the accessible name carry "preview" there.
+    let feature = match tile {
+        ExtraTile::LongShot => PreviewFeature::LongShot,
+        ExtraTile::ClickGuide => PreviewFeature::ClickGuide,
+    };
+    let d = d.when(!rail, |d| {
+        d.child(div().absolute().right(px(-4.)).top(px(-8.)).child(
+            crate::ui::preview_label::label(
+                t,
+                PreviewSize::Xs,
+                feature,
+                Some(t.surface),
+                Some(app_for_label),
+            ),
+        ))
+    });
     d.when(active, |d| {
         d.child(
             div()
                 .absolute()
                 .top(px(6.))
-                .right(px(6.))
+                .left(px(6.))
                 .child(crate::ui::components::rec_dot(t, 7.)),
         )
     })
@@ -754,4 +786,9 @@ fn settings_body(
     ];
     out.push(div().flex_1().into_any_element());
     out
+}
+
+/// A disabled tile's tooltip is its reason only.
+fn disabled_state(state: &TileState) -> bool {
+    state.is_disabled()
 }

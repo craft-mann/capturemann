@@ -173,6 +173,8 @@ pub struct AppModel {
     pub bulk: crate::bulk_flow::BulkUi,
     /// The Export popover (EXP-5), open or not; nothing of it is kept between exports.
     pub export_popover: Option<crate::export_flow::Popover>,
+    /// The Preview label's popover or the one-time intro card (design S24).
+    pub preview_card: Option<crate::ui::preview_label::PreviewCard>,
     /// The AI page: speech models, downloads the user started, the notice and the switches.
     pub ai: crate::ai::models::ModelsVm,
     /// The built-in text models of the AI page (AI-7): the list by memory tier and its downloads.
@@ -291,6 +293,7 @@ impl AppModel {
             import: Default::default(),
             bulk: Default::default(),
             export_popover: None,
+            preview_card: None,
             ai: crate::ai::models::ModelsVm {
                 notice_dismissed: settings
                     .get(crate::ui::ai::KEY_NOTICE_DISMISSED)

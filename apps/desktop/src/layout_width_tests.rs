@@ -1380,15 +1380,6 @@ fn cases() -> Vec<Case> {
         .text("Blur", || crate::editor::Tool::Blur.label())
         .text("Pixelate", || crate::editor::Tool::Pixelate.label()),
     );
-    // The "New in 0.3.3" pill next to the panel title: 11 px, 16 px padding; it may take at most
-    // 120 px of the 266 - 26 left of the icon, so the title keeps room.
-    v.push(
-        Case::new("Panel New pill", "120 - 16 padding", 104., 11., 400, one)
-            .text("New in 0.3.3", || {
-                cm_i18n::tr_ctx!("panel badge", "New in 0.3.3")
-            }),
-    );
-
     // Editor view pill (ANN-5): the Copy text button is 8 px side padding, 1 px border, a 16 px icon
     // and a 6 px gap; the pill wraps, so the button may be as wide as the pill. The reviewed
     // Vietnamese "Đang nhận dạng văn bản…" is 144 px, so the pinned button width is 190 px (it was 150).
@@ -1416,6 +1407,70 @@ fn cases() -> Vec<Case> {
             one,
         )
         .text("Reset to defaults", || cm_i18n::tr!("Reset to defaults")),
+    );
+    // Settings > General > Previews (S24): the Feedback buttons are 32 px, 12 px side padding, 1 px
+    // border, a 14 px icon and its gap, `flex_none` in a wrapping row, so each must fit alone in a
+    // 260 px room. The pill is 18 px high, 7 px side padding, 1 px dashed border, 11/600, alone on a
+    // wrapping title line. The row hints (12.5 px) and the page sentence (12 px) wrap.
+    v.push(
+        Case::new(
+            "Previews feedback buttons",
+            "260 - 24 padding - 2 border - 14 icon - 6 gap",
+            260. - 46.,
+            cap,
+            400,
+            one,
+        )
+        .text("Feedback", || {
+            crate::ui::settings::previews_text_for_tests().feedback
+        })
+        .text("Send general feedback", || {
+            crate::ui::settings::previews_text_for_tests().general_feedback
+        }),
+    );
+    v.push(
+        Case::new(
+            "Previews pill",
+            "120 - 14 padding - 2 border",
+            120. - 16.,
+            11.,
+            600,
+            one,
+        )
+        .text("Preview", || {
+            crate::ui::settings::previews_text_for_tests().pill
+        }),
+    );
+    v.push(
+        Case::new(
+            "Previews row hint and page sentence",
+            "180 min text column; sentence in a 440 px page",
+            180.,
+            12.5,
+            400,
+            Overflow::Lines(4),
+        )
+        .texts(cm_core::features::previews().map(|f| {
+            t(format!("hint of {}", f.id), move || {
+                crate::ui::settings::preview_feature_text_for_tests(f.id)
+            })
+        })),
+    );
+    v.push(
+        Case::new(
+            "Previews page sentence",
+            "440 px page column",
+            440.,
+            cap,
+            400,
+            Overflow::Lines(4),
+        )
+        .text("intro", || {
+            crate::ui::settings::previews_text_for_tests().intro
+        })
+        .text("footer", || {
+            crate::ui::settings::previews_text_for_tests().footer
+        }),
     );
     // Publish footer progress row: Cancel / Cancelling... are 40 px secondary buttons with 16 px
     // padding and a border, in the 150 px the status text leaves free on the narrowest page.
@@ -1842,4 +1897,33 @@ fn row_two_dock_tile_labels_have_room_for_forty_percent_more() {
             assert!(px <= 200. - 24. - 2., "{name:?}: {px:.0} px");
         }
     }
+}
+
+/// Design S24: the Preview label is never truncated. Each size's label fits where it goes, in
+/// English, Vietnamese ("Xem trước") and with 40 percent more text: the XS tag inside a dock tile
+/// (the half row of the sidebar, less the 4 px it overhangs), the S label after a launcher title
+/// and the M label next to a page title. The dock tile's two label lines also fit in Vietnamese.
+#[test]
+fn the_preview_label_fits_where_it_goes_in_every_language() {
+    use crate::ui::preview_label::{self as pl, Size};
+    let tile_w = (crate::theme::scale::SIDEBAR_W - 24. - 2. - 16. - 6.) / 2.;
+    for lang in [Lang::En, Lang::Vi] {
+        let label = with_language(lang, pl::label_text);
+        for (size, room) in [(Size::Xs, tile_w - 8.), (Size::S, 120.), (Size::M, 160.)] {
+            let m = pl::metrics(size);
+            let text = width(&label, Face::of(false, 600), m.font);
+            let whole = text + 2. * m.pad_x + 2. + m.icon.map_or(0., |i| i + 4.);
+            assert!(
+                whole * 1.4 <= room,
+                "{lang:?} {size:?}: {label:?} {whole:.0} px x 1.4 > {room:.0}"
+            );
+        }
+    }
+    // CG-11: the Vietnamese tile label wraps to at most two 13 px lines, which the tile has room for.
+    let vi = with_language(Lang::Vi, || crate::nav::ExtraTile::ClickGuide.label());
+    let n = lines(&vi, Face::of(false, 400), 11., DOCK_ROW2_ROOM).unwrap_or(99);
+    assert!(
+        n as f32 <= crate::nav::tile_metrics::LABEL_LINES,
+        "{vi:?}: {n} lines"
+    );
 }

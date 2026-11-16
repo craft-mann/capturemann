@@ -245,6 +245,7 @@ impl SettingsView {
             Some(login_toggle.into_any_element()),
             true,
         ));
+        let previews = self.previews_group(t, cx);
         div()
             .flex()
             .flex_col()
@@ -295,6 +296,7 @@ impl SettingsView {
                     }),
                 ),
             )
+            .children(previews)
             .into_any_element()
     }
 }

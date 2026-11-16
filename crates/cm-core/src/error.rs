@@ -50,10 +50,12 @@ pub enum ErrorCode {
     Internal,
     DaemonUnavailable,
     NotImplemented,
+    /// A Preview feature the user switched off in Settings (S24).
+    FeatureDisabled,
 }
 
 impl ErrorCode {
-    pub const ALL: [ErrorCode; 15] = [
+    pub const ALL: [ErrorCode; 16] = [
         ErrorCode::InvalidInput,
         ErrorCode::NotFound,
         ErrorCode::UserDeclined,
@@ -69,6 +71,7 @@ impl ErrorCode {
         ErrorCode::Internal,
         ErrorCode::DaemonUnavailable,
         ErrorCode::NotImplemented,
+        ErrorCode::FeatureDisabled,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -88,6 +91,7 @@ impl ErrorCode {
             ErrorCode::Internal => "internal",
             ErrorCode::DaemonUnavailable => "daemon_unavailable",
             ErrorCode::NotImplemented => "not_implemented",
+            ErrorCode::FeatureDisabled => "feature_disabled",
         }
     }
 
@@ -97,7 +101,7 @@ impl ErrorCode {
             ErrorCode::Internal | ErrorCode::NotImplemented => 1,
             ErrorCode::InvalidInput | ErrorCode::NotFound => 2,
             ErrorCode::UserDeclined | ErrorCode::ConfirmationTimeout => 3,
-            ErrorCode::PermissionMissing => 4,
+            ErrorCode::PermissionMissing | ErrorCode::FeatureDisabled => 4,
             ErrorCode::DeviceBusy
             | ErrorCode::DiskFull
             | ErrorCode::Network
@@ -152,6 +156,9 @@ pub enum CmError {
     DaemonUnavailable { message: String },
     #[error("{message}")]
     NotImplemented { message: String },
+    /// The feature is a Preview that the user switched off in Settings (`previews.<id>`).
+    #[error("{message}")]
+    FeatureDisabled { feature: String, message: String },
 }
 
 /// Serializable `{code, message, data}` form for MCP (`error.data`) and JSON-RPC.
@@ -268,6 +275,17 @@ impl CmError {
         }
     }
 
+    /// A Preview feature (see [`crate::features`]) that is switched off in Settings.
+    pub fn feature_disabled(feature: &str) -> Self {
+        let name = crate::features::feature(feature).map_or(feature, |f| f.name);
+        CmError::FeatureDisabled {
+            feature: feature.to_owned(),
+            message: format!(
+                "{name} is switched off. Turn it on in CaptureMann Settings > General > Previews."
+            ),
+        }
+    }
+
     pub fn code(&self) -> ErrorCode {
         match self {
             CmError::InvalidInput { .. } => ErrorCode::InvalidInput,
@@ -285,6 +303,7 @@ impl CmError {
             CmError::Internal { .. } => ErrorCode::Internal,
             CmError::DaemonUnavailable { .. } => ErrorCode::DaemonUnavailable,
             CmError::NotImplemented { .. } => ErrorCode::NotImplemented,
+            CmError::FeatureDisabled { .. } => ErrorCode::FeatureDisabled,
         }
     }
 
@@ -316,6 +335,7 @@ impl CmError {
             CmError::JobFailed { job_id, reason, .. } => {
                 Some(json!({ "job_id": job_id, "reason": reason }))
             }
+            CmError::FeatureDisabled { feature, .. } => Some(json!({ "feature": feature })),
             // The export refusals (EXP-5) carry their stable id and parameters.
             CmError::InvalidInput { message } => crate::message::export_refusal(message).map(|p| {
                 let mut d = serde_json::Map::new();
@@ -392,6 +412,13 @@ impl CmError {
             ErrorCode::Internal => CmError::Internal { message: msg },
             ErrorCode::DaemonUnavailable => CmError::DaemonUnavailable { message: msg },
             ErrorCode::NotImplemented => CmError::NotImplemented { message: msg },
+            ErrorCode::FeatureDisabled => CmError::FeatureDisabled {
+                feature: field("feature")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                message: msg,
+            },
         })
     }
 }
@@ -423,6 +450,7 @@ mod tests {
             CmError::internal("sqlite: database is locked"),
             CmError::daemon_unavailable("no daemon at daemon.sock"),
             CmError::not_implemented("the Windows encoder is not built yet"),
+            CmError::feature_disabled("long_shot"),
         ]
     }
 
@@ -444,13 +472,14 @@ mod tests {
             ("internal", 1),
             ("daemon_unavailable", 5),
             ("not_implemented", 1),
+            ("feature_disabled", 4),
         ];
         for (err, (code, exit)) in samples().iter().zip(expected) {
             assert_eq!(err.code().as_str(), code);
             assert_eq!(err.exit_code(), exit);
             assert_eq!(serde_json::to_value(err.code()).unwrap(), code);
         }
-        assert_eq!(ErrorCode::ALL.len(), 15);
+        assert_eq!(ErrorCode::ALL.len(), 16);
     }
 
     #[test]

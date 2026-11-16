@@ -53,17 +53,55 @@ impl ToolSpec {
         } else {
             ""
         };
-        let description = format!("{} {tier}{idem} Spec: {}.", self.summary, self.spec);
+        // S24: a tool of a Preview feature says so in its description and its `_meta.stage`.
+        let preview = cm_core::features::feature_of_tool(self.name).filter(|f| f.is_preview());
+        let mut description = format!("{} {tier}{idem} Spec: {}.", self.summary, self.spec);
+        if let Some(f) = preview {
+            description.push_str(&format!(
+                " (preview) Part of {}, a Preview feature: it may still change, and it answers `feature_disabled` when the user switches it off in Settings > General > Previews.",
+                f.name
+            ));
+        }
         let mut ann = ToolAnnotations::new()
             .read_only(!self.mutating)
             .open_world(false);
         if self.mutating {
             ann = ann.destructive(self.destructive).idempotent(false);
         }
-        Tool::new(self.name, description, obj(self.input.clone()))
+        // A parameter that starts a preview inside a shared tool (`capture_screenshot`.`mode`).
+        let mut input = self.input.clone();
+        for f in cm_core::features::previews() {
+            for (tool, param) in f.tool_params {
+                let prop = input
+                    .pointer_mut(&format!("/properties/{param}"))
+                    .and_then(Value::as_object_mut);
+                if let (true, Some(prop)) = (*tool == self.name, prop) {
+                    let old = prop
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned();
+                    prop.insert(
+                        "description".into(),
+                        json!(format!(
+                            "(preview) {old} A Preview feature: `feature_disabled` when the user switched it off in Settings > General > Previews."
+                        )),
+                    );
+                    prop.insert("x-stage".into(), json!(f.stage.as_str()));
+                }
+            }
+        }
+        let mut tool = Tool::new(self.name, description, obj(input))
             .with_raw_output_schema(obj(self.output.clone()))
             .with_title(self.name.replace('_', " "))
-            .with_annotations(ann)
+            .with_annotations(ann);
+        if let Some(f) = preview {
+            let mut meta = JsonObject::new();
+            meta.insert("stage".into(), json!(f.stage.as_str()));
+            meta.insert("feature".into(), json!(f.id));
+            tool.meta = Some(rmcp::model::MetaObject(meta));
+        }
+        tool
     }
 }
 
@@ -2207,6 +2245,79 @@ mod tests {
             assert_eq!(t.output["type"], "object", "{}", t.name);
             let tool = t.to_tool();
             assert!(tool.description.as_deref().unwrap_or("").contains("Tier:"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+
+    fn tool(name: &str) -> Tool {
+        crate::tools::all()
+            .iter()
+            .find(|t| t.name == name)
+            .unwrap_or_else(|| panic!("no tool {name}"))
+            .to_tool()
+    }
+
+    /// S24: every tool of a Preview feature says `stage: "preview"` and "(preview)"; a stable
+    /// tool says neither; the shared `capture_screenshot` marks only its `mode` parameter.
+    #[test]
+    fn preview_tools_are_marked_and_stable_ones_are_not() {
+        for name in [
+            "start_guide",
+            "stop_guide",
+            "get_guide",
+            "set_guide",
+            "export_guide",
+        ] {
+            let t = tool(name);
+            let meta = t
+                .meta
+                .as_ref()
+                .unwrap_or_else(|| panic!("{name} has no _meta"));
+            assert_eq!(meta.0["stage"], "preview", "{name}");
+            assert_eq!(meta.0["feature"], "click_guide", "{name}");
+            assert!(
+                t.description.as_deref().unwrap().contains("(preview)"),
+                "{name}"
+            );
+            assert!(t
+                .description
+                .as_deref()
+                .unwrap()
+                .contains("feature_disabled"));
+        }
+        for name in ["list_library", "annotate", "get_settings", "export_video"] {
+            let t = tool(name);
+            assert!(t.meta.is_none(), "{name}");
+            assert!(
+                !t.description.as_deref().unwrap().contains("(preview)"),
+                "{name}"
+            );
+        }
+        let shot = tool("capture_screenshot");
+        assert!(shot.meta.is_none());
+        assert!(!shot.description.as_deref().unwrap().contains("(preview)"));
+        let mode = &shot.input_schema["properties"]["mode"];
+        assert_eq!(mode["x-stage"], "preview");
+        assert!(mode["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("(preview)"));
+        assert!(shot.input_schema["properties"]["target"]
+            .get("x-stage")
+            .is_none());
+    }
+
+    #[test]
+    fn every_registered_tool_of_a_feature_exists_or_is_internal() {
+        let names: Vec<_> = crate::tools::all().iter().map(|t| t.name).collect();
+        for f in cm_core::features::FEATURES {
+            for t in f.tools.iter().filter(|t| **t != "long_shot_state") {
+                assert!(names.contains(t), "{t} of {} is not an MCP tool", f.id);
+            }
         }
     }
 }
