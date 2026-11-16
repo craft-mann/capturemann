@@ -8,7 +8,7 @@ use crate::picker::Mode;
 
 pub const USAGE: &str = "usage: cm-overlay <region|window|display|long> [--socket PATH] \
 [--confirm-on-release] [--no-magnifier] [--no-hint] [--pick] [--tab-to-list] \
-[--auto-scroll available|needs_accessibility|unavailable] [--no-click-guide] \
+[--auto-scroll available|needs_accessibility|unavailable] \
 [--exit-after-first-frame]
 
 Shows a frozen, dimmed copy of every display and lets you pick a region (drag, then Enter),
@@ -27,8 +27,6 @@ Esc cancels (exit 3, nothing saved). Exit codes follow the shared error table.
                         Wayland). Default `unavailable`. `long` always behaves like `--pick`:
                         it prints {\"picked\": {..., \"long\": {\"scroll\", \"direction\"}}} or
                         {\"switch_to\": \"region|window|display|guide|accessibility\"}
-  --no-click-guide      long mode: leave the Click Guide button off the bar (its preview is
-                        switched off in Settings)
   --tab-to-list         window mode: Tab leaves the picker and prints {\"switch_to\": \"list\"} with no
                         screenshot (the desktop app then shows its window list)
   --exit-after-first-frame
@@ -48,8 +46,6 @@ pub struct Args {
     pub tab_to_list: bool,
     /// Long Shot: whether the bar offers Auto scroll.
     pub auto_scroll: AutoSupport,
-    /// Long mode: the bar lists Click Guide (its preview is on).
-    pub click_guide: bool,
     pub exit_after_first_frame: bool,
 }
 
@@ -77,7 +73,6 @@ pub fn parse<I: IntoIterator<Item = String>>(
     let mut pick = false;
     let mut tab_to_list = false;
     let mut auto_scroll = AutoSupport::Unavailable;
-    let mut click_guide = true;
     let mut it = args.into_iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -103,7 +98,6 @@ pub fn parse<I: IntoIterator<Item = String>>(
                     )
                 })?;
             }
-            "--no-click-guide" => click_guide = false,
             "--exit-after-first-frame" => exit_after_first_frame = true,
             "region" | "window" | "display" | "long" => {
                 if mode.is_some() {
@@ -137,7 +131,6 @@ pub fn parse<I: IntoIterator<Item = String>>(
         pick,
         tab_to_list,
         auto_scroll,
-        click_guide,
         exit_after_first_frame,
     }))
 }
@@ -161,18 +154,6 @@ mod tests {
             panic!("expected Run");
         };
         assert!(b.exit_after_first_frame);
-    }
-
-    #[test]
-    fn the_click_guide_button_is_on_unless_the_flag_says_otherwise() {
-        let Ok(Parsed::Run(a)) = p(&["long"]) else {
-            panic!("expected Run");
-        };
-        assert!(a.click_guide);
-        let Ok(Parsed::Run(b)) = p(&["long", "--no-click-guide"]) else {
-            panic!("expected Run");
-        };
-        assert!(!b.click_guide);
     }
 
     #[test]

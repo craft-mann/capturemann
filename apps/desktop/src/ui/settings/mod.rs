@@ -24,7 +24,6 @@ mod diagnostics;
 mod general;
 mod library_folder;
 pub mod model;
-mod previews;
 mod privacy;
 mod problem;
 mod publish_card;
@@ -39,19 +38,6 @@ mod webcam_width_tests;
 pub(crate) mod widgets;
 
 use model::SettingsSection;
-
-/// The Previews section's texts, for the width tests.
-#[cfg(test)]
-pub(crate) fn previews_text_for_tests() -> previews::PreviewsText {
-    previews::PreviewsText::current()
-}
-
-/// The description of a preview in the UI language, for the width tests.
-#[cfg(test)]
-pub(crate) fn preview_feature_text_for_tests(id: &str) -> String {
-    let f = cm_core::features::feature(id).expect("a registered feature");
-    previews::feature_text(f).1.unwrap_or_default()
-}
 
 /// Why a change on the Agents page did not take (kept as a reason; worded when drawn).
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -359,13 +359,6 @@ async fn help_marks_the_preview_features() {
     }
 }
 
-/// S24: `feature_disabled` exits 4 (the code of a user setting that blocks the call).
-#[test]
-fn feature_disabled_exits_4() {
-    assert_eq!(cm_core::ErrorCode::FeatureDisabled.exit_code(), 4);
-    assert_eq!(cm_cli::exit_code_for("feature_disabled"), 4);
-}
-
 /// ANN-1/ANN-3: annotate (inline, file, stdin), get, undo, redo; each is one revision.
 #[tokio::test]
 async fn annotate_get_undo_redo_roundtrip() {

@@ -58,7 +58,7 @@ impl ToolSpec {
         let mut description = format!("{} {tier}{idem} Spec: {}.", self.summary, self.spec);
         if let Some(f) = preview {
             description.push_str(&format!(
-                " (preview) Part of {}, a Preview feature: it may still change, and it answers `feature_disabled` when the user switches it off in Settings > General > Previews.",
+                " (preview) Part of {}, a Preview feature: it may still change, but it is always available.",
                 f.name
             ));
         }
@@ -84,7 +84,7 @@ impl ToolSpec {
                     prop.insert(
                         "description".into(),
                         json!(format!(
-                            "(preview) {old} A Preview feature: `feature_disabled` when the user switched it off in Settings > General > Previews."
+                            "(preview) {old} A Preview feature: it may still change."
                         )),
                     );
                     prop.insert("x-stage".into(), json!(f.stage.as_str()));
@@ -2283,11 +2283,6 @@ mod preview_tests {
                 t.description.as_deref().unwrap().contains("(preview)"),
                 "{name}"
             );
-            assert!(t
-                .description
-                .as_deref()
-                .unwrap()
-                .contains("feature_disabled"));
         }
         for name in ["list_library", "annotate", "get_settings", "export_video"] {
             let t = tool(name);

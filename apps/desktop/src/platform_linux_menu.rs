@@ -43,8 +43,6 @@ pub struct MenuInputs {
     pub delay_s: u32,
     /// `(capture id, title)`, newest first.
     pub recents: Vec<(String, String)>,
-    /// The Click Guide preview is on (S24): off removes "New Click Guide" from the menu.
-    pub click_guide: bool,
 }
 
 impl Default for MenuInputs {
@@ -59,7 +57,6 @@ impl Default for MenuInputs {
             pause_label: menu_text(ids::REC_PAUSE),
             delay_s: 0,
             recents: Vec::new(),
-            click_guide: true,
         }
     }
 }
@@ -194,9 +191,7 @@ pub fn build_menu(inp: &MenuInputs) -> Vec<MenuNode> {
         node(ids::OPEN_LIBRARY, true),
         node(ids::OPEN_LAUNCHER, true),
     ]);
-    if inp.click_guide {
-        items.push(node(ids::NEW_CLICK_GUIDE, true));
-    }
+    items.push(node(ids::NEW_CLICK_GUIDE, true));
     items.extend([
         recent,
         separator(1),
@@ -526,14 +521,6 @@ mod tests {
     }
 
     /// Every action the app routes (`Command::TrayMenu`) can be reached from this menu.
-    #[test]
-    fn the_click_guide_item_leaves_the_tray_with_its_preview() {
-        let mut inp = MenuInputs::default();
-        assert!(find(&build_menu(&inp), item_id(ids::NEW_CLICK_GUIDE)).is_some());
-        inp.click_guide = false;
-        assert!(find(&build_menu(&inp), item_id(ids::NEW_CLICK_GUIDE)).is_none());
-    }
-
     #[test]
     fn every_native_tray_action_is_present() {
         let m = build_menu(&MenuInputs::default());

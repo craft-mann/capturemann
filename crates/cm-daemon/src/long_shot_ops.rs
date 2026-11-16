@@ -594,15 +594,6 @@ impl crate::daemon::Inner {
         if !starts_long && !starts_guide {
             return Ok(());
         }
-        // S24: a Preview the user switched off in Settings does not start (reading and exporting
-        // what exists, and stopping a run that already started, stay allowed).
-        let settings = self.settings.all()?;
-        let feature = if starts_long {
-            "long_shot"
-        } else {
-            "click_guide"
-        };
-        cm_core::features::require_enabled(&settings, feature)?;
         if self.delayed.long_running() {
             return Err(CmError::busy(BUSY_LONG_SHOT).into());
         }

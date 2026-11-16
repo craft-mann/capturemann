@@ -11917,57 +11917,6 @@ msgstr "Bảng ảnh chứa tối đa 12 ảnh chụp màn hình; bạn đã ch�
 msgid "The file name pattern has a mistake: use only the keys below, each between braces."
 msgstr "Mẫu tên tệp có lỗi: chỉ dùng các khóa bên dưới, mỗi khóa đặt trong dấu ngoặc nhọn."
 
-# NOTE: added with board S24 (Preview label, Settings > Previews); owner review required
-#, fuzzy
-msgctxt "previews page"
-msgid "Capture a scrolling page as one image."
-msgstr "Chụp một trang cuộn thành một ảnh."
-
-#, fuzzy
-msgctxt "previews page"
-msgid "Feedback"
-msgstr "Góp ý"
-
-#, fuzzy
-msgctxt "previews page"
-msgid "New features that are ready to use but may still change. Turning one off hides its buttons and menus; anything you made with it stays in your library."
-msgstr "Tính năng mới, dùng được ngay nhưng có thể còn thay đổi. Tắt một tính năng sẽ ẩn các nút và menu của nó; những gì bạn đã tạo vẫn nằm trong thư viện."
-
-#, fuzzy
-msgctxt "previews page"
-msgid "Preview"
-msgstr "Xem trước"
-
-#, fuzzy
-msgctxt "previews page"
-msgid "Previews"
-msgstr "Xem trước tính năng"
-
-#, fuzzy
-msgctxt "previews page"
-msgid "Previews are on by default."
-msgstr "Các bản xem trước được bật sẵn."
-
-#, fuzzy
-msgctxt "previews page"
-msgid "Send feedback about {feature}"
-msgstr "Gửi góp ý về {feature}"
-
-#, fuzzy
-msgctxt "previews page"
-msgid "Send general feedback"
-msgstr "Gửi góp ý chung"
-
-#, fuzzy
-msgctxt "previews page"
-msgid "Turn your clicks into a numbered guide."
-msgstr "Biến các cú nhấp chuột của bạn thành hướng dẫn có đánh số."
-
-#, fuzzy
-msgctxt "previews page"
-msgid "{feature}, preview"
-msgstr "{feature}, bản xem trước"
-
 msgid "Click through a task once; each click becomes a numbered step. Clicks only, never keystrokes."
 msgstr "Nhấp qua một tác vụ một lần; mỗi lần nhấp trở thành một bước có số. Chỉ ghi lần nhấp, không bao giờ ghi phím gõ."
 
@@ -12008,10 +11957,6 @@ msgid "Tell us what works and what doesn’t."
 msgstr "Cho chúng tôi biết điều gì dùng được và điều gì chưa."
 
 #, fuzzy
-msgid "Turn off in Settings › Previews"
-msgstr "Tắt trong Cài đặt › Xem trước"
-
-#, fuzzy
 msgid "What you captured so far is kept."
 msgstr "Phần bạn đã chụp được giữ lại."
 
@@ -12043,11 +11988,3 @@ msgstr "{title}, bản xem trước"
 msgctxt "preview label"
 msgid "Preview"
 msgstr "Xem trước"
-
-#, fuzzy
-msgid "Open Previews"
-msgstr "Mở Xem trước"
-
-#, fuzzy
-msgid "{name} is turned off in Settings › Previews"
-msgstr "{name} đang tắt trong Cài đặt › Xem trước"

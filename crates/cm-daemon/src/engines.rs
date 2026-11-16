@@ -107,8 +107,7 @@ pub(crate) const NOT_SECRET_KEYS: &[&str] = &["ai.text.context_tokens"];
 /// "app_only_setting"`; the in-process GUI (`Actor::User`) can write them.
 ///
 /// Why each one: `library.path` redirects every later capture (AGT-2 makes moving the library a
-/// Confirm-tier operation); `previews.*` holds the switches of the Preview features (S24);
-/// `privacy.*` holds the excluded-apps list; `shortcuts.*` rebinds
+/// Confirm-tier operation); `privacy.*` holds the excluded-apps list; `shortcuts.*` rebinds
 /// global hotkeys; `permissions.*` and `agents.*` are the setup state and the per-client
 /// policies; `storage.*` and `export.*` change what leaves the machine or runs unattended
 /// (`storage.pause_uploads_while_recording`, `export.auto_on_stop`); `recording.fps60_selftest`
@@ -123,9 +122,6 @@ pub(crate) const NOT_SECRET_KEYS: &[&str] = &["ai.text.context_tokens"];
 pub const APP_ONLY_SETTINGS: &[&str] = &[
     "library.*",
     "privacy.*",
-    // S24: the Preview switches (`previews.long_shot`, `previews.click_guide`); only the person
-    // at the keyboard turns a feature off or on.
-    "previews.*",
     "shortcuts.*",
     "permissions.*",
     "agents.*",
@@ -432,23 +428,6 @@ mod tests {
         assert!(is_app_only_setting("storage.destinations"));
         // A prefix family does not match a longer first segment.
         assert!(!is_app_only_setting("library_x.path"));
-    }
-
-    #[test]
-    fn s24_preview_switches_are_app_only() {
-        for f in cm_core::features::FEATURES {
-            let key = f.setting_key();
-            assert!(is_app_only_setting(&key), "{key}");
-            let m: Map<String, Value> = [(key.clone(), Value::Bool(false))].into_iter().collect();
-            assert!(
-                check_setting_writes(true, &m).is_err(),
-                "an agent wrote {key}"
-            );
-            assert!(
-                check_setting_writes(false, &m).is_ok(),
-                "the app may write {key}"
-            );
-        }
     }
 
     #[test]

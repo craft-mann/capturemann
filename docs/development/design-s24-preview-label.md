@@ -5,7 +5,7 @@ One line per text node; layout is in the artifact (artboard S24). Extracted for 
 0.3.4: Preview label
 S24 · Preview label
 A Preview label for big new features, reusable for the next ones
-Long Shot and Click Guide ship in 0.3.4 as previews: ready to use, still changing. One small neutral component marks them wherever people start them, with a popover for feedback and a switch in Settings.
+Long Shot and Click Guide ship in 0.3.4 as previews: ready to use, still changing. One small neutral component marks them wherever people start them, with a popover for feedback. (Nov 16, 2026: the Settings switch below was dropped; a preview is only a label and always available.)
 Component
 XS · corner tag
 Preview
@@ -153,11 +153,11 @@ HUDs while capturing (they stay minimal), captured or exported images, library c
 One per surface
 At most one Preview label per page, panel or row. Preview replaces “New in 0.3.4”; never show both.
 Interaction
-Hover shows the tooltip. Click (or Enter on focus) opens the popover with Send feedback and a link to Settings › Previews. Accessible name: “Preview. New and still changing.”
+Hover shows the tooltip. Click (or Enter on focus) opens the popover with Send feedback (the link to Settings › Previews was dropped with the switch). Accessible name: “Preview. New and still changing.”
 First use
 The first time a preview feature opens, a small intro card (non-blocking, top right of its surface) explains it in one line, with Got it and Send feedback. Shown once per feature.
 Settings › Previews
-A section on the General page lists every preview with a switch (on by default) and a Feedback button. Off hides its entry points; files made with it stay.
+Dropped on Nov 16, 2026: there is no Previews section and no switch; the previews are always available and keep only the label.
 Agents and CLI
 MCP tools of a preview feature add
 stage: "preview"
@@ -165,9 +165,7 @@ to their listing and “(preview)” to their description;
 capturemann --help
 marks them
 [preview]
-. A preview switched off answers
-feature_disabled
-.
+. (The `feature_disabled` answer was dropped on Nov 16, 2026.)
 Lifecycle
 Each feature has a stage in one registry (
 preview

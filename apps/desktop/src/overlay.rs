@@ -369,14 +369,9 @@ pub struct OverlayLauncher {
 /// restarted.
 pub const OVERLAY_WATCHDOG: Duration = Duration::from_secs(120);
 
-/// The extra command line of the Long Shot overlay: the Auto scroll state, and `--no-click-guide`
-/// when the Click Guide preview is switched off (the bar then has no Click Guide button).
-pub fn long_extra_args(auto_scroll: &str, click_guide: bool) -> Vec<OsString> {
-    let mut a: Vec<OsString> = vec!["--auto-scroll".into(), auto_scroll.into()];
-    if !click_guide {
-        a.push("--no-click-guide".into());
-    }
-    a
+/// The extra command line of the Long Shot overlay: the Auto scroll state.
+pub fn long_extra_args(auto_scroll: &str) -> Vec<OsString> {
+    vec!["--auto-scroll".into(), auto_scroll.into()]
 }
 
 impl OverlayLauncher {
@@ -396,18 +391,9 @@ impl OverlayLauncher {
 
     /// Runs the Long Shot overlay: picks the area and the options, takes no screenshot.
     /// `auto_scroll` is `available`, `needs_accessibility` or `unavailable`.
-    /// `click_guide`: the bar lists Click Guide (its preview is on, design S24).
-    pub async fn pick_long(
-        &self,
-        auto_scroll: &str,
-        click_guide: bool,
-    ) -> Result<LongOutcome, OverlayError> {
+    pub async fn pick_long(&self, auto_scroll: &str) -> Result<LongOutcome, OverlayError> {
         let (code, out, err) = self
-            .run_raw_with(
-                CaptureMode::Long,
-                true,
-                &long_extra_args(auto_scroll, click_guide),
-            )
+            .run_raw_with(CaptureMode::Long, true, &long_extra_args(auto_scroll))
             .await?;
         parse_long(code, &out, &err)
     }
@@ -580,22 +566,6 @@ impl OverlayLauncher {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// S24: the Long Shot overlay is told to leave the Click Guide button off when its preview is
-    /// switched off, and gets no extra flag otherwise.
-    #[test]
-    fn the_long_overlay_hears_about_the_click_guide_switch() {
-        let on: Vec<_> = long_extra_args("available", true)
-            .iter()
-            .map(|a| a.to_string_lossy().into_owned())
-            .collect();
-        assert_eq!(on, ["--auto-scroll", "available"]);
-        let off: Vec<_> = long_extra_args("unavailable", false)
-            .iter()
-            .map(|a| a.to_string_lossy().into_owned())
-            .collect();
-        assert_eq!(off, ["--auto-scroll", "unavailable", "--no-click-guide"]);
-    }
 
     /// CAP-1: the overlay hands back a capture id.
     #[test]

@@ -189,7 +189,6 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
         capture_available: backend.daemon.is_some(),
         copy_after_capture: copy,
         recording_off: recording_off(app, cx),
-        previews: app.read(cx).previews,
         guide_off: recording_off(app, cx)
             .or_else(crate::ui::guide_view::preflight::disabled_reason),
         fps60_ready: commands::fps60_ready(

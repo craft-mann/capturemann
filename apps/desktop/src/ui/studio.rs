@@ -100,15 +100,10 @@ pub fn bind_keys(cx: &mut App) {
         // S15: Esc clears the ticks (and closes an open card menu first).
         KeyBinding::new("escape", ClearSelection, Some("LibraryList")),
     ]);
-    let flags = cx
-        .try_global::<AppHandle>()
-        .map(|h| h.0.read(cx).previews)
-        .unwrap_or_default();
-    cx.set_menus(app_menus(flags));
+    cx.set_menus(app_menus());
 }
 
-/// The entries of the app menu, in order. A switched-off preview (S24) has no item: the menu is
-/// rebuilt when the switch changes (`app::sync_previews`).
+/// The entries of the app menu, in order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppMenuEntry {
     Library,
@@ -121,28 +116,22 @@ pub enum AppMenuEntry {
     Quit,
 }
 
-pub fn app_menu_plan(flags: crate::ui::preview_label::PreviewFlags) -> Vec<AppMenuEntry> {
-    let mut v = vec![AppMenuEntry::Library];
-    if flags.long_shot {
-        v.push(AppMenuEntry::LongShot);
-    }
-    if flags.click_guide {
-        v.push(AppMenuEntry::NewClickGuide);
-        v.push(AppMenuEntry::ClickGuideOfWindow);
-    }
-    v.extend([
+pub fn app_menu_plan() -> Vec<AppMenuEntry> {
+    vec![
+        AppMenuEntry::Library,
+        AppMenuEntry::LongShot,
+        AppMenuEntry::NewClickGuide,
+        AppMenuEntry::ClickGuideOfWindow,
         AppMenuEntry::Import,
         AppMenuEntry::Settings,
         AppMenuEntry::Separator,
         AppMenuEntry::Quit,
-    ]);
-    v
+    ]
 }
 
 /// The menu bar in the current UI language. Rebuilt by `app::apply_language` on a language switch
-/// and by `app::sync_previews` when a Preview switch changes.
-pub fn app_menus(flags: crate::ui::preview_label::PreviewFlags) -> Vec<Menu> {
-    let items = app_menu_plan(flags).into_iter().map(|e| match e {
+pub fn app_menus() -> Vec<Menu> {
+    let items = app_menu_plan().into_iter().map(|e| match e {
         AppMenuEntry::Library => MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
         // Native menus cannot draw the pill: the item text carries " (Preview)" (design S24).
         AppMenuEntry::LongShot => MenuItem::action(
@@ -371,7 +360,6 @@ impl Render for Studio {
                 section,
                 audio_open,
                 dock,
-                previews: self.app.read(cx).previews,
             },
             &self.app,
             &self.settings,
@@ -598,40 +586,11 @@ mod tests {
     /// it has the same items as before.
     #[test]
     fn the_menu_bar_has_the_app_menu() {
-        let menus = app_menus(Default::default());
+        let menus = app_menus();
         assert_eq!(menus.len(), 1);
         assert_eq!(menus[0].name.as_ref(), "CaptureMann");
         // Library, Long Shot, New Click Guide, Click Guide of a window, Import, Settings, a
         // separator and Quit.
         assert_eq!(menus[0].items.len(), 8);
-    }
-
-    /// S24: a switched-off preview has no menu item (the menu is rebuilt when the switch changes);
-    /// the other keeps its items; both back on restores all of them.
-    #[test]
-    fn a_preview_that_is_off_has_no_app_menu_item() {
-        use crate::ui::preview_label::PreviewFlags;
-        let count = |f: PreviewFlags| app_menus(f)[0].items.len();
-        let plan = |f: PreviewFlags| app_menu_plan(f);
-        let no_long = PreviewFlags {
-            long_shot: false,
-            click_guide: true,
-        };
-        let no_guide = PreviewFlags {
-            long_shot: true,
-            click_guide: false,
-        };
-        let none = PreviewFlags {
-            long_shot: false,
-            click_guide: false,
-        };
-        assert!(!plan(no_long).contains(&AppMenuEntry::LongShot));
-        assert!(plan(no_long).contains(&AppMenuEntry::NewClickGuide));
-        assert!(plan(no_guide).contains(&AppMenuEntry::LongShot));
-        assert!(!plan(no_guide).contains(&AppMenuEntry::NewClickGuide));
-        assert!(!plan(no_guide).contains(&AppMenuEntry::ClickGuideOfWindow));
-        assert_eq!(count(none), 5);
-        assert_eq!(count(no_long), 7);
-        assert_eq!(count(PreviewFlags::ALL_ON), 8);
     }
 }

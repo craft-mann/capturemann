@@ -63,8 +63,6 @@ pub struct Options {
     pub tab_to_list: bool,
     /// Long Shot: whether the bar offers Auto scroll.
     pub auto_scroll: AutoSupport,
-    /// Long Shot: whether the bar lists Click Guide.
-    pub click_guide: bool,
     /// Benchmark: finish as soon as every display has painted its first frame.
     pub exit_after_first_frame: bool,
 }
@@ -233,10 +231,7 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
         finish: None,
         error: None,
         next_monitor_check: Instant::now() + MONITOR_POLL,
-        bar: BarState {
-            click_guide: opts.click_guide,
-            ..BarState::new(opts.auto_scroll)
-        },
+        bar: BarState::new(opts.auto_scroll),
         pointer_at: None,
         bar_press: None,
         long_area: None,

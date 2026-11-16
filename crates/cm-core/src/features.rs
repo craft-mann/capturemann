@@ -1,13 +1,11 @@
 //! The feature-stage registry (design S24, the Preview label).
 //!
 //! One table says which big features are still `Preview` and which are `Stable`. Everything
-//! that marks or switches a preview reads it: the app's Preview label and Settings > General >
-//! Previews, the daemon's `feature_disabled` check, the MCP tool listing (`stage`, "(preview)")
-//! and the CLI help (`[preview]`). **Moving a feature to stable is a one-line change here**
-//! (`stage: Stage::Stable`): every label, the Settings row and the agent markers go away at
-//! once, and the switch no longer disables anything.
-
-use serde_json::{Map, Value};
+//! that marks a preview reads it: the app's Preview label, the MCP tool listing (`stage`, "(preview)")
+//! and the CLI help (`[preview]`).
+//! A preview is only a label: it is always available (the Settings switch was dropped on
+//! Nov 16, 2026). **Moving a feature to stable is a one-line change here**
+//! (`stage: Stage::Stable`): every label and the agent markers go away at once.
 
 /// Where a feature is in its life.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,7 +28,7 @@ impl Stage {
 /// One feature of the registry.
 #[derive(Debug, Clone, Copy)]
 pub struct Feature {
-    /// Stable id, used in the setting key, `feature_disabled` and the feedback link.
+    /// Stable id, used in the intro flag and the feedback link.
     pub id: &'static str,
     /// The English name (the UI translates it with its own catalogue).
     pub name: &'static str,
@@ -48,11 +46,6 @@ pub struct Feature {
 impl Feature {
     pub fn is_preview(&self) -> bool {
         self.stage == Stage::Preview
-    }
-
-    /// The settings key of the switch: `previews.<id>` (bool, default on).
-    pub fn setting_key(&self) -> String {
-        setting_key(self.id)
     }
 }
 
@@ -90,13 +83,6 @@ pub const FEATURES: &[Feature] = &[
     },
 ];
 
-/// The settings key prefix of the preview switches (app-only: an agent cannot write them).
-pub const SETTING_PREFIX: &str = "previews.";
-
-pub fn setting_key(id: &str) -> String {
-    format!("{SETTING_PREFIX}{id}")
-}
-
 /// The feature with this id.
 pub fn feature(id: &str) -> Option<&'static Feature> {
     FEATURES.iter().find(|f| f.id == id)
@@ -122,34 +108,9 @@ pub fn preview_param(tool: &str, param: &str) -> Option<&'static Feature> {
     previews().find(|f| f.tool_params.contains(&(tool, param)))
 }
 
-/// Whether the switch of `id` is on in `settings` (the full settings map). A missing or
-/// non-boolean value means on. A feature that is stable, or not in the registry, is always on.
-pub fn is_enabled(settings: &Map<String, Value>, id: &str) -> bool {
-    match feature(id) {
-        Some(f) if f.is_preview() => settings
-            .get(&f.setting_key())
-            .and_then(Value::as_bool)
-            .unwrap_or(true),
-        _ => true,
-    }
-}
-
-/// `Err(feature_disabled)` when the switch of `id` is off in `settings`.
-pub fn require_enabled(
-    settings: &Map<String, Value>,
-    id: &str,
-) -> Result<(), crate::error::CmError> {
-    if is_enabled(settings, id) {
-        Ok(())
-    } else {
-        Err(crate::error::CmError::feature_disabled(id))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn registry_ids_are_unique_and_keys_are_valid() {
@@ -157,7 +118,6 @@ mod tests {
         for f in FEATURES {
             assert!(seen.insert(f.id), "duplicate {}", f.id);
             assert!(f.id.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'));
-            assert_eq!(f.setting_key(), format!("previews.{}", f.id));
         }
         let ids: Vec<_> = previews().map(|f| f.id).collect();
         assert_eq!(ids, ["long_shot", "click_guide"]);
@@ -180,24 +140,8 @@ mod tests {
     }
 
     #[test]
-    fn on_by_default_and_off_only_for_false() {
-        let mut m = Map::new();
-        assert!(is_enabled(&m, "click_guide"));
-        m.insert("previews.click_guide".into(), json!(false));
-        assert!(!is_enabled(&m, "click_guide"));
-        assert!(is_enabled(&m, "long_shot"));
-        m.insert("previews.long_shot".into(), json!("no"));
-        assert!(is_enabled(&m, "long_shot"), "a non-bool value is on");
-        assert!(is_enabled(&m, "not_a_feature"));
-        let e = require_enabled(&m, "click_guide").unwrap_err();
-        assert_eq!(e.code().as_str(), "feature_disabled");
-        assert_eq!(e.data().unwrap()["feature"], "click_guide");
-        assert!(e.to_string().contains("Click Guide"));
-    }
-
-    #[test]
     fn a_stable_feature_has_no_switch() {
-        // What `Stage::Stable` means: not a preview, so never disabled by a switch.
+        // What `Stage::Stable` means: not a preview, so it carries no label.
         let f = Feature {
             stage: Stage::Stable,
             ..FEATURES[0]

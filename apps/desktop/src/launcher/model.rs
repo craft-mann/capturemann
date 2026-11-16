@@ -280,7 +280,6 @@ mod tests {
             recording_off: recording_off.map(str::to_owned),
             guide_off: recording_off.map(str::to_owned),
             fps60_ready,
-            previews: Default::default(),
         });
         LauncherModel::new(cmds, recent)
     }

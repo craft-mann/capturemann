@@ -3852,9 +3852,6 @@ msgstr ""
 msgid "Open Permissions…"
 msgstr ""
 
-msgid "Open Previews"
-msgstr ""
-
 msgid "Open Settings"
 msgstr ""
 
@@ -6601,9 +6598,6 @@ msgstr ""
 msgid "Turn off camera"
 msgstr ""
 
-msgid "Turn off in Settings › Previews"
-msgstr ""
-
 msgid "Turn off microphone"
 msgstr ""
 
@@ -7720,9 +7714,6 @@ msgid "{name} is in preview"
 msgstr ""
 
 msgid "{name} is saved as a PNG ({reason}). Camera and location data are not copied."
-msgstr ""
-
-msgid "{name} is turned off in Settings › Previews"
 msgstr ""
 
 msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your {secret_store}, never to a file, and are only sent to {service}."
@@ -10289,46 +10280,6 @@ msgstr ""
 
 msgctxt "preview label"
 msgid "Preview"
-msgstr ""
-
-msgctxt "previews page"
-msgid "Capture a scrolling page as one image."
-msgstr ""
-
-msgctxt "previews page"
-msgid "Feedback"
-msgstr ""
-
-msgctxt "previews page"
-msgid "New features that are ready to use but may still change. Turning one off hides its buttons and menus; anything you made with it stays in your library."
-msgstr ""
-
-msgctxt "previews page"
-msgid "Preview"
-msgstr ""
-
-msgctxt "previews page"
-msgid "Previews"
-msgstr ""
-
-msgctxt "previews page"
-msgid "Previews are on by default."
-msgstr ""
-
-msgctxt "previews page"
-msgid "Send feedback about {feature}"
-msgstr ""
-
-msgctxt "previews page"
-msgid "Send general feedback"
-msgstr ""
-
-msgctxt "previews page"
-msgid "Turn your clicks into a numbered guide."
-msgstr ""
-
-msgctxt "previews page"
-msgid "{feature}, preview"
 msgstr ""
 
 msgctxt "privacy"

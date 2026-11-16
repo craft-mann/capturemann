@@ -2035,15 +2035,12 @@ impl Render for LibraryView {
         }
         let list_focused = self.list_focus.contains_focused(window, cx);
 
-        // Design S24: with the Click Guide preview off, its buttons and its label are gone; the
-        // guides already made stay listed.
-        let guide_on = self.app.read(cx).previews.click_guide;
         // ---- title row: the page title, its real count, the search field ---------------------
         let icon_only = {
             let row_w = f32::from(window.viewport_size().width) - SIDEBAR_WIDTH - PAGE_PADDING * 2.;
             // The Click Guides title carries the M Preview label (design S24): its room is taken
             // from the row.
-            let tag_w = if matches!(route, Route::Guides) && guide_on {
+            let tag_w = if matches!(route, Route::Guides) {
                 crate::ui::preview_label::width(crate::ui::preview_label::Size::M) as f64 + 12.0
             } else {
                 0.0
@@ -2080,7 +2077,7 @@ impl Render for LibraryView {
                             .child(title),
                     )
                     // Design S24: one M label per page, after the title.
-                    .children((matches!(route, Route::Guides) && guide_on).then(|| {
+                    .children((matches!(route, Route::Guides)).then(|| {
                         crate::ui::preview_label::label(
                             &t,
                             crate::ui::preview_label::Size::M,
@@ -2121,7 +2118,7 @@ impl Render for LibraryView {
             }))
             .children(
                 // Only on the Click Guides page, not on All captures.
-                (matches!(route, Route::Guides) && guide_on)
+                (matches!(route, Route::Guides))
                     .then(|| click_guide_buttons(&t, &self.app, icon_only).into_any_element()),
             );
 
@@ -2368,7 +2365,7 @@ impl Render for LibraryView {
                 "mouse-pointer-click",
                 &tr!("No Click Guides yet"),
                 &tr!("Click through a task and CaptureMann writes the steps. It records clicks only, never keystrokes."),
-                guide_on.then(|| click_guide_buttons(&t, &app, false).into_any_element()),
+                Some(click_guide_buttons(&t, &app, false).into_any_element()),
             ),
             (_, Some(EmptyKind::NoCaptures)) => {
                 let keys = shortcuts

@@ -283,13 +283,12 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     }
     app.update(cx, |m, _| m.capture_busy = true);
     let auto = model::overlay_flag(cm_capture::long_shot::auto_scroll_support());
-    let click_guide = app.read(cx).previews.click_guide;
     let app2 = app.clone();
     cx.spawn(async move |cx| {
         let b = backend.clone();
         let picked = backend
             .rt
-            .spawn(async move { b.overlay.pick_long(auto, click_guide).await })
+            .spawn(async move { b.overlay.pick_long(auto).await })
             .await;
         cx.update(|cx| after_pick(&app2, picked, cx));
     })

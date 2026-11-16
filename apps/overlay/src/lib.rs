@@ -127,7 +127,6 @@ pub fn run(args: &Args, started: Instant) -> Result<Value, OverlayError> {
         confirm_on_release: args.confirm_on_release,
         tab_to_list: args.tab_to_list && args.mode == picker::Mode::Window,
         auto_scroll: args.auto_scroll,
-        click_guide: args.click_guide,
         exit_after_first_frame: args.exit_after_first_frame,
     };
     // Windows are closed when `app::run` returns, before the final capture is taken.

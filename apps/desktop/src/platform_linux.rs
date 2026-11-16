@@ -498,11 +498,6 @@ impl TrayHandle {
         self.update(|i| i.delay_s = secs);
     }
 
-    /// Design S24: a switched-off preview has no tray item (only Click Guide has one).
-    pub fn set_previews(&self, flags: crate::ui::preview_label::PreviewFlags) {
-        self.update(|i| i.click_guide = flags.click_guide);
-    }
-
     /// A live language switch: the menu is rebuilt from `menu_text`, so only the recents are
     /// passed on. A language change alone does not alter the inputs, so force a new layout.
     pub fn relabel(&self, recents: &[(String, String)]) {

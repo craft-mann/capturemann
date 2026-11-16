@@ -115,10 +115,10 @@ line, and the recording details page has a Published card. Differences from the 
 
 ## S24 Preview label (board R034Preview, Nov 16, 2026): backend and Settings built
 
-Not a request. Built: the stage registry (`crates/cm-core/src/features.rs`), settings `previews.long_shot` and
-`previews.click_guide` (app-only, default on), `feature_disabled` (shared error code 16, exit 4, JSON-RPC -32014),
-the MCP `_meta.stage` and "(preview)" markers, `[preview]` in the CLI help, and Settings > General > Previews
-(`apps/desktop/src/ui/settings/previews.rs`: a row per preview with a switch and Feedback, the footer line). The
+Not a request. Built: the stage registry (`crates/cm-core/src/features.rs`), the MCP `_meta.stage` and "(preview)"
+markers and `[preview]` in the CLI help. **Nov 16, 2026: the Settings > General > Previews section, the settings
+`previews.*` and the `feature_disabled` error were dropped; a preview is only a label.** What follows describes the
+dropped section as first built. The
 pill there is a local `preview_pill()` (dashed border, no fill, 18 px, 11/600) until the shared Preview label
 component replaces it. Text extracted from the board: `docs/development/design-s24-preview-label.md`.
 Differences: the Previews sentence is a caption under the section title (the board shows it as a note); the footer

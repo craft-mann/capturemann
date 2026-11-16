@@ -9,9 +9,10 @@
 //! `text` ring with a 2 px gap. It is never shown on HUDs while capturing, on captured or exported
 //! images, library cards, toasts or in the editor canvas, and at most once per surface.
 //!
-//! Which features are previews is the feature-stage registry's business (agent `previews`); this
-//! file only reads the setting `previews.<feature>` (default on) from the settings snapshot and
-//! writes one app-internal flag per feature (`ui.preview_intro.<feature>`) for the intro card.
+//! Which features are previews is the feature-stage registry's business (`cm_core::features`); a
+//! preview is only a label, the feature is always available (the Settings switch was dropped on
+//! Nov 16, 2026). This file writes one app-internal flag per feature
+//! (`ui.preview_intro.<feature>`) for the intro card.
 
 use cm_i18n::{tr, tr_ctx};
 use gpui::{
@@ -21,10 +22,9 @@ use gpui::{
 use serde_json::{Map, Value};
 
 use crate::theme::{Color, Mode, Theme};
-use crate::ui::app::{self, AppModel, Route};
+use crate::ui::app::AppModel;
 use crate::ui::components::{button, icon, ButtonKind};
 use crate::ui::paint::{hsla_of, rgba_of};
-use crate::ui::settings::model::SettingsSection;
 use crate::ui::tooltip::{rich_tip, TipLine};
 
 /// A feature that carries the label.
@@ -37,7 +37,7 @@ pub enum PreviewFeature {
 impl PreviewFeature {
     pub const ALL: [PreviewFeature; 2] = [PreviewFeature::LongShot, PreviewFeature::ClickGuide];
 
-    /// The stable key: `previews.<key>` is its setting, and `ui.preview_intro.<key>` its flag.
+    /// The stable key: `ui.preview_intro.<key>` is its flag.
     pub fn key(self) -> &'static str {
         match self {
             PreviewFeature::LongShot => "long_shot",
@@ -53,59 +53,8 @@ impl PreviewFeature {
         }
     }
 
-    pub fn setting_key(self) -> String {
-        format!("previews.{}", self.key())
-    }
-
     fn intro_key(self) -> String {
         format!("ui.preview_intro.{}", self.key())
-    }
-}
-
-/// Whether the feature's preview is on (`previews.<feature>`, on by default).
-pub fn enabled(settings: &Map<String, Value>, feature: PreviewFeature) -> bool {
-    settings
-        .get(&feature.setting_key())
-        .and_then(Value::as_bool)
-        .unwrap_or(true)
-}
-
-/// Which previews are switched on: the one value every entry point of the app reads (sidebar
-/// tiles and rail buttons, launcher rows, menus, the tray, the library buttons, the overlay's mode
-/// bar and the Preview labels). It is read from the settings snapshot once at start and again
-/// whenever a `previews.*` key is saved (`app::sync_previews`), never polled. Turning a feature off
-/// hides its entry points; what was made with it stays in the library (design S24).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PreviewFlags {
-    pub long_shot: bool,
-    pub click_guide: bool,
-}
-
-impl Default for PreviewFlags {
-    fn default() -> Self {
-        Self::ALL_ON
-    }
-}
-
-impl PreviewFlags {
-    pub const ALL_ON: PreviewFlags = PreviewFlags {
-        long_shot: true,
-        click_guide: true,
-    };
-
-    /// The switches in the full settings map (a missing key is on).
-    pub fn from_settings(settings: &Map<String, Value>) -> Self {
-        PreviewFlags {
-            long_shot: enabled(settings, PreviewFeature::LongShot),
-            click_guide: enabled(settings, PreviewFeature::ClickGuide),
-        }
-    }
-
-    pub fn is_on(self, feature: PreviewFeature) -> bool {
-        match feature {
-            PreviewFeature::LongShot => self.long_shot,
-            PreviewFeature::ClickGuide => self.click_guide,
-        }
     }
 }
 
@@ -353,13 +302,12 @@ pub fn close_card(app: &Entity<AppModel>, cx: &mut App) {
     });
 }
 
-/// Whether the intro of `feature` is still due: the label is on and the flag is not set.
+/// Whether the intro of `feature` is still due: the flag is not set.
 pub fn intro_due(settings: &Map<String, Value>, feature: PreviewFeature) -> bool {
-    enabled(settings, feature)
-        && !settings
-            .get(&feature.intro_key())
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
+    !settings
+        .get(&feature.intro_key())
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
 }
 
 /// Shows the intro card the first time a preview feature opens (once per feature, remembered in
@@ -377,15 +325,6 @@ pub fn show_intro_if_due(app: &Entity<AppModel>, feature: PreviewFeature, cx: &m
         m.preview_card = Some(PreviewCard::Intro(feature));
         cx.notify();
     });
-}
-
-/// "Turn off in Settings › Previews": the General page of Settings.
-pub fn open_previews_settings(app: &Entity<AppModel>, cx: &mut App) {
-    close_card(app, cx);
-    app.update(cx, |m, _| {
-        m.settings_page_request = Some(SettingsSection::General);
-    });
-    app::navigate(app, Route::Settings, cx);
 }
 
 fn popover_lines(feature: PreviewFeature) -> [String; 3] {
@@ -443,7 +382,7 @@ pub fn card_overlay(app: &Entity<AppModel>, t: &Theme, cx: &App) -> Option<AnyEl
             body = body.child(SharedString::from(line));
         }
     }
-    let (app_a, app_b, app_c) = (app.clone(), app.clone(), app.clone());
+    let (app_a, app_b) = (app.clone(), app.clone());
     let feedback = button(
         t,
         "preview-feedback",
@@ -467,15 +406,7 @@ pub fn card_overlay(app: &Entity<AppModel>, t: &Theme, cx: &App) -> Option<AnyEl
                     .on_click(move |_, _, cx| close_card(&app_b, cx)),
             )
     } else {
-        div().flex().flex_col().gap(px(8.)).child(feedback).child(
-            button(
-                t,
-                "preview-turn-off",
-                tr!("Turn off in Settings \u{203a} Previews"),
-                ButtonKind::Ghost,
-            )
-            .on_click(move |_, _, cx| open_previews_settings(&app_c, cx)),
-        )
+        div().flex().flex_col().gap(px(8.)).child(feedback)
     };
     let panel = crate::ui::components::card(t)
         .id(if intro {
@@ -578,24 +509,7 @@ mod tests {
     }
 
     #[test]
-    fn the_preview_setting_defaults_to_on_and_follows_the_key() {
-        let mut s = Map::new();
-        assert!(enabled(&s, PreviewFeature::LongShot));
-        s.insert("previews.long_shot".into(), Value::Bool(false));
-        assert!(!enabled(&s, PreviewFeature::LongShot));
-        assert!(enabled(&s, PreviewFeature::ClickGuide));
-    }
-
-    #[test]
-    fn the_flags_follow_the_settings_and_restore_when_turned_back_on() {
-        let mut s = Map::new();
-        assert_eq!(PreviewFlags::from_settings(&s), PreviewFlags::ALL_ON);
-        s.insert("previews.click_guide".into(), Value::Bool(false));
-        let f = PreviewFlags::from_settings(&s);
-        assert!(f.is_on(PreviewFeature::LongShot) && !f.is_on(PreviewFeature::ClickGuide));
-        s.insert("previews.click_guide".into(), Value::Bool(true));
-        assert_eq!(PreviewFlags::from_settings(&s), PreviewFlags::ALL_ON);
-        // Every feature of the registry has a flag (a new preview must be added to the flags).
+    fn every_registered_preview_has_a_preview_feature() {
         for f in cm_core::features::previews() {
             assert!(
                 PreviewFeature::ALL.iter().any(|p| p.key() == f.id),
@@ -612,9 +526,6 @@ mod tests {
         s.insert("ui.preview_intro.click_guide".into(), Value::Bool(true));
         assert!(!intro_due(&s, PreviewFeature::ClickGuide));
         assert!(intro_due(&s, PreviewFeature::LongShot), "per feature");
-        // A feature switched off shows no intro.
-        s.insert("previews.long_shot".into(), Value::Bool(false));
-        assert!(!intro_due(&s, PreviewFeature::LongShot));
     }
 
     #[test]

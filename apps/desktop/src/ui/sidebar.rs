@@ -43,8 +43,6 @@ pub struct SidebarProps {
     pub audio_open: bool,
     /// What the second dock row (Long Shot, Click Guide) needs to know (board S14).
     pub dock: DockFacts,
-    /// Which previews are on (S24): a switched-off one has no tile, rail button or label.
-    pub previews: crate::ui::preview_label::PreviewFlags,
 }
 
 impl SidebarProps {
@@ -370,15 +368,14 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .bg(rgba_of(t.surface_2))
         .child(record_row)
         .child(div().flex().gap(px(6.)).children(tiles))
-        // Row 2 (board S14): Long Shot and Click Guide, two to a row; a switched-off preview has no
-        // tile (S24), and with both off the row is gone.
-        .children((!nav::extra_tiles(p.previews).is_empty()).then(|| {
+        // Row 2 (board S14): Long Shot and Click Guide, two to a row.
+        .child(
             div().flex().gap(px(6.)).children(
-                nav::extra_tiles(p.previews)
+                nav::ExtraTile::ALL
                     .into_iter()
                     .map(|tile| extra_tile(t, p, app, tile, false)),
-            )
-        }))
+            ),
+        )
         .into_any_element()
 }
 
@@ -468,7 +465,7 @@ fn extra_tile(
         .map(|a| p.shortcuts.get(a).keycaps(p.platform))
         .unwrap_or_default();
     // Both tiles of the row get the same height: room for the chord when either has one.
-    let row_has_keys = nav::extra_tiles(p.previews).into_iter().any(|x| {
+    let row_has_keys = nav::ExtraTile::ALL.into_iter().any(|x| {
         x.shortcut()
             .is_some_and(|a| !p.shortcuts.get(a).keycaps(p.platform).is_empty())
     });
@@ -601,9 +598,6 @@ fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyEleme
     out.extend(
         nav::library_entries(&p.highlight(), &p.counts)
             .iter()
-            .filter(|e| {
-                e.item != nav::NavItem::Guides || nav::guides_page_visible(p.previews, &p.counts)
-            })
             .map(|e| nav_entry(t, p, app, e)),
     );
     out.push(group_label(t, tr_ctx!("sidebar group", "INTELLIGENCE")));
@@ -626,7 +620,7 @@ fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyEleme
 fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElement> {
     let entries = nav::dock(&p.shortcuts, p.platform);
     let counts = &p.counts;
-    nav::rail_layout(p.previews, counts)
+    nav::rail_layout()
         .into_iter()
         .map(|slot| match slot {
             RailEntry::Brand => div()

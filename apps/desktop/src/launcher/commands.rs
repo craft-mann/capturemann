@@ -341,8 +341,6 @@ pub struct Env<'a> {
     /// A 60 fps self-test passed on this machine and is still current, so "Record at 60 fps"
     /// can be offered (REC-3). The engine makes the final decision when the recording starts.
     pub fps60_ready: bool,
-    /// Which previews are on (S24): a switched-off one lists no row.
-    pub previews: crate::ui::preview_label::PreviewFlags,
 }
 
 /// Whether a 60 fps self-test passed on this machine, is not older than the daemon's staleness
@@ -368,8 +366,6 @@ pub fn fps60_ready(
 /// All commands in default (group, then table) order.
 pub fn build(env: &Env<'_>) -> Vec<Command> {
     let mut cmds = build_rows(env);
-    // Design S24: the rows of a preview that is switched off are not listed (search finds none).
-    cmds.retain(|c| c.preview_feature().is_none_or(|f| env.previews.is_on(f)));
     for c in &mut cmds {
         c.options = options_for(c.id, &c.verb, env);
     }
@@ -777,33 +773,7 @@ mod tests {
             recording_off: (!available).then(|| "Library unavailable".to_owned()),
             guide_off: (!available).then(|| "Library unavailable".to_owned()),
             fps60_ready: false,
-            previews: Default::default(),
         }
-    }
-
-    /// S24: a switched-off preview lists no launcher row (and so search finds none); both on lists
-    /// both rows.
-    #[test]
-    fn a_preview_that_is_off_has_no_launcher_row() {
-        use crate::ui::preview_label::PreviewFlags;
-        let map = ShortcutMap::defaults(Platform::Mac);
-        let mcp = derive(true, true, None, &[]);
-        let mut env = env_for(Platform::Mac, &map, &mcp, true);
-        let ids = |env: &Env<'_>| build(env).iter().map(|c| c.id).collect::<Vec<_>>();
-        assert!(ids(&env).contains(&CommandId::LongShot));
-        assert!(ids(&env).contains(&CommandId::NewClickGuide));
-        env.previews = PreviewFlags {
-            long_shot: false,
-            click_guide: true,
-        };
-        assert!(!ids(&env).contains(&CommandId::LongShot));
-        assert!(ids(&env).contains(&CommandId::NewClickGuide));
-        env.previews = PreviewFlags {
-            long_shot: true,
-            click_guide: false,
-        };
-        assert!(ids(&env).contains(&CommandId::LongShot));
-        assert!(!ids(&env).contains(&CommandId::NewClickGuide));
     }
 
     /// GDE-1.AC6: where the session has no click events the command is listed but off, and the

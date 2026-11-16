@@ -638,9 +638,6 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
         ToastAction::OpenScreenRecordingSettings => open_screen_recording_settings(),
         ToastAction::OpenPrivacyPane(pane) => open_privacy_pane(pane),
         ToastAction::OpenPermissions => open_permissions_page(app, cx),
-        ToastAction::OpenPreviewsSettings => {
-            crate::ui::preview_label::open_previews_settings(app, cx)
-        }
         ToastAction::PlayExport(id) => crate::ui::export_ui::play(app, &id, cx),
         ToastAction::RevealExport(id) => crate::ui::export_ui::reveal(app, &id, cx),
         ToastAction::CopyLink(link) => crate::ui::upload_ui::copy_link(app, &link, cx),
