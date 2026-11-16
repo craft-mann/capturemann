@@ -10014,14 +10014,6 @@ msgctxt "page title"
 msgid "Screenshot"
 msgstr ""
 
-msgctxt "panel badge"
-msgid "New in 0.3.3"
-msgstr ""
-
-msgctxt "panel badge"
-msgid "New in 0.3.4"
-msgstr ""
-
 msgctxt "people hint"
 msgid "optional"
 msgstr ""

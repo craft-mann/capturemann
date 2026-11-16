@@ -1380,15 +1380,6 @@ fn cases() -> Vec<Case> {
         .text("Blur", || crate::editor::Tool::Blur.label())
         .text("Pixelate", || crate::editor::Tool::Pixelate.label()),
     );
-    // The "New in 0.3.3" pill next to the panel title: 11 px, 16 px padding; it may take at most
-    // 120 px of the 266 - 26 left of the icon, so the title keeps room.
-    v.push(
-        Case::new("Panel New pill", "120 - 16 padding", 104., 11., 400, one)
-            .text("New in 0.3.3", || {
-                cm_i18n::tr_ctx!("panel badge", "New in 0.3.3")
-            }),
-    );
-
     // Editor view pill (ANN-5): the Copy text button is 8 px side padding, 1 px border, a 16 px icon
     // and a 6 px gap; the pill wraps, so the button may be as wide as the pill. The reviewed
     // Vietnamese "Đang nhận dạng văn bản…" is 144 px, so the pinned button width is 190 px (it was 150).

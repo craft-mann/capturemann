@@ -12,22 +12,6 @@ use crate::ui::field_style::{
 use cm_core::annotation::StampKind;
 use cm_core::annotation::{CalloutStyle, SpotMode, SpotShapeKind, StepStyle, MAX_SPOTLIGHT_SHAPES};
 
-/// The neutral "New in 0.3.4" pill in a panel header (0.3.4 design decision 2: `raised`
-/// background, 1 px `line`, `text-2`; blue is reserved for agents, so it is not used here).
-pub(super) fn new_pill(t: &Theme) -> Div {
-    div()
-        .flex_none()
-        .px(px(8.))
-        .py(px(2.))
-        .rounded_full()
-        .bg(rgba_of(t.raised))
-        .border_1()
-        .border_color(rgba_of(t.line))
-        .text_size(px(11.))
-        .text_color(rgba_of(t.text_2))
-        .child(SharedString::from(tr_ctx!("panel badge", "New in 0.3.4")))
-}
-
 /// A blue-tinted note under a panel (the design's info line).
 pub(super) fn info_note(t: &Theme, icon_name: Option<&'static str>, text: String) -> Div {
     let _ = t;
@@ -877,15 +861,5 @@ impl EditorView {
                 )
             }));
         self.panel_group(t, &tr_ctx!("annotation setting", "Style"), row)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_new_pill_text_is_translatable() {
-        assert_eq!(tr_ctx!("panel badge", "New in 0.3.4"), "New in 0.3.4");
     }
 }

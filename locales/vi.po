@@ -10167,11 +10167,6 @@ msgid "Bubble"
 msgstr "Bong bóng"
 
 #, fuzzy
-msgctxt "panel badge"
-msgid "New in 0.3.3"
-msgstr "Mới trong 0.3.3"
-
-#, fuzzy
 msgctxt "spotlight outside"
 msgid "Blur"
 msgstr "Làm mờ"
@@ -11503,10 +11498,6 @@ msgstr "Hướng dẫn thao tác"
 msgctxt "page title"
 msgid "Click Guide"
 msgstr "Hướng dẫn thao tác"
-
-msgctxt "panel badge"
-msgid "New in 0.3.4"
-msgstr "Mới trong 0.3.4"
 
 msgctxt "shortcut"
 msgid "Long Shot"

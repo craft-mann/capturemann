@@ -6,9 +6,8 @@ use super::tools::Tool;
 use cm_i18n::tr_ctx;
 use serde_json::{Map, Value};
 
-// 0.3.4 design decision 2: the blue "new" dots of 0.3.3 are gone and not reused (blue means
-// agent). A tool that is new in this release shows the neutral "New in 0.3.4" pill in its
-// inspector header instead (see `Tool::is_new`).
+// 0.3.4: the blue "new" dots of 0.3.3 are gone and not reused (blue means agent); no "New in"
+// pill marks a tool either (maintainer, Nov 16, 2026).
 
 /// The `editor.palette_faces` setting: the tool each group's button shows.
 pub const FACES_KEY: &str = "editor.palette_faces";
@@ -132,11 +131,6 @@ impl Tool {
     /// Whether some palette group offers this tool.
     pub fn in_palette(self) -> bool {
         Group::ALL.iter().any(|g| g.tools().contains(&self))
-    }
-
-    /// New in 0.3.4: the inspector header shows the neutral "New in 0.3.4" pill.
-    pub fn is_new(self) -> bool {
-        matches!(self, Tool::Magnify | Tool::Retype | Tool::MoveArea)
     }
 }
 
