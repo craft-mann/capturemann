@@ -73,7 +73,7 @@ boards, and fixes the recording bar drag on Windows.
   step before you share or export it.** A guide started by an agent or the CLI shows only a small toast, no bar and no Stop button (stop it with `capturemann guide stop`);
   it needs the app running and its confirmation. A fast burst of clicks at one point becomes one "Double-click" step. Markdown export writes into the folder you choose
   and **overwrites** a file or folder of the same name without asking. A click on a window lying over the guided window can become a step.
-- **Boards** look simpler than the design: BEFORE and AFTER labels are flat bands, not stamps, and the default margins, rounding and shadow are plainer than the design pack.
+- **Boards:** the preview in the sheet is drawn by the same code as the exported board (same margins, rounding, shadow, stamps, captions, title). Not built yet: the inspector does not fold so Title and Captions can sit below the fold, there is no warning for extreme picture ratios or for a board scaled down to fit 16,384 px, no drop tile to add a forgotten screenshot (use the arrows to reorder; to add one, start again), numeric values are set with presets, not sliders, and Bulk export shows no size estimate and does not remember its folder.
 - **Retype, Move area and Blueprint are not redactions**: use Blur or Pixelate to hide information.
 - Windows files are not code-signed (SmartScreen will warn). The speaker engine is not in the Windows files built on the lab laptop (`<FILL: say if the shipped files differ>`). <FILL: Windows licence list: "the list in the package is the macOS one" or "fixed", `release-day-0.3.4.md` decision 3>
 - Linux is not part of this release (`<FILL: or its line>`). Intel Mac hardware has not been tried.

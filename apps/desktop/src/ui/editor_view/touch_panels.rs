@@ -321,6 +321,11 @@ impl EditorView {
             )
             .into_any_element(),
         );
+        // The same note as Move area (maintainer decision, Nov 16, 2026): changing the words
+        // does not hide what was under them.
+        rows.push(warning_note(tr!(
+            "Not a redaction. To hide secrets, use Blur (B) or Pixelate (X)."
+        )));
         rows
     }
 
