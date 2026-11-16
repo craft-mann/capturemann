@@ -23,6 +23,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 - Default titles ("Screenshot ...", "Recording ...", "Click Guide ...") use your local time instead of UTC.
 
 ### Fixed
+- Long Shot: a window closed during a run ends it as `window_closed`, names the window and keeps the frames (it was `internal`, "Failed to copy data", with nothing kept); a run that starts on a page already at its end goes to the top first instead of saying nothing scrolled; the wheel is tried at every point of the area, and windows in front of the target (any owner) are avoided; a page whose side lists are pinned after the first pair no longer ends the run mid-page (Linux Firefox on long articles).
 - Copy as rich text reached the clipboard only in some builds; filter chips follow the page (Audio no longer lists Boards or Click Guides); deleting a capture whose upload waits for a Google sign-in is no longer blocked.
 - Zoom Lens edge colour fringe; a long library path fails fast with a clear message instead of hanging; `fetch-models.ps1` works on Windows PowerShell 5.1; `library list` prints `-` for a size-less guide.
 - Windows: the recording HUD (screen and audio) and the webcam bubble can be dragged. Since 0.2.9 the release text said they could, but the Windows window had no drag region, so the press did nothing (REC-5.AC18). macOS and Linux were not affected.

@@ -399,6 +399,21 @@ pub fn done_toast(result: &Value, how: Ending) -> Option<ToastSpec> {
                 )
             }),
         ),
+        // The window was closed during the run (the frames before are kept).
+        "window_closed" => open(
+            ToastSpec::new(ToastKind::Warning, tr!("Long Shot saved")).body(if frames == 1 {
+                tr!(
+                    "The window was closed. Everything up to there is kept: 1 frame, {size}.",
+                    size = size_text(w, h)
+                )
+            } else {
+                tr!(
+                    "The window was closed. Everything up to there is kept: {n} frames, {size}.",
+                    n = frames,
+                    size = size_text(w, h)
+                )
+            }),
+        ),
         "stopped_by_user" | "no_overlap" if how.esc => open(
             ToastSpec::new(ToastKind::Info, tr!("Long Shot saved")).body(if frames == 1 {
                 tr!(
@@ -661,6 +676,15 @@ mod tests {
         assert_eq!(
             t.body.as_deref(),
             Some("The window was moved or resized. Everything up to there is kept: 9 frames, 758 \u{d7} 7,320.")
+        );
+        assert_eq!(labels(&t), vec!["Open", "Copy"]);
+
+        // LS-14: a window that was closed has its own words.
+        let t = done_toast(&answer("window_closed"), Ending::default()).unwrap();
+        assert_eq!(t.kind, ToastKind::Warning);
+        assert_eq!(
+            t.body.as_deref(),
+            Some("The window was closed. Everything up to there is kept: 9 frames, 758 \u{d7} 7,320.")
         );
         assert_eq!(labels(&t), vec!["Open", "Copy"]);
 

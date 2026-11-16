@@ -25,6 +25,8 @@ const FIRST_FRAME_WARMUP: std::time::Duration = std::time::Duration::from_millis
 /// [`FIRST_SCROLL_RETRY_WAIT`] at the same point, the others at the scroller's next point)
 /// before the run ends with `nothing_scrolled`.
 const FIRST_SCROLL_RETRIES: u32 = 3;
+/// More tries, while the scroller still has another point to offer.
+const EXTRA_POINT_TRIES: u32 = 2;
 const FIRST_SCROLL_RETRY_WAIT: std::time::Duration = std::time::Duration::from_millis(200);
 /// A first pair that does not join is looked at again this many times (waiting longer each
 /// time) before the run ends with `no_overlap`.
@@ -41,6 +43,12 @@ const OVERSHOOT_SHARE_FACTOR: f64 = 0.75;
 const MIN_STEP_SHARE: f64 = 0.35;
 /// After a scroll back that lands on the last frame taken, the step is halved this many times.
 const SMALLER_STEPS: u32 = 4;
+/// After a frame joined, the same position is looked at again this many times (after
+/// [`LATE_REFRESH_WAIT`]) while the page still changes in a few stretches of lines.
+const LATE_REFRESHES: u32 = 3;
+const LATE_REFRESH_WAIT: std::time::Duration = std::time::Duration::from_millis(120);
+/// Most scrolls up to the top of a page that was at its end when the run began.
+const MAX_TO_TOP_STEPS: u32 = 200;
 
 /// Settings of one Long Shot.
 #[derive(Debug, Clone, Copy)]
@@ -130,6 +138,13 @@ fn window_changed(src: &mut dyn FrameSource, stitcher: &Stitcher, frame: &Frame)
     stitcher.size_differs(frame) || src.target_changed()
 }
 
+/// Whether a failed grab after the first frame is the window having been closed: the OS says it
+/// does not know the window any more (`not_found`), or the source says so. Such a run ends with
+/// what it has (QA macOS pass 7, LS-14: `internal` "Failed to copy data", no frames kept).
+fn window_closed(src: &mut dyn FrameSource, stitcher: &Stitcher, e: &CmError) -> bool {
+    stitcher.frames() >= 1 && (e.code() == cm_core::ErrorCode::NotFound || src.target_gone())
+}
+
 /// Auto scroll: frame, scroll about 80 % of the area, wait for the content to settle, frame,
 /// until the end, the limit, a failed join or `stop` returns true (Esc or Stop; what was
 /// captured is kept).
@@ -185,12 +200,24 @@ pub fn run_auto_ex(
     // Chrome, Nov 16, 2026: 480 px moved 480, 1140 px moved about 1355) overshoots the overlap
     // whatever the learned distance says, and the ladder is a rescue, not a way to walk a page.
     let mut share = cfg.step_fraction;
-    let end = loop {
+    // Going to the top of a page that was at its end is tried once.
+    let mut went_to_top = false;
+    // A grab that fails because the window was closed ends the run with what it has.
+    macro_rules! settled {
+        ($l:lifetime, $e:expr) => {
+            match $e {
+                Ok(s) => s,
+                Err(e) if window_closed(src, &stitcher, &e) => break $l EndReason::WindowClosed,
+                Err(e) => return Err(e),
+            }
+        };
+    }
+    let end = 'run: loop {
         if stop() {
             break EndReason::StoppedByUser;
         }
         scroller.scroll(cfg.direction, step)?;
-        let mut next = settle_frame(src, sleeper, cfg.settle)?;
+        let mut next = settled!('run, settle_frame(src, sleeper, cfg.settle));
         let mut outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         // The first pair that does not join: the screen may still be changing for another
         // reason than the scroll (a window coming to the front, a dialog fading out). Looked at
@@ -203,7 +230,7 @@ pub fn run_auto_ex(
         {
             retry += 1;
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
-            next = settle_frame(src, sleeper, cfg.settle)?;
+            next = settled!('run, settle_frame(src, sleeper, cfg.settle));
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         }
         // A later pair that does not join: scroll back by half a step and look again before the
@@ -243,7 +270,7 @@ pub fn run_auto_ex(
                 back_amt = fwd;
                 at_last = false;
                 sleeper.sleep(LATE_SCROLL_WAIT);
-                next = settle_frame(src, sleeper, cfg.settle)?;
+                next = settled!('run, settle_frame(src, sleeper, cfg.settle));
                 outcome = stitcher.push(&next.frame, Some(expected(fwd, gain)));
                 continue;
             }
@@ -258,7 +285,7 @@ pub fn run_auto_ex(
             back_total += back_amt;
             asked = step.saturating_sub(back_total).max(1);
             sleeper.sleep(LATE_SCROLL_WAIT);
-            next = settle_frame(src, sleeper, cfg.settle)?;
+            next = settled!('run, settle_frame(src, sleeper, cfg.settle));
             // No expected shift: how far the scroll-back moved is no better known than how far
             // the step did, and a wrong prior would pick one of several alike overlaps.
             outcome = stitcher.push(&next.frame, None);
@@ -278,7 +305,7 @@ pub fn run_auto_ex(
                 break;
             }
             sleeper.sleep(LATE_SCROLL_WAIT);
-            next = settle_frame(src, sleeper, cfg.settle)?;
+            next = settled!('run, settle_frame(src, sleeper, cfg.settle));
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         }
         if outcome == PushOutcome::NoChange && stitcher.frames() == 1 {
@@ -286,14 +313,17 @@ pub fn run_auto_ex(
             // (the first retry waits and scrolls at the same point), and a wheel that went to
             // another window (this app's own, on top of the area) needs another point (the
             // later retries ask the scroller for one) before nothing scrolled is believed.
-            for attempt in 0..FIRST_SCROLL_RETRIES {
+            // Every point the scroller has is tried (a page whose centre and quarter points are
+            // covered by other windows may be free at the last one), at least
+            // `FIRST_SCROLL_RETRIES` times.
+            for attempt in 0..FIRST_SCROLL_RETRIES + EXTRA_POINT_TRIES {
                 sleeper.sleep(FIRST_SCROLL_RETRY_WAIT);
-                if attempt > 0 {
-                    scroller.next_point();
+                if attempt > 0 && !scroller.next_point() && attempt >= FIRST_SCROLL_RETRIES {
+                    break;
                 }
                 scroller.scroll(cfg.direction, step)?;
                 sleeper.sleep(LATE_SCROLL_WAIT);
-                next = settle_frame(src, sleeper, cfg.settle)?;
+                next = settled!('run, settle_frame(src, sleeper, cfg.settle));
                 outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
                 if outcome != PushOutcome::NoChange {
                     break;
@@ -307,8 +337,45 @@ pub fn run_auto_ex(
                 && scroller.last_resort(cfg.direction, step)?
             {
                 sleeper.sleep(LATE_SCROLL_WAIT);
-                next = settle_frame(src, sleeper, cfg.settle)?;
+                next = settled!('run, settle_frame(src, sleeper, cfg.settle));
                 outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+            }
+            // Nothing scrolls down: the page may already be at its end (the person scrolled down
+            // before starting; QA macOS pass 7, LS-15). When it scrolls up, it goes to the top and
+            // the run starts there, once. A page that moves neither way is not scrollable.
+            if outcome == PushOutcome::NoChange && !went_to_top && !stop() {
+                went_to_top = true;
+                let up = size as u32;
+                if scroller.scroll_back(cfg.direction, up)? {
+                    let mut at = last_ok.clone();
+                    let mut moved = false;
+                    for _ in 0..MAX_TO_TOP_STEPS {
+                        sleeper.sleep(LATE_SCROLL_WAIT);
+                        let f = settled!('run, settle_frame(src, sleeper, cfg.settle)).frame;
+                        if f == at {
+                            break;
+                        }
+                        moved = true;
+                        at = f;
+                        if stop() || !scroller.scroll_back(cfg.direction, up)? {
+                            break;
+                        }
+                    }
+                    if moved && !stop() {
+                        sleeper.sleep(FIRST_FRAME_WARMUP);
+                        let top = settled!('run, settle_frame(src, sleeper, cfg.settle));
+                        stitcher = Stitcher::new(cfg.direction, cfg.limits);
+                        stitcher.push(&top.frame, None);
+                        on_progress(progress(&stitcher));
+                        on_stitch(&stitcher);
+                        last_ok = top.frame;
+                        step = ((size * cfg.first_step_fraction) as u32).max(1);
+                        gain = 1.0;
+                        learned = 0;
+                        share = cfg.step_fraction;
+                        continue 'run;
+                    }
+                }
             }
             if outcome == PushOutcome::NoChange {
                 break stopped_or(stop, EndReason::NothingScrolled);
@@ -339,15 +406,36 @@ pub fn run_auto_ex(
                     && tail < LATE_SCROLL_POLLS
                 {
                     tail += 1;
+                    // Pause (a `stop` that blocks) holds the run here too, not only at the next step.
+                    if stop() {
+                        break;
+                    }
                     sleeper.sleep(LATE_SCROLL_WAIT);
-                    let more = settle_frame(src, sleeper, cfg.settle)?;
+                    let more = match settle_frame(src, sleeper, cfg.settle) {
+                        Ok(m) => m,
+                        Err(e) if window_closed(src, &stitcher, &e) => {
+                            ended = Some(EndReason::WindowClosed);
+                            break;
+                        }
+                        Err(e) => return Err(e),
+                    };
                     match stitcher.push(&more.frame, Some(expected(asked, gain))) {
                         PushOutcome::Added { new_len: n } => {
                             new_len += n;
                             last_ok = more.frame.clone();
                             arrived = true;
                         }
-                        PushOutcome::NoChange => break,
+                        PushOutcome::NoChange => {
+                            // The same place, a few stretches drawn since: the later look wins.
+                            if stitcher.refresh_last(&more.frame) {
+                                last_ok = more.frame.clone();
+                            }
+                            break;
+                        }
+                        PushOutcome::NoOverlap if stitcher.refresh_last(&more.frame) => {
+                            last_ok = more.frame.clone();
+                            arrived = true;
+                        }
                         PushOutcome::NoOverlap => {
                             ended = Some(if window_changed(src, &stitcher, &more.frame) {
                                 EndReason::WindowChanged
@@ -360,6 +448,24 @@ pub fn run_auto_ex(
                             ended = Some(EndReason::LimitReached);
                             break;
                         }
+                    }
+                }
+                // The page may still be drawing what the frame shows (a heading that reveals
+                // itself once it is in view starts after the screen looked still): the same
+                // position is looked at again, and the rows this frame supplied are replaced by
+                // the later look (QA macOS, carchargeos.com: the top half of a heading missing
+                // at a seam). Nothing changing ends it at once.
+                if ended.is_none() {
+                    for _ in 0..LATE_REFRESHES {
+                        if stop() {
+                            break;
+                        }
+                        sleeper.sleep(LATE_REFRESH_WAIT);
+                        let look = settled!('run, settle_frame(src, sleeper, cfg.settle));
+                        if !stitcher.refresh_last(&look.frame) {
+                            break;
+                        }
+                        last_ok = look.frame;
                     }
                 }
                 on_progress(progress(&stitcher));
@@ -519,7 +625,11 @@ pub fn run_hand_ex(
             };
         }
         sleeper.sleep(cfg.settle.interval);
-        let g = src.grab()?;
+        let g = match src.grab() {
+            Ok(g) => g,
+            Err(e) if window_closed(src, &stitcher, &e) => break EndReason::WindowClosed,
+            Err(e) => return Err(e),
+        };
         // Content that never holds still (a video, a spinner) is taken after a second anyway.
         still_polls = if g == prev_poll { still_polls + 1 } else { 0 };
         let settled = still_polls >= HAND_STILL_POLLS || moving_polls >= HAND_MAX_MOVING_POLLS;

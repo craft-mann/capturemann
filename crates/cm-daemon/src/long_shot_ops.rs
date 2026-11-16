@@ -152,6 +152,16 @@ impl FrameSource for CapturerFrames {
 
     /// A window target whose rectangle is not the one it had at the first frame (moved or
     /// resized by the person). Display and region targets do not move.
+    /// A window target that the system does not list any more (closed during the run).
+    fn target_gone(&mut self) -> bool {
+        let cm_capture::CaptureTarget::Window { window_id } = self.target else {
+            return false;
+        };
+        self.capturer
+            .list_targets()
+            .is_ok_and(|t| !t.windows.iter().any(|w| w.id == window_id))
+    }
+
     fn target_changed(&mut self) -> bool {
         let (Some(first), cm_capture::CaptureTarget::Window { .. }) =
             (self.first_rect, self.target)
@@ -242,6 +252,10 @@ impl FrameSource for NamedWindow {
 
     fn target_changed(&mut self) -> bool {
         self.inner.target_changed()
+    }
+
+    fn target_gone(&mut self) -> bool {
+        self.inner.target_gone()
     }
 }
 
@@ -775,7 +789,7 @@ impl Inner {
                         cm_capture::CaptureTarget::Window { window_id } => Some(window_id),
                         _ => None,
                     },
-                    title: window_title,
+                    title: window_title.clone(),
                 });
                 let cfg = LongShotConfig {
                     direction,
@@ -829,7 +843,12 @@ impl Inner {
                 };
                 let result = match scroll {
                     ScrollMode::Auto => {
-                        let own = capturer_for_anchor.own_window_rects();
+                        // Windows that may take the wheel before the target does: this app's own
+                        // and, for a window target, every window in front of it.
+                        let mut own = capturer_for_anchor.own_window_rects();
+                        if let cm_capture::CaptureTarget::Window { window_id } = target {
+                            own.extend(capturer_for_anchor.windows_in_front_of(window_id));
+                        }
                         let area = area_rect(&capturer_for_anchor, target);
                         let points = match area {
                             Some(area) => scroll_points(area, &own),
@@ -874,7 +893,13 @@ impl Inner {
                 *meta_in.lock().unwrap_or_else(PoisonError::into_inner) = Some(LongMeta {
                     frames: result.image.frames,
                     end: result.end,
-                    note: result.end.note_for(cfg.limits, along),
+                    note: match (result.end, window_title.as_deref()) {
+                        // The window's name in the note: a number or no name means nothing.
+                        (long_shot::EndReason::WindowClosed, Some(t)) => {
+                            Some(format!("The window \"{t}\" was closed"))
+                        }
+                        _ => result.end.note_for(cfg.limits, along),
+                    },
                     limit_px: cfg.limits.max_len,
                     header_px: result.image.header_len,
                     footer_px: result.image.footer_len,

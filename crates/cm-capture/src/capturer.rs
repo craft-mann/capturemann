@@ -287,6 +287,29 @@ impl Capturer {
             .collect()
     }
 
+    /// The rectangles (global physical px) of the visible windows in front of window `window_id`,
+    /// whoever owns them (the OS lists windows front to back; empty when they cannot be listed or
+    /// the window is not in the list): what may take a wheel event aimed at a point of that
+    /// window. This app's own windows may be owned by another process than the one asking
+    /// (a CLI run against a separate daemon, QA macOS pass 7, LS-12), so the order is the
+    /// safer answer. Shell windows (the menu bar, the Dock) are left out.
+    pub fn windows_in_front_of(&self, window_id: u32) -> Vec<cm_core::PhysicalRect> {
+        let all = self.backend.windows().unwrap_or_default();
+        let Some(at) = all.iter().position(|w| w.id == window_id) else {
+            return Vec::new();
+        };
+        all.into_iter()
+            .take(at)
+            .filter(|w| {
+                !w.minimized
+                    && w.bounds.size.width > 0
+                    && w.bounds.size.height > 0
+                    && !is_shell_window(w)
+            })
+            .map(|w| w.bounds)
+            .collect()
+    }
+
     /// First window (front to back) whose title contains `needle`, case-insensitively
     /// (CLI `--window "<title substring>"`). `not_found` if none.
     pub fn find_window(&self, needle: &str) -> Result<WindowInfo, CmError> {
@@ -528,6 +551,23 @@ mod tests {
 
     fn take(c: &Capturer, t: CaptureTarget) -> Capture {
         c.capture(CaptureRequest::new(t), None).unwrap().unwrap()
+    }
+
+    /// The windows in front of a target, whoever owns them (LS-12).
+    #[test]
+    fn windows_in_front_of_a_target_are_those_listed_before_it() {
+        let backend = FakeBackend::new()
+            .with_display(1, 0, 0, 1000, 800, 1.0)
+            .with_window(1, "Other", "Notes", 7, 1, (500, 0, 200, 200), false)
+            .with_window(2, "Gone", "Notes", 7, 1, (0, 0, 50, 50), true)
+            .with_window(3, "Page", "Chrome", 8, 1, (100, 100, 600, 500), false)
+            .with_window(4, "Behind", "Notes", 7, 1, (0, 0, 900, 700), false);
+        let c = Capturer::new(backend).with_own_pid(None);
+        let front = c.windows_in_front_of(3);
+        assert_eq!(front.len(), 1, "{front:?}");
+        assert_eq!(front[0].origin.x, 500);
+        assert!(c.windows_in_front_of(1).is_empty());
+        assert!(c.windows_in_front_of(99).is_empty());
     }
 
     /// The library window is in screenshots, so it can be picked as a window: with the
