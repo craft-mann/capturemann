@@ -14,10 +14,11 @@ use cm_i18n::{tr, trn};
 use cm_render::compose_board::LayoutKind;
 use gpui::{
     div, img, prelude::*, px, AnyElement, App, Context, CursorStyle, Entity, FocusHandle,
-    FontWeight, KeyDownEvent, MouseButton, ObjectFit, Render, Role, SharedString, Subscription,
-    Window,
+    FontWeight, KeyDownEvent, MouseButton, ObjectFit, Render, RenderImage, Role, SharedString,
+    Subscription, Window,
 };
 use serde_json::{json, Value};
+use std::sync::Arc;
 
 use crate::backend::Backend;
 use crate::board_flow::{layout_label, BgChoice, BoardSheet, Grip, LAYOUTS};
@@ -77,6 +78,7 @@ impl Geometry {
 pub struct BoardSheetView {
     app: Entity<AppModel>,
     thumbs: Entity<ThumbCache>,
+    preview: PreviewCache,
     title_field: Entity<TextField>,
     tint_field: Entity<TextField>,
     seen_epoch: u64,
@@ -108,6 +110,7 @@ impl BoardSheetView {
         BoardSheetView {
             app,
             thumbs,
+            preview: PreviewCache::default(),
             title_field,
             tint_field,
             seen_epoch: u64::MAX,
@@ -173,12 +176,101 @@ fn row() -> gpui::Div {
     div().flex().flex_wrap().items_center().gap(px(8.))
 }
 
+/// The board picture drawn by the export's renderer from the library thumbnails (BR-01), kept
+/// until the setup, the sizes or the set of loaded thumbnails changes.
+#[derive(Default)]
+pub struct PreviewCache {
+    key: String,
+    image: Option<Arc<RenderImage>>,
+}
+
+impl PreviewCache {
+    fn image(
+        &mut self,
+        s: &BoardSheet,
+        thumbs: &Entity<ThumbCache>,
+        max_edge: u32,
+        cx: &mut App,
+    ) -> Option<Arc<RenderImage>> {
+        let opts = s.options().ok()?;
+        let layout = s.layout_json();
+        let loaded: Vec<Option<Arc<RenderImage>>> = s
+            .sources
+            .iter()
+            .map(|src| match thumbs.update(cx, |c, cx| c.get(&src.id, cx)) {
+                Thumb::Ready(i) => Some(i),
+                _ => None,
+            })
+            .collect();
+        let sizes: Vec<(u32, u32)> = s
+            .sources
+            .iter()
+            .map(|x| (x.width.max(1), x.height.max(1)))
+            .collect();
+        let key = format!(
+            "{layout:?}|{opts:?}|{sizes:?}|{max_edge}|{:?}",
+            loaded
+                .iter()
+                .map(|i| i.as_ref().map(|i| i.id))
+                .collect::<Vec<_>>()
+        );
+        if key == self.key {
+            return self.image.clone();
+        }
+        self.key = key;
+        self.image = render_preview_image(&sizes, &loaded, &layout, &opts, max_edge);
+        self.image.clone()
+    }
+}
+
+/// Draws the preview. Thumbnails not loaded yet are drawn as a flat tile of the same shape.
+fn render_preview_image(
+    sizes: &[(u32, u32)],
+    loaded: &[Option<Arc<RenderImage>>],
+    layout: &cm_render::compose_board::BoardLayout,
+    opts: &cm_render::compose_board::BoardOptions,
+    max_edge: u32,
+) -> Option<Arc<RenderImage>> {
+    let thumbs: Vec<image::RgbaImage> = sizes
+        .iter()
+        .zip(loaded)
+        .map(|(&(w, h), t)| {
+            t.as_ref()
+                .and_then(|i| {
+                    let sz = i.size(0);
+                    let bytes = i.as_bytes(0)?;
+                    // GPUI keeps BGRA; the renderer wants RGBA.
+                    let mut raw = bytes.to_vec();
+                    for p in raw.as_chunks_mut::<4>().0.iter_mut() {
+                        p.swap(0, 2);
+                    }
+                    image::RgbaImage::from_raw(u32::from(sz.width), u32::from(sz.height), raw)
+                })
+                .unwrap_or_else(|| {
+                    let k = (160.0 / w.max(h) as f32).min(1.0);
+                    image::RgbaImage::from_pixel(
+                        ((w as f32 * k) as u32).max(1),
+                        ((h as f32 * k) as u32).max(1),
+                        image::Rgba([0x3A, 0x3C, 0x42, 0xFF]),
+                    )
+                })
+        })
+        .collect();
+    let (mut rgba, _) =
+        cm_render::compose_board::render_preview(sizes, &thumbs, layout, opts, max_edge).ok()?;
+    for p in rgba.as_chunks_mut::<4>().0.iter_mut() {
+        p.swap(0, 2);
+    }
+    Some(Arc::new(RenderImage::new([image::Frame::new(rgba)])))
+}
+
 /// The canvas: the board at its real proportions, a box per picture.
 fn canvas(
     t: &Theme,
     s: &BoardSheet,
     app: &Entity<AppModel>,
     thumbs: &Entity<ThumbCache>,
+    preview: &mut PreviewCache,
     (canvas_w, canvas_h): (f32, f32),
     cx: &mut App,
 ) -> AnyElement {
@@ -207,11 +299,6 @@ fn canvas(
     let k = k.min((canvas_h - 40.) / plan.height as f32);
     let (w, h) = (plan.width as f32 * k, plan.height as f32 * k);
     let bg = bg_color(t, s.background, &s.tint);
-    let ink = if matches!(s.background, BgChoice::Dark) {
-        crate::theme::Color::rgb(0xF2F2F4)
-    } else {
-        crate::theme::Color::rgb(0x1B1C1F)
-    };
     let free = s.layout == LayoutKind::Free;
     // Window pixels per slot pixel (a board too large for its limits is scaled down by the plan).
     let kd = k * plan.scale as f32;
@@ -242,104 +329,38 @@ fn canvas(
                 update(&a_out, cx, |s| s.end_drag())
             });
     }
-    if let (Some(title), Some((x, y))) = (s.options().ok().and_then(|o| o.title), plan.title_at) {
+    // The picture is the export's own drawing at a smaller scale (BR-01): margins, radius,
+    // shadow, stamps, captions and title are the renderer's, not a second drawing here.
+    let max_edge = ((canvas_w.max(canvas_h) * 2.) as u32).clamp(256, 1800);
+    if let Some(image) = preview.image(s, thumbs, max_edge, cx) {
         board = board.child(
-            div()
+            img(image)
                 .absolute()
-                .left(px(x as f32 * k))
-                .top(px(y as f32 * k))
-                .text_size(px((plan.unit * 1.6 * k).clamp(9., 22.)))
-                .font_weight(FontWeight::SEMIBOLD)
-                .text_color(rgba_of(ink))
-                .child(SharedString::from(title)),
+                .left(px(0.))
+                .top(px(0.))
+                .w(px(w))
+                .h(px(h))
+                .object_fit(ObjectFit::Fill),
         );
     }
-    for (i, (cell, src)) in plan.cells.iter().zip(&s.sources).enumerate() {
-        let label = if s.layout == LayoutKind::Pair && s.before_after {
-            Some(if i == 0 { tr!("BEFORE") } else { tr!("AFTER") })
-        } else if s.layout == LayoutKind::Strip {
-            Some((i + 1).to_string())
-        } else {
-            None
-        };
-        let pick = free.then(|| {
+    if free {
+        // An invisible grab area per picture; the picture itself is in the image above.
+        for (i, cell) in plan.cells.iter().enumerate() {
             let a = app.clone();
-            move |ev: &gpui::MouseDownEvent, _: &mut Window, cx: &mut App| {
-                let at = (f32::from(ev.position.x), f32::from(ev.position.y));
-                update(&a, cx, |s| s.begin_drag(i, Grip::Move, at));
-            }
-        });
-        let thumb = thumbs.update(cx, |c, cx| c.get(&src.id, cx));
-        let round = px(s.radius as f32 * plan.scale as f32 * plan.spacing as f32 * k);
-        let mut cell_box = div()
-            .absolute()
-            .left(px(cell.x as f32 * k))
-            .top(px(cell.y as f32 * k))
-            .w(px(cell.w as f32 * k))
-            .h(px(cell.h as f32 * k))
-            .rounded(round)
-            .overflow_hidden()
-            .bg(rgba_of(t.raised))
-            .when_some(pick, |d, f| {
-                d.cursor(CursorStyle::OpenHand)
-                    .on_mouse_down(MouseButton::Left, f)
-            });
-        cell_box = match thumb {
-            Thumb::Ready(image) => cell_box.child(
-                img(image)
-                    .size_full()
-                    .rounded(round)
-                    .object_fit(ObjectFit::Fill),
-            ),
-            _ => cell_box
-                .p(px(4.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_size(px(11.))
-                .text_color(rgba_of(t.text_2))
-                .child(SharedString::from(src.title.clone())),
-        };
-        board = board.child(cell_box).children(label.map(|l| {
-            let (x, mut y) = (cell.x as f32 * k + 6., cell.y as f32 * k + 6.);
-            if s.layout == LayoutKind::Pair {
-                // BEFORE and AFTER sit in the band above the picture, not over it (the board
-                // renderer reserves the same band).
-                let band = s
-                    .options()
-                    .ok()
-                    .map(|o| cm_render::compose_board::label_band(&o, LayoutKind::Pair, plan.unit))
-                    .unwrap_or(0) as f32;
-                y = (cell.y as f32 - band) * k + 1.;
-                // The stamp of design board S10: bold red BEFORE and green AFTER with a frame.
-                let ink = crate::theme::Color::rgb(if i == 0 { 0xDC2626 } else { 0x16A34A });
+            board = board.child(
                 div()
                     .absolute()
                     .left(px(cell.x as f32 * k))
-                    .top(px(y))
-                    .px(px(8.))
-                    .py(px(1.))
-                    .rounded(px(4.))
-                    .border_2()
-                    .border_color(rgba_of(ink))
-                    .bg(rgba_of(crate::theme::Color::rgb(0xFFFFFF)))
-                    .text_size(px(13.))
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(rgba_of(ink))
-                    .child(SharedString::from(l))
-            } else {
-                div()
-                    .absolute()
-                    .left(px(x))
-                    .top(px(y))
-                    .px(px(5.))
-                    .rounded(px(4.))
-                    .bg(rgba_of(crate::theme::Color::rgb(0x1B1C1F)))
-                    .text_size(px(10.))
-                    .text_color(rgba_of(crate::theme::Color::rgb(0xFFFFFF)))
-                    .child(SharedString::from(l))
-            }
-        }));
+                    .top(px(cell.y as f32 * k))
+                    .w(px(cell.w as f32 * k))
+                    .h(px(cell.h as f32 * k))
+                    .cursor(CursorStyle::OpenHand)
+                    .on_mouse_down(MouseButton::Left, move |ev, _, cx| {
+                        let at = (f32::from(ev.position.x), f32::from(ev.position.y));
+                        update(&a, cx, |s| s.begin_drag(i, Grip::Move, at));
+                    }),
+            );
+        }
     }
     if free {
         // Corner handles on every picture (a corner drag resizes, keeping the proportions).
@@ -855,7 +876,15 @@ impl Render for BoardSheetView {
             .child(captions)
             .child(title);
 
-        let canvas_el = canvas(&t, &s, &app, &self.thumbs, (geo.canvas_w, geo.canvas_h), cx);
+        let canvas_el = canvas(
+            &t,
+            &s,
+            &app,
+            &self.thumbs,
+            &mut self.preview,
+            (geo.canvas_w, geo.canvas_h),
+            cx,
+        );
         let centre = div()
             .id("board-centre")
             .flex_1()

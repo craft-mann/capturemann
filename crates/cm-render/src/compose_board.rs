@@ -534,7 +534,7 @@ fn plan_k(
 /// covers the screenshot (maintainer, Nov 14, 2026). Zero when there are no labels.
 pub fn label_band(opts: &BoardOptions, kind: LayoutKind, unit: f32) -> u32 {
     if opts.before_after && kind == LayoutKind::Pair {
-        let (_, h, _) = stamp_metrics(unit * STAMP_K);
+        let (_, h, _) = stamp_metrics(unit * STAMP_K, 1.0);
         h.ceil() as u32 + (unit * 0.35).ceil() as u32
     } else {
         0
@@ -547,8 +547,8 @@ const STAMP_K: f32 = 1.3;
 /// The BEFORE / AFTER stamp (design S10): a white pill with a coloured border and coloured bold
 /// letters. Returns the vertical padding, the stamp height and the border width for text of
 /// `px`.
-fn stamp_metrics(px: f32) -> (f32, f32, f32) {
-    let border = (px * 0.12).max(2.0);
+fn stamp_metrics(px: f32, f: f32) -> (f32, f32, f32) {
+    let border = (px * 0.12).max(2.0 * f);
     let pad_y = px * 0.12;
     (pad_y, px * 1.2 + 2.0 * pad_y + 2.0 * border, border)
 }
@@ -605,6 +605,7 @@ fn draw_stamp(
     x: f32,
     mid_y: f32,
     max_w: f32,
+    f: f32,
 ) -> Result<(), CmError> {
     let measure = |fonts: &mut Fonts, px: f32| -> Result<f32, CmError> {
         let st = TextStyle {
@@ -619,14 +620,14 @@ fn draw_stamp(
     };
     let mut px = px;
     let mut tw = measure(fonts, px)?;
-    let wanted = |px: f32, tw: f32| tw + px * 1.1 + 2.0 * (px * 0.12).max(2.0);
+    let wanted = |px: f32, tw: f32| tw + px * 1.1 + 2.0 * (px * 0.12).max(2.0 * f);
     if wanted(px, tw) > max_w && tw > 0.0 {
-        px = (px * max_w / wanted(px, tw)).max(8.0);
+        px = (px * max_w / wanted(px, tw)).max(8.0 * f);
         tw = measure(fonts, px)?;
     }
-    let (pad_y, h, border) = stamp_metrics(px);
+    let (pad_y, h, border) = stamp_metrics(px, f);
     let w = wanted(px, tw).ceil();
-    let margin = 6.0;
+    let margin = 6.0 * f.max(0.5);
     let (pw, ph) = ((w + 2.0 * margin) as u32, (h + 2.0 * margin) as u32);
     let Some(mut st) = Pixmap::new(pw, ph) else {
         return Ok(());
@@ -793,9 +794,47 @@ pub fn render_board(
     opts: &BoardOptions,
 ) -> Result<RgbaImage, CmError> {
     let sizes: Vec<(u32, u32)> = sources.iter().map(RgbaImage::dimensions).collect();
-    let plan = plan(&sizes, layout, opts)?;
-    let mut canvas =
-        Pixmap::new(plan.width, plan.height).ok_or_else(|| invalid("the board is too large"))?;
+    render_scaled(&sizes, sources, layout, opts, 1.0)
+}
+
+/// The board as the sheet shows it (BR-01): the same plan and the same drawing as
+/// [`render_board`], at `ps` times its size (`ps` is chosen so the longer edge is at most
+/// `max_edge`, never above 1). `sizes` are the real pixel sizes of the sources, which fix the
+/// plan; `thumbs` are the pictures to draw (any resolution with the same proportions, for
+/// example the library thumbnails). Returns the image and `ps`.
+pub fn render_preview(
+    sizes: &[(u32, u32)],
+    thumbs: &[RgbaImage],
+    layout: &BoardLayout,
+    opts: &BoardOptions,
+    max_edge: u32,
+) -> Result<(RgbaImage, f64), CmError> {
+    let p = plan(sizes, layout, opts)?;
+    let longest = f64::from(p.width.max(p.height)).max(1.0);
+    let ps = (f64::from(max_edge.max(16)) / longest).min(1.0);
+    let img = render_scaled(sizes, thumbs, layout, opts, ps)?;
+    Ok((img, ps))
+}
+
+/// One drawing routine for the export (`ps` = 1) and the preview, so they cannot drift apart:
+/// every length of the plan is multiplied by `ps` when it is drawn.
+fn render_scaled(
+    sizes: &[(u32, u32)],
+    sources: &[RgbaImage],
+    layout: &BoardLayout,
+    opts: &BoardOptions,
+    ps: f64,
+) -> Result<RgbaImage, CmError> {
+    let plan = plan(sizes, layout, opts)?;
+    if sources.len() != sizes.len() {
+        return Err(invalid("a picture is missing"));
+    }
+    let f = ps as f32;
+    let (cw, ch) = (
+        ((f64::from(plan.width) * ps).round() as u32).max(1),
+        ((f64::from(plan.height) * ps).round() as u32).max(1),
+    );
+    let mut canvas = Pixmap::new(cw, ch).ok_or_else(|| invalid("the board is too large"))?;
     let [r, g, b, a] = opts.background.rgba();
     if a > 0 {
         canvas.fill(tiny_skia::Color::from_rgba8(r, g, b, a));
@@ -806,7 +845,18 @@ pub fn render_board(
     } else {
         Color::rgb(0x1B, 0x1C, 0x1F)
     };
-    let radius = (f64::from(opts.radius) * plan.scale * plan.spacing) as f32;
+    let radius = (f64::from(opts.radius) * plan.scale * plan.spacing * ps) as f32;
+    let unit = plan.unit * f;
+    let cells: Vec<Placed> = plan
+        .cells
+        .iter()
+        .map(|c| Placed {
+            x: (f64::from(c.x) * ps).round() as i32,
+            y: (f64::from(c.y) * ps).round() as i32,
+            w: ((f64::from(c.w) * ps).round() as u32).max(1),
+            h: ((f64::from(c.h) * ps).round() as u32).max(1),
+        })
+        .collect();
     let mut fonts = Fonts::bundled();
 
     if let (Some(t), Some(at)) = (&opts.title, plan.title_at) {
@@ -814,21 +864,21 @@ pub fn render_board(
             &mut canvas,
             &mut fonts,
             t,
-            plan.unit * 1.6,
+            unit * 1.6,
             ink,
-            (0, plan.width as i32),
-            at.1,
-            Some(plan.width as f32 * 0.9),
+            (0, cw as i32),
+            (f64::from(at.1) * ps).round() as i32,
+            Some(cw as f32 * 0.9),
             true,
         )?;
     }
     // Every shadow first, so one picture's shadow never darkens its neighbour.
     if opts.shadow {
-        for cell in &plan.cells {
-            draw_shadow(&mut canvas, cell, radius);
+        for cell in &cells {
+            draw_shadow(&mut canvas, cell, radius, f);
         }
     }
-    for (i, (src, cell)) in sources.iter().zip(&plan.cells).enumerate() {
+    for (i, (src, cell)) in sources.iter().zip(&cells).enumerate() {
         let resized = if src.dimensions() == (cell.w, cell.h) {
             src.clone()
         } else {
@@ -868,22 +918,23 @@ pub fn render_board(
                 Color::rgb(0x16, 0xA3, 0x4A)
             };
             // A stamp in the band above the picture, so it never covers the screenshot.
-            let band = label_band(opts, layout.kind, plan.unit) as f32;
+            let band = label_band(opts, layout.kind, plan.unit) as f32 * f;
             draw_stamp(
                 &mut canvas,
                 &mut fonts,
                 &words[i.min(1)],
-                plan.unit * STAMP_K,
+                unit * STAMP_K,
                 color,
-                cell.x as f32 + plan.unit * 0.3,
-                cell.y as f32 - band / 2.0 - plan.unit * 0.05,
-                (cell.w as f32 * 0.9).max(40.0),
+                x + unit * 0.3,
+                y - band / 2.0 - unit * 0.05,
+                (cell.w as f32 * 0.9).max(40.0 * f),
+                f,
             )?;
         }
         // Strip: a number on each frame.
         if layout.kind == LayoutKind::Strip {
-            let d = plan.unit * 1.7;
-            let (cx, cy) = (x + plan.unit * 0.3 + d / 2.0, y + plan.unit * 0.3 + d / 2.0);
+            let d = unit * 1.7;
+            let (cx, cy) = (x + unit * 0.3 + d / 2.0, y + unit * 0.3 + d / 2.0);
             let mut pb = PathBuilder::new();
             pb.push_circle(cx, cy, d / 2.0);
             if let Some(p) = pb.finish() {
@@ -893,7 +944,7 @@ pub fn render_board(
                 canvas.fill_path(&p, &paint, FillRule::Winding, Transform::identity(), None);
             }
             let s = (i + 1).to_string();
-            let px = plan.unit * 0.95;
+            let px = unit * 0.95;
             let tw = s.chars().count() as f32 * px * 0.56;
             draw_text(
                 &mut canvas,
@@ -912,11 +963,11 @@ pub fn render_board(
                 &mut canvas,
                 &mut fonts,
                 c,
-                plan.unit,
+                unit,
                 ink,
                 (cell.x, cell.w as i32),
-                cell.y + cell.h as i32 + (plan.unit * 0.3) as i32,
-                Some(cell.w.max(40) as f32),
+                cell.y + cell.h as i32 + (unit * 0.3) as i32,
+                Some((cell.w as f32).max(40.0 * f)),
                 false,
             )?;
         }
@@ -925,9 +976,9 @@ pub fn render_board(
 }
 
 /// A soft drop shadow (design: `0 12px 30px rgba(0,0,0,.18)`): many faint rings, deterministic.
-fn draw_shadow(canvas: &mut Pixmap, cell: &Placed, radius: f32) {
+fn draw_shadow(canvas: &mut Pixmap, cell: &Placed, radius: f32, f: f32) {
     let short = cell.w.min(cell.h) as f32;
-    let blur = (short * 0.06).clamp(8.0, 36.0);
+    let blur = (short * 0.06).clamp(8.0 * f, 36.0 * f);
     let dy = blur * 0.4;
     let rings = 18;
     let mut paint = Paint::default();
