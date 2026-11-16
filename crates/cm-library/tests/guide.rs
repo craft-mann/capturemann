@@ -402,3 +402,31 @@ fn a_second_frame_size_is_its_own_group_and_a_retake_moves_a_step_gde_1() {
     assert_eq!(visible(&g, 0), None);
     assert_eq!(visible(&g, 1), None);
 }
+
+#[test]
+fn a_guide_of_a_window_keeps_the_whole_window_in_every_step_gde_1() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut g = GuideBundle::create(
+        tmp.path(),
+        "Window",
+        serde_json::json!({ "window_id": 42 }),
+        T0,
+    )
+    .unwrap();
+    assert!(g.follows_window());
+    // A frame much larger than the default focus: a display guide would crop it.
+    add_at(&mut g, 3000, 2000, 500.0, 500.0, 1);
+    add_at(&mut g, 3000, 2000, 2500.0, 1500.0, 2);
+    assert_eq!(visible(&g, 0), None);
+    assert_eq!(visible(&g, 1), None);
+    assert!(!g.steps()[0].focus_crop);
+    // A display guide still crops (see the tests above).
+    let d = GuideBundle::create(
+        tmp.path(),
+        "Display",
+        serde_json::json!({ "display_id": 1 }),
+        T0,
+    )
+    .unwrap();
+    assert!(!d.follows_window());
+}

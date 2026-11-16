@@ -702,10 +702,19 @@ impl GuideBundle {
             .collect()
     }
 
+    /// The guide follows one chosen window (its target names a `window_id`): every step keeps the
+    /// whole window, with no automatic crop.
+    pub fn follows_window(&self) -> bool {
+        self.doc.target.get("window_id").is_some()
+    }
+
     /// The guide crop of every frame size in the guide: the click points of ALL image steps (not
     /// only those whose crop is on) grouped by frame size, because steps with different frame
     /// sizes (the display changed in between) cannot share one rectangle.
     fn guide_rects(&mut self) -> HashMap<(u32, u32), Option<Rc>> {
+        if self.follows_window() {
+            return HashMap::new();
+        }
         let mut groups: HashMap<(u32, u32), Vec<ClickAt>> = HashMap::new();
         for (img, c) in self.image_clicks() {
             if let Some(size) = self.frame_size(&img) {
@@ -796,7 +805,10 @@ impl GuideBundle {
         let n = u32::try_from(self.doc.steps.len() + 1).unwrap_or(u32::MAX);
         // The crop is on when the frame is larger than the default focus; its rectangle is the
         // guide crop (all clicks of this frame size, this one included).
-        let crop = focus_rect(size.width, size.height, (click.x, click.y), click.scale).is_some();
+        // A guide of a chosen window keeps the whole window in every step (maintainer decision
+        // Nov 16, 2026): the crop and zoom are the user's to set later in the editor.
+        let crop = !self.follows_window()
+            && focus_rect(size.width, size.height, (click.x, click.y), click.scale).is_some();
         let frame = (size.width, size.height);
         let mut clicks = self.group_clicks(frame);
         let before = guide_crop_rect(frame, &clicks);
