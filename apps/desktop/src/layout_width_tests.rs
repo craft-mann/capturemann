@@ -1417,6 +1417,70 @@ fn cases() -> Vec<Case> {
         )
         .text("Reset to defaults", || cm_i18n::tr!("Reset to defaults")),
     );
+    // Settings > General > Previews (S24): the Feedback buttons are 32 px, 12 px side padding, 1 px
+    // border, a 14 px icon and its gap, `flex_none` in a wrapping row, so each must fit alone in a
+    // 260 px room. The pill is 18 px high, 7 px side padding, 1 px dashed border, 11/600, alone on a
+    // wrapping title line. The row hints (12.5 px) and the page sentence (12 px) wrap.
+    v.push(
+        Case::new(
+            "Previews feedback buttons",
+            "260 - 24 padding - 2 border - 14 icon - 6 gap",
+            260. - 46.,
+            cap,
+            400,
+            one,
+        )
+        .text("Feedback", || {
+            crate::ui::settings::previews_text_for_tests().feedback
+        })
+        .text("Send general feedback", || {
+            crate::ui::settings::previews_text_for_tests().general_feedback
+        }),
+    );
+    v.push(
+        Case::new(
+            "Previews pill",
+            "120 - 14 padding - 2 border",
+            120. - 16.,
+            11.,
+            600,
+            one,
+        )
+        .text("Preview", || {
+            crate::ui::settings::previews_text_for_tests().pill
+        }),
+    );
+    v.push(
+        Case::new(
+            "Previews row hint and page sentence",
+            "180 min text column; sentence in a 440 px page",
+            180.,
+            12.5,
+            400,
+            Overflow::Lines(4),
+        )
+        .texts(cm_core::features::previews().map(|f| {
+            t(format!("hint of {}", f.id), move || {
+                crate::ui::settings::preview_feature_text_for_tests(f.id)
+            })
+        })),
+    );
+    v.push(
+        Case::new(
+            "Previews page sentence",
+            "440 px page column",
+            440.,
+            cap,
+            400,
+            Overflow::Lines(4),
+        )
+        .text("intro", || {
+            crate::ui::settings::previews_text_for_tests().intro
+        })
+        .text("footer", || {
+            crate::ui::settings::previews_text_for_tests().footer
+        }),
+    );
     // Publish footer progress row: Cancel / Cancelling... are 40 px secondary buttons with 16 px
     // padding and a border, in the 150 px the status text leaves free on the narrowest page.
     v.push(

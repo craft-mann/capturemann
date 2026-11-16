@@ -11896,3 +11896,54 @@ msgstr "{agent} muốn chạy “{title}”. Thao tác này luôn hỏi bạn tr
 #, fuzzy
 msgid "{n} steps left"
 msgstr "Còn {n} bước"
+
+# NOTE: added with board S24 (Preview label, Settings > Previews); owner review required
+#, fuzzy
+msgctxt "previews page"
+msgid "Capture a scrolling page as one image."
+msgstr "Chụp một trang cuộn thành một ảnh."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Feedback"
+msgstr "Góp ý"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "New features that are ready to use but may still change. Turning one off hides its buttons and menus; anything you made with it stays in your library."
+msgstr "Tính năng mới, dùng được ngay nhưng có thể còn thay đổi. Tắt một tính năng sẽ ẩn các nút và menu của nó; những gì bạn đã tạo vẫn nằm trong thư viện."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Preview"
+msgstr "Xem trước"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Previews"
+msgstr "Xem trước tính năng"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Previews are on by default."
+msgstr "Các bản xem trước được bật sẵn."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Send feedback about {feature}"
+msgstr "Gửi góp ý về {feature}"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Send general feedback"
+msgstr "Gửi góp ý chung"
+
+#, fuzzy
+msgctxt "previews page"
+msgid "Turn your clicks into a numbered guide."
+msgstr "Biến các cú nhấp chuột của bạn thành hướng dẫn có đánh số."
+
+#, fuzzy
+msgctxt "previews page"
+msgid "{feature}, preview"
+msgstr "{feature}, bản xem trước"

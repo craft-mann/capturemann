@@ -27,7 +27,7 @@ pub mod launch;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 use cm_ipc::Endpoint;
 
 pub use args::Cli;
@@ -178,6 +178,59 @@ impl Write for SharedBuf {
     }
 }
 
+/// The clap command of the program with the Preview markers of the feature registry (S24): the
+/// commands and flags of a feature in the Preview stage say `[preview]` in `--help`. Moving the
+/// feature to stable in `cm_core::features` removes the marker.
+pub fn command() -> clap::Command {
+    let mut cmd = Cli::command();
+    for f in cm_core::features::previews() {
+        for name in f.cli_commands {
+            cmd = mark_preview(cmd, &[name], None, true);
+        }
+        for (path, arg) in f.cli_args {
+            let path: Vec<&str> = path.split(' ').collect();
+            cmd = mark_preview(cmd, &path, Some(arg), false);
+        }
+    }
+    cmd
+}
+
+const PREVIEW_MARK: &str = " [preview]";
+
+/// Marks the command at `path` (or its argument `arg`, or, with `all`, it and every command
+/// below it). A path that does not exist is left alone; a test pins that the registry only names
+/// real commands.
+fn mark_preview(cmd: clap::Command, path: &[&str], arg: Option<&str>, all: bool) -> clap::Command {
+    if let Some((head, rest)) = path.split_first() {
+        if cmd.find_subcommand(head).is_none() {
+            return cmd;
+        }
+        return cmd.mut_subcommand(head, |c| mark_preview(c, rest, arg, all));
+    }
+    let mut cmd = cmd;
+    if let Some(arg) = arg {
+        if cmd.get_arguments().any(|a| a.get_id() == arg) {
+            cmd = cmd.mut_arg(arg, |a| {
+                let help = a.get_help().map(ToString::to_string).unwrap_or_default();
+                a.help(format!("{help}{PREVIEW_MARK}"))
+            });
+        }
+        return cmd;
+    }
+    let about = cmd.get_about().map(ToString::to_string).unwrap_or_default();
+    cmd = cmd.about(format!("{about}{PREVIEW_MARK}"));
+    if all {
+        let names: Vec<String> = cmd
+            .get_subcommands()
+            .map(|c| c.get_name().to_owned())
+            .collect();
+        for n in names {
+            cmd = cmd.mut_subcommand(n, |c| mark_preview(c, &[], None, true));
+        }
+    }
+    cmd
+}
+
 /// Runs one invocation (`args[0]` is the program name) and returns the exit code:
 /// 0 success, 2 bad input (including usage errors), 3/4/5/6 per the shared error table, 1
 /// for anything else.
@@ -186,7 +239,10 @@ where
     I: IntoIterator<Item = S>,
     S: Into<std::ffi::OsString> + Clone,
 {
-    let cli = match Cli::try_parse_from(args) {
+    let cli = match command()
+        .try_get_matches_from(args)
+        .and_then(|m| Cli::from_arg_matches(&m))
+    {
         Ok(c) => c,
         Err(e) => {
             let text = e.render().to_string();

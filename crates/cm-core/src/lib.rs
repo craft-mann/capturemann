@@ -12,6 +12,7 @@ pub mod clock;
 pub mod edit;
 pub mod edit_view;
 pub mod error;
+pub mod features;
 pub mod geometry;
 pub mod guard;
 pub mod idempotency;

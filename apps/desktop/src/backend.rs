@@ -853,6 +853,51 @@ mod tests {
         });
     }
 
+    /// S24: the Preview switches are stored like any setting by the app, read back as on when
+    /// absent, refused to a socket client (app-only), and a switched-off preview refuses its
+    /// start with `feature_disabled` while the app itself stays usable.
+    #[test]
+    fn preview_switches_default_on_persist_and_are_app_only() {
+        let f = fixture();
+        let daemon = f.backend.daemon.clone().unwrap();
+        let ep = f.backend.endpoint.clone().unwrap();
+        for id in ["long_shot", "click_guide"] {
+            assert!(cm_core::features::is_enabled(
+                &f.backend.settings.snapshot(),
+                id
+            ));
+        }
+        f.rt.block_on(async {
+            use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+            Backend::call(
+                &daemon,
+                "set_settings",
+                json!({"values": {"previews.click_guide": false}}),
+            )
+            .await
+            .unwrap();
+            assert_eq!(f.backend.settings.snapshot()["previews.click_guide"], false);
+            assert!(!cm_core::features::is_enabled(
+                &f.backend.settings.snapshot(),
+                "click_guide"
+            ));
+            assert!(cm_core::features::is_enabled(
+                &f.backend.settings.snapshot(),
+                "long_shot"
+            ));
+            // A socket client (an agent) cannot turn it back on.
+            let stream = cm_daemon::connect(&ep).await.unwrap();
+            let (r, mut w) = tokio::io::split(stream);
+            let mut lines = BufReader::new(r).lines();
+            let req = json!({"jsonrpc":"2.0","id":1,"method":"set_settings",
+                "params":{"values":{"previews.click_guide":true}}});
+            w.write_all(format!("{req}\n").as_bytes()).await.unwrap();
+            let resp = lines.next_line().await.unwrap().unwrap();
+            assert!(resp.contains("app_only_setting"), "{resp}");
+            assert_eq!(f.backend.settings.snapshot()["previews.click_guide"], false);
+        });
+    }
+
     /// F7 (Windows lab round 3): the CLI and the app are two clients of one daemon. A
     /// `set_settings` over the socket reaches the app's `FileSettings` (the handle the capture
     /// path and the Settings page read) and raises `settings.changed`; a write by the app is
