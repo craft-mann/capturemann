@@ -596,9 +596,6 @@ fn find_join_robust(
             let wide = (cw / 20).max(2).max(h / 4);
             h.saturating_sub(wide).max(1)..=(h + wide).min(cw - min_ov)
         }
-        (Prior::Trusted, Some(h)) => {
-            h.saturating_sub(TRUSTED_WIDE_PX).max(1)..=(h + TRUSTED_WIDE_PX).min(cw - min_ov)
-        }
         _ => 1..=(cw - min_ov),
     };
     for s in window {
@@ -656,7 +653,10 @@ fn find_join_robust(
         }
         // The step names the shift: what differs may outweigh what matches (a header and a
         // card still drawing are most of a short overlap), but not by more than 4 to 1.
-        let outweighed = if near_hint {
+        let outweighed = if prior == Prior::Trusted {
+            // The lines of the shift's own are what counts (below), not how many differ.
+            false
+        } else if near_hint {
             ink_ok * ROBUST_HINTED_BAD_PER_OK < ink_bad
         } else {
             ink_ok < ROBUST_INK_RATIO * ink_bad
@@ -692,11 +692,18 @@ fn find_join_robust(
         let mut scored: Vec<(usize, usize)> = found.iter().map(|c| (distinct(c.0), c.0)).collect();
         scored.sort_unstable_by_key(|c| std::cmp::Reverse(*c));
         let (lines, shift) = scored[0];
-        // Clearly more of them than the next shift has.
-        let clear = scored.get(1).is_none_or(|next| lines >= 2 * next.0);
-        if lines < TRUSTED_MIN_DISTINCT || !clear {
+        // The distance the wheel always moved by, and the shift with the most lines of its own
+        // anywhere (the whole range is looked at: a page that repeats every so many px would
+        // match at the usual distance whatever the wheel did this time), clearly more of them
+        // than any shift that is not just beside it.
+        let near_usual = hint.is_some_and(|d| shift.abs_diff(d) <= TRUSTED_WIDE_PX);
+        let clear = scored
+            .iter()
+            .filter(|c| c.1.abs_diff(shift) > TRUSTED_NEIGHBOUR_PX + 2)
+            .all(|c| lines >= 2 * c.0);
+        if lines < TRUSTED_MIN_DISTINCT || !near_usual || !clear {
             return Err(NoJoin::NoOverlap(
-                "no shift near the trusted distance has lines of its own".into(),
+                "no shift has lines of its own at the distance the wheel always moves by".into(),
             ));
         }
         return Ok(Join {
