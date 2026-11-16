@@ -54,6 +54,11 @@ pub struct SyntheticPage {
     pub corner_notch: Option<(u32, u32)>,
     /// Content rows repeat every this many rows (a page of identical paragraphs).
     pub period: Option<u32>,
+    /// A list of 44 px rows like a web page's (tests/fixtures/long-shot/long-page.html): every
+    /// other row on a tinted background, a rule under each, the row number drawn as a few dark
+    /// pixels, and a bar whose width is `40 + (row * 37) % 260`, so that rows 28 apart differ by
+    /// four pixels of bar and a few of digits: nearly alike, never equal. Needs `cross >= 460`.
+    pub ui_rows: bool,
 }
 
 impl SyntheticPage {
@@ -74,7 +79,13 @@ impl SyntheticPage {
             corner_rows: 0,
             corner_notch: None,
             period: None,
+            ui_rows: false,
         }
+    }
+
+    pub fn with_ui_rows(mut self) -> Self {
+        self.ui_rows = true;
+        self
     }
 
     pub fn with_corner_notch(mut self, rows: u32, width: u32) -> Self {
@@ -143,6 +154,7 @@ impl SyntheticPage {
             .map(|x| match kind {
                 Kind::Header => [200, 30, (x & 255) as u8, 255],
                 Kind::Footer => [30, 200, (x & 255) as u8, 255],
+                Kind::Content if self.ui_rows => self.ui_pixel(index, x),
                 Kind::Content => {
                     // The row index in the first four pixels; a mix of both after that, so every
                     // row differs and no two rows share a prefix of change.
@@ -164,6 +176,32 @@ impl SyntheticPage {
                 }
             })
             .collect()
+    }
+
+    fn ui_pixel(&self, index: u32, x: u32) -> [u8; 4] {
+        let (row, y) = (index / 44 + 1, index % 44);
+        let bg: [u8; 4] = if row % 2 == 0 {
+            [241, 244, 251, 255]
+        } else {
+            [255, 255, 255, 255]
+        };
+        if y == 43 {
+            return [208, 208, 208, 255];
+        }
+        // The row number: four digits in 12 px cells at x 20..68, a stroke pattern per digit.
+        if (10..30).contains(&y) && (20..68).contains(&x) {
+            let digit = [row / 1000 % 10, row / 100 % 10, row / 10 % 10, row % 10]
+                [((x - 20) / 12) as usize];
+            let (dx, dy) = ((x - 20) % 12, y - 10);
+            let on = (dx + dy.wrapping_mul(3) + digit * 5) % 4 < 2 && dx > 1 && dx < 10;
+            if on {
+                return [17, 17, 17, 255];
+            }
+        }
+        if (17..27).contains(&y) && x >= 150 && x < 150 + 40 + (row * 37) % 260 {
+            return [59, 111, 216, 255];
+        }
+        bg
     }
 
     fn assemble(&self, lines: Vec<Vec<[u8; 4]>>) -> Frame {

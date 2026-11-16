@@ -2115,3 +2115,53 @@ fn win_6_a_window_that_never_scrolls_ends_nothing_scrolled_after_every_way() {
     assert_eq!(r.end, EndReason::NothingScrolled);
     assert_eq!(sc.asked, 2);
 }
+
+/// CAP-6.AC3 on a page of rows that are nearly alike (Linux QA, Nov 16, 2026: `long-page.html`
+/// with `?jump=1`): rows 28 apart differ by four pixels of bar and a few of digits, so a pair
+/// of frames that do not overlap at all still "matched" over the one row they could share with
+/// the tolerant look, and 28 rows were silently left out. The run must stop at the jump.
+#[test]
+fn cap_6_ac3_a_jump_on_nearly_alike_rows_is_not_joined() {
+    for skip in [1100u32, 1232, 1300, 1500, 2000] {
+        let page = SyntheticPage::new(500, 80 * 44, 880)
+            .with_ui_rows()
+            .with_jump(1500, skip);
+        let (r, _) = auto(page.clone(), None);
+        assert_eq!(r.end, EndReason::NoOverlap, "skip {skip}");
+        let kept = r.image.frame.height();
+        assert_eq!(
+            r.image.frame,
+            page.expected_range(0, kept),
+            "skip {skip}: what is kept is a prefix of the page"
+        );
+    }
+}
+
+/// The same page without a jump still joins every row once.
+#[test]
+fn cap_6_nearly_alike_rows_without_a_jump_join() {
+    let page = SyntheticPage::new(500, 80 * 44, 880).with_ui_rows();
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}
+
+/// The pair the Linux run met: the page jumped by about two screens between two frames, and
+/// rows 28 (or 7) apart look alike. Whatever the distance, the pair does not join.
+#[test]
+fn cap_6_ac3_nearly_alike_rows_two_screens_apart_do_not_join() {
+    let page = SyntheticPage::new(500, 80 * 44, 880).with_ui_rows();
+    for d in [1700u32, 1900, 2004, 2020, 2100] {
+        let mut st = Stitcher::new(Direction::Vertical, Limits::with_max_px(None));
+        st.push(&page.frame_at(0), None);
+        assert!(matches!(
+            st.push(&page.frame_at(704), Some(704)),
+            PushOutcome::Added { .. }
+        ));
+        assert_eq!(
+            st.push(&page.frame_at(704 + d), Some(704)),
+            PushOutcome::NoOverlap,
+            "d {d}"
+        );
+    }
+}

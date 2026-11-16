@@ -383,6 +383,8 @@ const LENIENT_SHARE: f64 = 0.03;
 const LENIENT_MIN_PX: usize = 8;
 /// Lines narrower than this (in pixels) are only ever compared exactly.
 const LENIENT_MIN_LINE: usize = 256;
+/// Most compared lines of a lenient match that may differ at all (see `find_join_with`).
+const LENIENT_INEXACT_SHARE: f64 = 0.15;
 
 /// Where two frames join: exact lines first (the clean case, and the only one that never meets
 /// an ambiguity from the tolerance); when that finds nothing, again with lines that differ in a
@@ -662,6 +664,25 @@ fn find_join_with(
             }
         }
     };
+    // A match that only holds because lines may differ in a few pixels is believed only when
+    // those lines are few: a caret, a clock or a cursor changes a handful of lines, while
+    // content that is merely alike (rows 28 apart in a list, whose bars differ by 4 px and
+    // whose numbers by two digits) differs in every line that holds ink. Such a pair did not
+    // overlap at all (a page that jumped) and was joined, silently leaving rows out (Linux QA,
+    // Nov 16, 2026).
+    if max_px > 0 {
+        let overlap = cw - shift;
+        let g = GUARD.min(overlap / 3);
+        let compared = (overlap - 2 * g).max(1);
+        let inexact = (g..overlap - g)
+            .filter(|&i| !a.near(header + shift + i, b, header + i))
+            .count();
+        if inexact as f64 > compared as f64 * LENIENT_INEXACT_SHARE {
+            return Err(NoJoin::NoOverlap(format!(
+                "the match at shift {shift} needs the pixel tolerance on {inexact} of {compared} lines: the frames only look alike"
+            )));
+        }
+    }
     Ok(Join {
         shift,
         guard: GUARD.min((cw - shift) / 3),
