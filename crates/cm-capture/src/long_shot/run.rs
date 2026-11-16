@@ -256,6 +256,22 @@ pub fn run_auto_ex(
         // is known again, and the content moved further than a step can safely ask: the step is
         // sent again halved, up to `SMALLER_STEPS` times, and the distance it teaches counts from
         // that position.
+        if outcome == PushOutcome::NoOverlap && !window_changed(src, &stitcher, &next.frame) {
+            // The pair the step made, before the ladder moves the page again: the pair that is
+            // dumped when the run ends is the last one the ladder looked at, often a frame equal
+            // to the last (Windows, Edge, Nov 16, 2026: the refused frame of a dump was
+            // pixel-identical to the last one and said nothing about the failing step).
+            super::debug::dump_refused(
+                &last_ok,
+                &next.frame,
+                stitcher.last_refusal(),
+                &format!(
+                    "auto scroll, the pair the step of {step} px made (expected shift {}, {} frames so far)",
+                    expected(step, gain),
+                    stitcher.frames()
+                ),
+            );
+        }
         let mut asked = step;
         let mut back_total = 0u32;
         let mut retry = 0;
@@ -507,6 +523,16 @@ pub fn run_auto_ex(
                 if back_total > 0 || smaller > 0 {
                     share =
                         (share * OVERSHOOT_SHARE_FACTOR).max(MIN_STEP_SHARE.min(cfg.step_fraction));
+                }
+                if back_total > 0 {
+                    // A join found after scrolling back teaches the distance only roughly (the
+                    // scroll back is no better known than the step that overshot), but it says
+                    // the wheel moves at least this much per px asked, net of what was taken
+                    // back: the next step must not be sized as if it moved less (Windows, Edge:
+                    // after the first pair was rescued the next request moved past the overlap
+                    // again, YouTube ended `no_overlap` after 2 frames).
+                    let seen = (f64::from(new_len) / f64::from(asked)).clamp(0.25, 4.0);
+                    gain = gain.max(seen);
                 }
                 if back_total == 0 {
                     let seen = (f64::from(new_len) / f64::from(asked)).clamp(0.25, 4.0);

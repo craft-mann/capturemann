@@ -2740,6 +2740,7 @@ struct FirstBig {
     later: f64,
     scrolls: u32,
     notch: u32,
+    backs: u32,
 }
 
 impl FirstBig {
@@ -2762,6 +2763,7 @@ impl Scroller for FirstBig {
         Ok(())
     }
     fn scroll_back(&mut self, _: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.backs += 1;
         let by = self.moved(amount_px, self.later);
         self.view.back(by);
         self.pos.set(self.pos.get().saturating_sub(by));
@@ -2804,9 +2806,55 @@ fn lsreal_a_first_step_that_overshoots_is_scrolled_back_and_joined() {
             later: 1.5,
             scrolls: 0,
             notch: 15,
+            backs: 0,
         };
         let r = auto_with(&mut src, &mut sc);
         assert_eq!(r.end, EndReason::ReachedEnd, "first {first}");
         assert_eq!(r.image.frame, page.expected(), "first {first}");
+        // The rescue of the first pair taught that the wheel moves more than asked, so the
+        // steps after it do not overshoot again.
+        assert!(sc.backs <= 3, "first {first}: {} scroll backs", sc.backs);
+    }
+}
+
+/// A pair with little left in common: a translucent sticky header over the top of the next frame,
+/// and, at the bottom of the first, content that had not been drawn yet (a card that reveals
+/// itself as it scrolls into view), so that only a short stretch of the overlap matches. A real
+/// page, Windows Edge, carchargeos.com, Nov 16, 2026: 85 matching rows of 354, below the 40 inked
+/// lines a join needs. The shift the step names is believed on 20 lines when it is the only one
+/// that fits near the step; a step that names another place is not.
+#[test]
+fn lsreal_a_short_match_is_believed_only_at_the_shift_the_step_names() {
+    let page = SyntheticPage::new(300, 3000, 400)
+        .with_bands(30, 0)
+        .with_frosted_header(60);
+    let first = {
+        let f = page.frame_at(0);
+        let (w, h) = (f.width() as usize, f.height() as usize);
+        let mut data = f.rgba().to_vec();
+        // Rows 320 to 400 not drawn yet: one flat colour.
+        for y in 320..h {
+            for x in 0..w {
+                let i = (y * w + x) * 4;
+                data[i..i + 4].copy_from_slice(&[250, 250, 252, 255]);
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let next = page.frame_at(200);
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&first, None);
+    let got = s.push(&next, Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
+    // The same pair with a step that names another place is never believed.
+    for wrong in [60, 380] {
+        let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+        s.push(&first, None);
+        assert_eq!(s.push(&next, Some(wrong)), PushOutcome::NoOverlap, "{wrong}");
     }
 }

@@ -440,7 +440,20 @@ fn find_join_opt(
                     if same_but_for_a_region(a, b) {
                         return Err(NoJoin::Same);
                     }
-                    match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK) {
+                    let robust_result = match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK, false)
+                    {
+                        // A shift the step names, on fewer lines (see `ROBUST_HINTED_MIN_INK`).
+                        Err(NoJoin::NoOverlap(why)) => match hint {
+                            Some(_) => find_join_robust(a, b, hint, bands, ROBUST_HINTED_MIN_INK, true)
+                                .map_err(|e| match e {
+                                    NoJoin::NoOverlap(_) => NoJoin::NoOverlap(why),
+                                    other => other,
+                                }),
+                            None => Err(NoJoin::NoOverlap(why)),
+                        },
+                        other => other,
+                    };
+                    match robust_result {
                         Err(NoJoin::NoOverlap(robust)) => {
                             // A column that scrolls by another amount than the text (a table
                             // beside it at a fraction of a pixel, a card the pointer opened):
@@ -471,6 +484,14 @@ const ROBUST_MAX_RUNS: usize = 3;
 /// Lines that carry ink (not one flat colour) that must match exactly, and at least this many
 /// times as many as the ink lines that differ.
 const ROBUST_MIN_INK: usize = 40;
+/// Ink lines that must match when the step names the shift (the learned wheel distance times the
+/// asked step): the shift is looked for only near it and must be the only one that fits. For a
+/// pair with little left in common: a translucent header at the top, a card that reveals itself
+/// as it scrolls into view at the bottom, a few lines of text between (a real page, Windows
+/// Edge, carchargeos.com, Nov 16, 2026: 85 matching rows of 354).
+const ROBUST_HINTED_MIN_INK: usize = 20;
+/// Most inked lines that may differ per inked line that matches, when the step names the shift.
+const ROBUST_HINTED_BAD_PER_OK: usize = 4;
 const ROBUST_INK_RATIO: usize = 1;
 
 /// Whether a line is of one colour only (a blank stretch of page: it matches at every shift and
@@ -499,6 +520,7 @@ fn find_join_robust(
     hint: Option<usize>,
     bands: Option<(usize, usize)>,
     min_ink: usize,
+    near_hint: bool,
 ) -> Result<Join, NoJoin> {
     let n = a.count;
     if a.data == b.data {
@@ -538,7 +560,15 @@ fn find_join_robust(
     }
     // (shift, ink lines that match, ink lines that differ)
     let mut found: Vec<(usize, usize, usize)> = Vec::new();
-    for s in 1..=(cw - min_ov) {
+    // Only the shifts the step names: a quarter of it either way, as the tie-break below does.
+    let window = match (near_hint, hint) {
+        (true, Some(h)) => {
+            let wide = (cw / 20).max(2).max(h / 4);
+            h.saturating_sub(wide).max(1)..=(h + wide).min(cw - min_ov)
+        }
+        _ => 1..=(cw - min_ov),
+    };
+    for s in window {
         let overlap = cw - s;
         let g = GUARD.min(overlap / 3);
         let compared = overlap - 2 * g;
@@ -581,7 +611,14 @@ fn find_join_robust(
                 }
             }
         }
-        if ok && ink_ok >= min_ink && ink_ok >= ROBUST_INK_RATIO * ink_bad {
+        // The step names the shift: what differs may outweigh what matches (a header and a
+        // card still drawing are most of a short overlap), but not by more than 4 to 1.
+        let outweighed = if near_hint {
+            ink_ok * ROBUST_HINTED_BAD_PER_OK < ink_bad
+        } else {
+            ink_ok < ROBUST_INK_RATIO * ink_bad
+        };
+        if ok && ink_ok >= min_ink && !outweighed {
             found.push((s, ink_ok, ink_bad));
         }
     }
@@ -670,7 +707,7 @@ fn find_join_banded(
         if (moving as f64) < BANDED_MIN_MOVING * (n - header - footer) as f64 {
             continue;
         }
-        if let Ok(j) = find_join_robust(&ac, &bc, hint, bands, BANDED_MIN_INK) {
+        if let Ok(j) = find_join_robust(&ac, &bc, hint, bands, BANDED_MIN_INK, false) {
             // The lines the shift was believed on have to differ from each other: rows that
             // repeat (a list of alike rows, tinted stripes) match at many shifts, and the band
             // of columns that leaves out what tells them apart cannot say which is the true one.
