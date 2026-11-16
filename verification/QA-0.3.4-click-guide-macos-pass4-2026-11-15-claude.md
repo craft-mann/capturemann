@@ -34,7 +34,7 @@
 | Markdown with no folder chosen | PASS | opens the native folder chooser (it shows the user's own folders: consider that) |
 | Markdown export | PASS | `guide.md` + `images/step-01..18.png`, 800 x 533 at 1x |
 | HTML export, hostile titles/notes | PASS | no script/img element, text escaped; PDF shows the text literally, emoji/Arabic/CJK as tofu (known) |
-| **Markdown escaping (G45)** | FAIL (known G-GD-13) | title/step titles keep `[x](url)`, `![i](url)` and backticks live (link and image injection); notes are written as Markdown (`# h`, table, *b*); only `<` is escaped |
+| **Markdown escaping (G45)** | FAIL (known G-GD-13) | title/step titles keep `[x] (url)`, `![i] (url)` and backticks live (link and image injection); notes are written as Markdown (`# h`, table, *b*); only `<` is escaped |
 | **Folder reuse (G46)** | FAIL (known) | second guide exported to the same folder overwrote `guide.md` silently and left the first guide's `step-02.png`; a 0-step guide exports "0 step(s) written" as success |
 | Copy as rich text, paste into TextEdit (rich) | PASS (pasted with images) | images arrive at full pixel size (very large in TextEdit). Notes not run |
 | **Agent/CLI-started guide (G33)** | FAIL (known G-GD-1) | confirm dialog "Start a Click Guide: CaptureMann will take a screenshot of each mouse click (clicks only; keystrokes are never recorded)" with Cancel / Start guide; then **no bar**, only a toast "Started by agent via MCP" (said MCP, started by the CLI), no Stop on it, the sidebar tile stays "Click Guide" (not running); stopped with `guide stop` |

@@ -1,4 +1,4 @@
-# Release day, 0.3.4 (Windows, macOS; Linux only if you decide so): steps for the maintainer
+# Release day, 0.3.4 (Windows, macOS and Linux): steps for the maintainer
 
 Written on Nov 15, 2026 from `release-day-0.3.3.md` (the pattern) with the version changed and the 0.3.4 items added.
 "[M]" = only the maintainer does this (push, tag, sign, notarize, publish, accounts, decisions). "[A]" = an agent can do it
@@ -19,14 +19,7 @@ Nothing in this file has been run on a release day yet. **Blanks to fill on the 
 
 ## Before the day: decisions
 
-1. **[M] Is Linux in 0.3.4?** No Linux 0.3.4 build and no Linux regression was run on Nov 15, 2026. The last Linux reports are the 0.3.3 ones
-   (`L1-linux-0.3.3-*`: x86_64 61/0, aarch64 40/0). Long Shot, Click Guide, the picker and the HUD are new code with platform parts for
-   Linux that nobody has run. Options: (a) **ship Windows and macOS only and leave Linux at 0.3.3** (as 0.2.8 did for Windows alone); the text
-   says "Linux stays at 0.3.3", the APT repository is not touched, and the "Linux" lines of this file are skipped; or (b) ship Linux: you
-   need the x86_64 ThinkPad (dual boot, `scripts/testlab/lab.sh switch ubuntu`, then `packaging/linux/release-build.sh`, about an hour cold),
-   the aarch64 VM on this Mac (`~/VMs/cm-linux`), `packaging/linux/check-package.sh`, `scripts/testlab/regress.sh linux --tier standard` and
-   `--tier full` on both, `packaging/linux/sign-linux.sh` [M], the APT update, and the Linux Long Shot and Click Guide cases written down as
-   "not run" or run. Count a day for it. If you choose (a), delete the Linux rows and the Linux line of "Type" in the release text.
+1. **Linux ships in 0.3.4 (decided Nov 16, 2026).** Linux x86_64 candidate files of `596c7956` ran standard 57/0, full 65/0 and the `.deb` install 1/0 (`L1-linux-0.3.4-596c7956-*`); a run on the final commit and the aarch64 VM are not done. Steps: `packaging/linux/release-build.sh --src <checkout> --commit <sha> --jobs 3` on the ThinkPad (`scripts/testlab/lab.sh switch ubuntu`) and in the VM, `packaging/linux/check-package.sh`, `scripts/testlab/regress.sh linux --tier standard` and `--tier full`, `packaging/linux/sign-linux.sh` [M], the APT update with the 0.3.0 to 0.3.4 `.deb` files [M].
 2. **[M] Which audit P1 items are built before the tag** (see `release-0.3.4-morning-report.md`, "Decisions waiting"). Whatever is not built goes into
    "Known limits" of the text, which already lists the main ones.
 3. **[M] Windows licence list.** The Windows package builder printed "the Windows third-party licence list could not be generated (needs bash
