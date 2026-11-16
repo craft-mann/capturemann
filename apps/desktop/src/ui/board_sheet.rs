@@ -270,7 +270,7 @@ fn canvas(
             }
         });
         let thumb = thumbs.update(cx, |c, cx| c.get(&src.id, cx));
-        let round = px((s.radius as f32 * k).min(12.));
+        let round = px(s.radius as f32 * plan.scale as f32 * plan.spacing as f32 * k);
         let mut cell_box = div()
             .absolute()
             .left(px(cell.x as f32 * k))
@@ -651,8 +651,8 @@ impl Render for BoardSheetView {
                 .child(layouts)
                 .child(div().text_size(px(12.5)).text_color(rgba_of(t.mist)).child(
                     SharedString::from(trn!(
-                        "{n} screenshot, drag order = list order",
-                        "{n} screenshots, drag order = list order",
+                        "{n} screenshot, use the arrows to change the order",
+                        "{n} screenshots, use the arrows to change the order",
                         n
                     )),
                 ))
@@ -743,7 +743,7 @@ impl Render for BoardSheetView {
                 &t,
                 &a,
                 "board-margin",
-                &[0, 16, 32, 48, 64],
+                &[0, 16, 40, 64, 96],
                 s.margin,
                 |s, v| s.margin = v,
             )
@@ -798,7 +798,7 @@ impl Render for BoardSheetView {
             &t,
             format!("{}  \u{b7}  {} px", tr!("Corner radius"), s.radius),
             None,
-            preset(&t, &a, "board-radius", &[0, 8, 16, 24], s.radius, |s, v| {
+            preset(&t, &a, "board-radius", &[0, 8, 12, 24], s.radius, |s, v| {
                 s.radius = v
             })
             .into_any_element(),

@@ -11200,9 +11200,10 @@ msgstr "{n} khung hình"
 msgid "{n} of {max}"
 msgstr "{n} trên {max}"
 
-msgid "{n} screenshot, drag order = list order"
-msgid_plural "{n} screenshots, drag order = list order"
-msgstr[0] "{n} ảnh chụp màn hình · kéo để đổi thứ tự trong danh sách"
+#, fuzzy
+msgid "{n} screenshot, use the arrows to change the order"
+msgid_plural "{n} screenshots, use the arrows to change the order"
+msgstr[0] "{n} ảnh chụp màn hình · dùng mũi tên để đổi thứ tự"
 
 msgid "{n} selected"
 msgid_plural "{n} selected"
@@ -11887,3 +11888,19 @@ msgstr "{agent} muốn chạy “{title}”. Thao tác này luôn hỏi bạn tr
 #, fuzzy
 msgid "{n} steps left"
 msgstr "Còn {n} bước"
+
+#, fuzzy
+msgid "A board takes screenshots only. Deselect the recordings and audio."
+msgstr "Bảng ảnh chỉ nhận ảnh chụp màn hình. Hãy bỏ chọn bản ghi hình và âm thanh."
+
+#, fuzzy
+msgid "Select at least 2 screenshots to make a board."
+msgstr "Hãy chọn ít nhất 2 ảnh chụp màn hình để tạo bảng ảnh."
+
+#, fuzzy
+msgid "A board holds up to 12 screenshots; {n} are selected."
+msgstr "Bảng ảnh chứa tối đa 12 ảnh chụp màn hình; bạn đã chọn {n}."
+
+#, fuzzy
+msgid "The file name pattern has a mistake: use only the keys below, each between braces."
+msgstr "Mẫu tên tệp có lỗi: chỉ dùng các khóa bên dưới, mỗi khóa đặt trong dấu ngoặc nhọn."

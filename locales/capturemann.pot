@@ -58,7 +58,13 @@ msgstr ""
 msgid "A 5 second countdown"
 msgstr ""
 
+msgid "A board holds up to 12 screenshots; {n} are selected."
+msgstr ""
+
 msgid "A board needs 2 to 12 screenshots."
+msgstr ""
+
+msgid "A board takes screenshots only. Deselect the recordings and audio."
 msgstr ""
 
 msgid "A browser window opened. Sign in there and allow access; this page continues by itself. Closing the window without allowing it ends the attempt after a few minutes, or press Cancel."
@@ -5094,6 +5100,9 @@ msgstr ""
 msgid "Select a zoom on the zoom lane to change it."
 msgstr ""
 
+msgid "Select at least 2 screenshots to make a board."
+msgstr ""
+
 msgid "Selected segment or range"
 msgstr ""
 
@@ -5883,6 +5892,9 @@ msgid "The file can't be read. It may be damaged or cut short."
 msgstr ""
 
 msgid "The file could not be written"
+msgstr ""
+
+msgid "The file name pattern has a mistake: use only the keys below, each between braces."
 msgstr ""
 
 msgid "The file name pattern is empty."
@@ -7892,8 +7904,8 @@ msgstr[1] ""
 msgid "{n} rows (the limit is {limit})"
 msgstr ""
 
-msgid "{n} screenshot, drag order = list order"
-msgid_plural "{n} screenshots, drag order = list order"
+msgid "{n} screenshot, use the arrows to change the order"
+msgid_plural "{n} screenshots, use the arrows to change the order"
 msgstr[0] ""
 msgstr[1] ""
 
