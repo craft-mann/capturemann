@@ -917,6 +917,25 @@ pub(crate) fn selection_texts(n: u64) -> (String, [String; 3]) {
     )
 }
 
+/// Why Make a board is off: `shots` screenshots among `n` selected (a board takes 2 to 12
+/// screenshots and nothing else). `None` when it is on.
+pub(crate) fn board_disabled_reason(shots: usize, n: usize) -> Option<String> {
+    if shots != n {
+        Some(tr!(
+            "A board takes screenshots only. Deselect the recordings and audio."
+        ))
+    } else if shots < 2 {
+        Some(tr!("Select at least 2 screenshots to make a board."))
+    } else if shots > 12 {
+        Some(tr!(
+            "A board holds up to 12 screenshots; {n} are selected.",
+            n = shots
+        ))
+    } else {
+        None
+    }
+}
+
 /// The 1 px ring a hovered card gets (design S15), outside its border.
 const HOVER_RING: Color = Color::rgb(0x3A3A42);
 
@@ -2595,7 +2614,10 @@ impl LibraryView {
                                 v1.update(cx, |this, cx| this.make_board(cx)).ok();
                             })
                         } else {
-                            b
+                            match board_disabled_reason(shots, n) {
+                                Some(why) => b.tooltip(tip(why, Vec::new())),
+                                None => b,
+                            }
                         }
                     })
                     .child({
@@ -2934,6 +2956,22 @@ fn empty_state(
         })
         .children(action)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod board_reason_tests {
+    use super::board_disabled_reason;
+
+    #[test]
+    fn the_board_button_says_why_it_is_off() {
+        assert!(board_disabled_reason(2, 2).is_none());
+        assert!(board_disabled_reason(12, 12).is_none());
+        assert!(board_disabled_reason(1, 1).unwrap().contains("at least 2"));
+        assert!(board_disabled_reason(13, 13).unwrap().contains("13"));
+        assert!(board_disabled_reason(3, 4)
+            .unwrap()
+            .contains("screenshots only"));
+    }
 }
 
 #[cfg(test)]

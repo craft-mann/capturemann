@@ -195,10 +195,10 @@ impl Default for BoardOptions {
     fn default() -> Self {
         BoardOptions {
             gap: 24,
-            margin: 32,
-            background: Background::White,
-            radius: 0,
-            shadow: false,
+            margin: 40,
+            background: Background::LightGrey,
+            radius: 12,
+            shadow: true,
             captions: Vec::new(),
             title: None,
             before_after: false,
@@ -268,6 +268,18 @@ pub struct BoardPlan {
     pub caption_h: u32,
     /// 1.0, or the factor the whole board was scaled down by to stay within the limits.
     pub scale: f64,
+    /// Factor the gap, margin, radius and shadow were enlarged by so that the spacing keeps
+    /// its proportion on large pictures (1.0 to 3.0; 1.0 for Free, where the user places it).
+    pub spacing: f64,
+}
+
+/// Pictures this small (shortest side, px) get the gap and margin as set; larger ones get them
+/// enlarged in proportion, up to three times.
+const SPACING_REF: f64 = 400.0;
+
+fn spacing(cells: &[(u32, u32)]) -> f64 {
+    let m = cells.iter().map(|&(w, h)| w.min(h)).min().unwrap_or(1);
+    (f64::from(m) / SPACING_REF).clamp(1.0, 3.0)
 }
 
 fn invalid(msg: impl Into<String>) -> CmError {
@@ -328,8 +340,9 @@ fn plan_k(
     k: f64,
 ) -> Result<BoardPlan, CmError> {
     let n = sizes.len();
-    let gap = scaled(opts.gap, k) as i32;
-    let margin = scaled(opts.margin, k) as i32;
+    let gap0 = scaled(opts.gap, k);
+    let margin0 = scaled(opts.margin, k);
+    let margin = margin0 as i32;
     let src: Vec<(u32, u32)> = sizes
         .iter()
         .map(|&(w, h)| (scaled(w, k).max(1), scaled(h, k).max(1)))
@@ -382,6 +395,9 @@ fn plan_k(
                 )
             }));
             // Every cell is cw x ch; `dims` holds the fitted picture inside it.
+            let sp = spacing(&[(cw, ch)]);
+            let gap = (f64::from(gap0) * sp).round() as i32;
+            let margin = (f64::from(margin0) * sp).round() as i32;
             let unit = text_unit(&[(cw, ch)]);
             let caption_h = if any_caption {
                 (unit * 1.2).ceil() as u32 + (unit * 0.5) as u32
@@ -416,6 +432,7 @@ fn plan_k(
                 title_at: opts.title.as_ref().map(|_| (margin, margin)),
                 caption_h,
                 scale: k,
+                spacing: sp,
             });
         }
         LayoutKind::Free => {
@@ -461,11 +478,15 @@ fn plan_k(
                 title_at: opts.title.as_ref().map(|_| (margin, margin / 2)),
                 caption_h: if any_caption { (unit * 1.7) as u32 } else { 0 },
                 scale: k,
+                spacing: 1.0,
             });
         }
     }
 
     // Pair and Strip: one row or one column.
+    let sp = spacing(&dims);
+    let gap = (f64::from(gap0) * sp).round() as i32;
+    let margin = (f64::from(margin0) * sp).round() as i32;
     let unit = text_unit(&dims);
     let caption_h = if any_caption {
         (unit * 1.2).ceil() as u32 + (unit * 0.5) as u32
@@ -505,6 +526,7 @@ fn plan_k(
         title_at: opts.title.as_ref().map(|_| (margin, margin)),
         caption_h,
         scale: k,
+        spacing: sp,
     })
 }
 
@@ -512,10 +534,168 @@ fn plan_k(
 /// covers the screenshot (maintainer, Nov 14, 2026). Zero when there are no labels.
 pub fn label_band(opts: &BoardOptions, kind: LayoutKind, unit: f32) -> u32 {
     if opts.before_after && kind == LayoutKind::Pair {
-        (unit * 0.9 * 1.35).ceil() as u32 + 8
+        let (_, h, _) = stamp_metrics(unit * STAMP_K);
+        h.ceil() as u32 + (unit * 0.35).ceil() as u32
     } else {
         0
     }
+}
+
+/// Stamp text size relative to the text unit.
+const STAMP_K: f32 = 1.3;
+
+/// The BEFORE / AFTER stamp (design S10): a white pill with a coloured border and coloured bold
+/// letters. Returns the vertical padding, the stamp height and the border width for text of
+/// `px`.
+fn stamp_metrics(px: f32) -> (f32, f32, f32) {
+    let border = (px * 0.12).max(2.0);
+    let pad_y = px * 0.12;
+    (pad_y, px * 1.2 + 2.0 * pad_y + 2.0 * border, border)
+}
+
+/// Draws `s` bold-looking (the bundled Inter is regular only: a second pass one step to the
+/// side) with its box centred in `x0..x0+w`.
+#[allow(clippy::too_many_arguments)]
+fn draw_text_centered(
+    pm: &mut Pixmap,
+    fonts: &mut Fonts,
+    s: &str,
+    px: f32,
+    color: Color,
+    (x0, w): (i32, i32),
+    y: i32,
+    wrap: Option<f32>,
+    bold: bool,
+) -> Result<(), CmError> {
+    let style = TextStyle {
+        px,
+        color,
+        outline: None,
+        bg: None,
+        wrap_w: wrap,
+        center: true,
+    };
+    if let Some(l) = text::layout(fonts, s, &style)? {
+        let x = x0 + ((w as f32 - l.text_w) / 2.0).max(0.0) as i32 - l.pad;
+        let passes = if bold { 2 } else { 1 };
+        for k in 0..passes {
+            let dx = (k as f32 * (px * 0.035).max(1.0)).round() as i32;
+            pm.draw_pixmap(
+                x + dx,
+                y - l.pad,
+                l.pixmap.as_ref(),
+                &PixmapPaint::default(),
+                Transform::identity(),
+                None,
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Draws the stamp for `word` with its left edge at `x` and its middle at `mid_y`, tilted a
+/// little like a rubber stamp; never wider than `max_w` (a long translation shrinks).
+#[allow(clippy::too_many_arguments)]
+fn draw_stamp(
+    canvas: &mut Pixmap,
+    fonts: &mut Fonts,
+    word: &str,
+    px: f32,
+    color: Color,
+    x: f32,
+    mid_y: f32,
+    max_w: f32,
+) -> Result<(), CmError> {
+    let measure = |fonts: &mut Fonts, px: f32| -> Result<f32, CmError> {
+        let st = TextStyle {
+            px,
+            color,
+            outline: None,
+            bg: None,
+            wrap_w: None,
+            center: false,
+        };
+        Ok(text::layout(fonts, word, &st)?.map_or(0.0, |l| l.text_w))
+    };
+    let mut px = px;
+    let mut tw = measure(fonts, px)?;
+    let wanted = |px: f32, tw: f32| tw + px * 1.1 + 2.0 * (px * 0.12).max(2.0);
+    if wanted(px, tw) > max_w && tw > 0.0 {
+        px = (px * max_w / wanted(px, tw)).max(8.0);
+        tw = measure(fonts, px)?;
+    }
+    let (pad_y, h, border) = stamp_metrics(px);
+    let w = wanted(px, tw).ceil();
+    let margin = 6.0;
+    let (pw, ph) = ((w + 2.0 * margin) as u32, (h + 2.0 * margin) as u32);
+    let Some(mut st) = Pixmap::new(pw, ph) else {
+        return Ok(());
+    };
+    let rgb = |c: Color, a: u8| {
+        let mut p = Paint::default();
+        p.set_color_rgba8(c.r, c.g, c.b, a);
+        p.anti_alias = true;
+        p
+    };
+    let r = px * 0.4;
+    if let Some(path) = round_rect(margin, margin, w, h, r) {
+        st.fill_path(
+            &path,
+            &rgb(Color::WHITE, 235),
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
+    }
+    if let Some(path) = round_rect(
+        margin + border / 2.0,
+        margin + border / 2.0,
+        w - border,
+        h - border,
+        (r - border / 2.0).max(0.0),
+    ) {
+        let stroke = tiny_skia::Stroke {
+            width: border,
+            ..Default::default()
+        };
+        st.stroke_path(
+            &path,
+            &rgb(color, 255),
+            &stroke,
+            Transform::identity(),
+            None,
+        );
+    }
+    let ty = margin as i32 + (pad_y + border) as i32;
+    draw_text_centered(
+        &mut st,
+        fonts,
+        word,
+        px,
+        color,
+        (margin as i32, w as i32),
+        ty,
+        None,
+        true,
+    )?;
+    let (ox, oy) = (x - margin, mid_y - ph as f32 / 2.0);
+    let paint = PixmapPaint {
+        quality: tiny_skia::FilterQuality::Bilinear,
+        ..PixmapPaint::default()
+    };
+    canvas.draw_pixmap(
+        ox.round() as i32,
+        oy.round() as i32,
+        st.as_ref(),
+        &paint,
+        Transform::from_rotate_at(
+            -3.0,
+            ox.round() + pw as f32 / 2.0,
+            oy.round() + ph as f32 / 2.0,
+        ),
+        None,
+    );
+    Ok(())
 }
 
 fn title_band(opts: &BoardOptions, unit: f32, gap: i32) -> i32 {
@@ -626,20 +806,27 @@ pub fn render_board(
     } else {
         Color::rgb(0x1B, 0x1C, 0x1F)
     };
-    let radius = (f64::from(opts.radius) * plan.scale) as f32;
+    let radius = (f64::from(opts.radius) * plan.scale * plan.spacing) as f32;
     let mut fonts = Fonts::bundled();
 
     if let (Some(t), Some(at)) = (&opts.title, plan.title_at) {
-        draw_text(
+        draw_text_centered(
             &mut canvas,
             &mut fonts,
             t,
             plan.unit * 1.6,
             ink,
-            None,
-            at,
-            None,
+            (0, plan.width as i32),
+            at.1,
+            Some(plan.width as f32 * 0.9),
+            true,
         )?;
+    }
+    // Every shadow first, so one picture's shadow never darkens its neighbour.
+    if opts.shadow {
+        for cell in &plan.cells {
+            draw_shadow(&mut canvas, cell, radius);
+        }
     }
     for (i, (src, cell)) in sources.iter().zip(&plan.cells).enumerate() {
         let resized = if src.dimensions() == (cell.w, cell.h) {
@@ -650,25 +837,6 @@ pub fn render_board(
         let mut pic = to_pixmap(&resized)?;
         drop(resized);
         let (x, y) = (cell.x as f32, cell.y as f32);
-        if opts.shadow {
-            let spread = (plan.unit * 0.5).max(6.0);
-            let steps = 8;
-            for s in (1..=steps).rev() {
-                let grow = spread * s as f32 / steps as f32;
-                if let Some(p) = round_rect(
-                    x - grow,
-                    y - grow + spread * 0.4,
-                    cell.w as f32 + 2.0 * grow,
-                    cell.h as f32 + 2.0 * grow,
-                    radius + grow,
-                ) {
-                    let mut paint = Paint::default();
-                    paint.set_color_rgba8(0, 0, 0, 9);
-                    paint.anti_alias = true;
-                    canvas.fill_path(&p, &paint, FillRule::Winding, Transform::identity(), None);
-                }
-            }
-        }
         if radius > 0.5 {
             if let (Some(p), Some(mut mask)) = (
                 round_rect(0.0, 0.0, cell.w as f32, cell.h as f32, radius),
@@ -694,22 +862,22 @@ pub fn render_board(
                 .label_words
                 .clone()
                 .unwrap_or_else(|| ["BEFORE".to_owned(), "AFTER".to_owned()]);
-            let bg = if i == 0 {
-                Color::rgb(0x55, 0x5B, 0x66)
+            let color = if i == 0 {
+                Color::rgb(0xDC, 0x26, 0x26)
             } else {
-                Color::rgb(0x1F, 0x8A, 0x4C)
+                Color::rgb(0x16, 0xA3, 0x4A)
             };
-            // In the band above the picture, left-aligned with it.
-            let band = label_band(opts, layout.kind, plan.unit) as i32;
-            draw_text(
+            // A stamp in the band above the picture, so it never covers the screenshot.
+            let band = label_band(opts, layout.kind, plan.unit) as f32;
+            draw_stamp(
                 &mut canvas,
                 &mut fonts,
                 &words[i.min(1)],
-                plan.unit * 0.9,
-                Color::WHITE,
-                Some(bg),
-                (cell.x, cell.y - band + 3),
-                None,
+                plan.unit * STAMP_K,
+                color,
+                cell.x as f32 + plan.unit * 0.3,
+                cell.y as f32 - band / 2.0 - plan.unit * 0.05,
+                (cell.w as f32 * 0.9).max(40.0),
             )?;
         }
         // Strip: a number on each frame.
@@ -740,19 +908,43 @@ pub fn render_board(
         }
         // Caption under the image.
         if let Some(c) = opts.captions.get(i).filter(|c| !c.trim().is_empty()) {
-            draw_text(
+            draw_text_centered(
                 &mut canvas,
                 &mut fonts,
                 c,
                 plan.unit,
                 ink,
-                None,
-                (cell.x, cell.y + cell.h as i32 + (plan.unit * 0.3) as i32),
+                (cell.x, cell.w as i32),
+                cell.y + cell.h as i32 + (plan.unit * 0.3) as i32,
                 Some(cell.w.max(40) as f32),
+                false,
             )?;
         }
     }
     Ok(from_pixmap(&canvas))
+}
+
+/// A soft drop shadow (design: `0 12px 30px rgba(0,0,0,.18)`): many faint rings, deterministic.
+fn draw_shadow(canvas: &mut Pixmap, cell: &Placed, radius: f32) {
+    let short = cell.w.min(cell.h) as f32;
+    let blur = (short * 0.06).clamp(8.0, 36.0);
+    let dy = blur * 0.4;
+    let rings = 18;
+    let mut paint = Paint::default();
+    paint.set_color_rgba8(0, 0, 0, 3);
+    paint.anti_alias = true;
+    for s in (0..rings).rev() {
+        let grow = blur * (s as f32 / (rings - 1) as f32) - blur * 0.25;
+        if let Some(p) = round_rect(
+            cell.x as f32 - grow,
+            cell.y as f32 - grow + dy,
+            cell.w as f32 + 2.0 * grow,
+            cell.h as f32 + 2.0 * grow,
+            (radius + grow).max(0.0),
+        ) {
+            canvas.fill_path(&p, &paint, FillRule::Winding, Transform::identity(), None);
+        }
+    }
 }
 
 /// Composes a transparent board on white (a JPEG or another export without alpha).
@@ -783,6 +975,9 @@ mod tests {
         let opts = BoardOptions {
             gap: 20,
             margin: 10,
+            background: Background::White,
+            shadow: false,
+            radius: 0,
             ..Default::default()
         };
         let p = plan(
@@ -821,7 +1016,7 @@ mod tests {
         };
         let p = plan(&[(400, 200), (200, 100)], &layout, &BoardOptions::default()).unwrap();
         assert_eq!((p.cells[0].w, p.cells[1].w), (200, 200));
-        assert_eq!(p.cells[1].y, 32 + 100 + 24);
+        assert_eq!(p.cells[1].y, 40 + 100 + 24);
     }
 
     #[test]
@@ -835,7 +1030,7 @@ mod tests {
         .unwrap();
         // 5 images: 3 columns, 2 rows.
         assert_eq!(p.cells[3].y, p.cells[0].y + 80 + 24);
-        assert_eq!(p.cells[2].x, 32 + 2 * (100 + 24));
+        assert_eq!(p.cells[2].x, 40 + 2 * (100 + 24));
         let e = plan(
             &sizes[..2],
             &BoardLayout::new(LayoutKind::Free),
@@ -861,7 +1056,7 @@ mod tests {
             ..BoardLayout::new(LayoutKind::Free)
         };
         let p = plan(&sizes[..2], &free, &BoardOptions::default()).unwrap();
-        assert_eq!((p.width, p.height), (132, 82));
+        assert_eq!((p.width, p.height), (140, 90));
     }
 
     #[test]
@@ -939,6 +1134,7 @@ mod tests {
     fn transparent_background_keeps_alpha_and_flattens_on_white() {
         let opts = BoardOptions {
             background: Background::Transparent,
+            shadow: false,
             ..Default::default()
         };
         let src = [solid(40, 40, [0, 0, 0, 255]), solid(40, 40, [0, 0, 0, 255])];
@@ -948,5 +1144,181 @@ mod tests {
             flatten_on_white(&img).get_pixel(1, 1).0,
             [255, 255, 255, 255]
         );
+    }
+
+    #[test]
+    fn spacing_grows_with_big_pictures_but_not_small_or_free_ones() {
+        let opts = BoardOptions {
+            gap: 20,
+            margin: 30,
+            ..Default::default()
+        };
+        let pair = BoardLayout::new(LayoutKind::Pair);
+        let small = plan(&[(300, 300), (300, 300)], &pair, &opts).unwrap();
+        assert_eq!((small.cells[0].x, small.spacing), (30, 1.0));
+        let big = plan(&[(1200, 800), (1200, 800)], &pair, &opts).unwrap();
+        assert_eq!(big.spacing, 2.0);
+        assert_eq!(big.cells[0].x, 60);
+        assert_eq!(big.cells[1].x, 60 + 1200 + 40);
+        let huge = plan(&[(4000, 3000), (4000, 3000)], &pair, &opts).unwrap();
+        assert_eq!(huge.spacing, 3.0);
+    }
+
+    /// The pair labels are stamps: a coloured border (red BEFORE, green AFTER) around a light
+    /// pill, in the band above each picture, and the picture itself stays untouched.
+    #[test]
+    fn pair_labels_are_coloured_stamps_in_the_band() {
+        for words in [None, Some(["TRƯỚC".to_owned(), "SAU".to_owned()])] {
+            let opts = BoardOptions {
+                before_after: true,
+                shadow: false,
+                background: Background::Dark,
+                label_words: words,
+                ..Default::default()
+            };
+            let src = [
+                solid(600, 400, [30, 60, 200, 255]),
+                solid(600, 400, [30, 60, 200, 255]),
+            ];
+            let layout = BoardLayout::new(LayoutKind::Pair);
+            let img = render_board(&src, &layout, &opts).unwrap();
+            let plan = plan(&[(600, 400); 2], &layout, &opts).unwrap();
+            let c = plan.cells[0];
+            let (mut red, mut white) = (0, 0);
+            for y in 0..c.y as u32 {
+                for x in c.x as u32..(c.x as u32 + c.w) {
+                    let p = img.get_pixel(x, y).0;
+                    if p[0] > 190 && p[1] < 80 && p[2] < 80 {
+                        red += 1;
+                    }
+                    if p[0] > 230 && p[1] > 230 && p[2] > 230 {
+                        white += 1;
+                    }
+                }
+            }
+            assert!(red > 50 && white > 200, "red {red} white {white}");
+            let mut green = 0;
+            let c1 = plan.cells[1];
+            for y in 0..c1.y as u32 {
+                for x in c1.x as u32..(c1.x as u32 + c1.w) {
+                    let p = img.get_pixel(x, y).0;
+                    if p[1] > 140 && p[0] < 60 && p[2] < 110 {
+                        green += 1;
+                    }
+                }
+            }
+            assert!(green > 50, "green {green}");
+            // The picture is not covered.
+            assert_eq!(
+                img.get_pixel(c.x as u32 + 5, c.y as u32 + 5).0,
+                [30, 60, 200, 255]
+            );
+        }
+    }
+
+    /// One picture's shadow is not painted over its neighbour.
+    #[test]
+    fn a_shadow_never_darkens_the_neighbouring_picture() {
+        let opts = BoardOptions {
+            gap: 4,
+            ..Default::default()
+        };
+        let src = [
+            solid(300, 300, [250, 250, 250, 255]),
+            solid(300, 300, [250, 250, 250, 255]),
+        ];
+        let layout = BoardLayout::new(LayoutKind::Pair);
+        let img = render_board(&src, &layout, &opts).unwrap();
+        let c = plan(&[(300, 300); 2], &layout, &opts).unwrap().cells[0];
+        let p = img.get_pixel(c.x as u32 + 299, c.y as u32 + 150).0;
+        assert_eq!(p, [250, 250, 250, 255]);
+    }
+
+    /// Writes sample boards for a look by eye: `CM_BOARD_OUT=<dir> cargo test -p cm-render
+    /// --lib write_sample_boards -- --ignored`.
+    #[test]
+    #[ignore]
+    fn write_sample_boards() {
+        let Ok(dir) = std::env::var("CM_BOARD_OUT") else {
+            return;
+        };
+        let shot = |w: u32, h: u32, k: u8| {
+            let mut im = RgbaImage::from_pixel(w, h, image::Rgba([255, 255, 255, 255]));
+            for y in 0..h {
+                for x in 0..w {
+                    if y < h / 12 {
+                        im.put_pixel(x, y, image::Rgba([240, 240, 243, 255]));
+                    } else if x < w / 6 {
+                        im.put_pixel(x, y, image::Rgba([246, 246, 248, 255]));
+                    } else if (x / (w / 14)).is_multiple_of(2)
+                        && y > h / 2
+                        && y < h - h / 8 - (x % 97) * h / 400
+                    {
+                        im.put_pixel(x, y, image::Rgba([255, 140u8.saturating_add(k), 30, 255]));
+                    }
+                }
+            }
+            im
+        };
+        let sources = [shot(1800, 1100, 0), shot(1900, 1200, 40)];
+        let pair = BoardLayout::new(LayoutKind::Pair);
+        let cases: Vec<(&str, BoardLayout, BoardOptions, usize)> = vec![
+            (
+                "pair-en",
+                pair.clone(),
+                BoardOptions {
+                    before_after: true,
+                    title: Some("Billing page: before and after".into()),
+                    captions: vec![
+                        "Team plan, card on file".into(),
+                        "Business plan after the upgrade".into(),
+                    ],
+                    ..Default::default()
+                },
+                2,
+            ),
+            (
+                "pair-vi",
+                pair.clone(),
+                BoardOptions {
+                    before_after: true,
+                    label_words: Some(["TRƯỚC".into(), "SAU".into()]),
+                    title: Some("Trang thanh toán: trước và sau".into()),
+                    ..Default::default()
+                },
+                2,
+            ),
+            (
+                "pair-dark-noshadow",
+                pair,
+                BoardOptions {
+                    before_after: true,
+                    background: Background::Dark,
+                    shadow: false,
+                    ..Default::default()
+                },
+                2,
+            ),
+            (
+                "grid4",
+                BoardLayout::new(LayoutKind::Grid),
+                BoardOptions {
+                    captions: vec!["a".into(), "b".into(), "c".into(), "d".into()],
+                    ..Default::default()
+                },
+                4,
+            ),
+        ];
+        for (name, layout, opts, n) in cases {
+            let src: Vec<RgbaImage> = (0..n).map(|i| sources[i % 2].clone()).collect();
+            let img = render_board(&src, &layout, &opts).unwrap();
+            let small = image::imageops::resize(
+                &img,
+                img.width().min(1400),
+                img.height() * img.width().min(1400) / img.width(),
+                FilterType::Lanczos3,
+            );
+            small.save(format!("{dir}/{name}.png")).unwrap();
+        }
     }
 }

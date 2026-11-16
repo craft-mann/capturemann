@@ -330,6 +330,12 @@ impl BulkSheet {
         if self.pattern.trim().is_empty() {
             return Some(tr!("The file name pattern is empty."));
         }
+        // The same check the daemon makes, so the sheet names the mistake before the start.
+        if cm_daemon::export_images::check_pattern(self.pattern.trim()).is_err() {
+            return Some(tr!(
+                "The file name pattern has a mistake: use only the keys below, each between braces."
+            ));
+        }
         None
     }
 
@@ -616,6 +622,21 @@ mod tests {
         s.mark = MarkKind::None;
         s.pattern = " ".into();
         assert!(s.problem().is_some());
+    }
+
+    #[test]
+    fn a_pattern_with_an_unknown_token_or_a_stray_brace_blocks_the_start() {
+        for bad in ["{nam}", "shot}", "{name", "../{foo}"] {
+            let mut s = sheet();
+            s.dest = Some("/tmp/out".into());
+            s.pattern = bad.into();
+            assert!(s.problem().unwrap().contains("pattern"), "{bad}");
+            assert!(!s.can_start());
+        }
+        let mut s = sheet();
+        s.dest = Some("/tmp/out".into());
+        s.pattern = "{date}-{n}-{name}-{w}x{h}".into();
+        assert!(s.problem().is_none());
     }
 
     #[test]

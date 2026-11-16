@@ -515,9 +515,24 @@ fn safe_stem(s: &str) -> String {
     let t: String = t.chars().take(150).collect();
     if t.is_empty() {
         "image".to_owned()
+    } else if is_reserved_device_name(&t) {
+        format!("_{t}")
     } else {
         t
     }
+}
+
+/// Names Windows keeps for devices (`CON`, `NUL`, `COM1`...): a file called that cannot be
+/// created there, with or without an extension. A name that would be one gets a `_` in front, on
+/// every system, so the same pattern gives the same files everywhere.
+fn is_reserved_device_name(stem: &str) -> bool {
+    let base = stem.split('.').next().unwrap_or(stem).trim_end();
+    let up = base.to_ascii_uppercase();
+    matches!(up.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ["COM", "LPT"].iter().any(|p| {
+            up.strip_prefix(p)
+                .is_some_and(|d| d.len() == 1 && d.as_bytes()[0].is_ascii_digit() && d != "0")
+        })
 }
 
 /// The file stem for one picture. Pure.
@@ -870,6 +885,18 @@ mod tests {
         // Path characters never reach the file system.
         assert_eq!(file_stem("{name}", "a/b\\c:d", "d", 1, 1, 1), "a_b_c_d");
         assert_eq!(file_stem("{name}", "..", "d", 1, 1, 1), "image");
+    }
+
+    #[test]
+    fn a_name_that_windows_keeps_for_a_device_gets_a_prefix() {
+        assert_eq!(file_stem("{name}", "CON", "d", 1, 1, 1), "_CON");
+        assert_eq!(file_stem("{name}", "com1", "d", 1, 1, 1), "_com1");
+        assert_eq!(
+            file_stem("{name}", "Nul.backup", "d", 1, 1, 1),
+            "_Nul.backup"
+        );
+        assert_eq!(file_stem("{name}", "Console", "d", 1, 1, 1), "Console");
+        assert_eq!(file_stem("{name}", "COM10", "d", 1, 1, 1), "COM10");
     }
 
     #[test]
