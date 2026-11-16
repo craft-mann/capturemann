@@ -12,8 +12,11 @@ pub const META: f32 = 16.0;
 pub const GAPS: f32 = 4.0 * 12.0;
 /// The picture is at least this high; below that the column scrolls instead.
 pub const MIN_HEIGHT: f32 = 240.0;
-/// A fitted width under this share of the column makes the picture a tall one.
+/// A fitted width under this share of the column is a narrow picture.
 pub const TALL_SHARE: f32 = 0.6;
+/// A picture is "tall" (a scrolling page, a Long Shot) only when it is at least this many times
+/// higher than wide; a plain window frame (about 1:1 to 1:1.3) is not (QA CG-12).
+pub const TALL_ASPECT: f32 = 1.8;
 /// What the page puts above the editor's columns (window title, toolbar, banner) at its usual
 /// size, so a 900 px window has a 700 px column (the board's 524 px picture).
 pub const PAGE_CHROME: f32 = 200.0;
@@ -40,7 +43,8 @@ pub fn column_size(window_w: f32, window_h: f32) -> (f32, f32) {
 pub struct Fit {
     pub w: f32,
     pub h: f32,
-    /// The fitted width is under 60 % of the column.
+    /// The picture is really tall (height at least `TALL_ASPECT` times its width) and was fitted
+    /// narrower than the column.
     pub tall: bool,
 }
 
@@ -53,7 +57,7 @@ pub fn fit(natural_w: f32, natural_h: f32, col_w: f32, max_h: f32) -> Fit {
     Fit {
         w,
         h,
-        tall: w < TALL_SHARE * col_w,
+        tall: nh >= TALL_ASPECT * nw && w < TALL_SHARE * col_w,
     }
 }
 
@@ -93,11 +97,17 @@ mod tests {
         assert!((f.h - 524.0).abs() < 1e-3);
         assert!((f.w / f.h - 758.0 / 6360.0).abs() < 1e-6, "aspect kept");
         assert!(f.w < 600.0 && f.tall);
-        // 60 % is the line: just above it is not tall.
-        let wide = fit(800.0, 524.0, 1000.0, 524.0);
-        assert!(!wide.tall);
-        let narrow = fit(590.0, 524.0, 1000.0, 524.0);
-        assert!(narrow.tall);
+        // The aspect is the line (CG-12): a window frame of 770 x 860 is fitted narrower than
+        // 60 % of a wide column but is not a long picture.
+        let window = fit(770.0, 860.0, 1011.0, 524.0);
+        assert!(window.w < TALL_SHARE * 1011.0);
+        assert!(
+            !window.tall,
+            "a normal tall window frame is not a long image"
+        );
+        // Exactly at the threshold counts.
+        assert!(fit(500.0, 500.0 * TALL_ASPECT, 1000.0, 524.0).tall);
+        assert!(!fit(500.0, 500.0 * TALL_ASPECT - 5.0, 1000.0, 524.0).tall);
     }
 
     /// Contain never crops: the fitted size always fits the box and keeps the proportions.

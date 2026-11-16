@@ -9,6 +9,45 @@ pub enum QuitWait {
     Recording,
     /// Jobs are running (a transcription, an upload): they stop at a checkpoint first.
     Jobs,
+    /// A Long Shot or a Click Guide is running: it is stopped and kept first (never discarded).
+    Capture,
+}
+
+/// What Quit does about a running Long Shot or Click Guide (maintainer rule: work is never lost
+/// without a word, and a quit is not a place for a question the person may not see). Both are
+/// stopped the way their Stop button does, so the frames so far become a screenshot and the
+/// steps so far become a guide; only then does the app close.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuitPlan {
+    /// `stop_guide`: the guide is saved with its steps (an empty one is not kept, as with Stop).
+    pub stop_guide: bool,
+    /// The Long Shots stop and keep what they captured.
+    pub stop_long_shot: bool,
+    pub wait: Option<QuitWait>,
+}
+
+/// The plan for what is running. A recording keeps its own wait (it is the longer one) but a
+/// guide or Long Shot is stopped as well.
+pub fn quit_plan(
+    recording_active: bool,
+    running_jobs: usize,
+    guide_running: bool,
+    long_shot_running: bool,
+) -> QuitPlan {
+    let wait = if recording_active {
+        Some(QuitWait::Recording)
+    } else if guide_running || long_shot_running {
+        Some(QuitWait::Capture)
+    } else if running_jobs > 0 {
+        Some(QuitWait::Jobs)
+    } else {
+        None
+    };
+    QuitPlan {
+        stop_guide: guide_running,
+        stop_long_shot: long_shot_running,
+        wait,
+    }
 }
 
 /// `None`: nothing to wait for, quit at once.
@@ -33,10 +72,20 @@ pub fn quit(app: &Entity<AppModel>, cx: &mut App) {
     };
     let recording = daemon.recording_active();
     let jobs = daemon.job_queue().map_or(0, |q| q.running_count());
-    let Some(wait) = quit_wait(recording, jobs) else {
+    let plan = quit_plan(
+        recording,
+        jobs,
+        crate::ui::guide_view::hud::is_running(cx),
+        crate::ui::long_shot::is_running(cx),
+    );
+    let Some(wait) = plan.wait else {
         cx.quit();
         return;
     };
+    if plan.stop_long_shot {
+        // Keeps the frames so far; the run's own task saves the screenshot.
+        daemon.cancel_long_shots();
+    }
     // Saving a long recording, or a job stopping at its checkpoint, can take a few seconds: say so
     // instead of going quiet (R4-23). GPUI itself waits only 200 ms for the quit handler and logs
     // an error after that, so the wait happens here, before `cx.quit()`.
@@ -47,6 +96,11 @@ pub fn quit(app: &Entity<AppModel>, cx: &mut App) {
                 ToastSpec::new(ToastKind::Info, tr!("Saving the recording\u{2026}"))
                     .body(tr!("CaptureMann closes as soon as it is saved."))
             }
+            QuitWait::Capture => ToastSpec::new(
+                ToastKind::Info,
+                tr!("Saving your Long Shot or guide\u{2026}"),
+            )
+            .body(tr!("What you captured so far is kept.")),
             QuitWait::Jobs => {
                 ToastSpec::new(ToastKind::Info, tr!("Stopping background work\u{2026}")).body(tr!(
                     "Unfinished jobs go on the next time CaptureMann opens."
@@ -56,6 +110,25 @@ pub fn quit(app: &Entity<AppModel>, cx: &mut App) {
         cx,
     );
     cx.spawn(async move |cx| {
+        let (stop_daemon, rt) = (daemon.clone(), backend.rt.clone());
+        if plan.stop_guide {
+            let _ = rt
+                .spawn(async move {
+                    Backend::call(&stop_daemon, "stop_guide", serde_json::json!({})).await
+                })
+                .await;
+        }
+        if plan.stop_long_shot {
+            // The Long Shot's task saves its screenshot and then clears the app's run: wait for
+            // that, at most 10 s, before closing.
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while Instant::now() < deadline && cx.update(|cx| crate::ui::long_shot::is_running(cx))
+            {
+                cx.background_executor()
+                    .timer(Duration::from_millis(100))
+                    .await;
+            }
+        }
         let _ = backend
             .rt
             .spawn(async move { Backend::shutdown(&daemon).await })
@@ -239,5 +312,30 @@ mod quit_tests {
         assert_eq!(quit_wait(true, 0), Some(QuitWait::Recording));
         assert_eq!(quit_wait(false, 2), Some(QuitWait::Jobs));
         assert_eq!(quit_wait(true, 2), Some(QuitWait::Recording));
+    }
+
+    /// A Long Shot or a Click Guide is stopped and kept at Quit (never discarded), and Quit waits
+    /// for it; nothing running quits at once.
+    #[test]
+    fn quit_stops_and_keeps_a_running_long_shot_or_guide() {
+        let none = quit_plan(false, 0, false, false);
+        assert_eq!(
+            (none.stop_guide, none.stop_long_shot, none.wait),
+            (false, false, None)
+        );
+        let guide = quit_plan(false, 0, true, false);
+        assert!(guide.stop_guide && !guide.stop_long_shot);
+        assert_eq!(guide.wait, Some(QuitWait::Capture));
+        let long = quit_plan(false, 0, false, true);
+        assert!(long.stop_long_shot && !long.stop_guide);
+        assert_eq!(long.wait, Some(QuitWait::Capture));
+        // Both, with jobs: the capture is stopped, the wait is for it; jobs stop in shutdown.
+        let all = quit_plan(false, 3, true, true);
+        assert!(all.stop_guide && all.stop_long_shot);
+        assert_eq!(all.wait, Some(QuitWait::Capture));
+        // A recording keeps its own wait and still stops a guide.
+        let rec = quit_plan(true, 0, true, false);
+        assert!(rec.stop_guide);
+        assert_eq!(rec.wait, Some(QuitWait::Recording));
     }
 }

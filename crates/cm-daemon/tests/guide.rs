@@ -881,3 +881,38 @@ async fn gde_1_every_step_has_the_same_crop_and_a_far_click_recomputes_the_earli
     assert!(wide.iter().all(|r| *r == wide[0]), "{wide:?}");
     c.call("stop_guide", json!({"guide_id": id})).await;
 }
+
+/// CG-13 (QA pass 7): the card picture of a display guide is the guide's crop of its first step,
+/// not the whole frame (the frame holds more of the screen than the export shows).
+#[tokio::test]
+async fn cg_13_the_card_picture_of_a_display_guide_is_the_guide_crop() {
+    let (b, dir) =
+        builder(cm_capture::fake::FakeBackend::new().with_display(1, 0, 0, 3000, 2000, 1.0));
+    let clicks = ScriptedClicks::new();
+    let daemon = b
+        .guide_clicks(clicks.clone())
+        .text_recognizer(Screen { with_email: false })
+        .confirmer(Arc::new(FixedConfirmer::new(Decision::Approve)))
+        .build();
+    let mut c = Client::connect(&daemon, "agent");
+    let id = start(&mut c).await;
+    for x in [100.0, 200.0, 300.0] {
+        assert!(clicks.click(x, 1000.0));
+    }
+    wait_steps(&mut c, &id, 3).await;
+    c.call("stop_guide", json!({"guide_id": id})).await;
+    let folder = std::fs::read_dir(dir.path())
+        .unwrap()
+        .flatten()
+        .find(|e| e.path().extension().is_some_and(|x| x == "cmguide"))
+        .unwrap()
+        .path();
+    let crop = step_crops(&folder)[0].expect("a display guide has a crop");
+    let poster = image::open(folder.join("thumbs/poster.jpg")).unwrap();
+    // The poster has the crop's shape (1400 x 800), scaled to 512 on its longest edge.
+    let (pw, ph) = (f64::from(poster.width()), f64::from(poster.height()));
+    assert!(
+        (pw / ph - crop[2] / crop[3]).abs() < 0.02,
+        "poster {pw}x{ph} is not the crop {crop:?}"
+    );
+}

@@ -107,10 +107,20 @@ pub fn bind_keys(cx: &mut App) {
 pub fn app_menus() -> Vec<Menu> {
     vec![Menu::new("CaptureMann").items([
         MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
-        MenuItem::action(tr_ctx!("menu", "Long Shot"), LongShotAction),
-        MenuItem::action(tr_ctx!("menu", "New Click Guide"), NewClickGuide),
+        // Native menus cannot draw the pill: the item text carries " (Preview)" (design S24).
         MenuItem::action(
-            tr_ctx!("menu", "Click Guide of a window\u{2026}"),
+            crate::ui::preview_label::menu_text(&tr_ctx!("menu", "Long Shot")),
+            LongShotAction,
+        ),
+        MenuItem::action(
+            crate::ui::preview_label::menu_text(&tr_ctx!("menu", "New Click Guide")),
+            NewClickGuide,
+        ),
+        MenuItem::action(
+            crate::ui::preview_label::menu_text(&tr_ctx!(
+                "menu",
+                "Click Guide of a window\u{2026}"
+            )),
             NewClickGuideWindow,
         ),
         MenuItem::action(tr_ctx!("menu", "Import file\u{2026}"), ImportMedia),
@@ -491,6 +501,7 @@ impl Render for Studio {
             .when(self.app.read(cx).export_popover.is_some(), |d| {
                 d.child(self.export_popover.clone())
             })
+            .children(crate::ui::preview_label::card_overlay(&self.app, &t, cx))
             // Board R9/R20: the app behind a pop-up sheet or dialog is greyed out, and a click on
             // it does nothing (the pop-up is a window of its own, so this is only a tint here).
             .when(dim, |d| {

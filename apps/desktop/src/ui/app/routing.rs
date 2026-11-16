@@ -56,6 +56,14 @@ pub fn set_route(app: &Entity<AppModel>, route: Route, cx: &mut App) {
     if matches!(route, Route::Publish(_)) {
         crate::ui::upload_ui::publishes_seen(app, cx);
     }
+    // Design S24: the first time the Click Guide pages open, a one-line intro (once).
+    if matches!(route, Route::Guides | Route::Guide(_)) {
+        crate::ui::preview_label::show_intro_if_due(
+            app,
+            crate::ui::preview_label::PreviewFeature::ClickGuide,
+            cx,
+        );
+    }
     app.update(cx, |m, cx| {
         if !matches!(route, Route::Editor(_)) {
             m.editor_return = None;

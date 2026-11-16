@@ -387,7 +387,7 @@ pub fn menu_text(id: &str) -> String {
         ids::REC_STOP => tr!("Stop recording"),
         ids::OPEN_LIBRARY => tr!("Open library"),
         ids::OPEN_LAUNCHER => tr!("Open launcher"),
-        ids::NEW_CLICK_GUIDE => tr!("New Click Guide"),
+        ids::NEW_CLICK_GUIDE => crate::ui::preview_label::menu_text(&tr!("New Click Guide")),
         ids::IMPORT => tr_ctx!("menu", "Import file\u{2026}"),
         ids::SETTINGS => tr_ctx!("tray menu", "Settings"),
         ids::PERMISSIONS => tr!("Permissions\u{2026}"),

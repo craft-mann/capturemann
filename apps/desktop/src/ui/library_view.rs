@@ -2038,10 +2038,17 @@ impl Render for LibraryView {
         // ---- title row: the page title, its real count, the search field ---------------------
         let icon_only = {
             let row_w = f32::from(window.viewport_size().width) - SIDEBAR_WIDTH - PAGE_PADDING * 2.;
+            // The Click Guides title carries the M Preview label (design S24): its room is taken
+            // from the row.
+            let tag_w = if matches!(route, Route::Guides) {
+                crate::ui::preview_label::width(crate::ui::preview_label::Size::M) as f64 + 12.0
+            } else {
+                0.0
+            };
             guide_buttons_need_icon(
                 &nav::page_heading(&route).1,
                 nav::route_count(&route, &counts),
-                row_w,
+                row_w - tag_w as f32,
             )
         };
         let view = cx.entity().downgrade();
@@ -2069,6 +2076,16 @@ impl Render for LibraryView {
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(title),
                     )
+                    // Design S24: one M label per page, after the title.
+                    .children(matches!(route, Route::Guides).then(|| {
+                        crate::ui::preview_label::label(
+                            &t,
+                            crate::ui::preview_label::Size::M,
+                            crate::ui::preview_label::PreviewFeature::ClickGuide,
+                            None,
+                            Some(self.app.clone()),
+                        )
+                    }))
                     .children(nav::route_count(&route, &counts).map(|n| {
                         // S22: "6 of 61 \u{b7} published" while a published filter is on.
                         let note = self.state.count_note(Some(n));
