@@ -377,6 +377,72 @@ pub(crate) fn scroll_points(area: PhysicalRect, own: &[PhysicalRect]) -> Vec<(i3
     free
 }
 
+/// Smallest margin (physical px) beside the area that counts as room to park the pointer in.
+const PARK_MIN_MARGIN: i32 = 16;
+
+/// Where the pointer rests after each wheel step: a point where hovering does nothing (QA real
+/// pages, Nov 16, 2026: a pointer left in the page centre opened link preview cards on Wikipedia,
+/// greyed the card under it and started thumbnail previews on YouTube, so the overlap of two
+/// frames differed mid-page and the join was refused). In order of preference:
+///
+/// 1. beside the area, on the same display, in the widest free margin (right or left first, then
+///    above, then below; at least [`PARK_MIN_MARGIN`] px wide), near the area's edge so that it
+///    is not in a hot corner or on the dock, and not under one of this app's own windows;
+/// 2. inside the area on the scroll bar gutter (the right edge for a vertical scroll, the
+///    bottom edge for a horizontal one), halfway along, where a hover changes nothing.
+pub(crate) fn park_point(
+    area: PhysicalRect,
+    displays: &[PhysicalRect],
+    own: &[PhysicalRect],
+    vertical: bool,
+) -> (i32, i32) {
+    let (ax, ay) = (area.origin.x, area.origin.y);
+    let (aw, ah) = (area.size.width as i32, area.size.height as i32);
+    let (cx, cy) = (ax + aw / 2, ay + ah / 2);
+    let covered = |&(x, y): &(i32, i32)| {
+        own.iter().any(|r| {
+            x >= r.origin.x
+                && x < r.origin.x + r.size.width as i32
+                && y >= r.origin.y
+                && y < r.origin.y + r.size.height as i32
+        })
+    };
+    let display = displays.iter().find(|d| {
+        cx >= d.origin.x
+            && cx < d.origin.x + d.size.width as i32
+            && cy >= d.origin.y
+            && cy < d.origin.y + d.size.height as i32
+    });
+    if let Some(d) = display {
+        let (dx, dy) = (d.origin.x, d.origin.y);
+        let (dw, dh) = (d.size.width as i32, d.size.height as i32);
+        // (margin, point) of each side, the point `min(margin / 2, 24)` px from the area.
+        let near = |m: i32| (m / 2).clamp(1, 24);
+        let (left, right) = (ax - dx, (dx + dw) - (ax + aw));
+        let (top, bottom) = (ay - dy, (dy + dh) - (ay + ah));
+        let mut sides = [
+            (right, (ax + aw + near(right), cy.clamp(dy, dy + dh - 1))),
+            (left, (ax - near(left), cy.clamp(dy, dy + dh - 1))),
+            (top, (cx.clamp(dx, dx + dw - 1), ay - near(top))),
+            (bottom, (cx.clamp(dx, dx + dw - 1), ay + ah + near(bottom))),
+        ];
+        // Widest first among the margins that are wide enough (a stable sort keeps the order
+        // right, left, above, below for equal ones).
+        sides.sort_by_key(|(m, _)| std::cmp::Reverse(*m));
+        if let Some((_, p)) = sides
+            .iter()
+            .find(|(m, p)| *m >= PARK_MIN_MARGIN && !covered(p))
+        {
+            return *p;
+        }
+    }
+    if vertical {
+        (ax + aw - 2, cy)
+    } else {
+        (cx, ay + ah - 2)
+    }
+}
+
 /// A scroller that keeps a list of points of the area: it starts at the first and moves to the
 /// next one when the run asks for another point (the first step moved nothing).
 struct MultiPointScroller {
@@ -386,6 +452,9 @@ struct MultiPointScroller {
     points: Vec<(i32, i32)>,
     at: usize,
     current: Box<dyn Scroller + Send>,
+    /// Where the pointer rests after each wheel step ([`park_point`]); every scroller made for
+    /// a point gets it.
+    park: Option<(i32, i32)>,
 }
 
 impl MultiPointScroller {
@@ -393,14 +462,17 @@ impl MultiPointScroller {
         system: Arc<dyn LongShotSystem>,
         window_id: Option<u32>,
         points: Vec<(i32, i32)>,
+        park: Option<(i32, i32)>,
     ) -> Result<Self, CmError> {
-        let current = system.scroller_for(points.first().copied(), window_id)?;
+        let mut current = system.scroller_for(points.first().copied(), window_id)?;
+        current.park_at(park);
         Ok(MultiPointScroller {
             system,
             window_id,
             points,
             at: 0,
             current,
+            park,
         })
     }
 }
@@ -426,8 +498,9 @@ impl Scroller for MultiPointScroller {
             .system
             .scroller_for(Some(self.points[self.at + 1]), self.window_id)
         {
-            Ok(s) => {
+            Ok(mut s) => {
                 self.at += 1;
+                s.park_at(self.park);
                 self.current = s;
                 true
             }
@@ -756,18 +829,25 @@ impl Inner {
                 };
                 let result = match scroll {
                     ScrollMode::Auto => {
-                        let points = match area_rect(&capturer_for_anchor, target) {
-                            Some(area) => {
-                                scroll_points(area, &capturer_for_anchor.own_window_rects())
-                            }
+                        let own = capturer_for_anchor.own_window_rects();
+                        let area = area_rect(&capturer_for_anchor, target);
+                        let points = match area {
+                            Some(area) => scroll_points(area, &own),
                             None => Vec::new(),
                         };
+                        let park = area.map(|area| {
+                            let displays: Vec<PhysicalRect> = capturer_for_anchor
+                                .list_targets()
+                                .map(|t| t.displays.iter().map(|d| d.bounds).collect())
+                                .unwrap_or_default();
+                            park_point(area, &displays, &own, direction == Direction::Vertical)
+                        });
                         let window_id = match target {
                             cm_capture::CaptureTarget::Window { window_id } => Some(window_id),
                             _ => None,
                         };
                         let mut scroller =
-                            MultiPointScroller::new(system.clone(), window_id, points)?;
+                            MultiPointScroller::new(system.clone(), window_id, points, park)?;
                         long_shot::run_auto_ex(
                             frames.as_mut(),
                             &mut scroller,
@@ -894,11 +974,50 @@ mod point_tests {
         assert_eq!(p[0], (500, 400));
     }
 
+    /// Hover safety (real pages, Nov 16, 2026): the pointer rests beside the area, not in it.
+    #[test]
+    fn ls_park_beside_the_area_in_the_widest_margin() {
+        let display = rect(0, 0, 2000, 1000);
+        // A window with 300 px free on the right and 100 px on the left: the right one.
+        let area = rect(100, 50, 1600, 900);
+        let (x, y) = park_point(area, &[display], &[], true);
+        assert!((1701..=1724).contains(&x), "{x}");
+        assert_eq!(y, 500);
+        // Only the left is free: left of the area.
+        let area = rect(300, 50, 1700, 900);
+        let (x, _) = park_point(area, &[display], &[], true);
+        assert!((276..300).contains(&x), "{x}");
+        // A margin of 8 px is not room: the gutter inside the area (right edge, middle).
+        let area = rect(8, 8, 1984, 984);
+        assert_eq!(park_point(area, &[display], &[], true), (1990, 500));
+        // A horizontal run uses the bottom gutter.
+        assert_eq!(park_point(area, &[display], &[], false), (1000, 990));
+    }
+
+    /// The whole display: no margin, the gutter; and never a point under our own window.
+    #[test]
+    fn ls_park_whole_display_uses_the_gutter_and_avoids_our_own_windows() {
+        let display = rect(0, 0, 1920, 1080);
+        assert_eq!(park_point(display, &[display], &[], true), (1918, 540));
+        // The right margin is covered by the app's own window: the left one is used.
+        let area = rect(200, 0, 1000, 1000);
+        let own = [rect(1200, 0, 720, 1000)];
+        let (x, _) = park_point(area, &[display], &own, true);
+        assert!(x < 200, "{x}");
+        // A second display: the margin is measured on the display of the area.
+        let second = rect(1920, 0, 1920, 1080);
+        let area = rect(2000, 100, 1000, 800);
+        let (x, _) = park_point(area, &[display, second], &[], true);
+        assert!((3000..3840).contains(&x), "{x}");
+    }
+
     type Log = Arc<Mutex<Vec<Option<(i32, i32)>>>>;
+    type ParkLog = Log;
 
     struct Anchored {
         at: Option<(i32, i32)>,
         log: Log,
+        parks: ParkLog,
     }
 
     impl Scroller for Anchored {
@@ -906,9 +1025,16 @@ mod point_tests {
             self.log.lock().unwrap().push(self.at);
             Ok(())
         }
+        fn park_at(&mut self, point: Option<(i32, i32)>) {
+            self.parks.lock().unwrap().push(point);
+        }
     }
 
     struct Sys(Log);
+
+    thread_local! {
+        static PARKS: ParkLog = Arc::default();
+    }
 
     impl LongShotSystem for Sys {
         fn frames(
@@ -925,6 +1051,7 @@ mod point_tests {
             Ok(Box::new(Anchored {
                 at: anchor,
                 log: self.0.clone(),
+                parks: PARKS.with(Arc::clone),
             }))
         }
         fn auto_scroll(&self) -> AutoScrollSupport {
@@ -937,7 +1064,8 @@ mod point_tests {
     fn ls_flaky_the_scroller_moves_to_the_next_point_when_asked() {
         let log = Log::default();
         let points = vec![(1, 1), (2, 2), (3, 3)];
-        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), None, points).unwrap();
+        let mut s =
+            MultiPointScroller::new(Arc::new(Sys(log.clone())), None, points, None).unwrap();
         s.scroll(Direction::Vertical, 10).unwrap();
         assert!(s.next_point());
         s.scroll(Direction::Vertical, 10).unwrap();
@@ -950,11 +1078,26 @@ mod point_tests {
         );
     }
 
+    /// Every scroller made for a point (the first and the later ones) is told where the pointer
+    /// rests after the wheel.
+    #[test]
+    fn ls_park_every_scroller_of_the_list_gets_the_park_point() {
+        let log = Log::default();
+        PARKS.with(|p| p.lock().unwrap().clear());
+        let points = vec![(1, 1), (2, 2)];
+        let mut s =
+            MultiPointScroller::new(Arc::new(Sys(log)), None, points, Some((900, 5))).unwrap();
+        assert!(s.next_point());
+        let parks = PARKS.with(|p| p.lock().unwrap().clone());
+        assert_eq!(parks, vec![Some((900, 5)), Some((900, 5))]);
+    }
+
     /// No target found: no point, the scroller is made without an anchor as before.
     #[test]
     fn ls_flaky_no_points_means_no_anchor_and_no_next_point() {
         let log = Log::default();
-        let mut s = MultiPointScroller::new(Arc::new(Sys(log.clone())), None, Vec::new()).unwrap();
+        let mut s =
+            MultiPointScroller::new(Arc::new(Sys(log.clone())), None, Vec::new(), None).unwrap();
         s.scroll(Direction::Vertical, 10).unwrap();
         assert!(!s.next_point());
         assert_eq!(*log.lock().unwrap(), vec![None]);

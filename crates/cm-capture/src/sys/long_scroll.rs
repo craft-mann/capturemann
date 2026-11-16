@@ -271,6 +271,8 @@ mod imp {
         /// Physical px per point of the display under the anchor: a pixel-unit wheel event
         /// counts points, `amount_px` is physical.
         scale: f64,
+        /// Where the pointer rests after the wheel (points), see [`Scroller::park_at`].
+        park: Option<CGPoint>,
     }
 
     impl Scroller for MacScroller {
@@ -281,6 +283,10 @@ mod imp {
         fn scroll_back(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
             self.wheel(direction, amount_px, false)?;
             Ok(true)
+        }
+
+        fn park_at(&mut self, point: Option<(i32, i32)>) {
+            self.park = point.map(|p| anchor_to_points(p).0);
         }
     }
 
@@ -328,6 +334,15 @@ mod imp {
                     std::thread::sleep(std::time::Duration::from_millis(8));
                 }
             }
+            if let Some(p) = self.park {
+                // The events carry their own location, so the app that got them keeps
+                // scrolling (smooth scrolling goes on) when the pointer leaves.
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                // SAFETY: a plain call with a value point.
+                unsafe {
+                    CGWarpMouseCursorPosition(p);
+                }
+            }
             Ok(())
         }
     }
@@ -340,7 +355,11 @@ mod imp {
             Some((p, s)) => (Some(p), s),
             None => (None, 1.0),
         };
-        Ok(Box::new(MacScroller { anchor, scale }))
+        Ok(Box::new(MacScroller {
+            anchor,
+            scale,
+            park: None,
+        }))
     }
 }
 
@@ -455,6 +474,8 @@ mod imp {
         /// target with fallbacks.
         console: Option<u32>,
         way: Way,
+        /// Where the pointer rests after the wheel, see [`Scroller::park_at`].
+        park: Option<(i32, i32)>,
     }
 
     impl Scroller for WinScroller {
@@ -465,6 +486,10 @@ mod imp {
         fn scroll_back(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
             self.go(direction, amount_px, false)?;
             Ok(true)
+        }
+
+        fn park_at(&mut self, point: Option<(i32, i32)>) {
+            self.park = point;
         }
 
         fn last_resort(&mut self, direction: Direction, amount_px: u32) -> Result<bool, CmError> {
@@ -531,6 +556,14 @@ mod imp {
                 };
                 send(&[input])?;
                 std::thread::sleep(EVENT_GAP);
+            }
+            if let Some((x, y)) = self.park {
+                // The events are queued before the move: the window under the anchor took the
+                // wheel, then the pointer leaves and nothing under it reacts.
+                // `SetCursorPos` is immediate and the input queue is not: wait for the wheel.
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                // SAFETY: as above.
+                let _ = unsafe { SetCursorPos(x, y) };
             }
             Ok(())
         }
@@ -629,6 +662,7 @@ mod imp {
             anchor,
             console,
             way: Way::Wheel,
+            park: None,
         }))
     }
 }

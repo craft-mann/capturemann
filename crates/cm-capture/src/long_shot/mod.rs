@@ -57,6 +57,15 @@ pub trait Scroller {
         false
     }
 
+    /// Where the pointer rests after each wheel step (global physical px): a point where
+    /// hovering does nothing, outside the captured area when there is room (a hover card, a
+    /// link preview, a hover background or a thumbnail preview under the pointer changes what
+    /// the next frame shows, and a page that differs mid-way cannot be told from content that
+    /// only looks alike). The wheel is posted at the scroll point first and the pointer moved
+    /// away after it, so the wheel still reaches the target. `None` (the default) leaves the
+    /// pointer where the wheel was posted; scrollers with no pointer ignore it.
+    fn park_at(&mut self, _point: Option<(i32, i32)>) {}
+
     /// Scrolls the content back (up or left) by about `amount_px`; `Ok(false)` when this
     /// scroller cannot (nothing was done). Used once after a join failed: the content may have
     /// moved past the overlap, and half a step back gives the stitcher another try.

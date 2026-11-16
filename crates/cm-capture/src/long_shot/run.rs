@@ -12,6 +12,9 @@ const LATE_SCROLL_WAIT: std::time::Duration = std::time::Duration::from_millis(1
 /// A join that moved less than this share of the asked distance is looked at again (see
 /// `run_auto_ex`): real wheel steps move about as much as asked or more.
 const MIN_MOVED_PER_ASKED: f64 = 0.5;
+/// A join that moved less than this share of what the learned distance predicts is looked at
+/// again after a longer wait (the animation of a browser's smooth scrolling may not be over).
+const CONFIRM_BELOW_PREDICTED: f64 = 0.9;
 
 /// The first frame is taken again after this wait, and the later one is the first: a window that
 /// has just been activated (its title bar changes colour), an overlay or a dialog that is still
@@ -32,6 +35,10 @@ const FIRST_PAIR_RETRIES: u32 = 2;
 /// run ends with `no_overlap`.
 const NO_OVERLAP_RETRIES: u32 = 2;
 const BACK_SHARE: f64 = 0.5;
+/// Each step that needed the scroll-back ladder multiplies the share of the content a step asks
+/// for by this, down to [`MIN_STEP_SHARE`].
+const OVERSHOOT_SHARE_FACTOR: f64 = 0.75;
+const MIN_STEP_SHARE: f64 = 0.35;
 /// After a scroll back that lands on the last frame taken, the step is halved this many times.
 const SMALLER_STEPS: u32 = 4;
 
@@ -173,6 +180,11 @@ pub fn run_auto_ex(
     // expected shift of a step, which breaks ties between equally good overlaps.
     let mut gain = 1.0f64;
     let mut learned = 0u32;
+    // Share of the content a step asks for. It shrinks every time a step needed the scroll-back
+    // ladder: a wheel that moves more for a big request than for the small first one (macOS
+    // Chrome, Nov 16, 2026: 480 px moved 480, 1140 px moved about 1355) overshoots the overlap
+    // whatever the learned distance says, and the ladder is a rescue, not a way to walk a page.
+    let mut share = cfg.step_fraction;
     let end = loop {
         if stop() {
             break EndReason::StoppedByUser;
@@ -313,7 +325,17 @@ pub fn run_auto_ex(
                 let mut new_len = new_len;
                 let mut ended = None;
                 let mut tail = 0;
-                while f64::from(new_len) < f64::from(asked) * MIN_MOVED_PER_ASKED
+                // Looked at again after a longer wait when the first join of the run (nothing
+                // is known about this wheel yet) or one that fell short of what the learned
+                // distance predicts arrived: a browser animating each wheel step can hold a
+                // frame still for longer than the settle check waits, and a distance learned
+                // from it is too short (macOS Chrome 520 to 700 of 1469 px asked, Linux Firefox
+                // `no_overlap` after 3 frames, Nov 16, 2026). While more keeps arriving the
+                // look is repeated, up to `LATE_SCROLL_POLLS` times; the first poll that finds
+                // nothing new ends it.
+                let mut arrived = learned == 0
+                    || f64::from(new_len) < f64::from(asked) * gain * CONFIRM_BELOW_PREDICTED;
+                while (arrived || f64::from(new_len) < f64::from(asked) * MIN_MOVED_PER_ASKED)
                     && tail < LATE_SCROLL_POLLS
                 {
                     tail += 1;
@@ -323,6 +345,7 @@ pub fn run_auto_ex(
                         PushOutcome::Added { new_len: n } => {
                             new_len += n;
                             last_ok = more.frame.clone();
+                            arrived = true;
                         }
                         PushOutcome::NoChange => break,
                         PushOutcome::NoOverlap => {
@@ -351,6 +374,10 @@ pub fn run_auto_ex(
                 // that a wheel rounded the other way (a notch more or less) does not make the
                 // next one overshoot the overlap. A join found after scrolling back teaches
                 // nothing: how far the scroll-back moved is only about known.
+                if back_total > 0 || smaller > 0 {
+                    share =
+                        (share * OVERSHOOT_SHARE_FACTOR).max(MIN_STEP_SHARE.min(cfg.step_fraction));
+                }
                 if back_total == 0 {
                     let seen = (f64::from(new_len) / f64::from(asked)).clamp(0.25, 4.0);
                     gain = if learned == 0 {
@@ -364,7 +391,7 @@ pub fn run_auto_ex(
                 // 80 % of what actually scrolls: the area without the fixed bands.
                 let (h, f) = stitcher.bands();
                 let content = (size - f64::from(h) - f64::from(f)).max(1.0);
-                step = ((content * cfg.step_fraction / moved_per_asked) as u32).max(1);
+                step = ((content * share / moved_per_asked) as u32).max(1);
             }
             PushOutcome::NoChange => break stopped_or(stop, EndReason::ReachedEnd),
             PushOutcome::NoOverlap => {

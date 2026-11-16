@@ -5,14 +5,19 @@
 //! It scrolls a real window and captures the screen: run it only on a machine set up for that.
 //!
 //! ```text
-//! long_shot_probe (--window "Long Shot test page" | --region x,y,w,h) --out result.png [--max-px 16384] [--horizontal] [--hand-secs 30] [--dump dir]
+//! long_shot_probe (--window "Long Shot test page" | --region x,y,w,h) --out result.png [--max-px 16384] [--horizontal] [--hand-secs 30] [--dump dir] [--park x,y]
 //! ```
+//!
+//! `--park x,y`: where the pointer rests after each wheel step (global physical px; the
+//! daemon picks a point beside the area by itself). Progress and the asked distances go to
+//! stderr.
 //!
 //! `--hand-secs N`: Hand scroll for N seconds (the user, or the page's own script, scrolls).
 //! Prints one JSON line: frames, end reason, size, bands, scrolls asked, time.
 
 use std::time::{Duration, Instant};
 
+use cm_capture::long_shot::Scroller as _;
 use cm_capture::long_shot::{
     self, Direction, FrameSource, Limits, LongShotConfig, ThreadSleeper, MAX_LONG_SIDE,
 };
@@ -64,6 +69,26 @@ impl FrameSource for Frames {
     }
 }
 
+/// Prints what the driver asks the scroller for (`--trace`).
+struct Trace(Box<dyn long_shot::Scroller + Send>);
+
+impl long_shot::Scroller for Trace {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        eprintln!("scroll {amount_px}");
+        self.0.scroll(d, amount_px)
+    }
+    fn next_point(&mut self) -> bool {
+        self.0.next_point()
+    }
+    fn park_at(&mut self, point: Option<(i32, i32)>) {
+        self.0.park_at(point);
+    }
+    fn scroll_back(&mut self, d: Direction, amount_px: u32) -> Result<bool, CmError> {
+        eprintln!("scroll back {amount_px}");
+        self.0.scroll_back(d, amount_px)
+    }
+}
+
 fn main() {
     if let Err(e) = run() {
         eprintln!("{{\"error\": {:?}}}", e.to_string());
@@ -75,6 +100,7 @@ fn run() -> Result<(), CmError> {
     cm_capture::ensure_dpi_aware();
     let mut args = std::env::args().skip(1);
     let (mut window, mut out, mut dump) = (None, None, None);
+    let mut park: Option<(i32, i32)> = None;
     let mut region: Option<String> = None;
     let (mut max_px, mut hand_secs, mut horizontal) = (MAX_LONG_SIDE, 0u64, false);
     while let Some(a) = args.next() {
@@ -85,6 +111,17 @@ fn run() -> Result<(), CmError> {
             "--max-px" => max_px = args.next().and_then(|v| v.parse().ok()).unwrap_or(max_px),
             "--hand-secs" => hand_secs = args.next().and_then(|v| v.parse().ok()).unwrap_or(0),
             "--horizontal" => horizontal = true,
+            "--park" => {
+                let v: Vec<i32> = args
+                    .next()
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter_map(|p| p.trim().parse().ok())
+                    .collect();
+                if let [x, y] = v[..] {
+                    park = Some((x, y));
+                }
+            }
             "--dump" => dump = args.next().map(|d| (std::path::PathBuf::from(d), 0)),
             other => return Err(CmError::invalid_input(format!("unknown argument {other}"))),
         }
@@ -167,10 +204,11 @@ fn run() -> Result<(), CmError> {
             &mut on_progress,
         )?
     } else {
-        let mut scroller = long_shot::platform_scroller_at(Some(centre))?;
+        let mut scroller = Trace(long_shot::platform_scroller_at(Some(centre))?);
+        scroller.park_at(park);
         long_shot::run_auto(
             &mut frames,
-            scroller.as_mut(),
+            &mut scroller,
             &mut ThreadSleeper,
             cfg,
             &mut || false,
