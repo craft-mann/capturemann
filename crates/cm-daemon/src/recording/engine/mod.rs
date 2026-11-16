@@ -486,7 +486,7 @@ const ENGINE_ACTIONS: [&str; 11] = [
 ];
 
 mod api;
-mod describe;
+pub(crate) mod describe;
 mod driver;
 mod inner;
 mod outcome;

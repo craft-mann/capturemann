@@ -1010,6 +1010,13 @@ impl Daemon {
             });
         }
 
+        // 1b. A capture that an import is still bringing in: wait for it, or say `busy`.
+        if let Some(id) = action.capture_id() {
+            if !id.contains('/') {
+                self.inner.wait_for_importing(id).await?;
+            }
+        }
+
         // 2. Idempotency. The lock makes concurrent repeats wait for the first call.
         let key = action.request_id().map(|rid| format!("{actor}\u{0}{rid}"));
         let _request_guard = match &key {
@@ -1088,8 +1095,17 @@ impl Daemon {
             // The user's own setting asks (the sentence says so), or the call always asks (an
             // agent's Auto Long Shot): the dialog must not blame a setting the user did not make.
             let by_policy = self.inner.effective_tier(&spec) == Tier::Confirm;
-            let (summary, details, params) =
-                crate::tool_policy::ask_first_dialog(name, &spec, &action.details(), by_policy);
+            // The target in words, not `{...}`.
+            let mut input = action.details();
+            let mut typed = Value::Null;
+            self.inner
+                .word_target(&action, &mut input, &mut typed)
+                .await;
+            let (summary, details, mut params) =
+                crate::tool_policy::ask_first_dialog(name, &spec, &input, by_policy);
+            if let (Some(o), false) = (params.as_object_mut(), typed.is_null()) {
+                o.insert("target".into(), typed);
+            }
             let outcome = self
                 .inner
                 .gate
@@ -1209,7 +1225,15 @@ impl Daemon {
                 }
                 // The dialog is built from the live model list: name, size, where it goes.
                 (_, Action::Ai(p)) => self.inner.plan_ai(p).await?,
-                _ => (action.summary(), action.details(), action.confirm_params()),
+                _ => {
+                    let (summary, mut details, mut params) =
+                        (action.summary(), action.details(), action.confirm_params());
+                    // A Click Guide or a Long Shot names a display or a window: say which.
+                    self.inner
+                        .word_target(&action, &mut details, &mut params)
+                        .await;
+                    (summary, details, params)
+                }
             };
             if let Some(name) = &agent {
                 let outcome = self

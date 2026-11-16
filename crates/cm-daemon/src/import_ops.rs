@@ -691,7 +691,54 @@ fn capture_rows(plan: &ImportPlan, ids: &BTreeMap<PathBuf, String>) -> Vec<Value
         .collect()
 }
 
+/// How long a call about a capture that an import is still bringing in waits for it.
+const IMPORT_WAIT: Duration = Duration::from_secs(10);
+
 impl Inner {
+    /// Whether an unfinished `import` job is about to install the capture `id`.
+    fn import_is_pending(&self, id: &str) -> bool {
+        let Some(rt) = self.jobs.as_ref() else {
+            return false;
+        };
+        let filter = cm_jobs::JobFilter {
+            job_type: Some(JOB_IMPORT.to_owned()),
+            states: Some(vec![
+                cm_jobs::JobState::Queued,
+                cm_jobs::JobState::Running,
+                cm_jobs::JobState::Paused,
+            ]),
+            limit: None,
+        };
+        rt.queue.list(&filter).unwrap_or_default().iter().any(|j| {
+            j.inputs["files"]
+                .as_array()
+                .is_some_and(|f| f.iter().any(|f| f["capture_id"].as_str() == Some(id)))
+        })
+    }
+
+    /// `import_media` answers at once and the files arrive when its job has run, so a call
+    /// that follows straight away (`annotate` of the id `import_media` returned) used to answer
+    /// `not_found` for the first seconds. A call about a capture that is not in the library yet
+    /// but is being imported waits for it (at most [`IMPORT_WAIT`]) and then says `busy` with
+    /// a hint to retry; for CLI, MCP and the app alike.
+    pub(crate) async fn wait_for_importing(&self, id: &str) -> Result<(), DaemonError> {
+        let there = || lock_library(&self.library).get(id).is_ok();
+        if there() || !self.import_is_pending(id) {
+            return Ok(());
+        }
+        let deadline = tokio::time::Instant::now() + IMPORT_WAIT;
+        while tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            if there() || !self.import_is_pending(id) {
+                return Ok(());
+            }
+        }
+        Err(CmError::busy(format!(
+            "`{id}` is still being imported; try again in a few seconds"
+        ))
+        .into())
+    }
+
     /// The plan of a call (the dialog of `remove_originals` is built from it).
     pub(crate) async fn plan_import(
         &self,

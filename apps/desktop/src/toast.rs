@@ -91,6 +91,15 @@ pub struct Hint {
     pub keys: Vec<String>,
 }
 
+/// The name the `capturemann` command gives in `session.hello` (see `cm-cli`); every other
+/// client of an agent call comes through the MCP server with its own name.
+pub const CLI_CLIENT_NAME: &str = "capturemann-cli";
+
+/// Whether the client of an agent call is the command line, not an MCP client.
+pub fn is_cli_client(client: &str) -> bool {
+    client == CLI_CLIENT_NAME
+}
+
 /// Which agent tool call an agent toast reports.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentCall {
@@ -248,12 +257,19 @@ impl ToastSpec {
         spec
     }
 
-    /// "Started by agent via MCP" with the tool name and the client.
+    /// "Started by agent via MCP" with the tool name and the client; "via the command line" when
+    /// the client is the `capturemann` command (it is not MCP).
     pub fn agent(tool: impl Into<String>, client: impl Into<String>) -> Self {
-        let mut spec = ToastSpec::new(ToastKind::Agent, cm_i18n::tr!("Started by agent via MCP"));
+        let client = client.into();
+        let title = if is_cli_client(&client) {
+            cm_i18n::tr!("Started by agent via the command line")
+        } else {
+            cm_i18n::tr!("Started by agent via MCP")
+        };
+        let mut spec = ToastSpec::new(ToastKind::Agent, title);
         spec.agent = Some(AgentCall {
             tool: tool.into(),
-            client: client.into(),
+            client,
         });
         spec
     }
@@ -688,6 +704,15 @@ mod tests {
         assert!(q.toasts()[0].buttons.is_empty());
         q.dismiss(b);
         assert!(!q.replace(b, ToastSpec::new(ToastKind::Info, "x"), t));
+    }
+
+    /// QA macOS pass 7: a guide started with `capturemann capture guide` said "via MCP".
+    #[test]
+    fn agent_toast_says_the_command_line_when_the_client_is_the_cli() {
+        let cli = ToastSpec::agent("start_guide", CLI_CLIENT_NAME);
+        assert_eq!(cli.title, "Started by agent via the command line");
+        let mcp = ToastSpec::agent("start_guide", "claude-desktop");
+        assert_eq!(mcp.title, "Started by agent via MCP");
     }
 
     #[test]

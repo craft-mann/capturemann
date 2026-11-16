@@ -59,25 +59,88 @@ pub fn heading(h: Headings, label: &str, title: &str, position: usize) -> String
     }
 }
 
+/// Text as plain text in Markdown: every mark that would make a link, an image, HTML, code,
+/// emphasis, a table cell, a heading or a list is escaped with a backslash (CommonMark renders
+/// `\[` as `[`), line breaks become spaces unless `multiline`, `block` also guards what starts a
+/// line (`#`, `-`, `1.`), and the three things a viewer
+/// turns into a live link by itself (`scheme://`, `www.`, an address with `@`) are broken up.
+/// A title comes from the clicked screen or from an agent and must never become markup (QA
+/// macOS pass 7: live links in titles).
+fn md_text(s: &str, multiline: bool, block: bool) -> String {
+    let chars: Vec<char> = s
+        .chars()
+        .filter(|c| *c != '\r' && (!c.is_control() || matches!(c, '\n' | '\t')))
+        .collect();
+    let mut out = String::with_capacity(chars.len() + 8);
+    // Everything before the character on its line, to know a heading or a list marker.
+    let mut line_start = 0;
+    for (i, &c) in chars.iter().enumerate() {
+        if c == '\n' {
+            if multiline {
+                out.push('\n');
+                line_start = i + 1;
+            } else {
+                out.push(' ');
+            }
+            continue;
+        }
+        if c == '\t' {
+            out.push(' ');
+            continue;
+        }
+        let before = &chars[line_start..i];
+        let first_on_line = block && before.iter().all(|b| *b == ' ');
+        let after_is = |t: &str| chars[i + 1..].iter().take(t.len()).copied().eq(t.chars());
+        let escape = match c {
+            '\\' | '`' | '*' | '_' | '[' | ']' | '(' | ')' | '<' | '>' | '|' | '~' | '!' | '&'
+            | '@' => true,
+            // The colon of `https://`, `ftp://`.
+            ':' => after_is("//"),
+            // The dot of `www.`.
+            '.' => {
+                (i >= 3
+                    && chars[i - 3..i]
+                        .iter()
+                        .collect::<String>()
+                        .eq_ignore_ascii_case("www"))
+                    // `1.` at the start of a line is a list item.
+                    || (block
+                        && !before.is_empty()
+                        && before.iter().all(char::is_ascii_digit)
+                        && after_is(" "))
+            }
+            // A heading, a list, a setext underline.
+            '#' | '-' | '+' | '=' => first_on_line,
+            _ => false,
+        };
+        if escape {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
 fn md_inline(s: &str) -> String {
-    s.replace('\n', " ").replace('<', "\\<")
+    md_text(s, false, false)
 }
 
 fn md_alt(s: &str) -> String {
-    s.replace(['[', ']', '\n'], " ").replace('<', " ")
+    md_text(s, false, false)
 }
 
-/// `guide.md`: relative image links, no absolute path anywhere (GDE-3.AC1).
+/// `guide.md`: relative image links, no absolute path anywhere (GDE-3.AC1). Every text of the
+/// guide is written as plain text (see [`md_text`]).
 pub fn markdown(doc: &ExportDoc, headings: Headings, intro: bool, notes: bool) -> String {
     let mut out = format!("# {}\n\n", md_inline(&doc.title));
     if intro && !doc.intro.trim().is_empty() {
-        let _ = write!(out, "{}\n\n", doc.intro.trim().replace('<', "\\<"));
+        let _ = write!(out, "{}\n\n", md_text(doc.intro.trim(), true, true));
     }
     for (i, s) in doc.steps.iter().enumerate() {
         let h = heading(headings, &s.label, &s.title, i + 1);
         let _ = write!(out, "## {}\n\n", md_inline(&h));
         if notes && !s.note.trim().is_empty() {
-            let _ = write!(out, "{}\n\n", s.note.trim().replace('<', "\\<"));
+            let _ = write!(out, "{}\n\n", md_text(s.note.trim(), true, true));
         }
         if let Some(img) = &s.image {
             let _ = write!(out, "![{}]({})\n\n", md_alt(&h), img.file);
@@ -293,6 +356,143 @@ fn file_stem(title: &str) -> String {
     }
 }
 
+fn io_err(path: &Path, e: &std::io::Error) -> CmError {
+    if e.kind() == std::io::ErrorKind::StorageFull {
+        CmError::disk_full(format!("cannot write `{}`: {e}", path.display()))
+    } else {
+        CmError::internal(format!("cannot write `{}`: {e}", path.display()))
+    }
+}
+
+/// `name`, `name (2)`, `name (3)` ... : the n-th candidate of a name that is taken.
+fn numbered(stem: &str, ext: Option<&str>, n: u32) -> String {
+    let base = if n <= 1 {
+        stem.to_owned()
+    } else {
+        format!("{stem} ({n})")
+    };
+    match ext {
+        Some(e) => format!("{base}.{e}"),
+        None => base,
+    }
+}
+
+/// Creates the folder `parent/<stem>` that did not exist before (`<stem> (2)`, `(3)` ... when it
+/// did): the name is claimed by `create_dir`, which fails when the folder is there, so two
+/// exports at once cannot share one.
+fn claim_dir(parent: &Path, stem: &str) -> Result<PathBuf, CmError> {
+    std::fs::create_dir_all(parent).map_err(|e| io_err(parent, &e))?;
+    for n in 1..10_000 {
+        let p = parent.join(numbered(stem, None, n));
+        match std::fs::create_dir(&p) {
+            Ok(()) => return Ok(p),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(io_err(&p, &e)),
+        }
+    }
+    Err(CmError::internal(format!(
+        "no free folder name next to `{stem}`"
+    )))
+}
+
+/// The folder a Markdown export writes into; never a folder or file that was already there with
+/// something in it (QA macOS pass 7: the export replaced `guide.md` and `images/` of an earlier
+/// one without asking):
+/// * `dest` is not there: it is created and used;
+/// * `dest` is an empty folder: used as it is;
+/// * `dest` is a folder with files in it (the person chose `Documents`, or an earlier export):
+///   a new folder named after the guide is made inside it, `Title (2)` when that is taken;
+/// * `dest` is a file: a new folder next to it, `name (2)`.
+fn markdown_root(dest: &Path, title: &str) -> Result<PathBuf, CmError> {
+    if dest.as_os_str().is_empty() {
+        return Err(CmError::invalid_field(
+            "dest",
+            "is required: the folder to write the Markdown into",
+        ));
+    }
+    match std::fs::metadata(dest) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            if let (Some(parent), Some(name)) = (dest.parent(), dest.file_name()) {
+                return claim_dir(parent, &name.to_string_lossy());
+            }
+            std::fs::create_dir_all(dest).map_err(|e| io_err(dest, &e))?;
+            Ok(dest.to_owned())
+        }
+        Err(e) => Err(io_err(dest, &e)),
+        Ok(m) if m.is_dir() => {
+            let empty = std::fs::read_dir(dest)
+                .map_err(|e| io_err(dest, &e))?
+                .next()
+                .is_none();
+            if empty {
+                Ok(dest.to_owned())
+            } else {
+                claim_dir(dest, &file_stem(title))
+            }
+        }
+        Ok(_) => {
+            let parent = dest
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."));
+            let name = dest
+                .file_name()
+                .map_or_else(|| "guide".to_owned(), |n| n.to_string_lossy().into_owned());
+            claim_dir(parent, &name)
+        }
+    }
+}
+
+/// Writes `bytes` to a file that did not exist: `path`, or `stem (2).ext`, `(3)` ... when it
+/// did. Returns the path written. The file is made with `create_new`, so a file that appears
+/// meanwhile is not replaced either.
+fn write_unique(path: &Path, bytes: &[u8]) -> Result<PathBuf, CmError> {
+    use std::io::Write as _;
+    if let Some(p) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(p).map_err(|e| io_err(p, &e))?;
+    }
+    let stem = path
+        .file_stem()
+        .map_or_else(|| "guide".to_owned(), |n| n.to_string_lossy().into_owned());
+    let ext = path.extension().map(|e| e.to_string_lossy().into_owned());
+    for n in 1..10_000 {
+        let p = path.with_file_name(numbered(&stem, ext.as_deref(), n));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&p)
+        {
+            Ok(mut f) => {
+                f.write_all(bytes).map_err(|e| io_err(&p, &e))?;
+                return Ok(p);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(io_err(&p, &e)),
+        }
+    }
+    Err(CmError::internal(format!(
+        "no free file name next to `{}`",
+        path.display()
+    )))
+}
+
+/// The file an HTML or PDF export is for: `dest` itself when it names a file, `<title>.<ext>` in
+/// it when it is a folder (or has no extension).
+fn single_file_target(dest: &str, title: &str, ext: &str) -> Result<PathBuf, CmError> {
+    if dest.is_empty() {
+        return Err(CmError::invalid_field(
+            "dest",
+            "is required: the folder or file to write",
+        ));
+    }
+    let dest = PathBuf::from(dest);
+    Ok(if dest.is_dir() || dest.extension().is_none() {
+        dest.join(format!("{}.{ext}", file_stem(title)))
+    } else {
+        dest
+    })
+}
+
 impl Inner {
     pub(crate) async fn export_guide(
         &self,
@@ -323,7 +523,8 @@ impl Inner {
             });
             match a.format {
                 Format::Markdown => {
-                    let root = PathBuf::from(a.dest.as_deref().unwrap_or_default());
+                    let requested = PathBuf::from(a.dest.as_deref().unwrap_or_default());
+                    let root = markdown_root(&requested, &doc.title)?;
                     let mut files = Vec::new();
                     for s in &doc.steps {
                         if let Some(img) = &s.image {
@@ -334,18 +535,20 @@ impl Inner {
                     let md = markdown(&doc, a.headings, a.intro, a.notes);
                     write_file(&root.join("guide.md"), md.as_bytes())?;
                     files.insert(0, "guide.md".to_owned());
+                    out["renamed"] = json!(root != requested);
+                    out["requested"] = json!(requested);
                     out["path"] = json!(root);
                     out["files"] = json!(files);
                 }
                 Format::Html => {
-                    let dest = PathBuf::from(a.dest.as_deref().unwrap_or_default());
-                    let path = if dest.is_dir() || dest.extension().is_none() {
-                        dest.join(format!("{}.html", file_stem(&doc.title)))
-                    } else {
-                        dest
-                    };
+                    let wanted = single_file_target(
+                        a.dest.as_deref().unwrap_or_default(),
+                        &doc.title,
+                        "html",
+                    )?;
                     let page = html(&doc, a.headings, a.intro, a.notes, "en");
-                    write_file(&path, page.as_bytes())?;
+                    let path = write_unique(&wanted, page.as_bytes())?;
+                    out["renamed"] = json!(path != wanted);
                     out["path"] = json!(path);
                     out["files"] = json!([path.file_name().map(|n| n.to_string_lossy())]);
                 }
@@ -368,14 +571,14 @@ impl Inner {
                     out["html"] = json!(frag);
                 }
                 Format::Pdf => {
-                    let dest = PathBuf::from(a.dest.as_deref().unwrap_or_default());
-                    let path = if dest.is_dir() || dest.extension().is_none() {
-                        dest.join(format!("{}.pdf", file_stem(&doc.title)))
-                    } else {
-                        dest
-                    };
+                    let wanted = single_file_target(
+                        a.dest.as_deref().unwrap_or_default(),
+                        &doc.title,
+                        "pdf",
+                    )?;
                     let bytes = super::pdf::pdf(&doc, a.headings, a.intro, a.notes, a.paper)?;
-                    write_file(&path, &bytes)?;
+                    let path = write_unique(&wanted, &bytes)?;
+                    out["renamed"] = json!(path != wanted);
                     out["path"] = json!(path);
                     out["files"] = json!([path.file_name().map(|n| n.to_string_lossy())]);
                 }
@@ -425,7 +628,7 @@ mod tests {
         assert!(md.contains("![1. Click \"Save\"](images/step-01.png)"));
         assert!(md.contains("## 2. Type your password"));
         assert!(!md.contains("](/") && !md.contains(":\\"));
-        assert!(md.contains("# Set up \\<SSO>"));
+        assert!(md.contains("# Set up \\<SSO\\>"), "{md}");
         let md = markdown(&doc(), Headings::Step, false, false);
         assert!(md.contains("## Step 1 · Click"));
         assert!(!md.contains("Before you start") && !md.contains("Wait a second"));
@@ -449,5 +652,79 @@ mod tests {
     fn empty_title_falls_back_to_the_position() {
         assert_eq!(heading(Headings::Numbered, "3", " ", 3), "3. Step 3");
         assert_eq!(heading(Headings::Step, "B", "Go", 2), "Step B · Go");
+    }
+
+    /// QA macOS pass 7: a title from the screen or from an agent must not become a link, an
+    /// image, HTML, code, a table or a list in the Markdown.
+    #[test]
+    fn markdown_titles_and_notes_are_plain_text() {
+        let mut d = doc();
+        d.title = "[Docs](https://evil.example/x) <b>hi</b> `code` a|b".into();
+        d.steps[0].title = "Click \"![x](http://t.example/p.png)\"\n# not a heading".into();
+        d.steps[0].note = "See www.example.com or mail jane@example.com or http://example.com/a\n\n1. one\n- two\n# three".into();
+        let md = markdown(&d, Headings::Numbered, true, true);
+        // No unescaped bracket-paren pair outside the one image of the step.
+        let without_image = md
+            .replace("![1. Click", "IMG")
+            .replace("](images/step-01.png)", "");
+        assert!(!without_image.contains("]("), "{md}");
+        assert!(!md.contains("<b>"), "{md}");
+        assert!(!md.contains("](https") && !md.contains("](http"), "{md}");
+        assert!(!md.contains("http://") && !md.contains("https://"), "{md}");
+        assert!(!md.contains("www.example"), "{md}");
+        assert!(!md.contains("jane@"), "{md}");
+        assert!(md.contains("\\[Docs\\]\\(https\\://evil"), "{md}");
+        // A title is one line of the heading.
+        for line in md.lines().filter(|l| l.starts_with("## ")) {
+            assert!(!line.contains("\n"));
+        }
+        assert!(
+            md.contains("\\# three") && md.contains("\\- two") && md.contains("1\\. one"),
+            "{md}"
+        );
+        // Ordinary words are not changed.
+        assert_eq!(
+            md_text("Click \"Save\" now", false, false),
+            "Click \"Save\" now"
+        );
+        assert_eq!(md_text("Đăng nhập", false, false), "Đăng nhập");
+    }
+
+    #[test]
+    fn a_markdown_export_never_writes_over_what_is_there() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = |n: &str| dir.path().join(n);
+        // A folder that is not there: made and used.
+        let a = markdown_root(&p("guide"), "Set up").unwrap();
+        assert_eq!(a, p("guide"));
+        // The same name again (empty): used as it is.
+        assert_eq!(markdown_root(&p("guide"), "Set up").unwrap(), p("guide"));
+        // With a file in it: a folder of the guide's name inside, then (2).
+        std::fs::write(p("guide").join("guide.md"), "mine").unwrap();
+        let b = markdown_root(&p("guide"), "Set up").unwrap();
+        assert_eq!(b, p("guide").join("Set up"));
+        std::fs::write(b.join("guide.md"), "x").unwrap();
+        let c = markdown_root(&p("guide"), "Set up").unwrap();
+        assert_eq!(c, p("guide").join("Set up (2)"));
+        assert_eq!(
+            std::fs::read_to_string(p("guide").join("guide.md")).unwrap(),
+            "mine"
+        );
+        // A file of that name: a folder next to it.
+        std::fs::write(p("note.txt"), "keep").unwrap();
+        assert_eq!(
+            markdown_root(&p("note.txt"), "Set up").unwrap(),
+            p("note.txt (2)")
+        );
+        assert_eq!(std::fs::read_to_string(p("note.txt")).unwrap(), "keep");
+        // A title that is a path is one folder name.
+        std::fs::write(p("guide").join("other"), "x").unwrap();
+        let d = markdown_root(&p("guide"), "../../etc/passwd").unwrap();
+        assert!(d.starts_with(p("guide")), "{d:?}");
+        // Single files: the second export is `(2)`.
+        let f1 = write_unique(&p("g.html"), b"one").unwrap();
+        let f2 = write_unique(&p("g.html"), b"two").unwrap();
+        assert_eq!((f1, f2), (p("g.html"), p("g (2).html")));
+        assert_eq!(std::fs::read_to_string(p("g.html")).unwrap(), "one");
     }
 }

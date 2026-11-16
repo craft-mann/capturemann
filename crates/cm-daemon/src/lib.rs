@@ -44,6 +44,7 @@ pub mod blueprint_ops;
 pub mod caption_options;
 pub mod clock;
 pub mod config;
+mod confirm_target;
 mod daemon;
 pub mod diagnostics;
 pub mod edit_ops;

@@ -134,9 +134,33 @@ impl Frame {
     /// Encodes as an 8-bit RGBA PNG.
     pub fn to_png(&self) -> Result<Vec<u8>, CmError> {
         let mut out = Vec::new();
-        let mut enc = png::Encoder::new(&mut out, self.width, self.height);
+        self.encode_png(&mut out, None)?;
+        Ok(out)
+    }
+
+    /// Encodes as an 8-bit RGBA PNG into `out` (cleared first, its capacity reused) with a fixed
+    /// `Sub` filter instead of trying every filter on every row: 3 to 5 times quicker than
+    /// [`Frame::to_png`] on a screen-sized frame (0.19 s against 0.7 to 1.1 s at 2880 x 1800,
+    /// release-like build) for a file of the same size, to within 5 %. For frames that are written
+    /// while the person keeps working (a Click Guide step); the pixels are the same.
+    pub fn to_png_fast_into(&self, out: &mut Vec<u8>) -> Result<(), CmError> {
+        out.clear();
+        out.reserve(self.rgba.len() / 8);
+        self.encode_png(out, Some((png::Compression::Balanced, png::Filter::Sub)))
+    }
+
+    fn encode_png(
+        &self,
+        out: &mut Vec<u8>,
+        tuning: Option<(png::Compression, png::Filter)>,
+    ) -> Result<(), CmError> {
+        let mut enc = png::Encoder::new(out, self.width, self.height);
         enc.set_color(png::ColorType::Rgba);
         enc.set_depth(png::BitDepth::Eight);
+        if let Some((level, filter)) = tuning {
+            enc.set_compression(level);
+            enc.set_filter(filter);
+        }
         let mut writer = enc
             .write_header()
             .map_err(|e| CmError::internal(format!("PNG encoding failed: {e}")))?;
@@ -146,7 +170,7 @@ impl Frame {
         writer
             .finish()
             .map_err(|e| CmError::internal(format!("PNG encoding failed: {e}")))?;
-        Ok(out)
+        Ok(())
     }
 }
 

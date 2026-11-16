@@ -134,8 +134,8 @@ fn run(view: &mut GuideView, cx: &mut Context<GuideView>) {
     if let Some(e) = &mut view.export {
         e.busy = true;
     }
-    // Markdown writes into a folder of its own named after the guide; HTML is one file in the
-    // chosen folder.
+    // Markdown goes into the chosen folder when it is empty, else into a folder of the guide's
+    // name inside it; HTML and PDF are one file in the chosen folder. Nothing is overwritten.
     let params = json!({
         "guide_id": id,
         "format": ex.format.key(),
@@ -152,7 +152,12 @@ fn run(view: &mut GuideView, cx: &mut Context<GuideView>) {
         match r {
             Ok(v) => {
                 let n = v["steps"].as_u64().unwrap_or(0);
-                let mut body = tr!("{n} steps written to {path}", n = n, path = dest.display());
+                // Where it really went: the daemon never writes over what is there, so a folder
+                // that held files gets a folder of the guide's name inside it (or `(2)`).
+                let path = v["path"]
+                    .as_str()
+                    .map_or_else(|| dest.display().to_string(), str::to_owned);
+                let mut body = tr!("{n} steps written to {path}", n = n, path = path);
                 if let Some(w) = v["warnings"][0].as_str() {
                     body = format!("{body}\n{w}");
                 }

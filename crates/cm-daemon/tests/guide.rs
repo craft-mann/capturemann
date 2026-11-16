@@ -846,8 +846,9 @@ fn step_crops(folder: &std::path::Path) -> Vec<Option<[f64; 4]>> {
 
 /// GDE-1 (maintainer review Nov 15, 2026): one crop for the whole guide, so the framing does not
 /// jump between steps; a later click outside the box moves the rectangle of the earlier steps.
-#[tokio::test]
-async fn gde_1_every_step_has_the_same_crop_and_a_far_click_recomputes_the_earlier_ones() {
+/// The earlier steps are rewritten once, when the recording ends (rewriting all of them on every
+/// click made a long guide slower with every step), so the crops are compared after the stop.
+async fn crops_after(xs: &[f64]) -> Vec<Option<[f64; 4]>> {
     let (b, dir) =
         builder(cm_capture::fake::FakeBackend::new().with_display(1, 0, 0, 3000, 2000, 1.0));
     let clicks = ScriptedClicks::new();
@@ -858,28 +859,31 @@ async fn gde_1_every_step_has_the_same_crop_and_a_far_click_recomputes_the_earli
         .build();
     let mut c = Client::connect(&daemon, "agent");
     let id = start(&mut c).await;
-    for x in [100.0, 200.0, 300.0] {
-        assert!(clicks.click(x, 1000.0));
+    for x in xs {
+        assert!(clicks.click(*x, 1000.0));
     }
-    wait_steps(&mut c, &id, 3).await;
+    wait_steps(&mut c, &id, xs.len()).await;
+    c.call("stop_guide", json!({"guide_id": id})).await;
     let folder = std::fs::read_dir(dir.path())
         .unwrap()
         .flatten()
         .find(|e| e.path().extension().is_some_and(|x| x == "cmguide"))
         .unwrap()
         .path();
-    let narrow = step_crops(&folder);
+    step_crops(&folder)
+}
+
+#[tokio::test]
+async fn gde_1_every_step_has_the_same_crop_and_a_far_click_recomputes_the_earlier_ones() {
+    let narrow = crops_after(&[100.0, 200.0, 300.0]).await;
     assert_eq!(narrow.len(), 3);
     assert_eq!(narrow[0], Some([0.0, 600.0, 1400.0, 800.0]), "{narrow:?}");
     assert!(narrow.iter().all(|r| *r == narrow[0]), "{narrow:?}");
     // A fourth click at the far side: the three earlier steps get the wider rectangle too.
-    assert!(clicks.click(2800.0, 1000.0));
-    wait_steps(&mut c, &id, 4).await;
-    let wide = step_crops(&folder);
+    let wide = crops_after(&[100.0, 200.0, 300.0, 2800.0]).await;
     assert_eq!(wide.len(), 4);
     assert_eq!(wide[0], Some([0.0, 600.0, 3000.0, 800.0]), "{wide:?}");
     assert!(wide.iter().all(|r| *r == wide[0]), "{wide:?}");
-    c.call("stop_guide", json!({"guide_id": id})).await;
 }
 
 /// CG-13 (QA pass 7): the card picture of a display guide is the guide's crop of its first step,

@@ -251,6 +251,52 @@ async fn a_png_and_a_jpeg_become_two_screenshot_bundles() {
     assert_eq!(chunks(&again), ["IHDR", "IDAT", "IEND"]);
 }
 
+/// QA Linux pass 1 / macOS pass 7: `annotate` right after `import_media` answered `not_found`
+/// for a few seconds, while the import job was still queued. A call about a capture an import is
+/// bringing in waits for it (and says `busy`, not `not_found`, when it takes too long).
+#[tokio::test]
+async fn annotate_right_after_import_waits_for_the_import_job() {
+    let r = rig();
+    let png = r.png("Soon.png", 40, 30);
+    let q = r.daemon.job_queue().unwrap();
+    // The import job is held, so it is certainly still queued when the call comes.
+    q.pause_type("import");
+    let out = r
+        .import(Actor::User, json!({"paths": [s(&png)]}))
+        .await
+        .unwrap();
+    let id = out["captures"][0]["capture_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let ops = json!([{"op": "rect", "rect": [2, 2, 20, 10], "stroke": "#ff0000"}]);
+    let annotate = r.call(
+        agent(),
+        "annotate",
+        json!({"capture_id": id, "ops": ops, "return_image": false}),
+    );
+    let release = async {
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        q.resume_type("import");
+    };
+    let (an, ()) = tokio::join!(annotate, release);
+    let an = an.expect("annotate waited for the import");
+    assert!(
+        an.get("revision").is_some() || an.get("capture_id").is_some(),
+        "{an}"
+    );
+    // A capture no import is bringing in is still `not_found`.
+    let e = r
+        .call(
+            agent(),
+            "annotate",
+            json!({"capture_id": "shot_000000000000000X", "ops": ops, "return_image": false}),
+        )
+        .await
+        .unwrap_err();
+    assert!(e.to_string().contains("no capture"), "{e}");
+}
+
 /// IMP-6.AC7: a dry run on a mix of pictures, video and a folder-free list gives every file its
 /// own row (width and height for pictures) and writes nothing.
 #[tokio::test]
