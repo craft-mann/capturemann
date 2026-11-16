@@ -2165,3 +2165,103 @@ fn cap_6_ac3_nearly_alike_rows_two_screens_apart_do_not_join() {
         );
     }
 }
+
+/// A real marketing site (https://www.carchargeos.com, Linux, Nov 16, 2026: `no_overlap` after
+/// the first frame): a sticky translucent header that is opaque in the first frame and frosted
+/// over the scrolled page in every later one, a scrollbar, a floating scroll-to-top button, and
+/// the browser's own toolbar above. The header's rows differ between any two frames; the rest of
+/// the overlap is exact.
+fn frosted_page() -> SyntheticPage {
+    SyntheticPage::new(800, 6 * 1100, 1100)
+        .with_bands(40, 0)
+        .with_scrollbar(6)
+        .with_frosted_header(70)
+        .with_floating_button(40, 48)
+}
+
+#[test]
+fn cap_6_a_translucent_sticky_header_with_a_floating_button_joins() {
+    let page = frosted_page();
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.header_len, 40);
+    // Every content row once and in order (columns the button and the scrollbar never touch).
+    assert_rows_match(&r.image.frame, &page.expected(), "frosted");
+}
+
+#[test]
+fn cap_6_a_translucent_sticky_header_alone_joins() {
+    let page = SyntheticPage::new(800, 5 * 700, 700).with_frosted_header(70);
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_rows_match(&r.image.frame, &page.expected(), "frosted alone");
+}
+
+#[test]
+fn cap_6_a_floating_button_alone_joins() {
+    let page = SyntheticPage::new(800, 5 * 700, 700).with_floating_button(50, 48);
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_rows_match(&r.image.frame, &page.expected(), "button alone");
+}
+
+/// The same page that jumps still stops, with an exact prefix kept.
+#[test]
+fn cap_6_a_translucent_header_page_that_jumps_still_ends_no_overlap() {
+    let page = frosted_page().with_jump(1500, 900);
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::NoOverlap);
+    let kept = r.image.frame.height();
+    assert!(kept > 700 && kept < 2600, "kept {kept}");
+    assert_rows_match(&r.image.frame, &page.expected_range(0, kept - 40), "prefix");
+}
+
+/// Linux QA, Nov 16, 2026: a horizontal Long Shot of a page whose every row repeats numbered cells
+/// (c001, c002, ...) every 194 px: shifts that are multiples of the cell width match except for
+/// the label. The image was longer than the page (content repeated) and the run ended
+/// `no_overlap`.
+#[test]
+fn ls_b_horizontal_cells_that_repeat_every_194_px_are_joined_at_the_true_shift() {
+    for gain in [1.0, 0.6, 1.4] {
+        let page = SyntheticPage::new(520, 8 * 1000, 1000)
+            .horizontal()
+            .with_cells(194);
+        let view = page.clone().view().with_gain(gain);
+        let (mut src, mut sc) = (view.clone(), view);
+        let r = run_auto(
+            &mut src,
+            &mut sc,
+            &mut NoSleep::default(),
+            cfg(Direction::Horizontal),
+            &mut || false,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(r.end, EndReason::ReachedEnd, "gain {gain}");
+        assert_eq!(r.image.frame, page.expected(), "gain {gain}");
+    }
+}
+
+/// QA macOS pass 7 (LS-13): on real pages the first scroll moved the page far from what was asked
+/// (520 to 700 px of the step asked), and the first join was refused. The join is searched at
+/// every shift, so a wheel that moves less or more than asked must join on a page with a
+/// translucent header and a floating button too.
+#[test]
+fn ls_13_a_wheel_that_moves_far_less_or_more_than_asked_on_a_translucent_header_page() {
+    for gain in [0.3, 0.45, 0.7, 1.9] {
+        let page = frosted_page();
+        let view = page.clone().view().with_gain(gain);
+        let (mut src, mut sc) = (view.clone(), view);
+        let r = run_auto(
+            &mut src,
+            &mut sc,
+            &mut NoSleep::default(),
+            cfg(Direction::Vertical),
+            &mut || false,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(r.end, EndReason::ReachedEnd, "gain {gain}");
+        assert_rows_match(&r.image.frame, &page.expected(), "gain");
+    }
+}

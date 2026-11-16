@@ -59,6 +59,17 @@ pub struct SyntheticPage {
     /// pixels, and a bar whose width is `40 + (row * 37) % 260`, so that rows 28 apart differ by
     /// four pixels of bar and a few of digits: nearly alike, never equal. Needs `cross >= 460`.
     pub ui_rows: bool,
+    /// A translucent sticky header over the top `frosted` rows of the content viewport: opaque
+    /// (the page itself) at position 0, frosted over the scrolled content in every later frame,
+    /// so its rows differ between any two frames (a real marketing site).
+    pub frosted: u32,
+    /// Cells of this many lines repeat along the page (a row of numbered cells, c001, c002, ...):
+    /// every line equals the one a cell away except a short label whose pixels carry the cell
+    /// number.
+    pub cells: Option<u32>,
+    /// `(rows, width)`: a floating button (scroll to top) in the bottom right corner of the
+    /// viewport, the same in every frame.
+    pub float_button: Option<(u32, u32)>,
 }
 
 impl SyntheticPage {
@@ -80,7 +91,25 @@ impl SyntheticPage {
             corner_notch: None,
             period: None,
             ui_rows: false,
+            frosted: 0,
+            cells: None,
+            float_button: None,
         }
+    }
+
+    pub fn with_cells(mut self, period: u32) -> Self {
+        self.cells = Some(period);
+        self
+    }
+
+    pub fn with_frosted_header(mut self, rows: u32) -> Self {
+        self.frosted = rows;
+        self
+    }
+
+    pub fn with_floating_button(mut self, rows: u32, width: u32) -> Self {
+        self.float_button = Some((rows, width));
+        self
     }
 
     pub fn with_ui_rows(mut self) -> Self {
@@ -155,6 +184,19 @@ impl SyntheticPage {
                 Kind::Header => [200, 30, (x & 255) as u8, 255],
                 Kind::Footer => [30, 200, (x & 255) as u8, 255],
                 Kind::Content if self.ui_rows => self.ui_pixel(index, x),
+                Kind::Content if self.cells.is_some() => {
+                    let p = self.cells.unwrap_or(1).max(1);
+                    let (cell, local) = (index / p, index % p);
+                    let label = (40..64).contains(&local) && (100..124).contains(&x);
+                    let v = if label { cell } else { 0 };
+                    [
+                        (local.wrapping_mul(31).wrapping_add(x.wrapping_mul(17)) & 255) as u8,
+                        ((local >> 3) ^ x) as u8,
+                        (local.wrapping_mul(7) ^ x.wrapping_mul(3)).wrapping_add(v.wrapping_mul(61))
+                            as u8,
+                        255,
+                    ]
+                }
                 Kind::Content => {
                     // The row index in the first four pixels; a mix of both after that, so every
                     // row differs and no two rows share a prefix of change.
@@ -294,6 +336,27 @@ impl SyntheticPage {
                     for k in 0..(w as usize).min(n) {
                         line[k] = [128, 128, 128, 255];
                         line[n - 1 - k] = [128, 128, 128, 255];
+                    }
+                }
+            }
+            if self.frosted > 0 && pos > 0 && i < self.frosted {
+                for (x, p) in line.iter_mut().enumerate() {
+                    let m = (pos.wrapping_mul(13) as usize + x * 5 + i as usize * 3) as u8;
+                    *p = [
+                        (p[0] / 2).wrapping_add(100 + m / 8),
+                        p[1] / 2 + 100,
+                        230 - m / 9,
+                        255,
+                    ];
+                }
+            }
+            if let Some((rows, w)) = self.float_button {
+                if i + rows + 20 >= view && i + 20 < view {
+                    let n = line.len();
+                    for p in
+                        line[n.saturating_sub((w + 20) as usize)..n.saturating_sub(20)].iter_mut()
+                    {
+                        *p = [10, 60, 200, 255];
                     }
                 }
             }
