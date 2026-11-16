@@ -348,6 +348,20 @@ pub fn run_auto_ex(
             next = settled!('run, settle_frame(src, sleeper, cfg.settle));
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
         }
+        // The end of the content is believed after a second scroll: a wheel event can be lost
+        // (the window lost the pointer for a moment, a page was busy), and one step that moved
+        // nothing ended a page of more than 16,000 px after 12 frames (Windows, Edge,
+        // paulgraham.com, Nov 16, 2026). The page's real end moves nothing again.
+        if outcome == PushOutcome::NoChange && stitcher.frames() > 1 && !stop() {
+            scroller.scroll(cfg.direction, step)?;
+            sleeper.sleep(LATE_SCROLL_WAIT);
+            next = settled!('run, settle_frame(src, sleeper, cfg.settle));
+            outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
+            super::debug::trace(
+                &next.frame,
+                &format!("the end looked at after one more step of {step} -> {outcome:?}"),
+            );
+        }
         if outcome == PushOutcome::NoChange && stitcher.frames() == 1 {
             // The first scroll moved nothing. A fresh window can ignore the wheel for a moment
             // (the first retry waits and scrolls at the same point), and a wheel that went to

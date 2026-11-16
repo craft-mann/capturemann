@@ -38,7 +38,10 @@ fn main() {
     let row = |f: &Frame, y: usize| f.rgba()[y * w * 4..(y + 1) * w * 4][cols.clone()].to_vec();
     let rows_a: Vec<_> = (0..h).map(|y| row(&a, y)).collect();
     let rows_b: Vec<_> = (0..h).map(|y| row(&b, y)).collect();
-    let tol: u8 = std::env::var("LS_TOL").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let tol: u8 = std::env::var("LS_TOL")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
     let same = |x: &[u8], y: &[u8]| x.iter().zip(y).all(|(p, q)| p.abs_diff(*q) <= tol);
     let flat = |r: &[u8]| r.chunks(4).all(|p| p == &r[..4]);
     let cw = h - header - footer;
@@ -60,7 +63,11 @@ fn main() {
                 }
             }
         }
-        res.push((s, bad * 1000 / overlap.max(1), ink_ok * 1000 / (ink_ok + ink_bad).max(1)));
+        res.push((
+            s,
+            bad * 1000 / overlap.max(1),
+            ink_ok * 1000 / (ink_ok + ink_bad).max(1),
+        ));
     }
     res.sort_by_key(|r| r.1);
     println!("best shifts (shift, differing rows per mille of the overlap, inked rows that match per mille):");

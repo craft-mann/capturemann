@@ -2855,6 +2855,148 @@ fn lsreal_a_short_match_is_believed_only_at_the_shift_the_step_names() {
     for wrong in [60, 380] {
         let mut s = Stitcher::new(Direction::Vertical, Limits::default());
         s.push(&first, None);
-        assert_eq!(s.push(&next, Some(wrong)), PushOutcome::NoOverlap, "{wrong}");
+        assert_eq!(
+            s.push(&next, Some(wrong)),
+            PushOutcome::NoOverlap,
+            "{wrong}"
+        );
     }
+}
+
+/// A page of short paragraphs in a narrow column with wide blank gaps (paulgraham.com, Windows
+/// Edge, Nov 16, 2026): two frames 300 px apart differ in a few stretches of rows and in the
+/// columns of the text only, which is also what a hover card or a status bar looks like at one
+/// scroll position. The pair was called "the same frame", the run ended `reached_end` after 12
+/// frames of a page of more than 16,000 px, and nothing said that the end was not the end. A
+/// pair whose rows mostly differ because the inked rows moved is a scroll, not a region.
+#[test]
+fn lsreal_a_sparse_text_page_that_scrolled_is_not_the_same_frame() {
+    let (w, h) = (600usize, 300usize);
+    let row = |y: usize| -> Vec<u8> {
+        let mut line = vec![255u8; w * 4];
+        if y % 200 < 60 {
+            for x in 100..340 {
+                let v = ((y * 31 + x * 17) ^ (x >> 1)) % 251;
+                let i = x * 4;
+                line[i..i + 4].copy_from_slice(&[v as u8, (v / 2) as u8, 20, 255]);
+            }
+        }
+        line
+    };
+    // A floating button in the bottom right corner whose pixels follow the position (a shadow
+    // over what scrolls under it): it keeps the exact look from matching.
+    let frame_at = |pos: usize| {
+        let mut data: Vec<u8> = (0..h).flat_map(|i| row(pos + i)).collect();
+        for y in 262..h {
+            for x in 540..590 {
+                let i = (y * w + x) * 4;
+                let v = ((pos * 7 + y * 3 + x) % 200) as u8;
+                data[i..i + 4].copy_from_slice(&[v, v, 200, 255]);
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&frame_at(0), None);
+    let got = s.push(&frame_at(200), Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
+    // The same position with a status bar drawn over the bottom rows is still the same frame.
+    let mut bar = frame_at(0).rgba().to_vec();
+    for y in 280..300 {
+        for x in 0..200 {
+            let i = (y * w + x) * 4;
+            bar[i..i + 4].copy_from_slice(&[10, 10, 10, 255]);
+        }
+    }
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&frame_at(0), None);
+    let bar = Frame::new(w as u32, h as u32, bar).unwrap();
+    assert_eq!(s.push(&bar, Some(200)), PushOutcome::NoChange);
+}
+
+/// A wheel event that is lost in the middle of a page (a step that moved nothing) is not the end
+/// of the content: the end is believed after one more step. (Windows, Edge, paulgraham.com,
+/// Nov 16, 2026: `reached_end` after 12 frames of a page of more than 16,000 px.)
+#[test]
+fn lsreal_one_lost_wheel_step_is_not_the_end_of_the_page() {
+    struct Lossy {
+        view: fake::PageView,
+        calls: u32,
+        lose: u32,
+    }
+    impl Scroller for Lossy {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.calls += 1;
+            if self.calls == self.lose {
+                return Ok(());
+            }
+            self.view.scroll(d, amount_px)
+        }
+    }
+    for lose in [3, 5, 8] {
+        let page = SyntheticPage::new(40, 12 * 300, 300);
+        let view = page.clone().view();
+        let mut src = view.clone();
+        let mut sc = Lossy {
+            view,
+            calls: 0,
+            lose,
+        };
+        let r = auto_with(&mut src, &mut sc);
+        assert_eq!(r.end, EndReason::ReachedEnd, "lose {lose}");
+        assert_eq!(r.image.frame, page.expected(), "lose {lose}");
+    }
+}
+
+/// As above, with the text lines of the card that was still drawing separated by blank lines that
+/// match (a card's text lines are not one block): the blank lines between do not end the
+/// stretch of lines that differ.
+#[test]
+fn lsreal_lines_that_differ_with_blank_lines_between_them_are_one_stretch() {
+    let page = SyntheticPage::new(300, 3000, 400)
+        .with_bands(30, 0)
+        .with_frosted_header(60);
+    let flat = [250u8, 250, 252, 255];
+    let first = {
+        let f = page.frame_at(0);
+        let (w, h) = (f.width() as usize, f.height() as usize);
+        let mut data = f.rgba().to_vec();
+        for y in 320..h {
+            for x in 0..w {
+                let i = (y * w + x) * 4;
+                data[i..i + 4].copy_from_slice(&flat);
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let next = {
+        let f = page.frame_at(200);
+        let (w, h) = (f.width() as usize, f.height() as usize);
+        let mut data = f.rgba().to_vec();
+        // Where the first frame has nothing yet, the card's text lines: three lines of text,
+        // three blank ones (the same as the first frame's), and so on.
+        for y in 120..h {
+            if (y / 3) % 2 == 0 {
+                for x in 0..w {
+                    let i = (y * w + x) * 4;
+                    data[i..i + 4].copy_from_slice(&flat);
+                }
+            }
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&first, None);
+    let got = s.push(&next, Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
 }

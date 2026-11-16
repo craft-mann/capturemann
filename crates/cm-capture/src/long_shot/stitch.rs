@@ -440,19 +440,21 @@ fn find_join_opt(
                     if same_but_for_a_region(a, b) {
                         return Err(NoJoin::Same);
                     }
-                    let robust_result = match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK, false)
-                    {
-                        // A shift the step names, on fewer lines (see `ROBUST_HINTED_MIN_INK`).
-                        Err(NoJoin::NoOverlap(why)) => match hint {
-                            Some(_) => find_join_robust(a, b, hint, bands, ROBUST_HINTED_MIN_INK, true)
-                                .map_err(|e| match e {
-                                    NoJoin::NoOverlap(_) => NoJoin::NoOverlap(why),
-                                    other => other,
-                                }),
-                            None => Err(NoJoin::NoOverlap(why)),
-                        },
-                        other => other,
-                    };
+                    let robust_result =
+                        match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK, false) {
+                            // A shift the step names, on fewer lines (see `ROBUST_HINTED_MIN_INK`).
+                            Err(NoJoin::NoOverlap(why)) => match hint {
+                                Some(_) => {
+                                    find_join_robust(a, b, hint, bands, ROBUST_HINTED_MIN_INK, true)
+                                        .map_err(|e| match e {
+                                            NoJoin::NoOverlap(_) => NoJoin::NoOverlap(why),
+                                            other => other,
+                                        })
+                                }
+                                None => Err(NoJoin::NoOverlap(why)),
+                            },
+                            other => other,
+                        };
                     match robust_result {
                         Err(NoJoin::NoOverlap(robust)) => {
                             // A column that scrolls by another amount than the text (a table
@@ -590,7 +592,12 @@ fn find_join_robust(
                 if inked {
                     lead = false;
                 }
-                prev_bad = false;
+                // When the step names the shift, a blank line that matches between differing
+                // ones does not end the stretch (a card still drawing: its text lines differ,
+                // the gaps between them are blank in both).
+                if inked || !near_hint {
+                    prev_bad = false;
+                }
                 if inked {
                     ink_ok += 1;
                 }
@@ -756,6 +763,9 @@ const REGION_COLUMN_SHARE: f64 = 0.01;
 const REGION_LEFT_SHARE: f64 = 0.06;
 /// Most of the lines that may differ for [`same_but_for_a_region`].
 const REGION_MAX_LINES: f64 = 0.6;
+/// Share of the lines that carry ink in either frame that must be equal, unshifted, for two frames
+/// to be one position drawn differently in a region (see [`same_but_for_a_region`]).
+const REGION_MIN_INKED_EQUAL: f64 = 0.5;
 
 /// Two frames of the same scroll position that differ only in a region: a link preview or a
 /// status bar that the pointer opened (Firefox shows the address of the link under the pointer
@@ -788,6 +798,24 @@ fn same_but_for_a_region(a: &Lines, b: &Lines) -> bool {
         }
     }
     if rows_differing as f64 > REGION_MAX_LINES * a.count as f64 {
+        return false;
+    }
+    // A scroll moves the inked rows: few of them are the same unshifted. A card or a status bar
+    // leaves the page as it was, so most of its inked rows are equal. (A narrow column of text
+    // with wide blank gaps differs in few stretches and few columns too, and was called the same
+    // frame after a scroll: paulgraham.com, Windows Edge, Nov 16, 2026, `reached_end` after 12
+    // frames of a page of more than 16,000 px.)
+    let (mut inked, mut inked_equal) = (0usize, 0usize);
+    for i in 0..a.count {
+        if flat(a.line(i)) && flat(b.line(i)) {
+            continue;
+        }
+        inked += 1;
+        if a.near(i, b, i) {
+            inked_equal += 1;
+        }
+    }
+    if (inked_equal as f64) < REGION_MIN_INKED_EQUAL * inked as f64 {
         return false;
     }
     let limit = ((a.count as f64 * REGION_COLUMN_SHARE) as usize).max(3);
@@ -2079,4 +2107,42 @@ fn box_rows<'a>(
 /// `box_rows` over one contiguous RGBA buffer.
 fn box_scale(rgba: &[u8], w: usize, h: usize, scale: f64, max_h: usize) -> Option<Frame> {
     box_rows(&|i| &rgba[i * w * 4..(i + 1) * w * 4], h, w, scale, max_h)
+}
+
+#[cfg(test)]
+mod region_tests {
+    use super::*;
+
+    /// Short paragraphs in a narrow column with wide blank gaps, the page at `pos`.
+    fn sparse(pos: usize, status_bar: bool) -> Frame {
+        let (w, h) = (600usize, 300usize);
+        let mut data = Vec::with_capacity(w * h * 4);
+        for i in 0..h {
+            let y = pos + i;
+            let mut line = vec![255u8; w * 4];
+            if y % 200 < 60 {
+                for x in 100..340 {
+                    let v = ((y * 31 + x * 17) ^ (x >> 1)) % 251;
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[v as u8, (v / 2) as u8, 20, 255]);
+                }
+            }
+            if status_bar && i >= 280 {
+                for x in 0..200 {
+                    line[x * 4..x * 4 + 4].copy_from_slice(&[10, 10, 10, 255]);
+                }
+            }
+            data.extend_from_slice(&line);
+        }
+        Frame::new(w as u32, h as u32, data).unwrap()
+    }
+
+    /// Windows Edge, paulgraham.com (Nov 16, 2026): a scroll of 200 px on a sparse text page
+    /// differs in two stretches of rows and in the columns of the text only, like a card; it is
+    /// not "the same frame". A status bar over the same position still is.
+    #[test]
+    fn lsreal_a_scroll_of_a_sparse_page_is_not_one_position_with_a_region() {
+        let at = |pos, bar| Lines::from_frame(&sparse(pos, bar), Direction::Vertical);
+        assert!(!same_but_for_a_region(&at(0, false), &at(200, false)));
+        assert!(same_but_for_a_region(&at(0, false), &at(0, true)));
+    }
 }
