@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::preview_label::PreviewFeature;
 
 pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
     match cmd {
@@ -21,7 +22,11 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                     recording::toggle_audio_hotkey(app, cx)
                 }
                 Some(ShortcutAction::AddMarker) => recording::add_marker_hotkey(app, cx),
-                Some(ShortcutAction::LongShot) => crate::ui::long_shot::start(app, cx),
+                Some(ShortcutAction::LongShot) => {
+                    if preview_allows(app, PreviewFeature::LongShot, cx) {
+                        crate::ui::long_shot::start(app, cx)
+                    }
+                }
                 None if id == crate::ui::delay_pill::escape_hotkey_id() => {
                     // A running Long Shot first (CAP-6), a Click Guide countdown, then a delay
                     // (CAP-5.AC2).
@@ -49,7 +54,11 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 "capture_display" => start_capture(app, CaptureMode::Display, cx),
                 "open_library" => navigate(app, Route::Library, cx),
                 "open_launcher" => crate::ui::launcher_window::toggle(app, cx),
-                crate::platform::ids::NEW_CLICK_GUIDE => crate::ui::guide_view::hud::start(app, cx),
+                crate::platform::ids::NEW_CLICK_GUIDE => {
+                    if preview_allows(app, PreviewFeature::ClickGuide, cx) {
+                        crate::ui::guide_view::hud::start(app, cx)
+                    }
+                }
                 "settings" => navigate(app, Route::Settings, cx),
                 crate::platform::ids::IMPORT => {
                     crate::ui::import_actions::open(app, Vec::new(), cx)
@@ -74,9 +83,22 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
         Command::Capture(mode) => start_capture(app, mode, cx),
         Command::ShowLibrary => navigate(app, Route::Library, cx),
         Command::ShowSettings => navigate(app, Route::Settings, cx),
-        Command::NewClickGuide => crate::ui::guide_view::hud::start(app, cx),
-        Command::NewClickGuideWindow => crate::ui::guide_view::hud::pick_window(app, cx),
-        Command::LongShot => crate::ui::long_shot::start(app, cx),
+        // Design S24: a switched-off preview starts nothing (a toast says where to turn it on).
+        Command::NewClickGuide => {
+            if preview_allows(app, PreviewFeature::ClickGuide, cx) {
+                crate::ui::guide_view::hud::start(app, cx)
+            }
+        }
+        Command::NewClickGuideWindow => {
+            if preview_allows(app, PreviewFeature::ClickGuide, cx) {
+                crate::ui::guide_view::hud::pick_window(app, cx)
+            }
+        }
+        Command::LongShot => {
+            if preview_allows(app, PreviewFeature::LongShot, cx) {
+                crate::ui::long_shot::start(app, cx)
+            }
+        }
         Command::ImportFiles(paths) => crate::ui::import_actions::open(app, paths, cx),
         Command::OpenCapture(id) => navigate(app, Route::Editor(id), cx),
         Command::ToastAction(a) => toast_action(app, a, cx),

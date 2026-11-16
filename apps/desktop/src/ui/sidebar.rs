@@ -43,6 +43,8 @@ pub struct SidebarProps {
     pub audio_open: bool,
     /// What the second dock row (Long Shot, Click Guide) needs to know (board S14).
     pub dock: DockFacts,
+    /// Which previews are on (S24): a switched-off one has no tile, rail button or label.
+    pub previews: crate::ui::preview_label::PreviewFlags,
 }
 
 impl SidebarProps {
@@ -368,14 +370,15 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .bg(rgba_of(t.surface_2))
         .child(record_row)
         .child(div().flex().gap(px(6.)).children(tiles))
-        // Row 2 (board S14): Long Shot and Click Guide, two to a row.
-        .child(
+        // Row 2 (board S14): Long Shot and Click Guide, two to a row; a switched-off preview has no
+        // tile (S24), and with both off the row is gone.
+        .children((!nav::extra_tiles(p.previews).is_empty()).then(|| {
             div().flex().gap(px(6.)).children(
-                ExtraTile::ALL
+                nav::extra_tiles(p.previews)
                     .into_iter()
                     .map(|tile| extra_tile(t, p, app, tile, false)),
-            ),
-        )
+            )
+        }))
         .into_any_element()
 }
 
@@ -426,6 +429,28 @@ fn keycap_row(t: &Theme, keys: &[String]) -> gpui::Div {
         }))
 }
 
+/// Where the XS Preview tag sits on a dock tile: its top-right corner straddling the border (S24),
+/// px from the tile's right and top edges (negative: outside).
+pub(crate) const TAG_RIGHT: f32 = -4.;
+pub(crate) const TAG_TOP: f32 = -8.;
+
+/// The label of a dock tile: wraps to at most `LABEL_LINES` lines of `LABEL_LINE` px at the width
+/// of the tile, each cut with an ellipsis at the end when it still does not fit, never clipped or
+/// cut at the start. Its height follows the text (one or two lines) and the tile centres it.
+pub(crate) fn tile_label(text: impl Into<SharedString>) -> gpui::Div {
+    div()
+        .w_full()
+        .min_w(px(0.))
+        .max_h(px(
+            nav::tile_metrics::LABEL_LINE * nav::tile_metrics::LABEL_LINES
+        ))
+        .text_center()
+        .line_height(px(nav::tile_metrics::LABEL_LINE))
+        .line_clamp(nav::tile_metrics::LABEL_LINES as usize)
+        .text_ellipsis()
+        .child(text.into())
+}
+
 /// A Long Shot or Click Guide tile: in the dock a 54 px tile with a 16 px icon and a label, in the
 /// rail a 44 px icon button. Ready starts the capture; while it runs the border is `rec` at 70 % with
 /// a 7 px rec dot at the top right and a click brings its HUD to front; disabled is dimmed, not a Tab
@@ -443,7 +468,7 @@ fn extra_tile(
         .map(|a| p.shortcuts.get(a).keycaps(p.platform))
         .unwrap_or_default();
     // Both tiles of the row get the same height: room for the chord when either has one.
-    let row_has_keys = ExtraTile::ALL.into_iter().any(|x| {
+    let row_has_keys = nav::extra_tiles(p.previews).into_iter().any(|x| {
         x.shortcut()
             .is_some_and(|a| !p.shortcuts.get(a).keycaps(p.platform).is_empty())
     });
@@ -520,23 +545,12 @@ fn extra_tile(
     let d = if rail {
         d
     } else {
-        // Two lines at most (Vietnamese "Hướng dẫn / thao tác"); the tooltip has the name. The
-        // box is two 13 px lines high, so the second line is never cut (CG-11).
-        d.child(
-            div()
-                .max_w_full()
-                .h(px(
-                    nav::tile_metrics::LABEL_LINE * nav::tile_metrics::LABEL_LINES
-                ))
-                .flex()
-                .items_center()
-                .justify_center()
-                .overflow_hidden()
-                .text_center()
-                .line_height(px(nav::tile_metrics::LABEL_LINE))
-                .child(tile.label()),
-        )
-        .when(!keys.is_empty(), |d| d.child(keycap_row(t, &keys)))
+        // Two lines at most (Vietnamese "Hướng dẫn / thao tác"), each cut with an ellipsis when it
+        // still does not fit; the tooltip has the name. The box is a block (not a flex row, whose
+        // text item would size to its whole text and be clipped on both sides) as wide as the tile,
+        // so the text wraps at the tile's width (`tile_label`).
+        d.child(tile_label(tile.label()))
+            .when(!keys.is_empty(), |d| d.child(keycap_row(t, &keys)))
     };
     // The Preview tag (design S24): XS, on the tile's top-right corner, straddling its border.
     // The run's red dot moves to the top-left so the two never meet. In the rail the tile is an
@@ -545,16 +559,26 @@ fn extra_tile(
         ExtraTile::LongShot => PreviewFeature::LongShot,
         ExtraTile::ClickGuide => PreviewFeature::ClickGuide,
     };
+    // The tag is drawn in a deferred layer: after every tile and row of the dock, so nothing (the
+    // neighbour tile, the row above, the tile's own border or hover fill) is painted over it. It
+    // fills with the dock's own ground (`surface_2`), so the tile's border does not run through it.
     let d = d.when(!rail, |d| {
-        d.child(div().absolute().right(px(-4.)).top(px(-8.)).child(
-            crate::ui::preview_label::label(
-                t,
-                PreviewSize::Xs,
-                feature,
-                Some(t.surface),
-                Some(app_for_label),
-            ),
-        ))
+        d.child(
+            gpui::deferred(
+                div()
+                    .absolute()
+                    .right(px(TAG_RIGHT))
+                    .top(px(TAG_TOP))
+                    .child(crate::ui::preview_label::label(
+                        t,
+                        PreviewSize::Xs,
+                        feature,
+                        Some(t.surface_2),
+                        Some(app_for_label),
+                    )),
+            )
+            .with_priority(1),
+        )
     });
     d.when(active, |d| {
         d.child(
@@ -577,6 +601,9 @@ fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyEleme
     out.extend(
         nav::library_entries(&p.highlight(), &p.counts)
             .iter()
+            .filter(|e| {
+                e.item != nav::NavItem::Guides || nav::guides_page_visible(p.previews, &p.counts)
+            })
             .map(|e| nav_entry(t, p, app, e)),
     );
     out.push(group_label(t, tr_ctx!("sidebar group", "INTELLIGENCE")));
@@ -599,7 +626,7 @@ fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyEleme
 fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElement> {
     let entries = nav::dock(&p.shortcuts, p.platform);
     let counts = &p.counts;
-    nav::rail_layout()
+    nav::rail_layout(p.previews, counts)
         .into_iter()
         .map(|slot| match slot {
             RailEntry::Brand => div()
@@ -791,4 +818,105 @@ fn settings_body(
 /// A disabled tile's tooltip is its reason only.
 fn disabled_state(state: &TileState) -> bool {
     state.is_disabled()
+}
+
+#[cfg(test)]
+mod tile_label_tests {
+    use super::*;
+    use gpui::{Context, IntoElement, Render, TestAppContext, Window};
+
+    /// A dock tile's content box: the half row of the 248 px sidebar less the tile's border and
+    /// padding (`layout_width_tests::DOCK_ROW2_ROOM`).
+    const ROOM: f32 = (scale::SIDEBAR_W - 24. - 2. - 16. - 6.) / 2. - 2. - 8.;
+
+    /// The label in the column the tile gives it, or (`old`) the first layout: a flex row whose
+    /// text item sizes to its whole text.
+    struct Probe {
+        text: String,
+        old: bool,
+    }
+
+    impl Render for Probe {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let label = if self.old {
+                div()
+                    .max_w_full()
+                    .h(px(26.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .overflow_hidden()
+                    .text_center()
+                    .line_height(px(13.))
+                    .child(
+                        div()
+                            .debug_selector(|| "tile-label-text".to_owned())
+                            .child(SharedString::from(self.text.clone())),
+                    )
+            } else {
+                tile_label(self.text.clone())
+            };
+            div()
+                .w(px(ROOM))
+                .flex()
+                .flex_col()
+                .items_center()
+                .text_size(px(11.))
+                .child(label.debug_selector(|| "tile-label".to_owned()))
+        }
+    }
+
+    fn measure(cx: &mut TestAppContext, text: &str, old: bool) -> (f32, f32) {
+        let window = cx.add_window(|_, _| Probe {
+            text: text.to_owned(),
+            old,
+        });
+        let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+        vcx.run_until_parked();
+        let b = vcx
+            .debug_bounds(if old { "tile-label-text" } else { "tile-label" })
+            .expect("label drawn");
+        (f32::from(b.size.width), f32::from(b.size.height))
+    }
+
+    /// CG-11: the Vietnamese name of Click Guide wraps inside the tile (its box is never wider
+    /// than the tile, so it is neither clipped on both sides nor cut at the start) and takes at
+    /// most two 13 px lines. The first layout (a flex row) made the text item as wide as the whole
+    /// text, which `overflow_hidden` then clipped at both ends.
+    #[gpui::test]
+    fn the_vietnamese_label_wraps_to_two_lines_inside_the_tile(cx: &mut TestAppContext) {
+        let vi = cm_i18n::with_language(cm_i18n::Lang::Vi, || ExtraTile::ClickGuide.label());
+        let (w, h) = measure(cx, &vi, false);
+        assert!(
+            w <= ROOM + 0.5,
+            "{vi:?}: box {w} px wider than the tile ({ROOM})"
+        );
+        assert!(
+            h > nav::tile_metrics::LABEL_LINE + 0.5
+                && h <= 2. * nav::tile_metrics::LABEL_LINE + 0.5,
+            "{vi:?}: {h} px high, wanted two lines"
+        );
+    }
+
+    /// S24 board: the XS tag sits at right -4 px, top -8 px of the tile (straddling its top-right
+    /// corner, never over the icon or the label), filled with the dock's own ground.
+    #[test]
+    fn the_xs_tag_sits_on_the_tile_corner_as_on_the_board() {
+        assert_eq!((TAG_RIGHT, TAG_TOP), (-4., -8.));
+        let m = crate::ui::preview_label::metrics(PreviewSize::Xs);
+        // Its 14 px height reaches 6 px into the tile: above the icon row (8 px of padding).
+        assert!(m.height + TAG_TOP <= 8.);
+    }
+
+    /// The same measurement on the first layout: its text item is as wide as the whole text, wider
+    /// than the tile, so the clipping box cut it on both sides.
+    #[gpui::test]
+    fn the_first_layout_overflowed_the_tile(cx: &mut TestAppContext) {
+        let vi = cm_i18n::with_language(cm_i18n::Lang::Vi, || ExtraTile::ClickGuide.label());
+        let (w, _) = measure(cx, &vi, true);
+        assert!(
+            w > ROOM + 0.5,
+            "{vi:?}: the old box was {w} px, tile {ROOM}"
+        );
+    }
 }

@@ -480,6 +480,27 @@ impl NativeTray {
         }
     }
 
+    /// Design S24: a switched-off preview has no tray item (only Click Guide has one). The item
+    /// goes back right after "Open launcher" when the preview is switched on again.
+    pub fn set_previews(&self, flags: crate::ui::preview_label::PreviewFlags) {
+        let Some((_, item)) = self.plain.iter().find(|(i, _)| *i == ids::NEW_CLICK_GUIDE) else {
+            return;
+        };
+        let id = tray_icon::menu::MenuId::new(ids::NEW_CLICK_GUIDE);
+        let present = self.menu.items().iter().any(|k| k.id() == &id);
+        if flags.click_guide && !present {
+            let at = self
+                .menu
+                .items()
+                .iter()
+                .position(|k| k.id() == &tray_icon::menu::MenuId::new(ids::OPEN_LAUNCHER))
+                .map_or(self.menu.items().len(), |p| p + 1);
+            let _ = self.menu.insert(item, at);
+        } else if !flags.click_guide && present {
+            let _ = self.menu.remove(item);
+        }
+    }
+
     /// Shows which capture delay is selected (CAP-5); the menu toggles a check by itself on a
     /// click, so this also puts the mark back where the model says it is.
     pub fn set_delay(&self, secs: u32) {

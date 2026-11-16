@@ -3852,6 +3852,9 @@ msgstr ""
 msgid "Open Permissions…"
 msgstr ""
 
+msgid "Open Previews"
+msgstr ""
+
 msgid "Open Settings"
 msgstr ""
 
@@ -7717,6 +7720,9 @@ msgid "{name} is in preview"
 msgstr ""
 
 msgid "{name} is saved as a PNG ({reason}). Camera and location data are not copied."
+msgstr ""
+
+msgid "{name} is turned off in Settings › Previews"
 msgstr ""
 
 msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your {secret_store}, never to a file, and are only sent to {service}."

@@ -86,6 +86,14 @@ impl BarMode {
         BarMode::ClickGuide,
     ];
 
+    /// The modes the bar lists: Click Guide only while its preview is on (design S24).
+    pub fn listed(click_guide: bool) -> Vec<BarMode> {
+        BarMode::ALL
+            .into_iter()
+            .filter(|m| click_guide || *m != BarMode::ClickGuide)
+            .collect()
+    }
+
     fn switch_name(self) -> Option<&'static str> {
         match self {
             BarMode::Region => Some("region"),
@@ -148,6 +156,8 @@ pub struct BarState {
     pub auto: AutoSupport,
     /// The Accessibility card is open.
     pub card: bool,
+    /// The Click Guide preview is on: off removes its button from the bar (design S24).
+    pub click_guide: bool,
 }
 
 impl BarState {
@@ -162,6 +172,7 @@ impl BarState {
             dir: Dir::Vertical,
             auto,
             card: false,
+            click_guide: true,
         }
     }
 
@@ -365,7 +376,7 @@ pub fn layout(state: &BarState, w: i32, h: i32, scale: f64, measure: Measure<'_>
             icon_only,
         });
     };
-    for m in BarMode::ALL.iter() {
+    for m in BarMode::listed(state.click_guide).iter() {
         push(
             Item::Mode(*m),
             m.label(),
@@ -789,6 +800,24 @@ mod tests {
         assert_eq!(s.scroll, Scroll::Auto);
         assert_eq!(Dir::Horizontal.name(), "horizontal");
         assert_eq!(Scroll::Hand.name(), "hand");
+    }
+
+    #[test]
+    fn the_click_guide_button_leaves_the_bar_with_its_preview() {
+        let mut s = BarState::new(AutoSupport::Available);
+        let has = |l: &BarLayout| {
+            l.entries
+                .iter()
+                .any(|e| e.item == Item::Mode(BarMode::ClickGuide))
+        };
+        assert!(has(&lay(&s)));
+        s.click_guide = false;
+        let l = lay(&s);
+        assert!(!has(&l));
+        assert!(l
+            .entries
+            .iter()
+            .any(|e| e.item == Item::Mode(BarMode::LongShot)));
     }
 
     #[test]

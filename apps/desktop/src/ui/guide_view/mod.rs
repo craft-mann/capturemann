@@ -883,7 +883,7 @@ impl Render for GuideView {
             tr!("Click Guide"),
             crumb,
             SharedString::from(heading),
-            Some(tag),
+            self.app.read(cx).previews.click_guide.then_some(tag),
             actions,
         );
 

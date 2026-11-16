@@ -70,6 +70,45 @@ pub fn enabled(settings: &Map<String, Value>, feature: PreviewFeature) -> bool {
         .unwrap_or(true)
 }
 
+/// Which previews are switched on: the one value every entry point of the app reads (sidebar
+/// tiles and rail buttons, launcher rows, menus, the tray, the library buttons, the overlay's mode
+/// bar and the Preview labels). It is read from the settings snapshot once at start and again
+/// whenever a `previews.*` key is saved (`app::sync_previews`), never polled. Turning a feature off
+/// hides its entry points; what was made with it stays in the library (design S24).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PreviewFlags {
+    pub long_shot: bool,
+    pub click_guide: bool,
+}
+
+impl Default for PreviewFlags {
+    fn default() -> Self {
+        Self::ALL_ON
+    }
+}
+
+impl PreviewFlags {
+    pub const ALL_ON: PreviewFlags = PreviewFlags {
+        long_shot: true,
+        click_guide: true,
+    };
+
+    /// The switches in the full settings map (a missing key is on).
+    pub fn from_settings(settings: &Map<String, Value>) -> Self {
+        PreviewFlags {
+            long_shot: enabled(settings, PreviewFeature::LongShot),
+            click_guide: enabled(settings, PreviewFeature::ClickGuide),
+        }
+    }
+
+    pub fn is_on(self, feature: PreviewFeature) -> bool {
+        match feature {
+            PreviewFeature::LongShot => self.long_shot,
+            PreviewFeature::ClickGuide => self.click_guide,
+        }
+    }
+}
+
 /// The three sizes of the label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Size {
@@ -341,7 +380,7 @@ pub fn show_intro_if_due(app: &Entity<AppModel>, feature: PreviewFeature, cx: &m
 }
 
 /// "Turn off in Settings › Previews": the General page of Settings.
-fn open_previews_settings(app: &Entity<AppModel>, cx: &mut App) {
+pub fn open_previews_settings(app: &Entity<AppModel>, cx: &mut App) {
     close_card(app, cx);
     app.update(cx, |m, _| {
         m.settings_page_request = Some(SettingsSection::General);
@@ -545,6 +584,25 @@ mod tests {
         s.insert("previews.long_shot".into(), Value::Bool(false));
         assert!(!enabled(&s, PreviewFeature::LongShot));
         assert!(enabled(&s, PreviewFeature::ClickGuide));
+    }
+
+    #[test]
+    fn the_flags_follow_the_settings_and_restore_when_turned_back_on() {
+        let mut s = Map::new();
+        assert_eq!(PreviewFlags::from_settings(&s), PreviewFlags::ALL_ON);
+        s.insert("previews.click_guide".into(), Value::Bool(false));
+        let f = PreviewFlags::from_settings(&s);
+        assert!(f.is_on(PreviewFeature::LongShot) && !f.is_on(PreviewFeature::ClickGuide));
+        s.insert("previews.click_guide".into(), Value::Bool(true));
+        assert_eq!(PreviewFlags::from_settings(&s), PreviewFlags::ALL_ON);
+        // Every feature of the registry has a flag (a new preview must be added to the flags).
+        for f in cm_core::features::previews() {
+            assert!(
+                PreviewFeature::ALL.iter().any(|p| p.key() == f.id),
+                "{} has no PreviewFeature",
+                f.id
+            );
+        }
     }
 
     #[test]

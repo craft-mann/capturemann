@@ -42,6 +42,8 @@ pub enum ToastAction {
     OpenPrivacyPane(&'static str),
     /// Settings -> Permissions (PRM-1).
     OpenPermissions,
+    /// Settings > General > Previews (a start that reached a preview switched off).
+    OpenPreviewsSettings,
     /// Play the combined MP4 (the quick export) of a recording in the system player.
     PlayExport(String),
     /// Show the combined MP4 of a recording in Finder / Explorer.
@@ -132,7 +134,8 @@ impl ToastAction {
             ToastAction::DeleteCapture(_) => "trash-2",
             ToastAction::OpenScreenRecordingSettings
             | ToastAction::OpenPrivacyPane(_)
-            | ToastAction::OpenPermissions => "settings",
+            | ToastAction::OpenPermissions
+            | ToastAction::OpenPreviewsSettings => "settings",
             ToastAction::PlayExport(_) => "play",
             ToastAction::RevealExport(_) | ToastAction::RevealPath(_) => "folder-open",
             ToastAction::CopyLink(_) => "link",
@@ -860,6 +863,7 @@ mod tests {
             OpenScreenRecordingSettings,
             OpenPrivacyPane("p"),
             OpenPermissions,
+            OpenPreviewsSettings,
             PlayExport("a".into()),
             RevealExport("a".into()),
             CopyLink("a".into()),

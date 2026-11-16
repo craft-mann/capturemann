@@ -100,34 +100,76 @@ pub fn bind_keys(cx: &mut App) {
         // S15: Esc clears the ticks (and closes an open card menu first).
         KeyBinding::new("escape", ClearSelection, Some("LibraryList")),
     ]);
-    cx.set_menus(app_menus());
+    let flags = cx
+        .try_global::<AppHandle>()
+        .map(|h| h.0.read(cx).previews)
+        .unwrap_or_default();
+    cx.set_menus(app_menus(flags));
 }
 
-/// The menu bar in the current UI language. Rebuilt by `app::apply_language` on a language switch.
-pub fn app_menus() -> Vec<Menu> {
-    vec![Menu::new("CaptureMann").items([
-        MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
+/// The entries of the app menu, in order. A switched-off preview (S24) has no item: the menu is
+/// rebuilt when the switch changes (`app::sync_previews`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppMenuEntry {
+    Library,
+    LongShot,
+    NewClickGuide,
+    ClickGuideOfWindow,
+    Import,
+    Settings,
+    Separator,
+    Quit,
+}
+
+pub fn app_menu_plan(flags: crate::ui::preview_label::PreviewFlags) -> Vec<AppMenuEntry> {
+    let mut v = vec![AppMenuEntry::Library];
+    if flags.long_shot {
+        v.push(AppMenuEntry::LongShot);
+    }
+    if flags.click_guide {
+        v.push(AppMenuEntry::NewClickGuide);
+        v.push(AppMenuEntry::ClickGuideOfWindow);
+    }
+    v.extend([
+        AppMenuEntry::Import,
+        AppMenuEntry::Settings,
+        AppMenuEntry::Separator,
+        AppMenuEntry::Quit,
+    ]);
+    v
+}
+
+/// The menu bar in the current UI language. Rebuilt by `app::apply_language` on a language switch
+/// and by `app::sync_previews` when a Preview switch changes.
+pub fn app_menus(flags: crate::ui::preview_label::PreviewFlags) -> Vec<Menu> {
+    let items = app_menu_plan(flags).into_iter().map(|e| match e {
+        AppMenuEntry::Library => MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
         // Native menus cannot draw the pill: the item text carries " (Preview)" (design S24).
-        MenuItem::action(
+        AppMenuEntry::LongShot => MenuItem::action(
             crate::ui::preview_label::menu_text(&tr_ctx!("menu", "Long Shot")),
             LongShotAction,
         ),
-        MenuItem::action(
+        AppMenuEntry::NewClickGuide => MenuItem::action(
             crate::ui::preview_label::menu_text(&tr_ctx!("menu", "New Click Guide")),
             NewClickGuide,
         ),
-        MenuItem::action(
+        AppMenuEntry::ClickGuideOfWindow => MenuItem::action(
             crate::ui::preview_label::menu_text(&tr_ctx!(
                 "menu",
                 "Click Guide of a window\u{2026}"
             )),
             NewClickGuideWindow,
         ),
-        MenuItem::action(tr_ctx!("menu", "Import file\u{2026}"), ImportMedia),
-        MenuItem::action(tr_ctx!("menu", "Settings\u{2026}"), ShowSettings),
-        MenuItem::separator(),
-        MenuItem::action(tr!("Quit CaptureMann"), QuitApp),
-    ])]
+        AppMenuEntry::Import => {
+            MenuItem::action(tr_ctx!("menu", "Import file\u{2026}"), ImportMedia)
+        }
+        AppMenuEntry::Settings => {
+            MenuItem::action(tr_ctx!("menu", "Settings\u{2026}"), ShowSettings)
+        }
+        AppMenuEntry::Separator => MenuItem::separator(),
+        AppMenuEntry::Quit => MenuItem::action(tr!("Quit CaptureMann"), QuitApp),
+    });
+    vec![Menu::new("CaptureMann").items(items)]
 }
 
 /// Registers the global action handlers that work with no window open (menu bar items).
@@ -329,6 +371,7 @@ impl Render for Studio {
                 section,
                 audio_open,
                 dock,
+                previews: self.app.read(cx).previews,
             },
             &self.app,
             &self.settings,
@@ -555,11 +598,40 @@ mod tests {
     /// it has the same items as before.
     #[test]
     fn the_menu_bar_has_the_app_menu() {
-        let menus = app_menus();
+        let menus = app_menus(Default::default());
         assert_eq!(menus.len(), 1);
         assert_eq!(menus[0].name.as_ref(), "CaptureMann");
         // Library, Long Shot, New Click Guide, Click Guide of a window, Import, Settings, a
         // separator and Quit.
         assert_eq!(menus[0].items.len(), 8);
+    }
+
+    /// S24: a switched-off preview has no menu item (the menu is rebuilt when the switch changes);
+    /// the other keeps its items; both back on restores all of them.
+    #[test]
+    fn a_preview_that_is_off_has_no_app_menu_item() {
+        use crate::ui::preview_label::PreviewFlags;
+        let count = |f: PreviewFlags| app_menus(f)[0].items.len();
+        let plan = |f: PreviewFlags| app_menu_plan(f);
+        let no_long = PreviewFlags {
+            long_shot: false,
+            click_guide: true,
+        };
+        let no_guide = PreviewFlags {
+            long_shot: true,
+            click_guide: false,
+        };
+        let none = PreviewFlags {
+            long_shot: false,
+            click_guide: false,
+        };
+        assert!(!plan(no_long).contains(&AppMenuEntry::LongShot));
+        assert!(plan(no_long).contains(&AppMenuEntry::NewClickGuide));
+        assert!(plan(no_guide).contains(&AppMenuEntry::LongShot));
+        assert!(!plan(no_guide).contains(&AppMenuEntry::NewClickGuide));
+        assert!(!plan(no_guide).contains(&AppMenuEntry::ClickGuideOfWindow));
+        assert_eq!(count(none), 5);
+        assert_eq!(count(no_long), 7);
+        assert_eq!(count(PreviewFlags::ALL_ON), 8);
     }
 }

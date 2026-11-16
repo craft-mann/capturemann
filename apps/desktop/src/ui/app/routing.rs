@@ -36,7 +36,7 @@ pub fn apply_language(app: &Entity<AppModel>, cx: &mut App) {
     // The tray plan (tooltip, Pause / Resume text) is cached: drop it so the next sync rewrites it.
     rec.update(cx, |r, _| r.last_plan = None);
     crate::ui::recording::sync_tray(app, cx);
-    cx.set_menus(crate::ui::studio::app_menus());
+    cx.set_menus(crate::ui::studio::app_menus(app.read(cx).previews));
     // Sticky toasts on screen are worded again (and the toast window resized to the new text).
     if app.update(cx, |m, _| m.toasts.relabel()) {
         sync_toasts(app, cx);

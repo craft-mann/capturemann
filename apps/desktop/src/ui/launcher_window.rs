@@ -189,6 +189,7 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
         capture_available: backend.daemon.is_some(),
         copy_after_capture: copy,
         recording_off: recording_off(app, cx),
+        previews: app.read(cx).previews,
         guide_off: recording_off(app, cx)
             .or_else(crate::ui::guide_view::preflight::disabled_reason),
         fps60_ready: commands::fps60_ready(
@@ -487,7 +488,7 @@ fn execute(id: CommandId, option: LaunchOption, cx: &mut App) {
                 delayed_capture(app, mode, plan, cx);
             }
         }
-        CommandId::LongShot => crate::ui::long_shot::start(&app, cx),
+        CommandId::LongShot => app::handle_command(&app, app::Command::LongShot, cx),
         CommandId::OpenLibrary => app::navigate(&app, Route::Library, cx),
         CommandId::OpenSettings => app::navigate(&app, Route::Settings, cx),
         CommandId::OpenPermissions => app::open_permissions_page(&app, cx),
@@ -544,7 +545,7 @@ fn execute(id: CommandId, option: LaunchOption, cx: &mut App) {
                 cx.background_executor()
                     .timer(Duration::from_millis(CAPTURE_DELAY_MS))
                     .await;
-                cx.update(|cx| crate::ui::guide_view::hud::start(&app, cx));
+                cx.update(|cx| app::handle_command(&app, app::Command::NewClickGuide, cx));
             })
             .detach();
         }

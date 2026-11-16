@@ -12043,3 +12043,11 @@ msgstr "{title}, bản xem trước"
 msgctxt "preview label"
 msgid "Preview"
 msgstr "Xem trước"
+
+#, fuzzy
+msgid "Open Previews"
+msgstr "Mở Xem trước"
+
+#, fuzzy
+msgid "{name} is turned off in Settings › Previews"
+msgstr "{name} đang tắt trong Cài đặt › Xem trước"

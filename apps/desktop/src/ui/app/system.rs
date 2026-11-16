@@ -242,6 +242,9 @@ pub fn set_setting(
                 if key == KEY_LANGUAGE {
                     apply_language(&app2, cx);
                 }
+                if key.starts_with(cm_core::features::SETTING_PREFIX) {
+                    sync_previews(&app2, cx);
+                }
             }
             Ok(Err(e)) => push_toast(
                 &app2,
@@ -298,6 +301,68 @@ pub fn sync_from_settings(app: &Entity<AppModel>, cx: &mut App) {
     if language_changed {
         apply_language(app, cx);
     }
+    sync_previews(app, cx);
+}
+
+/// Design S24: the Preview switches (`previews.*`) changed. Re-reads them from the shared store
+/// and, when one changed, takes every entry point along without a restart: the app menu and the
+/// tray are rebuilt, an open Preview card of a feature that went off is closed and every window
+/// is drawn again (sidebar tiles, library buttons, labels). Idempotent; driven by the settings
+/// event and by the app's own write, never polled.
+pub fn sync_previews(app: &Entity<AppModel>, cx: &mut App) {
+    let flags = crate::ui::preview_label::PreviewFlags::from_settings(
+        &app.read(cx).backend.settings.snapshot(),
+    );
+    if app.read(cx).previews == flags {
+        return;
+    }
+    app.update(cx, |m, cx| {
+        m.previews = flags;
+        if let Some(card) = m.preview_card {
+            let f = match card {
+                crate::ui::preview_label::PreviewCard::Popover(f)
+                | crate::ui::preview_label::PreviewCard::Intro(f) => f,
+            };
+            if !flags.is_on(f) {
+                m.preview_card = None;
+            }
+        }
+        cx.notify();
+    });
+    if let Some(tray) = &app.read(cx).tray {
+        tray.set_previews(flags);
+    }
+    cx.set_menus(crate::ui::studio::app_menus(flags));
+    cx.refresh_windows();
+}
+
+/// The "turned off" answer for a start that reached a switched-off preview (a hotkey, a menu item,
+/// a stale launcher row): a toast that names the feature and opens Settings > Previews. Returns
+/// `true` when the feature is on and the start may go on.
+pub fn preview_allows(
+    app: &Entity<AppModel>,
+    feature: crate::ui::preview_label::PreviewFeature,
+    cx: &mut App,
+) -> bool {
+    if app.read(cx).previews.is_on(feature) {
+        return true;
+    }
+    push_toast(app, preview_off_toast(feature), cx);
+    false
+}
+
+/// "Long Shot is turned off in Settings > Previews", with a button to the switch.
+pub fn preview_off_toast(feature: crate::ui::preview_label::PreviewFeature) -> ToastSpec {
+    ToastSpec::live(move || {
+        ToastSpec::new(
+            ToastKind::Info,
+            tr!(
+                "{name} is turned off in Settings \u{203a} Previews",
+                name = feature.name()
+            ),
+        )
+        .button(tr!("Open Previews"), ToastAction::OpenPreviewsSettings)
+    })
 }
 
 #[cfg(test)]

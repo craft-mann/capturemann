@@ -8,6 +8,7 @@ use cm_i18n::{tr, tr_ctx};
 use crate::library::Filter;
 use crate::shortcuts::{Platform, ShortcutAction, ShortcutMap};
 use crate::ui::app::Route;
+use crate::ui::preview_label::{PreviewFeature, PreviewFlags};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NavItem {
@@ -289,14 +290,12 @@ pub enum RailEntry {
 
 /// The rail from the top: brand mark, Record, Region, a divider, the seven destinations, then
 /// Settings at the bottom.
-pub fn rail_layout() -> Vec<RailEntry> {
-    vec![
+pub fn rail_layout(previews: PreviewFlags, counts: &NavCounts) -> Vec<RailEntry> {
+    let mut v = vec![
         RailEntry::Brand,
         RailEntry::Record,
         RailEntry::Region,
         RailEntry::RecordAudio,
-        RailEntry::Extra(ExtraTile::LongShot),
-        RailEntry::Extra(ExtraTile::ClickGuide),
         RailEntry::Divider,
         RailEntry::Nav(NavItem::AllCaptures),
         RailEntry::Nav(NavItem::Recordings),
@@ -307,7 +306,32 @@ pub fn rail_layout() -> Vec<RailEntry> {
         RailEntry::Nav(NavItem::Agents),
         RailEntry::Spacer,
         RailEntry::Nav(NavItem::Settings),
-    ]
+    ];
+    // A switched-off preview has no rail button (design S24); the rest keep their order.
+    let at = v
+        .iter()
+        .position(|e| *e == RailEntry::Divider)
+        .unwrap_or(v.len());
+    for (i, tile) in extra_tiles(previews).into_iter().enumerate() {
+        v.insert(at + i, RailEntry::Extra(tile));
+    }
+    v.retain(|e| *e != RailEntry::Nav(NavItem::Guides) || guides_page_visible(previews, counts));
+    v
+}
+
+/// The second dock row's tiles that are switched on, in order (design S24: turning a preview off
+/// hides its buttons; turning it on restores them).
+pub fn extra_tiles(previews: PreviewFlags) -> Vec<ExtraTile> {
+    ExtraTile::ALL
+        .into_iter()
+        .filter(|t| previews.is_on(t.feature()))
+        .collect()
+}
+
+/// Whether the Click Guides library page is listed in the sidebar: always while the preview is on,
+/// and with it off only while guides exist ("anything you made with it stays in your library").
+pub fn guides_page_visible(previews: PreviewFlags, counts: &NavCounts) -> bool {
+    previews.click_guide || counts.guides.unwrap_or(0) > 0
 }
 
 // ---------------------------------------------------------------------------------------
@@ -435,6 +459,14 @@ impl ExtraTile {
         match self {
             ExtraTile::LongShot => tr_ctx!("capture dock", "Long Shot"),
             ExtraTile::ClickGuide => tr_ctx!("capture dock", "Click Guide"),
+        }
+    }
+
+    /// The preview feature the tile starts.
+    pub fn feature(self) -> PreviewFeature {
+        match self {
+            ExtraTile::LongShot => PreviewFeature::LongShot,
+            ExtraTile::ClickGuide => PreviewFeature::ClickGuide,
         }
     }
 
@@ -1005,7 +1037,7 @@ mod tests {
 
     #[test]
     fn rail_items_and_their_order() {
-        let rail = rail_layout();
+        let rail = rail_layout(PreviewFlags::ALL_ON, &NavCounts::default());
         assert_eq!(rail.first(), Some(&RailEntry::Brand));
         assert_eq!(rail.last(), Some(&RailEntry::Nav(NavItem::Settings)));
         let nav: Vec<_> = rail
@@ -1041,13 +1073,70 @@ mod tests {
 
     #[test]
     fn rail_has_the_two_extra_tiles_above_the_divider() {
-        let rail = rail_layout();
+        let rail = rail_layout(PreviewFlags::ALL_ON, &NavCounts::default());
         let pos = |e: RailEntry| rail.iter().position(|x| *x == e).unwrap();
         let (l, g) = (
             pos(RailEntry::Extra(ExtraTile::LongShot)),
             pos(RailEntry::Extra(ExtraTile::ClickGuide)),
         );
         assert!(pos(RailEntry::RecordAudio) < l && l < g && g < pos(RailEntry::Divider));
+    }
+
+    fn flags(long_shot: bool, click_guide: bool) -> PreviewFlags {
+        PreviewFlags {
+            long_shot,
+            click_guide,
+        }
+    }
+
+    /// S24: every entry of the dock row and the rail follows the Preview switches; both on is the
+    /// full layout again.
+    #[test]
+    fn a_preview_that_is_off_has_no_dock_tile_and_no_rail_button() {
+        assert_eq!(
+            extra_tiles(flags(true, true)),
+            [ExtraTile::LongShot, ExtraTile::ClickGuide]
+        );
+        assert_eq!(extra_tiles(flags(false, true)), [ExtraTile::ClickGuide]);
+        assert_eq!(extra_tiles(flags(true, false)), [ExtraTile::LongShot]);
+        assert!(extra_tiles(flags(false, false)).is_empty());
+        let counts = NavCounts::default();
+        let extras = |f: PreviewFlags| -> Vec<ExtraTile> {
+            rail_layout(f, &counts)
+                .into_iter()
+                .filter_map(|e| match e {
+                    RailEntry::Extra(t) => Some(t),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(extras(flags(false, true)), [ExtraTile::ClickGuide]);
+        assert!(extras(flags(false, false)).is_empty());
+        assert_eq!(extras(flags(true, true)).len(), 2, "back on: restored");
+        // Everything else stays: only the two buttons and (no guides, preview off) the Guides page go.
+        assert_eq!(
+            rail_layout(flags(false, false), &counts).len() + 3,
+            rail_layout(flags(true, true), &counts).len()
+        );
+    }
+
+    /// S24: what was made stays: the Click Guides page is listed with its preview off only while
+    /// guides exist.
+    #[test]
+    fn the_guides_page_stays_while_guides_exist() {
+        let some = NavCounts {
+            guides: Some(3),
+            ..Default::default()
+        };
+        let none = NavCounts::default();
+        assert!(guides_page_visible(flags(true, true), &none));
+        assert!(guides_page_visible(flags(true, false), &some));
+        assert!(!guides_page_visible(flags(true, false), &none));
+        let has_guides =
+            |f, c: &NavCounts| rail_layout(f, c).contains(&RailEntry::Nav(NavItem::Guides));
+        assert!(has_guides(flags(true, false), &some));
+        assert!(!has_guides(flags(true, false), &none));
+        assert!(has_guides(flags(true, true), &none));
     }
 
     fn facts() -> DockFacts {

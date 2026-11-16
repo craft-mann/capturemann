@@ -393,6 +393,8 @@ fn main() {
             });
         }
         cx.set_global(AppHandle(model.clone()));
+        // S24: the menu bar knows the Preview switches now (bind_keys ran before the model existed).
+        cx.set_menus(studio::app_menus(model.read(cx).previews));
         cx.set_global(studio::ThemeGlobal(cm_desktop::theme::Theme::DARK));
         app::apply_theme(&model, cx);
         // The saved UI language, before the first window or the tray is built.
@@ -511,6 +513,7 @@ fn main() {
             Ok(tray) => model.update(cx, |m, _| {
                 // CAP-5: the remembered delay is the checked tray item from the start.
                 tray.set_delay(m.capture_delay_s);
+                tray.set_previews(m.previews);
                 m.tray = Some(tray);
             }),
             Err(e) => startup_problems
