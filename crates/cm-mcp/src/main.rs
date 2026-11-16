@@ -23,29 +23,6 @@ fn usage() -> ExitCode {
 /// (`thread 'main' has overflowed its stack`, CI, Nov 16, 2026), and polling the future on the
 /// main thread keeps it on that stack.
 fn main() -> ExitCode {
-    let rt = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
-        .build()
-    {
-        Ok(rt) => rt,
-        Err(e) => {
-            eprintln!("cm-mcp: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
-    rt.block_on(async {
-        match tokio::spawn(run()).await {
-            Ok(code) => code,
-            Err(e) => {
-                eprintln!("cm-mcp: {e}");
-                ExitCode::FAILURE
-            }
-        }
-    })
-}
-
-async fn run() -> ExitCode {
     let mut endpoint = Endpoint::from_env_or_default();
     let mut http = false;
     let mut port: u16 = 0;
@@ -64,6 +41,29 @@ async fn run() -> ExitCode {
             _ => return usage(),
         }
     }
+    let rt = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(8 * 1024 * 1024)
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("cm-mcp: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    rt.block_on(async {
+        match tokio::spawn(run(endpoint, http, port)).await {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("cm-mcp: {e}");
+                ExitCode::FAILURE
+            }
+        }
+    })
+}
+
+async fn run(endpoint: Endpoint, http: bool, port: u16) -> ExitCode {
     let connector = cm_mcp::endpoint_connector(endpoint);
     let result = if http {
         run_http(connector, port).await
