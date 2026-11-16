@@ -3064,3 +3064,60 @@ fn lsreal_a_steady_wheel_names_the_shift_of_a_pair_with_little_in_common() {
         }
     }
 }
+
+/// Side panels that stay put (Wikipedia's contents list and appearance panel, Linux Firefox, Nov 16,
+/// 2026: `no_overlap` at 7 to 10 frames, the panels' text at other rows in every shifted overlap).
+/// The run trimmed the scrollbar's edge columns after its first pair, which joined without
+/// the panels being in the way; a later pair has them, with list items and gaps between them (many
+/// stretches of lines that differ), and the trimmed run refused it. The columns of the panels are
+/// left out of the comparison only; the rows are composed from the trimmed frames as before, so
+/// the image keeps its width, and the columns between the panels are the page row for row.
+#[test]
+fn lsreal_panels_that_stay_put_are_left_out_of_the_comparison_of_a_trimmed_run() {
+    let page = SyntheticPage::new(420, 4000, 300).with_scrollbar(14);
+    let framed = |pos: u32| {
+        let f = page.frame_at(pos);
+        let (w, h) = (f.width(), f.height());
+        let mut data = f.rgba().to_vec();
+        for y in 0..h {
+            // List items ten lines tall with ten blank lines between them, the same in every
+            // frame (fixed to the window).
+            for x in (0..90).chain(w - 100..w - 14) {
+                let v = ((y / 20 * 37 + y * 29 + x * 11) % 200) as u8;
+                let i = ((y * w + x) * 4) as usize;
+                let px = if y % 20 < 10 {
+                    [40 + v / 2, 40, 90 + v / 2, 255]
+                } else {
+                    [250, 250, 250, 255]
+                };
+                data[i..i + 4].copy_from_slice(&px);
+            }
+        }
+        Frame::new(w, h, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&framed(1000), None);
+    s.assume_trim(0, 14);
+    let got = s.push(&framed(1200), Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 200 },
+        "{:?}",
+        s.last_refusal()
+    );
+    let got = s.push(&framed(1410), Some(200));
+    assert_eq!(
+        got,
+        PushOutcome::Added { new_len: 210 },
+        "{:?}",
+        s.last_refusal()
+    );
+    let image = s.finish().unwrap().frame;
+    let want = page.expected_range(1000, 1000 + 300 + 200 + 210);
+    assert_eq!(image.height(), want.height());
+    for y in 0..image.height() {
+        for x in 100..(want.width() - 114) {
+            assert_eq!(image.pixel(x, y), want.pixel(x, y), "({x}, {y})");
+        }
+    }
+}

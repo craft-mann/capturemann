@@ -1517,6 +1517,11 @@ pub struct Stitcher {
     /// The distance the wheel has moved the content every time for the last few steps (see
     /// [`Stitcher::trust_hint`]).
     trust_hint: Option<usize>,
+    /// Columns at the two ends of the trimmed frames that are left out of the comparison only,
+    /// the rows of the image still being composed from the trimmed frames (side panels that stay
+    /// put once the page is scrolled further than the first pair was: Wikipedia's contents list
+    /// and appearance panel, Linux Firefox, Nov 16, 2026; see `join_masked_trimmed`).
+    mask_extra: Option<(usize, usize)>,
 }
 
 #[cfg(test)]
@@ -1524,6 +1529,12 @@ impl Stitcher {
     /// Test only: the state a run is in after a first pair that joined on the whole width.
     pub(super) fn assume_whole_width(&mut self) {
         self.trim = Some((0, 0));
+    }
+
+    /// Test only: the state a run is in after a first pair that joined with `l` and `r` columns
+    /// cut at the two ends of every frame.
+    pub(super) fn assume_trim(&mut self, l: usize, r: usize) {
+        self.trim = Some((l, r));
     }
 }
 
@@ -1546,6 +1557,7 @@ impl Stitcher {
             refusal: None,
             last_add: None,
             trust_hint: None,
+            mask_extra: None,
         }
     }
 
@@ -1705,7 +1717,17 @@ impl Stitcher {
         let (prev, lines) = self.apply_trim(prev, lines, hint);
         let mut full = self.full.take();
         let pair = full.as_ref().zip(whole.as_ref());
-        let outcome = self.join(&prev, &lines, size, hint, pair);
+        let outcome = match (self.mask_extra, &full) {
+            (Some((l, r)), None) => self.join_with_mask(&prev, &lines, (l, r), size, hint),
+            _ => self.join(&prev, &lines, size, hint, pair),
+        };
+        if outcome == PushOutcome::NoOverlap && full.is_none() && self.mask_extra.is_none() {
+            if let Some((o, mask)) = self.join_masked_trimmed(&prev, &lines, size, hint) {
+                self.mask_extra = Some(mask);
+                self.prev = Some(lines);
+                return o;
+            }
+        }
         // A join that fails after the first pair: an overlay scrollbar that was not there in the
         // first pair (or that was narrower) draws a thumb over the outermost columns, which then
         // differ in every line it covers, in the content and in the fixed bands alike (QA macOS
@@ -1763,6 +1785,87 @@ impl Stitcher {
         // The newest accepted frame is the one the next frame is matched against.
         self.prev = Some(if added { lines } else { prev });
         outcome
+    }
+
+    /// Whether the last refusal says that several shifts match or the overlap is too little or too
+    /// alike: such a pair is not made joinable by leaving columns out, which only makes it more
+    /// alike (see `join_masked`).
+    fn refusal_is_ambiguous(&self) -> bool {
+        self.refusal.as_deref().is_some_and(|r| {
+            [
+                "shifts match",
+                "shifts explain",
+                "several shifts",
+                "far from the expected",
+                "only look alike",
+            ]
+            .iter()
+            .any(|k| r.contains(k))
+        })
+    }
+
+    /// [`Stitcher::join`] on the trimmed frames with `mask` columns at the two ends left out of the
+    /// comparison; the rows are composed from the trimmed frames.
+    fn join_with_mask(
+        &mut self,
+        prev: &Lines,
+        lines: &Lines,
+        mask: (usize, usize),
+        size: (u32, u32),
+        hint: Option<u32>,
+    ) -> PushOutcome {
+        let cross = lines.line_len / 4;
+        let (l, r) = mask;
+        if prev.line_len != lines.line_len || cross.saturating_sub(l + r) < MIN_COMPARED_COLS {
+            return PushOutcome::NoOverlap;
+        }
+        let (pc, nc) = (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
+        let fs = FullSides {
+            l,
+            r,
+            prev: prev.clone(),
+        };
+        self.join(&pc, &nc, size, hint, Some((&fs, lines)))
+    }
+
+    /// [`Stitcher::push`]'s look at a pair that did not join when the run trims the edge columns
+    /// of its frames (a scroll bar): columns that stay put in this pair (a contents list and a
+    /// panel that the page pinned after the first pair was looked at, the overlay scrollbar's
+    /// edges) are left out of the comparison, and the rows are still composed from the trimmed
+    /// frames, whose width the image so far has. Returns the outcome with the mask when the pair
+    /// joined; the mask is then kept for the pairs after it.
+    fn join_masked_trimmed(
+        &mut self,
+        prev: &Lines,
+        lines: &Lines,
+        size: (u32, u32),
+        hint: Option<u32>,
+    ) -> Option<(PushOutcome, (usize, usize))> {
+        let cross = lines.line_len / 4;
+        let trimmed = matches!(self.trim, Some((l, r)) if (l, r) != (0, 0));
+        if self.dir != Direction::Vertical
+            || !trimmed
+            || self.limit_hit
+            || self.size != Some(size)
+            || prev.line_len != lines.line_len
+            || cross < 4 * (OVERLAY_EDGE_LEFT + 16)
+        {
+            return None;
+        }
+        let mut masks = vec![(OVERLAY_EDGE_LEFT, OVERLAY_EDGE_RIGHT)];
+        if !self.refusal_is_ambiguous() {
+            masks.extend(masked_sides(prev, lines));
+        }
+        for mask in masks {
+            let o = self.join_with_mask(prev, lines, mask, size, hint);
+            if matches!(
+                o,
+                PushOutcome::Added { .. } | PushOutcome::LimitReached { .. }
+            ) {
+                return Some((o, mask));
+            }
+        }
+        None
     }
 
     /// [`Stitcher::push`]'s second look at a pair that did not join: with at least
