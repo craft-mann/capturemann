@@ -258,6 +258,12 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     if is_running(cx) {
         return;
     }
+    // Design S24: the first Long Shot shows the one-time Preview intro in the main window.
+    crate::ui::preview_label::show_intro_if_due(
+        app,
+        crate::ui::preview_label::PreviewFeature::LongShot,
+        cx,
+    );
     let (backend, busy) = {
         let m = app.read(cx);
         (m.backend.clone(), m.capture_busy)

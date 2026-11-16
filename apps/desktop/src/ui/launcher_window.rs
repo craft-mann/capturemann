@@ -741,8 +741,21 @@ impl LauncherView {
                 div()
                     .flex_1()
                     .min_w(px(0.))
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
                     .when(selected && enabled, |d| d.font_weight(FontWeight::MEDIUM))
-                    .child(SharedString::from(c.title.clone())),
+                    .child(crate::ui::components::shrink_text(c.title.clone()))
+                    // Design S24: the S label after the title (never truncated, search ignores it).
+                    .children(c.preview_feature().map(|f| {
+                        crate::ui::preview_label::label(
+                            t,
+                            crate::ui::preview_label::Size::S,
+                            f,
+                            None,
+                            None,
+                        )
+                    })),
             )
             .children(hint.map(|h| {
                 div()

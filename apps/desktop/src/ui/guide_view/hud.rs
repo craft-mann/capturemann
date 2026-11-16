@@ -81,6 +81,8 @@ pub struct GuideHud {
     started: Instant,
     /// The "window closed" toast was shown (once per guide).
     closed_toast: bool,
+    /// A guide started by an agent or the CLI: `Some(client)` shows the passive bar.
+    passive: Option<Option<String>>,
 }
 
 /// What the bar can look like. The window is as wide as the widest of them, so it never moves or
@@ -278,6 +280,11 @@ enum GuideEvent {
         guide_id: String,
         max: u64,
     },
+    /// A guide started (`by` is `user` or `agent:<name>`).
+    Started {
+        guide_id: String,
+        by: String,
+    },
     /// A click was not saved.
     Error {
         reason: String,
@@ -305,6 +312,10 @@ fn classify_event(name: &str, data: &Value) -> GuideEvent {
             } else {
                 text("message")
             },
+        },
+        "guide.started" => GuideEvent::Started {
+            guide_id: text("guide_id"),
+            by: text("by"),
         },
         "guide.stopped" => GuideEvent::Stopped {
             guide_id: text("guide_id"),
@@ -384,8 +395,76 @@ pub fn on_event(app: &Entity<AppModel>, name: &str, data: &Value, cx: &mut App) 
                 close(cx);
             }
         }
+        GuideEvent::Started { guide_id, by } => {
+            // CG-2: a guide this app did not start (an agent, the CLI) gets a passive bar too,
+            // so a person can always see it and stop it. The app's own start opened its bar
+            // before the daemon answered, so a bar that is already open is left alone.
+            if !is_running(cx) && !guide_id.is_empty() {
+                open_passive(app, guide_id, &by, cx);
+            }
+        }
         GuideEvent::Other => {}
     }
+}
+
+/// The width of the passive bar (Stop, "Step n", the agent line and the Agent chip), points,
+/// never wider than `limit`.
+const PASSIVE_W: f64 = 440.0;
+
+pub fn passive_bar_width(limit: f64) -> f64 {
+    PASSIVE_W.min(limit)
+}
+
+/// The client of a guide `by` names: `agent:capturemann-cli` is `capturemann-cli`; the user's own
+/// (`user`) and an empty name are `None`.
+fn passive_client(by: &str) -> Option<String> {
+    by.strip_prefix("agent:")
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+        .map(str::to_owned)
+}
+
+/// The agent line of the passive bar and the chip's accessible name.
+fn passive_line(client: Option<&str>) -> String {
+    match client {
+        Some(c) => tr!("Started by agent {client}", client = c),
+        None => tr!("Started by an agent or the command line"),
+    }
+}
+
+/// The bar for a guide started elsewhere (CG-2): Stop, the step count and an Agent chip; no Pause,
+/// Note or Undo. It follows the display under the pointer and keeps its own rectangle clear of
+/// clicks, like the full bar.
+fn open_passive(app: &Entity<AppModel>, guide_id: String, by: &str, cx: &mut App) {
+    let backend = app.read(cx).backend.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        return;
+    };
+    let Some(display) = pointer_display(cx) else {
+        return;
+    };
+    let visible = visible_part(&display.1);
+    let limit = bar_layout::guide_bar_limit(visible.w);
+    let rect = bar_rect(&visible, passive_bar_width(limit));
+    let gpui_id = u32::try_from(u64::from(display.0)).unwrap_or(1);
+    let client = passive_client(by);
+    let app2 = app.clone();
+    let h = cx
+        .open_window(
+            panel_options(display, rect, false, false),
+            move |window, cx| {
+                harden(window, false);
+                cx.new(|cx| GuideHud::new_passive(app2, guide_id, client, cx))
+            },
+        )
+        .ok();
+    let Some(h) = h else { return };
+    crate::surfaces::opened(crate::surfaces::Surface::GuideHud, h);
+    cx.set_global(Holder(Some(h)));
+    notify_studio(cx);
+    let display_px = crate::platform_window::gpui_monitor_rects_px()
+        .and_then(|v| v.into_iter().find(|(id, _)| *id == gpui_id).map(|(_, r)| r));
+    daemon.set_guide_exclusions(vec![exclusion_in_os_space(&rect, &display.1, display_px)]);
 }
 
 /// "New Click Guide": follows the display under the pointer, shows the bar and starts the guide
@@ -801,7 +880,25 @@ impl GuideHud {
             limit,
             started: Instant::now(),
             closed_toast: false,
+            passive: None,
         }
+    }
+
+    /// The bar of a guide an agent or the CLI started: no countdown, the guide's id is known.
+    fn new_passive(
+        app: Entity<AppModel>,
+        guide_id: String,
+        client: Option<String>,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let mut hud = Self::new(app, None, PASSIVE_W, cx);
+        hud.shown = Shown {
+            guide_id: Some(guide_id),
+            state: "recording".into(),
+            ..Shown::default()
+        };
+        hud.passive = Some(client);
+        hud
     }
 
     /// The toast of design S16: the window closed, the guide paused, nothing lost.
@@ -906,6 +1003,9 @@ fn hud_button(
 impl Render for GuideHud {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::overlay();
+        if let Some(client) = self.passive.clone() {
+            return self.render_passive(&t, client, cx).into_any_element();
+        }
         let mode = self.mode();
         let (_, bar) = layout(mode, self.follow.as_deref(), self.limit);
         let p = parts(
@@ -1065,7 +1165,102 @@ impl Render for GuideHud {
             };
             root = root.child(child);
         }
-        root
+        root.into_any_element()
+    }
+}
+
+impl GuideHud {
+    /// The bar of a guide started elsewhere: Stop, "Step n" with the agent line, the Agent chip.
+    fn render_passive(
+        &self,
+        t: &Theme,
+        client: Option<String>,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<gpui::Div> {
+        let mode = self.mode();
+        let p = parts(mode, self.shown.steps + 1, 0, None);
+        let line = passive_line(client.as_deref());
+        let mark = match mode {
+            Mode::Paused | Mode::Closed => dot(t.mist, 8.).into_any_element(),
+            _ => rec_dot(t, 8.).into_any_element(),
+        };
+        div()
+            .id("guide-hud")
+            .role(Role::Toolbar)
+            .aria_label(tr!("Click Guide"))
+            .size_full()
+            .flex()
+            .items_center()
+            .gap(px(bar_layout::GAP as f32))
+            .px(px(bar_layout::PAD as f32))
+            .rounded(px(16.))
+            .border_1()
+            .border_color(rgba_of(t.line))
+            .bg(rgba_of(t.surface))
+            .font_family(UI_FONT)
+            .font_features(ui_features())
+            .child(
+                div()
+                    .id("guide-hud-stop")
+                    .role(Role::Button)
+                    .aria_label(tr!("Stop"))
+                    .size(px(bar_layout::STOP as f32))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(11.))
+                    .bg(rgba_of(t.rec))
+                    .cursor_pointer()
+                    .child(div().size(px(14.)).rounded(px(3.)).bg(rgba_of(t.on_rec)))
+                    .on_click(cx.listener(|this, _, _, cx| this.stop(After::Open, cx))),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .flex()
+                    .flex_col()
+                    .px(px(bar_layout::TEXT_PAD as f32))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(8.))
+                            .whitespace_nowrap()
+                            .child(mark)
+                            .child(
+                                div()
+                                    .mono()
+                                    .text_size(px(HEAD_SIZE))
+                                    .text_color(rgba_of(t.text))
+                                    .child(SharedString::from(p.headline)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .id("guide-hud-second")
+                            .whitespace_nowrap()
+                            .overflow_hidden()
+                            .text_size(px(SECOND_SIZE))
+                            .text_color(rgba_of(t.text_3))
+                            .child(SharedString::from(line.clone())),
+                    ),
+            )
+            .child(
+                div()
+                    .id("guide-hud-agent-chip")
+                    .role(Role::Status)
+                    .aria_label(SharedString::from(line.clone()))
+                    .tooltip(tip(line, Vec::new()))
+                    .flex_none()
+                    .child(crate::ui::kit::pill(
+                        t,
+                        crate::ui::kit::Tone::Agent,
+                        Some(crate::recording::hud_layout::AGENT_ICON),
+                        crate::ui::long_shot::bar::agent_chip_text(),
+                    )),
+            )
     }
 }
 
@@ -1275,6 +1470,41 @@ mod ended_tests {
         assert!(guide_has_ended(true, Some("stopped")));
         assert!(guide_has_ended(true, Some("discarded")));
         assert!(guide_has_ended(true, None), "the guide is gone");
+    }
+
+    /// CG-2: an agent's or the CLI's guide gets the passive bar; the client is named from `by`.
+    #[test]
+    fn cg_2_a_guide_started_elsewhere_is_classified_and_named() {
+        assert_eq!(
+            classify_event(
+                "guide.started",
+                &json!({ "guide_id": "g1", "by": "agent:capturemann-cli" })
+            ),
+            GuideEvent::Started {
+                guide_id: "g1".into(),
+                by: "agent:capturemann-cli".into()
+            }
+        );
+        assert_eq!(
+            passive_client("agent:capturemann-cli").as_deref(),
+            Some("capturemann-cli")
+        );
+        assert_eq!(passive_client("user"), None);
+        assert_eq!(passive_client("agent:  "), None);
+        assert!(passive_line(Some("x")).contains('x'));
+    }
+
+    /// The passive bar is never wider than the display's limit or the full bar's maximum.
+    #[test]
+    fn cg_2_the_passive_bar_fits_every_display() {
+        for visible_w in [800.0, 1280.0, 2560.0] {
+            let limit = bar_layout::guide_bar_limit(visible_w);
+            let w = passive_bar_width(limit);
+            assert!(
+                w <= limit && w <= bar_layout::GUIDE_BAR_MAX_W,
+                "{w} in {limit}"
+            );
+        }
     }
 
     #[test]

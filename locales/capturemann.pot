@@ -1165,6 +1165,9 @@ msgstr ""
 msgid "Click through a task and CaptureMann writes the steps. It records clicks only, never keystrokes."
 msgstr ""
 
+msgid "Click through a task once; each click becomes a numbered step. Clicks only, never keystrokes."
+msgstr ""
+
 msgid "Click through a task, get the steps"
 msgstr ""
 
@@ -2447,6 +2450,9 @@ msgstr ""
 msgid "Google will say “Google hasn’t verified this app” when you sign in. That is your own app, so choose Advanced, then “Go to … (unsafe)”. An app in Testing mode only lets the test users you listed sign in (up to 100), and Google ends the sign-in after 7 days; choose “Publish app” on the consent screen to keep it signed in."
 msgstr ""
 
+msgid "Got it"
+msgstr ""
+
 msgid "Grant access…"
 msgstr ""
 
@@ -2697,6 +2703,9 @@ msgid "It reached the size limit of {limit} px. Everything up to there is kept."
 msgstr ""
 
 msgid "It reached {limit} px, the longest image CaptureMann can edit. Everything up to there is kept."
+msgstr ""
+
+msgid "It works and it is ready to use, but how it looks and behaves may still change in the next releases."
 msgstr ""
 
 msgid "Its own windows, toolbars and the webcam bubble preview"
@@ -3330,6 +3339,9 @@ msgid "Never larger than the recording"
 msgstr ""
 
 msgid "New Click Guide"
+msgstr ""
+
+msgid "New and still changing. Your files are safe and stay readable. Click to send feedback."
 msgstr ""
 
 msgid "New board"
@@ -4034,6 +4046,9 @@ msgstr ""
 msgid "Pick a tool, or click an annotation to edit it."
 msgstr ""
 
+msgid "Pick a window or an area, then scroll; the pictures are joined into one tall image."
+msgstr ""
+
 msgid "Pick a window…"
 msgstr ""
 
@@ -4158,6 +4173,12 @@ msgid "Preview of the edited recording"
 msgstr ""
 
 msgid "Preview only. Nothing is recorded, and the camera turns off when you leave this page."
+msgstr ""
+
+msgid "Preview. New and still changing."
+msgstr ""
+
+msgid "Preview: new and still changing."
 msgstr ""
 
 msgid "Previous doubtful word"
@@ -4931,6 +4952,9 @@ msgstr ""
 msgid "Saving the recording…"
 msgstr ""
 
+msgid "Saving your Long Shot or guide…"
+msgstr ""
+
 msgid "Saving…"
 msgstr ""
 
@@ -5101,6 +5125,9 @@ msgid "Selected segment, or the one under the playhead"
 msgstr ""
 
 msgid "Selection"
+msgstr ""
+
+msgid "Send feedback"
 msgstr ""
 
 msgid "Sends"
@@ -5604,6 +5631,9 @@ msgid "Tall picture · click to see full size"
 msgstr ""
 
 msgid "Target"
+msgstr ""
+
+msgid "Tell us what works and what doesn’t."
 msgstr ""
 
 msgid "Term, spelled the way you want it"
@@ -6547,6 +6577,9 @@ msgstr ""
 msgid "Turn off camera"
 msgstr ""
 
+msgid "Turn off in Settings › Previews"
+msgstr ""
+
 msgid "Turn off microphone"
 msgstr ""
 
@@ -6859,6 +6892,9 @@ msgstr ""
 msgid "What was recorded up to that moment is saved in your library."
 msgstr ""
 
+msgid "What you captured so far is kept."
+msgstr ""
+
 #. FACT: owner review required (privacy)
 msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, {your_computer}, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
 msgstr ""
@@ -7022,6 +7058,12 @@ msgid "YouTube · {name}"
 msgstr ""
 
 msgid "YouTube: the video \"{title}\" {url} (channel \"{channel}\")"
+msgstr ""
+
+msgid "Your Click Guides are normal guides and stay readable."
+msgstr ""
+
+msgid "Your Long Shots are normal screenshots and stay readable."
 msgstr ""
 
 msgid "Your active model, {model}, only transcribes. Install Large v3 ({size}) or Medium on the AI page to translate to English."
@@ -7650,6 +7692,9 @@ msgstr ""
 msgid "{name} has {reason}. A copy is prepared for smooth editing; the original file is kept unchanged in the bundle."
 msgstr ""
 
+msgid "{name} is in preview"
+msgstr ""
+
 msgid "{name} is saved as a PNG ({reason}). Camera and location data are not copied."
 msgstr ""
 
@@ -7696,6 +7741,9 @@ msgid "{name}, not connected. Coming soon."
 msgstr ""
 
 msgid "{name}, optional, {state}"
+msgstr ""
+
+msgid "{name}, preview"
 msgstr ""
 
 msgid "{name}, reconnect needed"
@@ -8086,6 +8134,9 @@ msgstr ""
 msgid "{time} between In and Out"
 msgstr ""
 
+msgid "{title} (Preview)"
+msgstr ""
+
 msgid "{title} panel"
 msgstr ""
 
@@ -8105,6 +8156,9 @@ msgid "{title} · cuts and speed applied"
 msgstr ""
 
 msgid "{title} · {app}"
+msgstr ""
+
+msgid "{title}, preview"
 msgstr ""
 
 msgid "{title}, shortcut {shortcut}"
@@ -10212,6 +10266,10 @@ msgstr ""
 
 msgctxt "platform word"
 msgid "your system settings"
+msgstr ""
+
+msgctxt "preview label"
+msgid "Preview"
 msgstr ""
 
 msgctxt "privacy"

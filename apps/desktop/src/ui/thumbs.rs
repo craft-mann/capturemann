@@ -15,6 +15,17 @@ static DECODE_LOCK: Mutex<()> = Mutex::new(());
 /// Decoded posters kept at once (about 0.7 MB each at 512 px).
 const CACHE_CAP: usize = 60;
 
+/// A poster that is not there yet (a guide or a screenshot whose picture is still being made) is
+/// asked for again this many times, each after [`RETRY_AFTER`], showing the placeholder meanwhile;
+/// only then does the card say "No preview" (CG-13: it showed "No preview" for minutes).
+const POSTER_TRIES: u8 = 4;
+const RETRY_AFTER: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Whether a poster that failed to load `failed` times is asked for again.
+fn retry_poster(failed: u8) -> bool {
+    failed < POSTER_TRIES
+}
+
 enum Entry {
     Pending,
     /// No poster file (broken bundle, recording without a poster yet).
@@ -36,6 +47,8 @@ pub struct ThumbCache {
     entries: HashMap<String, Entry>,
     /// Posters cut to a card's shape, by capture id and aspect (see [`ThumbCache::get_cover`]).
     crops: HashMap<(String, u32), Arc<RenderImage>>,
+    /// How often each poster failed to load (see [`retry_poster`]).
+    failed: HashMap<String, u8>,
     tick: u64,
 }
 
@@ -90,6 +103,7 @@ impl ThumbCache {
             backend,
             entries: HashMap::new(),
             crops: HashMap::new(),
+            failed: HashMap::new(),
             tick: 0,
         }
     }
@@ -216,7 +230,26 @@ impl ThumbCache {
                         this.evict(cx);
                     }
                     None => {
-                        this.entries.insert(id, Entry::Missing);
+                        // The picture may be written a moment later (a guide's card picture
+                        // follows its stop): keep the placeholder and ask again.
+                        let failed = this.failed.entry(id.clone()).or_insert(0);
+                        *failed += 1;
+                        if retry_poster(*failed) {
+                            let again = id.clone();
+                            cx.spawn(async move |this, cx| {
+                                cx.background_executor().timer(RETRY_AFTER).await;
+                                this.update(cx, |this, cx| {
+                                    if matches!(this.entries.get(&again), Some(Entry::Pending)) {
+                                        this.entries.remove(&again);
+                                        cx.notify();
+                                    }
+                                })
+                                .ok();
+                            })
+                            .detach();
+                        } else {
+                            this.entries.insert(id, Entry::Missing);
+                        }
                     }
                 }
                 cx.notify();
@@ -229,6 +262,7 @@ impl ThumbCache {
 
     /// Forget a poster (the capture changed) so it reloads.
     pub fn invalidate(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.failed.remove(id);
         for image in forget_poster(&mut self.entries, &mut self.crops, id) {
             cx.drop_image(image, None);
         }
@@ -239,6 +273,7 @@ impl ThumbCache {
     /// one: a library reload must not make the visible grid re-decode and flicker (R1-7).
     pub fn invalidate_missing(&mut self, cx: &mut Context<Self>) {
         self.entries.retain(|_, e| !matches!(e, Entry::Missing));
+        self.failed.clear();
         cx.notify();
     }
 
@@ -301,6 +336,13 @@ mod tests {
             p.0 = [(x % 251) as u8, 0, 0, 255];
         }
         RenderImage::new([Frame::new(img)])
+    }
+
+    /// CG-13: a poster that is not there yet is asked for again before the card gives up.
+    #[test]
+    fn a_missing_poster_is_asked_for_again_a_few_times() {
+        assert!(retry_poster(1) && retry_poster(POSTER_TRIES - 1));
+        assert!(!retry_poster(POSTER_TRIES));
     }
 
     #[test]

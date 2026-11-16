@@ -1843,3 +1843,32 @@ fn row_two_dock_tile_labels_have_room_for_forty_percent_more() {
         }
     }
 }
+
+/// Design S24: the Preview label is never truncated. Each size's label fits where it goes, in
+/// English, Vietnamese ("Xem trước") and with 40 percent more text: the XS tag inside a dock tile
+/// (the half row of the sidebar, less the 4 px it overhangs), the S label after a launcher title
+/// and the M label next to a page title. The dock tile's two label lines also fit in Vietnamese.
+#[test]
+fn the_preview_label_fits_where_it_goes_in_every_language() {
+    use crate::ui::preview_label::{self as pl, Size};
+    let tile_w = (crate::theme::scale::SIDEBAR_W - 24. - 2. - 16. - 6.) / 2.;
+    for lang in [Lang::En, Lang::Vi] {
+        let label = with_language(lang, pl::label_text);
+        for (size, room) in [(Size::Xs, tile_w - 8.), (Size::S, 120.), (Size::M, 160.)] {
+            let m = pl::metrics(size);
+            let text = width(&label, Face::of(false, 600), m.font);
+            let whole = text + 2. * m.pad_x + 2. + m.icon.map_or(0., |i| i + 4.);
+            assert!(
+                whole * 1.4 <= room,
+                "{lang:?} {size:?}: {label:?} {whole:.0} px x 1.4 > {room:.0}"
+            );
+        }
+    }
+    // CG-11: the Vietnamese tile label wraps to at most two 13 px lines, which the tile has room for.
+    let vi = with_language(Lang::Vi, || crate::nav::ExtraTile::ClickGuide.label());
+    let n = lines(&vi, Face::of(false, 400), 11., DOCK_ROW2_ROOM).unwrap_or(99);
+    assert!(
+        n as f32 <= crate::nav::tile_metrics::LABEL_LINES,
+        "{vi:?}: {n} lines"
+    );
+}

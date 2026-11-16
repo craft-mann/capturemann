@@ -31,6 +31,7 @@ pub mod long_shot;
 pub mod pages;
 pub mod paint;
 pub mod permissions_view;
+pub mod preview_label;
 pub mod publish_sheet;
 pub mod recording;
 pub mod recording_editor;
