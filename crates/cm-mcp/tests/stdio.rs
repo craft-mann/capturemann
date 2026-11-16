@@ -93,6 +93,23 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
     // and recognize_text (ANN-5), suggest_blueprint (ANN-11), create_board and export_images (BRD-1, BLK-1),
     // and the five Click Guide tools (GDE-4).
     assert_eq!(list.len(), 89);
+    // S24: the tools of a Preview feature say so in the listing (`_meta.stage`, "(preview)");
+    // the others do not.
+    let previews: Vec<&str> = list
+        .iter()
+        .filter(|t| t["_meta"]["stage"] == "preview")
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(previews.len(), 5, "{previews:?}");
+    for t in list {
+        let preview = t["_meta"]["stage"] == "preview";
+        assert_eq!(
+            t["description"].as_str().unwrap().contains("(preview)"),
+            preview,
+            "{}",
+            t["name"]
+        );
+    }
     assert!(list
         .iter()
         .all(|t| t["inputSchema"].is_object() && t["outputSchema"].is_object()));

@@ -10218,6 +10218,46 @@ msgctxt "platform word"
 msgid "your system settings"
 msgstr ""
 
+msgctxt "previews page"
+msgid "Capture a scrolling page as one image."
+msgstr ""
+
+msgctxt "previews page"
+msgid "Feedback"
+msgstr ""
+
+msgctxt "previews page"
+msgid "New features that are ready to use but may still change. Turning one off hides its buttons and menus; anything you made with it stays in your library."
+msgstr ""
+
+msgctxt "previews page"
+msgid "Preview"
+msgstr ""
+
+msgctxt "previews page"
+msgid "Previews"
+msgstr ""
+
+msgctxt "previews page"
+msgid "Previews are on by default."
+msgstr ""
+
+msgctxt "previews page"
+msgid "Send feedback about {feature}"
+msgstr ""
+
+msgctxt "previews page"
+msgid "Send general feedback"
+msgstr ""
+
+msgctxt "previews page"
+msgid "Turn your clicks into a numbered guide."
+msgstr ""
+
+msgctxt "previews page"
+msgid "{feature}, preview"
+msgstr ""
+
 msgctxt "privacy"
 msgid "Private"
 msgstr ""

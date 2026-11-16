@@ -14,9 +14,10 @@
 //! | -32601 | Method not found (unknown name, or a Never-tier operation) |
 //! | -32602 | Invalid params; also `invalid_input` |
 //! | -32603 | Internal error (a worker panicked, a lock was poisoned) |
-//! | -32001 ..= -32013 | Application errors, see [`rpc_code_for`] |
+//! | -32001 ..= -32014 | Application errors, see [`rpc_code_for`] |
 //! | -32012 | `internal` (unexpected I/O, database or other internal failure; exit 1) |
 //! | -32013 | `daemon_unavailable` (normally produced client-side; mapped for completeness) |
+//! | -32014 | `feature_disabled` (a Preview feature switched off in Settings > General > Previews; exit 4) |
 //! | -32099 | `not_implemented` (a shared code, exit 1): the action exists but no engine is wired to it yet |
 //!
 //! `user_declined` caused by a per-client policy carries `data.data.reason` of
@@ -51,6 +52,7 @@ pub fn rpc_code_for(code: ErrorCode) -> i64 {
         ErrorCode::Busy => -32011,
         ErrorCode::Internal => -32012,
         ErrorCode::DaemonUnavailable => -32013,
+        ErrorCode::FeatureDisabled => -32014,
         ErrorCode::NotImplemented => NOT_IMPLEMENTED,
     }
 }

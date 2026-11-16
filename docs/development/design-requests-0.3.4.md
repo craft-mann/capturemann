@@ -113,6 +113,18 @@ Needs attention chips, a published card shows the platform pill, "Published <tim
 line, and the recording details page has a Published card. Differences from the boards are listed in
 `docs/development/design-surfaces.md` ("Published (S22, S23, 0.3.4)").
 
+## S24 Preview label (board R034Preview, Nov 16, 2026): backend and Settings built
+
+Not a request. Built: the stage registry (`crates/cm-core/src/features.rs`), settings `previews.long_shot` and
+`previews.click_guide` (app-only, default on), `feature_disabled` (shared error code 16, exit 4, JSON-RPC -32014),
+the MCP `_meta.stage` and "(preview)" markers, `[preview]` in the CLI help, and Settings > General > Previews
+(`apps/desktop/src/ui/settings/previews.rs`: a row per preview with a switch and Feedback, the footer line). The
+pill there is a local `preview_pill()` (dashed border, no fill, 18 px, 11/600) until the shared Preview label
+component replaces it. Text extracted from the board: `docs/development/design-s24-preview-label.md`.
+Differences: the Previews sentence is a caption under the section title (the board shows it as a note); the footer
+row sits inside the card; Feedback buttons carry a message icon; the switch label for screen readers is
+"<feature>, preview".
+
 ## D10. Default colour of new Text annotations (screenshot editor, Text tool, key T)
 **Designed (board S21, Nov 15, 2026) and built:** the Auto default (`cm_render::auto_text_style`; #111111 or #FFFFFF by the mean luminance of the picture under the box, switch point 0.19; a 2 px outline in the other colour when fewer than 90 % of the sampled pixels reach 4.5:1), the Auto / Light / Dark control with the AUTO tag and the source line, `annotate` with no `color` (answers `auto_text`), ANN-1.AC8. Differences from the board: the Text panel had no Outline or Shadow controls to keep, so it shows a read-only "Outline 2 px · #111111" line when Auto turned one on; an explicit `color` sent to `annotate` without `outline` keeps the schema's old black outline default (Auto adds none).
 

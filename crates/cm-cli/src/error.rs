@@ -141,6 +141,7 @@ mod tests {
             ("internal", 1),
             ("daemon_unavailable", 5),
             ("not_implemented", 1),
+            ("feature_disabled", 4),
         ];
         assert_eq!(table.len(), ErrorCode::ALL.len());
         for (code, exit) in table {
