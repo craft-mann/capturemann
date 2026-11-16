@@ -487,6 +487,11 @@ pub(crate) fn guide_json(id: &str, g: &cm_library::guide::GuideBundle, state: &s
             );
             o.insert("type".into(), json!(s.kind));
             o.insert("title".into(), json!(s.title));
+            // `screen_text` or `generic` for a title CaptureMann made; absent for one a person
+            // or an agent wrote.
+            if let Some(src) = &s.title_source {
+                o.insert("title_source".into(), json!(src));
+            }
             o.insert("note".into(), json!(s.note));
             if let Some(img) = &s.image {
                 o.insert("image_id".into(), json!(format!("{id}/{}", s.id)));

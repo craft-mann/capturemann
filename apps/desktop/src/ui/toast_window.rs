@@ -98,7 +98,12 @@ fn toast_view(t: &Theme, toast: &Toast, app: &Entity<AppModel>) -> gpui::Div {
                 Role::Status
             })
             .aria_label(SharedString::from(match &toast.body {
-                Some(b) => tr!("{title}. {body}", title = toast.title, body = b),
+                // A title that ends with a full stop must not give "saved.. Start" (QA pass 7).
+                Some(b) => tr!(
+                    "{title}. {body}",
+                    title = toast.title.trim_end_matches(['.', '\u{3002}']),
+                    body = b
+                ),
                 None => toast.title.clone(),
             }))
             .on_hover(move |hovered, _, cx| {

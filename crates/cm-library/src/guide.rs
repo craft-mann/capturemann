@@ -135,9 +135,19 @@ pub struct GuideStep {
     /// (the redaction-proposals feature was withdrawn, maintainer decision Nov 15, 2026).
     #[serde(default)]
     pub has_proposals: bool,
+    /// Where an automatic title came from: `screen_text` (named from the text recognized next
+    /// to the click) or `generic` (`Click here`). Absent for a title a person or an agent wrote,
+    /// and for guides recorded before this field existed. Optional, so schema 1 is unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_source: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
+
+/// [`GuideStep::title_source`] of a title named from text on the screen.
+pub const TITLE_FROM_SCREEN: &str = "screen_text";
+/// [`GuideStep::title_source`] of the wording used when no usable text was near the click.
+pub const TITLE_GENERIC: &str = "generic";
 
 impl GuideStep {
     pub fn is_note(&self) -> bool {
@@ -223,6 +233,10 @@ pub struct GuideBundle {
     /// Frame size (physical px) by step image folder, read lazily from the step bundles (not
     /// stored: the guide crop needs it for every step on every change).
     sizes: HashMap<String, (u32, u32)>,
+    /// A click moved the guide crop while recording and the earlier steps still hold the old
+    /// rectangle (rewriting all of them on every click makes a long guide slower with every
+    /// step): [`GuideBundle::settle_crops`] makes them equal, once, when the recording ends.
+    crop_dirty: bool,
 }
 
 /// The focus crop of a frame of `w` x `h` physical px around `click` (physical px): 1200 x 800
@@ -433,6 +447,7 @@ impl GuideBundle {
             manifest,
             doc,
             sizes: HashMap::new(),
+            crop_dirty: false,
         };
         let res = fs::create_dir_all(g.dir.join(STEPS_DIR))
             .map_err(|e| io_err("cannot create", &g.dir, &e))
@@ -467,6 +482,7 @@ impl GuideBundle {
             manifest,
             doc,
             sizes: HashMap::new(),
+            crop_dirty: false,
         })
     }
 
@@ -793,6 +809,20 @@ impl GuideBundle {
         by: &Actor,
         at: OffsetDateTime,
     ) -> Result<GuideStep, CmError> {
+        self.add_click_step_titled(png, click, title, None, by, at)
+    }
+
+    /// [`GuideBundle::add_click_step`] saying where the draft title came from
+    /// ([`TITLE_FROM_SCREEN`] or [`TITLE_GENERIC`]).
+    pub fn add_click_step_titled(
+        &mut self,
+        png: &[u8],
+        click: ClickPoint,
+        title: &str,
+        title_source: Option<&str>,
+        by: &Actor,
+        at: OffsetDateTime,
+    ) -> Result<GuideStep, CmError> {
         if self.doc.steps.len() >= MAX_STEPS {
             return Err(CmError::invalid_input(format!(
                 "a guide holds at most {MAX_STEPS} steps"
@@ -844,6 +874,7 @@ impl GuideBundle {
             click: Some(click),
             focus_crop: crop,
             has_proposals: false,
+            title_source: title_source.map(str::to_owned),
             extra: Map::new(),
         };
         if let Some(name) = &step.image {
@@ -851,11 +882,22 @@ impl GuideBundle {
         }
         self.doc.steps.push(step.clone());
         self.save()?;
-        // A click outside the old box moves the rectangle of the earlier steps too.
+        // A click outside the old box moves the rectangle of the earlier steps too; that is
+        // done once, when the recording ends (every step already shows its own click).
         if rect != before {
-            self.apply_guide_crop(None, by, at)?;
+            self.crop_dirty = true;
         }
         Ok(step)
+    }
+
+    /// Makes the crop of every step the guide crop again after clicks moved it during the
+    /// recording. Call it when the recording ends; a no-op when nothing moved.
+    pub fn settle_crops(&mut self, by: &Actor, at: OffsetDateTime) -> Result<(), CmError> {
+        if !self.crop_dirty {
+            return Ok(());
+        }
+        self.crop_dirty = false;
+        self.apply_guide_crop(None, by, at)
     }
 
     /// HUD "Add note step": a step with no image.
@@ -870,6 +912,7 @@ impl GuideBundle {
             click: None,
             focus_crop: false,
             has_proposals: false,
+            title_source: None,
             extra: Map::new(),
         };
         self.doc.steps.push(step.clone());
@@ -888,14 +931,21 @@ impl GuideBundle {
         };
         self.save()?;
         if s.click.is_some() {
-            self.apply_guide_crop(None, by, at)?;
+            // The crop of the steps left is made equal when the recording ends.
+            self.crop_dirty = true;
         }
+        let _ = (by, at);
         Ok(Some(s))
     }
 
     /// A second mouse-down at the same spot is a double click: the newest image step keeps its
     /// frame and takes the new title and click count (GDE-1).
-    pub fn amend_last_click(&mut self, count: u32, title: &str) -> Result<Option<String>, CmError> {
+    pub fn amend_last_click(
+        &mut self,
+        count: u32,
+        title: &str,
+        title_source: Option<&str>,
+    ) -> Result<Option<String>, CmError> {
         let title = clean(title, "title")?;
         let Some(s) = self.doc.steps.iter_mut().rev().find(|s| s.click.is_some()) else {
             return Ok(None);
@@ -904,9 +954,43 @@ impl GuideBundle {
             c.count = count;
         }
         s.title = title;
+        s.title_source = title_source.map(str::to_owned);
         let id = s.id.clone();
         self.save()?;
         Ok(Some(id))
+    }
+
+    /// Replaces the automatic title of a step while the guide records (the text read next to
+    /// the click arrived after the step was written). Not an undo step. `false` when the step
+    /// is gone or its title is no longer automatic (a person changed it).
+    pub fn set_draft_title(
+        &mut self,
+        step_id: &str,
+        title: &str,
+        title_source: &str,
+    ) -> Result<bool, CmError> {
+        let title = clean(title, "title")?;
+        let Some(s) = self
+            .doc
+            .steps
+            .iter_mut()
+            .find(|s| s.id == step_id && s.title_source.is_some())
+        else {
+            return Ok(false);
+        };
+        s.title = title;
+        s.title_source = Some(title_source.to_owned());
+        self.save()?;
+        Ok(true)
+    }
+
+    /// The click of an image step (`None` for a note or a missing step).
+    pub fn click_of(&self, step_id: &str) -> Option<ClickPoint> {
+        self.doc
+            .steps
+            .iter()
+            .find(|s| s.id == step_id)
+            .and_then(|s| s.click.clone())
     }
 
     // ---- editing (GDE-2): every call is one undo step ------------------------------------
@@ -972,6 +1056,8 @@ impl GuideBundle {
                 .expect("checked");
             if let Some(t) = title {
                 s.title = t;
+                // A title somebody wrote is not a draft any more.
+                s.title_source = None;
             }
             if let Some(n) = note {
                 s.note = n;
@@ -1181,6 +1267,7 @@ impl GuideBundle {
                     click: None,
                     focus_crop: false,
                     has_proposals: false,
+                    title_source: None,
                     extra: Map::new(),
                 });
             }
@@ -1202,7 +1289,11 @@ impl GuideBundle {
                     continue;
                 }
                 if let Some(t) = &e.title {
-                    s.title = t.trim().to_owned();
+                    // The editor sends every title back: only a changed one stops being a draft.
+                    if s.title != t.trim() {
+                        s.title = t.trim().to_owned();
+                        s.title_source = None;
+                    }
                 }
                 if let Some(t) = &e.note {
                     s.note = t.trim().to_owned();
@@ -1241,6 +1332,7 @@ impl GuideBundle {
             click: None,
             focus_crop: false,
             has_proposals: false,
+            title_source: None,
             extra: Map::new(),
         };
         self.change("add_note_step", by, at, |g| {

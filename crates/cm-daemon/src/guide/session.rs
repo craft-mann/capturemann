@@ -19,15 +19,15 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use cm_capture::{CaptureRequest, CaptureTarget, Capturer, Frame};
-use cm_core::{Actor, CmError};
-use cm_library::guide::{ClickPoint, GuideBundle, MAX_STEPS};
+use cm_core::{Actor, CmError, PhysicalPoint, PhysicalRect, PhysicalSize};
+use cm_library::guide::{ClickPoint, GuideBundle, MAX_STEPS, TITLE_FROM_SCREEN, TITLE_GENERIC};
 use cm_render::ocr::{TextLine, TextRecognizer};
 use image::RgbaImage;
 use serde_json::{json, Value};
 use tokio::sync::Notify;
 
 use super::clicks::{GuideClicks, LocalClick};
-use super::titles::draft_title;
+use super::titles::{self, compose, nearest_label};
 use super::{guide_json, NoteArgs, SetArgs};
 use crate::action::ScreenshotTarget;
 use crate::clock::Clock;
@@ -54,10 +54,60 @@ pub const NEAR_LIMIT_LEFT: usize = 50;
 
 type Reply = mpsc::SyncSender<Result<Value, CmError>>;
 
+/// The neighbourhood of a click, cut out of its frame in the click path (a few hundred
+/// kilobytes, where the frame is 6 to 25 MB), for the text reader.
+struct TitleInput {
+    crop: Frame,
+    /// The click in the crop's own pixels.
+    click: (f64, f64),
+}
+
+/// A frame on its way to a PNG: the PNG (or why there is none) arrives on the receiver.
+type Encoded = mpsc::Receiver<Result<Vec<u8>, CmError>>;
+/// A frame to encode and where its PNG goes.
+type EncodeJob = (Frame, mpsc::SyncSender<Result<Vec<u8>, CmError>>);
+
+/// How many frames are encoded at once. A screen-sized PNG takes a fifth of a second; two
+/// encoders keep up with five clicks a second while the writer saves the step before.
+const ENCODERS: usize = 2;
+
+/// Turns frames into PNGs on threads of their own, so the click path only hands the frame over
+/// and the writer takes the PNGs in click order.
+#[derive(Clone)]
+struct Encoders {
+    tx: mpsc::Sender<EncodeJob>,
+}
+
+impl Encoders {
+    fn start() -> Encoders {
+        let (tx, rx) = mpsc::channel::<EncodeJob>();
+        let rx = Arc::new(Mutex::new(rx));
+        for _ in 0..ENCODERS {
+            let rx = rx.clone();
+            std::thread::spawn(move || loop {
+                let job = rx.lock().unwrap_or_else(PoisonError::into_inner).recv();
+                let Ok((frame, reply)) = job else { return };
+                let mut png = Vec::new();
+                let r = frame.to_png_fast_into(&mut png).map(|()| png);
+                drop(frame);
+                let _ = reply.send(r);
+            });
+        }
+        Encoders { tx }
+    }
+
+    fn encode(&self, frame: Frame) -> Option<Encoded> {
+        let (rtx, rrx) = mpsc::sync_channel(1);
+        self.tx.send((frame, rtx)).ok()?;
+        Some(rrx)
+    }
+}
+
 enum Job {
     Step {
-        frame: Frame,
+        png: Encoded,
         click: ClickPoint,
+        title_input: Option<TitleInput>,
     },
     /// The same spot was clicked again: the newest step becomes a double click.
     Double,
@@ -138,9 +188,76 @@ struct SinkState {
     guide_id: String,
     /// `(host_ns, x, y, button)` of the newest step's click, and whether it is a double already.
     last: Option<(u64, f64, f64, String, bool)>,
+    /// Names steps from the text next to the click (`guide.titles_from_screen`, and a reader).
+    titles: bool,
+    encoders: Encoders,
+    /// The followed window as it was when the guide started (see [`WindowFollow`]).
+    follow: Option<WindowFollow>,
+}
+
+/// A guide of one window maps every click with the rectangle the window had when the guide
+/// started. The window can be moved or resized since (the window is the thing being shown, so
+/// people do), and the ring would land where the window used to be: so each click reads the
+/// window's rectangle again and moves the click by how far the window's corner went (QA macOS
+/// pass 7).
+struct WindowFollow {
+    window_id: u32,
+    origin: (i32, i32),
 }
 
 impl SinkState {
+    /// The click as the window is now: `Some((x, y))` in the window's own pixels, `None` when
+    /// the click is outside it. A listing that fails or no longer shows the window leaves the
+    /// click as it was mapped.
+    fn follow_window(&self, c: &LocalClick) -> Option<(f64, f64)> {
+        let as_mapped = || (!c.outside).then_some((c.x, c.y));
+        let Some(f) = &self.follow else {
+            return as_mapped();
+        };
+        let Ok(t) = self.capturer.list_targets_with(true) else {
+            return as_mapped();
+        };
+        let Some(w) = t.windows.iter().find(|w| w.id == f.window_id) else {
+            return as_mapped();
+        };
+        let x = c.x - f64::from(w.bounds.origin.x - f.origin.0);
+        let y = c.y - f64::from(w.bounds.origin.y - f.origin.1);
+        let inside = x >= 0.0
+            && y >= 0.0
+            && x < f64::from(w.bounds.size.width)
+            && y < f64::from(w.bounds.size.height);
+        inside.then_some((x, y))
+    }
+
+    /// The part of `frame` around the click that the text reader gets.
+    fn title_input(&self, frame: &Frame, click: (f64, f64)) -> Option<TitleInput> {
+        if !self.titles {
+            return None;
+        }
+        let s = self.scale.max(1.0);
+        let (rx, ry) = (titles::READ_RADIUS_X * s, titles::READ_RADIUS_Y * s);
+        let (fw, fh) = (f64::from(frame.width()), f64::from(frame.height()));
+        let x0 = (click.0 - rx).floor().clamp(0.0, fw - 1.0);
+        let y0 = (click.1 - ry).floor().clamp(0.0, fh - 1.0);
+        let x1 = (click.0 + rx).ceil().clamp(x0 + 1.0, fw);
+        let y1 = (click.1 + ry).ceil().clamp(y0 + 1.0, fh);
+        let rect = PhysicalRect {
+            origin: PhysicalPoint {
+                x: x0 as i32,
+                y: y0 as i32,
+            },
+            size: PhysicalSize {
+                width: (x1 - x0) as u32,
+                height: (y1 - y0) as u32,
+            },
+        };
+        let crop = frame.crop(rect).ok()?;
+        Some(TitleInput {
+            crop,
+            click: (click.0 - x0, click.1 - y0),
+        })
+    }
+
     fn excluded(&self, gx: f64, gy: f64) -> bool {
         self.exclusions
             .lock()
@@ -149,10 +266,14 @@ impl SinkState {
             .any(|r| gx >= r[0] && gx < r[0] + r[2] && gy >= r[1] && gy < r[1] + r[3])
     }
 
-    fn on_click(&mut self, c: LocalClick) {
-        if self.paused.load(Ordering::Relaxed) || c.outside || self.excluded(c.gx, c.gy) {
+    fn on_click(&mut self, mut c: LocalClick) {
+        if self.paused.load(Ordering::Relaxed) || self.excluded(c.gx, c.gy) {
             return;
         }
+        let Some((x, y)) = self.follow_window(&c) else {
+            return;
+        };
+        (c.x, c.y) = (x, y);
         if let Some((t, x, y, button, double)) = &mut self.last {
             let near = (c.x - *x).hypot(c.y - *y) <= DOUBLE_CLICK_PX;
             if !*double
@@ -191,9 +312,14 @@ impl SinkState {
             }
         };
         self.last = Some((c.host_ns, c.x, c.y, c.button.clone(), false));
+        let title_input = self.title_input(&frame, (c.x, c.y));
+        let Some(png) = self.encoders.encode(frame) else {
+            return;
+        };
         self.pending.fetch_add(1, Ordering::SeqCst);
         let _ = self.tx.send(Job::Step {
-            frame,
+            png,
+            title_input,
             click: ClickPoint {
                 x: c.x,
                 y: c.y,
@@ -205,16 +331,89 @@ impl SinkState {
     }
 }
 
+/// Neighbourhoods waiting for the text reader. When it is behind, the next one is not read and
+/// its step keeps the generic title (the step itself is already saved).
+const TITLE_QUEUE: usize = 4;
+/// How long a stop waits for the text reader to finish what it was given.
+const TITLE_DRAIN: Duration = Duration::from_secs(5);
+/// How often the writer looks for a finished title while it has nothing to write.
+const IDLE_TICK: Duration = Duration::from_millis(100);
+
+struct TitleWork {
+    step_id: String,
+    input: TitleInput,
+    scale: f64,
+}
+
+struct TitleDone {
+    step_id: String,
+    label: Option<String>,
+}
+
+/// The text reader of a guide: a thread of its own, so reading text (a second on a slow
+/// engine) never holds up writing the next step.
+struct Titler {
+    tx: Option<mpsc::SyncSender<TitleWork>>,
+    results: mpsc::Receiver<TitleDone>,
+    done: mpsc::Receiver<()>,
+}
+
+impl Titler {
+    fn start(recognizer: Arc<dyn TextRecognizer>) -> Titler {
+        let (tx, rx) = mpsc::sync_channel::<TitleWork>(TITLE_QUEUE);
+        let (rtx, results) = mpsc::channel();
+        let (dtx, done) = mpsc::channel();
+        std::thread::spawn(move || {
+            for w in rx {
+                let size = w.input.crop.size();
+                let img = RgbaImage::from_raw(size.width, size.height, w.input.crop.into_rgba());
+                let lines: Vec<TextLine> = match img {
+                    Some(img) => recognizer.recognize(&img).unwrap_or_default(),
+                    None => Vec::new(),
+                };
+                let label = nearest_label(&lines, w.input.click, w.scale);
+                if rtx
+                    .send(TitleDone {
+                        step_id: w.step_id,
+                        label,
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            }
+            let _ = dtx.send(());
+        });
+        Titler {
+            tx: Some(tx),
+            results,
+            done,
+        }
+    }
+
+    /// Hands a neighbourhood over; `false` when the reader is behind (nothing is queued).
+    fn submit(&self, w: TitleWork) -> bool {
+        self.tx.as_ref().is_some_and(|tx| tx.try_send(w).is_ok())
+    }
+
+    /// Closes the input and waits (at most [`TITLE_DRAIN`]) for what was given to be read.
+    fn finish(&mut self) {
+        self.tx = None;
+        let _ = self.done.recv_timeout(TITLE_DRAIN);
+    }
+}
+
 struct Worker {
     guide: GuideBundle,
-    recognizer: Arc<dyn TextRecognizer>,
     events: EventBus,
     clock: Arc<dyn Clock>,
     by: Actor,
     steps: Arc<AtomicUsize>,
     guide_id: String,
-    /// The text lines and click of the newest step (a double click rewrites its title).
-    last: Option<(Vec<TextLine>, ClickPoint)>,
+    /// `None` when steps are not named from the screen (the setting is off, or no reader).
+    titler: Option<Titler>,
+    /// The newest image step and the label read for it (a double click rewrites its title).
+    last: Option<(String, Option<String>)>,
     /// Frames waiting in the channel (see [`MAX_PENDING_FRAMES`]).
     pending: Arc<AtomicUsize>,
     /// Shared with the click filter: set when the guide is full, so no click is a step any more.
@@ -224,24 +423,35 @@ struct Worker {
     full: bool,
 }
 
-/// The text lines of a frame (empty when the recognizer is unavailable or fails).
-fn read_lines(recognizer: &dyn TextRecognizer, frame: Frame) -> Vec<TextLine> {
-    let size = frame.size();
-    match RgbaImage::from_raw(size.width, size.height, frame.into_rgba()) {
-        Some(img) if recognizer.is_available() => recognizer.recognize(&img).unwrap_or_default(),
-        _ => Vec::new(),
-    }
-}
-
 impl Worker {
-    fn step(&mut self, frame: Frame, click: ClickPoint) -> Result<(), CmError> {
-        let png = frame.to_png()?;
-        let lines = read_lines(self.recognizer.as_ref(), frame);
-        let title = draft_title(&lines, (click.x, click.y), click.scale, &click.button, 1);
-        let step =
-            self.guide
-                .add_click_step(&png, click.clone(), &title, &self.by, self.clock.now())?;
-        self.last = Some((lines, click));
+    /// Writes one step. The picture is saved at once with the generic title; the title from the
+    /// screen (if allowed and plausible) follows from the [`Titler`].
+    fn step(
+        &mut self,
+        png: Encoded,
+        click: ClickPoint,
+        title_input: Option<TitleInput>,
+    ) -> Result<(), CmError> {
+        let png = png
+            .recv()
+            .map_err(|_| CmError::internal("the picture of a step was lost"))??;
+        let title = compose(&click.button, 1, None);
+        let step = self.guide.add_click_step_titled(
+            &png,
+            click.clone(),
+            &title,
+            Some(TITLE_GENERIC),
+            &self.by,
+            self.clock.now(),
+        )?;
+        self.last = Some((step.id.clone(), None));
+        if let (Some(t), Some(input)) = (&self.titler, title_input) {
+            t.submit(TitleWork {
+                step_id: step.id.clone(),
+                input,
+                scale: click.scale,
+            });
+        }
         let n = self.steps.fetch_add(1, Ordering::SeqCst) + 1;
         self.events.publish(
             "guide.step_added",
@@ -250,6 +460,37 @@ impl Worker {
         );
         self.check_limit();
         Ok(())
+    }
+
+    /// Applies the labels the reader has finished.
+    fn apply_titles(&mut self) {
+        let done: Vec<TitleDone> = self
+            .titler
+            .as_ref()
+            .map(|t| t.results.try_iter().collect())
+            .unwrap_or_default();
+        for d in done {
+            let Some(label) = d.label else { continue };
+            if let Some((id, l)) = &mut self.last {
+                if *id == d.step_id {
+                    *l = Some(label.clone());
+                }
+            }
+            let Some(click) = self.guide.click_of(&d.step_id) else {
+                continue;
+            };
+            let title = compose(&click.button, click.count, Some(&label));
+            if matches!(
+                self.guide
+                    .set_draft_title(&d.step_id, &title, TITLE_FROM_SCREEN),
+                Ok(true)
+            ) {
+                self.events.publish(
+                    "guide.step_updated",
+                    json!({ "guide_id": self.guide_id, "step_id": d.step_id, "title": title }),
+                );
+            }
+        }
     }
 
     /// After a step or a note was added: the 450th step says 50 are left, the 500th fills the
@@ -274,11 +515,19 @@ impl Worker {
     }
 
     fn double(&mut self) -> Result<(), CmError> {
-        let Some((lines, click)) = &self.last else {
+        let Some((id, label)) = &self.last else {
             return Ok(());
         };
-        let title = draft_title(lines, (click.x, click.y), click.scale, &click.button, 2);
-        if let Some(id) = self.guide.amend_last_click(2, &title)? {
+        let Some(click) = self.guide.click_of(id) else {
+            return Ok(());
+        };
+        let title = compose(&click.button, 2, label.as_deref());
+        let source = if label.is_some() {
+            TITLE_FROM_SCREEN
+        } else {
+            TITLE_GENERIC
+        };
+        if let Some(id) = self.guide.amend_last_click(2, &title, Some(source))? {
             self.events.publish(
                 "guide.step_updated",
                 json!({ "guide_id": self.guide_id, "step_id": id, "title": title }),
@@ -287,16 +536,36 @@ impl Worker {
         Ok(())
     }
 
+    /// The recording ends: the earlier steps take the crop the clicks settled on.
+    fn settle(&mut self) {
+        if let Err(e) = self.guide.settle_crops(&self.by, self.clock.now()) {
+            log::debug!("guide crops not settled: {e}");
+        }
+    }
+
     fn run(mut self, rx: mpsc::Receiver<Job>) {
-        for job in rx {
+        loop {
+            self.apply_titles();
+            let job = match rx.recv_timeout(IDLE_TICK) {
+                Ok(job) => job,
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    self.settle();
+                    break;
+                }
+            };
             match job {
-                Job::Step { frame, click } => {
+                Job::Step {
+                    png,
+                    click,
+                    title_input,
+                } => {
                     self.pending.fetch_sub(1, Ordering::SeqCst);
                     // The guide is full: what is still queued is dropped (and freed) unread.
                     if self.full {
                         continue;
                     }
-                    if let Err(e) = self.step(frame, click) {
+                    if let Err(e) = self.step(png, click, title_input) {
                         self.events.publish(
                             "guide.error",
                             json!({ "guide_id": self.guide_id, "message": e.to_string() }),
@@ -331,6 +600,13 @@ impl Worker {
                     let _ = reply.send(r);
                 }
                 Job::Stop(reply) => {
+                    // The titles still being read are waited for, so a guide that was stopped
+                    // right after its last click has them.
+                    if let Some(t) = &mut self.titler {
+                        t.finish();
+                    }
+                    self.apply_titles();
+                    self.settle();
                     let _ = reply.send(Ok(json!({})));
                     break;
                 }
@@ -506,6 +782,15 @@ impl Inner {
         })
         .await?;
         let now = self.clock.now();
+        // Steps are named from the text next to the click only when the person allows it
+        // (`guide.titles_from_screen`, on by default) and there is a reader; otherwise the screen
+        // is not even read.
+        let titles_on = self.recognizer.is_available()
+            && self
+                .settings
+                .all()
+                .map(|m| titles::titles_from_screen(&m))
+                .unwrap_or(true);
         let (library, t) = (self.library.clone(), title.clone());
         let target_json = serde_json::to_value(target).unwrap_or(Value::Null);
         let (guide_id, dir) = {
@@ -533,7 +818,7 @@ impl Inner {
             let limit = Arc::new(Notify::new());
             let worker = Worker {
                 guide,
-                recognizer: self.recognizer.clone(),
+                titler: titles_on.then(|| Titler::start(self.recognizer.clone())),
                 events: self.events.clone(),
                 clock: self.clock.clone(),
                 by: actor.clone(),
@@ -630,6 +915,19 @@ impl Inner {
             events: self.events.clone(),
             guide_id: guide_id.clone(),
             last: None,
+            titles: titles_on,
+            encoders: Encoders::start(),
+            follow: match capture_target {
+                CaptureTarget::Window { window_id } => targets
+                    .windows
+                    .iter()
+                    .find(|w| w.id == window_id)
+                    .map(|w| WindowFollow {
+                        window_id,
+                        origin: (w.bounds.origin.x, w.bounds.origin.y),
+                    }),
+                _ => None,
+            },
         };
         let res = self.guide.clicks.start(
             &capture_target,

@@ -112,5 +112,18 @@ debug = false
 [profile.dev.package.zune-jpeg]
 opt-level = 3
 
+# PNG encoding of a screen-sized frame (a Click Guide step) takes seconds in an unoptimised build,
+# which made the burst test measure the compiler, not the code.
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+
 [profile.release]
 debug = 1

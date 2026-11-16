@@ -764,6 +764,27 @@ fn guide_row(key: &str, p: &Value) -> Option<String> {
     match key {
         "target" => {
             let t = p.get("target")?;
+            // The typed form of the daemon (`type`, `id`, `title`, `app`): said in words.
+            if let Some(kind) = text(t, "type") {
+                return match kind {
+                    "display" => Some(tr!("Display {id}", id = num(t, "id")?)),
+                    "window" => match (text(t, "title"), text(t, "app")) {
+                        (Some(title), Some(app)) => {
+                            Some(tr!("Window \"{title}\" of {app}", title = title, app = app))
+                        }
+                        _ => Some(tr!("Window {id}", id = num(t, "id")?)),
+                    },
+                    "region" => Some(tr!(
+                        "Region {w} x {h} px at ({x}, {y}) on display {id}",
+                        w = num(t, "width")?,
+                        h = num(t, "height")?,
+                        x = num_or_zero(t, "x"),
+                        y = num_or_zero(t, "y"),
+                        id = num(t, "display_id")?
+                    )),
+                    _ => None,
+                };
+            }
             if let Some(id) = num(t, "window_id") {
                 Some(tr!("window {id}", id = id))
             } else {

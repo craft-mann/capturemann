@@ -3052,6 +3052,10 @@ msgstr "Bắt đầu quay?"
 msgid "Started by agent via MCP"
 msgstr "Do tác nhân bắt đầu qua MCP"
 
+#, fuzzy
+msgid "Started by agent via the command line"
+msgstr "Do tác nhân bắt đầu qua dòng lệnh"
+
 msgid "Started by agent {client}"
 msgstr "Do tác nhân {client} bắt đầu"
 

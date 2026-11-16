@@ -5396,6 +5396,9 @@ msgstr ""
 msgid "Started by agent via MCP"
 msgstr ""
 
+msgid "Started by agent via the command line"
+msgstr ""
+
 msgid "Started by agent {client}"
 msgstr ""
 

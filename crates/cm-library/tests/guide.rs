@@ -347,12 +347,17 @@ fn every_step_of_a_guide_shares_one_crop_and_it_follows_the_clicks_gde_1() {
     for (i, x) in [100.0, 200.0, 300.0].into_iter().enumerate() {
         add_at(&mut g, 3000, 2000, x, 1000.0, i as u8);
     }
+    // While recording the earlier steps keep the rectangle of their time (rewriting all of them
+    // on every click made a long guide slower with every step); the end of the recording makes
+    // them equal.
+    g.settle_crops(&Actor::User, T0).unwrap();
     let first = visible(&g, 0).unwrap();
     assert_eq!(first, (0.0, 600.0, 1400.0, 800.0));
     assert_eq!(visible(&g, 1), Some(first));
     assert_eq!(visible(&g, 2), Some(first));
     // A fourth click far away: the earlier steps follow.
     add_at(&mut g, 3000, 2000, 2800.0, 1000.0, 9);
+    g.settle_crops(&Actor::User, T0).unwrap();
     let all = (0.0, 600.0, 3000.0, 800.0);
     for i in 0..4 {
         assert_eq!(visible(&g, i), Some(all), "step {i}");
