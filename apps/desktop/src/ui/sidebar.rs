@@ -350,23 +350,7 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
             .on_click(move |_, _, cx| open_capture(&app, action, cx))
             .child(icon(action.icon(), 18., t.text_2))
             .child(ellipsis_text(action.label()))
-            .child(div().flex().items_center().gap(px(2.)).children(
-                nav::tile_keys(&e.keys).into_iter().map(|k| {
-                    div()
-                        .min_w(px(15.))
-                        .h(px(15.))
-                        .px(px(3.))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .rounded(px(4.))
-                        .bg(rgba_of(t.raised))
-                        .text_size(px(10.))
-                        .text_color(rgba_of(t.mist))
-                        .mono()
-                        .child(SharedString::from(k))
-                }),
-            ))
+            .child(keycap_row(t, &e.keys))
     });
 
     div()
@@ -418,6 +402,29 @@ fn tile_ring(t: &Theme, gap: crate::theme::Color) -> Vec<gpui::BoxShadow> {
     vec![shadow(t.text, 4.), shadow(gap, 2.)]
 }
 
+/// The chord of a dock tile as small keycaps under its label (nothing when there is no chord).
+fn keycap_row(t: &Theme, keys: &[String]) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .gap(px(2.))
+        .children(nav::tile_keys(keys).into_iter().map(|k| {
+            div()
+                .min_w(px(15.))
+                .h(px(15.))
+                .px(px(3.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(4.))
+                .bg(rgba_of(t.raised))
+                .text_size(px(10.))
+                .text_color(rgba_of(t.mist))
+                .mono()
+                .child(SharedString::from(k))
+        }))
+}
+
 /// A Long Shot or Click Guide tile: in the dock a 54 px tile with a 16 px icon and a label, in the
 /// rail a 44 px icon button. Ready starts the capture; while it runs the border is `rec` at 70 % with
 /// a 7 px rec dot at the top right and a click brings its HUD to front; disabled is dimmed, not a Tab
@@ -434,6 +441,11 @@ fn extra_tile(
         .shortcut()
         .map(|a| p.shortcuts.get(a).keycaps(p.platform))
         .unwrap_or_default();
+    // Both tiles of the row get the same height: room for the chord when either has one.
+    let row_has_keys = ExtraTile::ALL.into_iter().any(|x| {
+        x.shortcut()
+            .is_some_and(|a| !p.shortcuts.get(a).keycaps(p.platform).is_empty())
+    });
     let tip_model = nav::tile_tip(tile, &state, &keys);
     let tooltip = rich_tip(tip_model.name.clone(), tile_lines(&tip_model), 200.);
     let active = state == TileState::Active;
@@ -471,7 +483,7 @@ fn extra_tile(
     } else {
         d.flex_1()
             .min_w(px(0.))
-            .h(px(54.))
+            .h(px(if row_has_keys { 70. } else { 54. }))
             .flex_col()
             .gap(px(3.))
             .px(px(4.))
@@ -510,6 +522,7 @@ fn extra_tile(
                 .text_center()
                 .child(tile.label()),
         )
+        .when(!keys.is_empty(), |d| d.child(keycap_row(t, &keys)))
     };
     d.when(active, |d| {
         d.child(
