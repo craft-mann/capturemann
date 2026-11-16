@@ -212,6 +212,11 @@ else
   }
   mkdir -p "$tmp/home"
   runner capturemann 0 --version
+  # The programs must carry the version of the file name (a stale binary once shipped as a new version).
+  if [ -x "$progs/capturemann" ]; then
+    got="$(HOME="$tmp/home" CAPTUREMANN_LIBRARY="$tmp/home/lib" CAPTUREMANN_CONFIG_DIR="$tmp/home/cfg" timeout 30 "$progs/capturemann" --version 2>/dev/null </dev/null || true)"
+    case "$got" in *" $ver"*) ok "capturemann --version says $ver" ;; *) fail "capturemann --version says '$got', the file name says $ver" ;; esac
+  fi
   runner cm-mcp 2 --bogus
   runner cm-daemon 2 --bogus
   runner cm-overlay 0 --help

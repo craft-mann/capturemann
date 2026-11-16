@@ -34,7 +34,8 @@
 # texts (share/doc/capturemann/SHERPA-ONNX/).
 #   CM_SPEAKER_MODELS_BUNDLE  folder with the two models and LICENSES/ (default packaging/sherpa/out/models
 #                      when it exists, made by `make sherpa`).
-#   CM_REQUIRE_SPEAKER_MODELS=1  fail unless both models and their licence files are bundled.set -euo pipefail
+#   CM_REQUIRE_SPEAKER_MODELS=1  fail unless both models and their licence files are bundled.
+set -euo pipefail
 die() { echo "build-linux.sh: $*" >&2; exit 1; }
 
 [ "$(uname -s)" = "Linux" ] || die "this script only runs on Linux"

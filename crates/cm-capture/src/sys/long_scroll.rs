@@ -382,7 +382,7 @@ pub(crate) fn wheel_deltas(amount_px: u32, px_per_notch: u32, max_event: u32) ->
 
 #[cfg(target_os = "linux")]
 mod imp {
-    use super::session::{self, DisplayServer};
+    use super::super::session::{self, DisplayServer};
     use super::*;
 
     pub fn trusted() -> bool {
