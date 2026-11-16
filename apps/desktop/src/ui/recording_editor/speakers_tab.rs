@@ -447,14 +447,23 @@ impl RecordingEditor {
             "merge",
             tr!("Merge {name} into another speaker", name = sp.name.clone()),
         );
+        let merge_open = matches!(self.vp.merging, Some((f, _)) if f == id);
         let merge = if s.voice.speakers.len() > 1 {
             merge
+                .when(merge_open, |d| {
+                    d.bg(rgba_of(t.raised)).border_color(rgba_of(t.text_3))
+                })
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.vp.renaming = None;
                     this.vp.merging = match this.vp.merging {
                         Some((f, _)) if f == id => None,
                         _ => Some((id, None)),
                     };
+                    // The form opens under the row: bring the row (and so the form) into view
+                    // instead of leaving it below the edge of the list.
+                    if this.vp.merging.is_some() {
+                        this.speakers_scroll.scroll_to_item(ix);
+                    }
                     cx.notify();
                 }))
                 .into_any_element()
