@@ -11842,6 +11842,14 @@ msgid "The window was moved or resized. Everything up to there is kept: {n} fram
 msgstr "Cửa sổ đã bị di chuyển hoặc đổi kích thước. Mọi thứ đến đó đều được giữ lại: {n} khung hình, {size}."
 
 #, fuzzy
+msgid "The window was closed. Everything up to there is kept: 1 frame, {size}."
+msgstr "Cửa sổ đã bị đóng. Mọi thứ đến đó đều được giữ lại: 1 khung hình, {size}."
+
+#, fuzzy
+msgid "The window was closed. Everything up to there is kept: {n} frames, {size}."
+msgstr "Cửa sổ đã bị đóng. Mọi thứ đến đó đều được giữ lại: {n} khung hình, {size}."
+
+#, fuzzy
 msgid "A click was not saved: {reason}"
 msgstr "Một lần nhấp chưa được lưu: {reason}"
 

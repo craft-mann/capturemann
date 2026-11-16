@@ -2476,3 +2476,242 @@ fn ls_13_a_wheel_that_moves_far_less_or_more_than_asked_on_a_translucent_header_
         assert_rows_match(&r.image.frame, &page.expected(), "gain");
     }
 }
+
+/// Linux Firefox, Wikipedia and YouTube (QA, Nov 16, 2026): the run ended `no_overlap` mid-page at
+/// the same place every time, while a fresh stitcher joined the same two frames. The run kept the
+/// mask of its first pair (none: the whole width joined then), and a contents list that the page
+/// pinned later made static columns that no shift matches. A pair that does not join is now looked
+/// at again with the side columns that stay put in that pair left out of the comparison.
+#[test]
+fn ls_fix_side_columns_that_became_fixed_after_the_first_pair_are_masked_later() {
+    let page = SyntheticPage::new(240, 1500, 300);
+    // A pinned list of 60 columns, ink in 6 of every 40 rows and white between, the same in every
+    // frame.
+    let with_list = |pos: u32| {
+        let f = page.frame_at(pos);
+        let (w, h) = (f.width(), f.height());
+        let mut data = f.rgba().to_vec();
+        for y in 0..h {
+            for x in 0..60 {
+                let v = (x * 31 + y * 17) as u8;
+                let i = ((y * w + x) * 4) as usize;
+                let px = if y % 40 < 6 {
+                    [v, 40, v ^ 0x55, 255]
+                } else {
+                    [255, 255, 255, 255]
+                };
+                data[i..i + 4].copy_from_slice(&px);
+            }
+        }
+        Frame::new(w, h, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&with_list(0), None);
+    // As after a first pair that joined on the whole width.
+    s.assume_whole_width();
+    let mut pos = 0;
+    for _ in 0..4 {
+        pos += 210;
+        let o = s.push(&with_list(pos), Some(210));
+        assert!(
+            matches!(o, PushOutcome::Added { .. }),
+            "pos {pos}: {o:?}, {:?}",
+            s.last_refusal()
+        );
+    }
+    let out = s.finish().unwrap();
+    assert_eq!(out.frame.width(), 240, "no column is cut");
+    assert_eq!(s.frames(), 5);
+}
+
+/// LS-12 (QA macOS pass 7): four of the five points of the area were covered by other windows and
+/// the run gave up after the third try. Every point the scroller offers is tried.
+#[test]
+fn ls_12_the_last_of_five_points_is_tried_before_nothing_scrolled() {
+    struct Points {
+        view: fake::PageView,
+        at: usize,
+        points: usize,
+    }
+    impl Scroller for Points {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            if self.at < self.points - 1 {
+                return Ok(());
+            }
+            self.view.scroll(d, amount_px)
+        }
+        fn next_point(&mut self) -> bool {
+            if self.at + 1 >= self.points {
+                return false;
+            }
+            self.at += 1;
+            true
+        }
+    }
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let mut src = view.clone();
+    let mut sc = Points {
+        view,
+        at: 0,
+        points: 5,
+    };
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}
+
+/// A scroller that can also scroll back, over a [`fake::PageView`].
+struct Backable(fake::PageView);
+
+impl Scroller for Backable {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.0.scroll(d, amount_px)
+    }
+    fn scroll_back(&mut self, _d: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.0.back(amount_px);
+        Ok(true)
+    }
+}
+
+/// LS-15 (QA macOS pass 7): a run that starts on a page already at its end said `nothing_scrolled`
+/// and kept one frame. It goes to the top first (once) and captures the whole page.
+#[test]
+fn ls_15_a_page_already_at_its_end_is_scrolled_to_the_top_first() {
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    view.clone().scroll(Direction::Vertical, 100_000).unwrap();
+    let mut src = view.clone();
+    let mut sc = Backable(view);
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}
+
+/// ... and a page that scrolls neither way is still `nothing_scrolled`.
+#[test]
+fn ls_15_a_page_that_does_not_scroll_either_way_is_nothing_scrolled() {
+    struct Stuck;
+    impl Scroller for Stuck {
+        fn scroll(&mut self, _d: Direction, _amount_px: u32) -> Result<(), CmError> {
+            Ok(())
+        }
+        fn scroll_back(&mut self, _d: Direction, _amount_px: u32) -> Result<bool, CmError> {
+            Ok(true)
+        }
+    }
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let mut src = page.view();
+    let r = auto_with(&mut src, &mut Stuck);
+    assert_eq!(r.end, EndReason::NothingScrolled);
+}
+
+/// LS-14 (QA macOS pass 7): the target window was closed during the run: `internal` "Failed to
+/// copy data" and no frames. The run ends `window_closed` and keeps the frames it has.
+#[test]
+fn ls_14_a_window_closed_during_the_run_ends_it_and_keeps_the_frames() {
+    struct Dies {
+        view: fake::PageView,
+        grabs: u32,
+        error: fn() -> CmError,
+        says_gone: bool,
+    }
+    impl FrameSource for Dies {
+        fn grab(&mut self) -> Result<Frame, CmError> {
+            self.grabs += 1;
+            if self.grabs > 14 {
+                return Err((self.error)());
+            }
+            self.view.grab()
+        }
+        fn target_gone(&mut self) -> bool {
+            self.says_gone
+        }
+    }
+    let cases: [(fn() -> CmError, bool); 2] = [
+        (|| CmError::not_found("Window 7 not found"), false),
+        (|| CmError::internal("Failed to copy data"), true),
+    ];
+    for (error, says_gone) in cases {
+        let page = SyntheticPage::new(40, 12 * 300, 300);
+        let view = page.view();
+        let mut src = Dies {
+            view: view.clone(),
+            grabs: 0,
+            error,
+            says_gone,
+        };
+        let r = auto_with(&mut src, &mut Backable(view));
+        assert_eq!(r.end, EndReason::WindowClosed, "{says_gone}");
+        assert!(r.image.frames >= 2, "frames kept: {}", r.image.frames);
+    }
+    // An error that is not a closed window still fails the run.
+    let page = SyntheticPage::new(40, 12 * 300, 300);
+    let view = page.view();
+    let mut src = Dies {
+        view: view.clone(),
+        grabs: 0,
+        error: || CmError::internal("boom"),
+        says_gone: false,
+    };
+    let r = run_auto(
+        &mut src,
+        &mut Backable(view),
+        &mut fake::NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    );
+    assert!(r.is_err());
+}
+
+/// A heading that reveals itself (QA macOS, carchargeos.com: "IT approves it. Marketing launches"
+/// had its top half missing at a seam): for the first three grabs after every scroll a band of the
+/// viewport is blank, which looks still (two equal frames) before the page draws it. The frames
+/// are looked at again and the rows they supplied replaced.
+#[test]
+fn ls_seam_a_band_that_is_drawn_late_is_in_the_image() {
+    struct Reveal {
+        view: fake::PageView,
+        since: std::rc::Rc<std::cell::Cell<u32>>,
+    }
+    impl FrameSource for Reveal {
+        fn grab(&mut self) -> Result<Frame, CmError> {
+            self.since.set(self.since.get() + 1);
+            let f = self.view.grab()?;
+            if self.since.get() > 3 {
+                return Ok(f);
+            }
+            let (w, h) = (f.width(), f.height());
+            let mut data = f.rgba().to_vec();
+            for y in 120..160.min(h) {
+                for x in 60..240.min(w) {
+                    let i = ((y * w + x) * 4) as usize;
+                    data[i..i + 4].copy_from_slice(&[255, 255, 255, 255]);
+                }
+            }
+            Frame::new(w, h, data)
+        }
+    }
+    struct Resets {
+        view: fake::PageView,
+        since: std::rc::Rc<std::cell::Cell<u32>>,
+    }
+    impl Scroller for Resets {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.since.set(0);
+            self.view.scroll(d, amount_px)
+        }
+    }
+    let page = SyntheticPage::new(300, 6 * 300, 300);
+    let view = page.clone().view();
+    let since = std::rc::Rc::new(std::cell::Cell::new(0));
+    let mut src = Reveal {
+        view: view.clone(),
+        since: since.clone(),
+    };
+    let mut sc = Resets { view, since };
+    let r = auto_with(&mut src, &mut sc);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, page.expected());
+}

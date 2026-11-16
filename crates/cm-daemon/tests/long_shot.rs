@@ -27,6 +27,8 @@ struct Scripted {
     raised: Arc<Mutex<Vec<u32>>>,
     /// From this page position on, the frames are 4 px narrower (the window was resized).
     narrow_from: Option<u32>,
+    /// From this page position on, the window is gone: grabbing fails like a closed window does.
+    close_from: Option<u32>,
 }
 
 impl Scripted {
@@ -37,6 +39,7 @@ impl Scripted {
             support: AutoScrollSupport::Available,
             raised: Arc::default(),
             narrow_from: None,
+            close_from: None,
         }
     }
 }
@@ -44,6 +47,9 @@ impl Scripted {
 impl FrameSource for Scripted {
     fn grab(&mut self) -> Result<Frame, CmError> {
         let pos = *self.pos.lock().unwrap();
+        if self.close_from.is_some_and(|c| pos >= c) {
+            return Err(CmError::internal("Failed to copy data"));
+        }
         let f = self.page.frame_at(pos);
         if self.narrow_from.is_some_and(|n| pos >= n) {
             let (w, h) = (f.width() as usize, f.height() as usize);
@@ -54,6 +60,11 @@ impl FrameSource for Scripted {
             return Frame::new(w as u32 - 4, h as u32, data);
         }
         Ok(f)
+    }
+
+    fn target_gone(&mut self) -> bool {
+        let pos = *self.pos.lock().unwrap();
+        self.close_from.is_some_and(|c| pos >= c)
     }
 }
 
@@ -216,6 +227,32 @@ async fn ls_2_a_resized_window_ends_the_run_as_window_changed_and_saves() {
     let warnings = out["warnings"].to_string();
     assert!(
         warnings.contains("The window was moved or resized"),
+        "{warnings}"
+    );
+}
+
+/// LS-14 (QA macOS pass 7): the window is closed during the run. Not `internal` "Failed to copy
+/// data" with nothing kept: the run ends `window_closed`, names the window, and stores the frames
+/// it has.
+#[tokio::test]
+async fn ls_14_a_window_closed_during_the_run_ends_it_names_the_window_and_saves() {
+    let mut sys = Scripted::new(SyntheticPage::new(24, 3000, 300));
+    sys.close_from = Some(500);
+    let (d, _c, _dir) = daemon(sys, Decision::Approve);
+    let out = call(&d, agent(), {
+        let mut p = params(json!({}));
+        p["target"] = json!({"window_id": 10});
+        p
+    })
+    .await
+    .unwrap();
+    assert_eq!(out["long_shot"]["end"], "window_closed");
+    assert!(out["capture_id"].as_str().is_some());
+    assert!(out["height"].as_u64().unwrap() > 300);
+    let warnings = out["warnings"].to_string();
+    assert!(warnings.contains("was closed"), "{warnings}");
+    assert_eq!(
+        out["warnings"][0], "The window \"Editor\" was closed",
         "{warnings}"
     );
 }

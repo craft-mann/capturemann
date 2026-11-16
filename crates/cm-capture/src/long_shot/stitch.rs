@@ -79,6 +79,8 @@ pub enum EndReason {
     /// The window was moved or resized while the run went on (the frames are another size, or
     /// the window's rectangle is not where it was): what was captured before is kept.
     WindowChanged,
+    /// The window was closed while the run went on: what was captured before is kept.
+    WindowClosed,
 }
 
 impl EndReason {
@@ -91,6 +93,7 @@ impl EndReason {
                 Some("Nothing scrolled: the area may be covered by another window or the page is not scrollable")
             }
             EndReason::WindowChanged => Some("The window was moved or resized"),
+            EndReason::WindowClosed => Some("The window was closed"),
             EndReason::ReachedEnd | EndReason::StoppedByUser => None,
         }
     }
@@ -1359,6 +1362,17 @@ pub struct Stitcher {
     limit_hit: bool,
     /// Why the last frame was refused (see [`Stitcher::last_refusal`]).
     refusal: Option<String>,
+    /// The rows the last joined frame put into the content: `(first row of the frame, one past
+    /// the last)`, for [`Stitcher::refresh_last`].
+    last_add: Option<(usize, usize)>,
+}
+
+#[cfg(test)]
+impl Stitcher {
+    /// Test only: the state a run is in after a first pair that joined on the whole width.
+    pub(super) fn assume_whole_width(&mut self) {
+        self.trim = Some((0, 0));
+    }
 }
 
 impl Stitcher {
@@ -1378,6 +1392,7 @@ impl Stitcher {
             len: 0,
             limit_hit: false,
             refusal: None,
+            last_add: None,
         }
     }
 
@@ -1450,6 +1465,63 @@ impl Stitcher {
         (self.limits.max_len as usize).min(by_px)
     }
 
+    /// Takes a later look at the position of the last joined frame in place of that frame: the
+    /// page was still drawing when the frame was taken (a heading that reveals itself when it
+    /// scrolls into view: QA macOS, carchargeos.com, the top half of a heading missing at a seam).
+    /// `frame` must be the same size, at the same scroll position (it differs from the last frame
+    /// in at most a few stretches of lines, not as a scroll does). The rows that frame put into
+    /// the image are replaced by the same rows of `frame`. Returns whether anything changed.
+    pub fn refresh_last(&mut self, frame: &Frame) -> bool {
+        let Some(prev) = &self.prev else {
+            return false;
+        };
+        if self.limit_hit || self.size != Some((frame.width(), frame.height())) {
+            return false;
+        }
+        let whole = Lines::from_frame(frame, self.dir);
+        let mut lines = whole.clone();
+        if let Some((l, r)) = self.trim {
+            if (l, r) != (0, 0) {
+                let cross = lines.line_len / 4;
+                lines = lines.cropped(l, cross - r);
+            }
+        }
+        if lines.line_len != prev.line_len || lines.data == prev.data {
+            return false;
+        }
+        // The same position: a few stretches differ, never a scroll (which changes most lines).
+        let flags: Vec<bool> = (0..lines.count).map(|i| !prev.near(i, &lines, i)).collect();
+        let differing = flags.iter().filter(|&&f| f).count();
+        if differing == 0
+            || differing as f64 > REGION_MAX_LINES * lines.count as f64
+            || stretches(&flags) > MAX_REGION_RUNS
+        {
+            return false;
+        }
+        let src = match &self.full {
+            Some(_) => &whole,
+            None => &lines,
+        };
+        if self.frames >= 2 {
+            let (Some((from, to)), line_len) = (self.last_add, src.line_len) else {
+                return false;
+            };
+            let (header, footer) = self.bands.unwrap_or((0, 0));
+            let have = self.content.len() / line_len;
+            if to > src.count || to < from || to - from > have || footer > src.count - header {
+                return false;
+            }
+            self.content.truncate((have - (to - from)) * line_len);
+            self.content.extend_from_slice(src.range(from, to));
+            self.footer = src.range(src.count - footer, src.count).to_vec();
+        }
+        if let Some(f) = self.full.as_mut() {
+            f.prev = whole;
+        }
+        self.prev = Some(lines);
+        true
+    }
+
     /// Adds the next frame. `hint` is the step the scroller meant to scroll, in px; it only
     /// breaks ties between equally good overlaps.
     pub fn push(&mut self, frame: &Frame, hint: Option<u32>) -> PushOutcome {
@@ -1493,6 +1565,33 @@ impl Stitcher {
                 return o;
             }
         }
+        if outcome == PushOutcome::NoOverlap && super::debug::enabled() {
+            // For the dump: which state of the run the pair needs. A fresh look that joins the
+            // pair where the run did not names the culprit (hint, bands or the mask).
+            let fresh = |hint: Option<usize>, bands: Option<(usize, usize)>| match find_join(
+                &prev, &lines, hint, bands,
+            ) {
+                Ok(j) => format!(
+                    "joins at shift {} (header {}, footer {})",
+                    j.shift, j.header, j.footer
+                ),
+                Err(NoJoin::Same) => "same frame".to_string(),
+                Err(NoJoin::NoOverlap(_)) => "no".to_string(),
+            };
+            let note = format!(
+                "; run state: trim {:?}, full mask {:?}, bands {:?}, hint {:?}; same pair with the hint left out: {}; with the bands left out: {}; with both left out: {}",
+                self.trim,
+                self.full.as_ref().map(|f| (f.l, f.r)).or(full.as_ref().map(|f| (f.l, f.r))),
+                self.bands,
+                hint,
+                fresh(None, self.bands),
+                fresh(hint.map(|h| h as usize), None),
+                fresh(None, None),
+            );
+            if let Some(r) = self.refusal.as_mut() {
+                r.push_str(&note);
+            }
+        }
         let added = matches!(outcome, PushOutcome::Added { .. });
         if let (Some(f), Some(w)) = (full.as_mut(), whole) {
             if added {
@@ -1531,23 +1630,57 @@ impl Stitcher {
         if whole_prev.line_len != whole_next.line_len || cross < 4 * (OVERLAY_EDGE_LEFT + 16) {
             return None;
         }
-        let (l, r) = (l0.max(OVERLAY_EDGE_LEFT), r0.max(OVERLAY_EDGE_RIGHT));
-        if (l, r) == (l0, r0) {
-            return None;
-        }
-        let pc = whole_prev.cropped(l, cross - r);
-        let nc = whole_next.cropped(l, cross - r);
-        let fs = FullSides {
-            l,
-            r,
-            prev: whole_prev,
+        // The masks to try, the overlay scrollbar's edges first, then the side columns that stay
+        // put in this pair (a sidebar, a panel, a contents list that the page pinned after the
+        // first pair was looked at: a fresh stitcher finds them from the pair, a run that kept
+        // the mask of its first pair did not: Linux, Firefox, Wikipedia and YouTube, Nov 16,
+        // 2026, `no_overlap` mid-page). Never narrower than the mask the run has.
+        let mut masks = vec![(l0.max(OVERLAY_EDGE_LEFT), r0.max(OVERLAY_EDGE_RIGHT))];
+        // Only when no shift matched at all: a pair that was refused because several shifts match
+        // or the overlap is too little or too alike (a terminal's numbered lines, a page that
+        // overshot) is not made joinable by leaving columns out, which only makes it more alike.
+        let ambiguous = self.refusal.as_deref().is_some_and(|r| {
+            [
+                "shifts match",
+                "shifts explain",
+                "several shifts",
+                "far from the expected",
+                "only look alike",
+            ]
+            .iter()
+            .any(|k| r.contains(k))
+        });
+        let sides = if ambiguous {
+            Vec::new()
+        } else {
+            masked_sides(&whole_prev, &whole_next)
         };
-        let o = self.join(&pc, &nc, size, hint, Some((&fs, &whole_next)));
-        matches!(
-            o,
-            PushOutcome::Added { .. } | PushOutcome::LimitReached { .. }
-        )
-        .then_some((o, l, r, nc))
+        for (sl, sr) in sides {
+            let m = (l0.max(sl), r0.max(sr));
+            if !masks.contains(&m) {
+                masks.push(m);
+            }
+        }
+        for (l, r) in masks {
+            if (l, r) == (l0, r0) || cross.saturating_sub(l + r) < MIN_COMPARED_COLS {
+                continue;
+            }
+            let pc = whole_prev.cropped(l, cross - r);
+            let nc = whole_next.cropped(l, cross - r);
+            let fs = FullSides {
+                l,
+                r,
+                prev: whole_prev.clone(),
+            };
+            let o = self.join(&pc, &nc, size, hint, Some((&fs, &whole_next)));
+            if matches!(
+                o,
+                PushOutcome::Added { .. } | PushOutcome::LimitReached { .. }
+            ) {
+                return Some((o, l, r, nc));
+            }
+        }
+        None
     }
 
     /// Cuts the edge strips from both frames' lines: with the trim chosen so far, or (the first
@@ -1728,6 +1861,7 @@ impl Stitcher {
             self.content.truncate(keep);
             self.content
                 .extend_from_slice(src.range(from - join.guard, from + join.shift));
+            self.last_add = Some((from - join.guard, from + join.shift));
             self.footer = src.range(n - join.footer, n).to_vec();
             self.len = total;
             self.frames += 1;
@@ -1736,6 +1870,7 @@ impl Stitcher {
             };
         }
         // Over the limit: fill up to it, drop the footer (the content under it was cut off).
+        self.last_add = None;
         let take = room.saturating_sub(have).min(join.shift);
         self.content.truncate(keep);
         self.content

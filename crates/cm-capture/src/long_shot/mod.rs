@@ -44,6 +44,13 @@ pub trait FrameSource {
     fn target_changed(&mut self) -> bool {
         false
     }
+
+    /// Whether the window the frames come from no longer exists (it was closed during the run).
+    /// Asked when a grab fails after the first frame: the run then ends with what it has.
+    /// `false` when the source cannot tell.
+    fn target_gone(&mut self) -> bool {
+        false
+    }
 }
 
 /// Scrolls the content under the area. `amount_px` is physical px along `direction`; the
