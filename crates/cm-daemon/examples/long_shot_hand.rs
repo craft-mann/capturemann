@@ -6,12 +6,13 @@
 //! It captures your screen: run it only on a machine set up for that, and delete the output.
 //!
 //! ```text
-//! CM_LONG_SHOT_DEBUG_DIR=/tmp/ls-dbg long_shot_hand --window "<title part>" --secs 20 --out /tmp/ls.png [--area] [--max-px N]
+//! CM_LONG_SHOT_DEBUG_DIR=/tmp/ls-dbg long_shot_hand --window "<title part>" --secs 20 --out /tmp/ls.png [--area] [--max-px N] [--auto]
 //! ```
 //!
 //! `--area` picks the window's rectangle on its display (the overlay's region drag) instead of
 //! the window itself. With `CM_LONG_SHOT_DEBUG_DIR` set, every refused frame is written there
-//! (see `docs/development/long-shot-debug.md`).
+//! (see `docs/development/long-shot-debug.md`). `--auto` lets CaptureMann scroll (the daemon's
+//! point list and the pointer parked off the area); `--secs` is then the safety stop.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -27,6 +28,7 @@ async fn main() {
     cm_capture::ensure_dpi_aware();
     let mut args = std::env::args().skip(1);
     let (mut window, mut out, mut secs, mut area, mut max_px) = (None, None, 20u64, false, None);
+    let mut auto = false;
     while let Some(a) = args.next() {
         match a.as_str() {
             "--window" => window = args.next(),
@@ -34,6 +36,7 @@ async fn main() {
             "--secs" => secs = args.next().and_then(|v| v.parse().ok()).unwrap_or(secs),
             "--max-px" => max_px = args.next().and_then(|v| v.parse::<u32>().ok()),
             "--area" => area = true,
+            "--auto" => auto = true,
             other => panic!("unknown argument {other}"),
         }
     }
@@ -72,7 +75,7 @@ async fn main() {
         eprintln!("stop sent: {ok}");
     });
     let mut params = json!({ "mode": "long", "target": target, "direction": "vertical",
-        "scroll": "hand", "request_id": rid });
+        "scroll": if auto { "auto" } else { "hand" }, "request_id": rid });
     if let Some(m) = max_px {
         params["max_px"] = json!(m);
     }

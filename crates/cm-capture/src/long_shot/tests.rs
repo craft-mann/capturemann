@@ -809,6 +809,104 @@ fn cap_6_smooth_scroll_that_pauses_early_is_not_believed() {
     }
 }
 
+/// Real pages, Nov 16, 2026 (Linux Firefox, macOS Chrome): a browser animates every wheel step
+/// and the animation looks settled for a grab or two part-way. The distance learned from such a
+/// frame was far too short (a third, a half), the next step overshot the overlap and the run
+/// ended `no_overlap` after 3 frames. The frame is now looked at again after a longer wait
+/// before it is believed, and what arrives late is joined on top.
+#[test]
+fn cap_6_smooth_scroll_on_every_step_with_pauses_does_not_poison_the_distance() {
+    for ratio in [1.0, 1.7, 0.6] {
+        for shares in [
+            &[0.3, 0.3, 0.55, 0.55, 1.0][..],
+            &[0.2, 0.2, 0.2, 0.7, 0.7, 1.0][..],
+            &[0.4, 0.4, 1.0][..],
+            &[0.5, 0.5, 0.5, 1.0][..],
+            &[0.6, 0.6, 1.0][..],
+            &[0.7, 0.7, 0.7, 1.0][..],
+            &[0.35, 0.55, 0.55, 1.0][..],
+        ] {
+            let page = SyntheticPage::new(40, 12 * 300, 300);
+            let view = page
+                .clone()
+                .view()
+                .with_gain(ratio)
+                .with_smooth_every_scroll(shares);
+            let (mut src, mut sc) = (view.clone(), view);
+            let r = run_auto(
+                &mut src,
+                &mut sc,
+                &mut NoSleep::default(),
+                cfg(page.direction),
+                &mut || false,
+                &mut |_| {},
+            )
+            .unwrap();
+            assert_eq!(
+                r.end,
+                EndReason::ReachedEnd,
+                "ratio {ratio} shares {shares:?}"
+            );
+            assert_eq!(
+                r.image.frame,
+                page.expected(),
+                "ratio {ratio} shares {shares:?}"
+            );
+        }
+    }
+}
+
+/// A wheel that moves more for a big request than for a small one (macOS Chrome, Nov 16, 2026:
+/// the first 480 px moved 480, a request of 1140 moved about 1355, past the overlap, and every
+/// later step needed the scroll-back ladder, which gave up on the third page). A step that
+/// needed the ladder teaches the driver to ask for a smaller share of the area.
+struct BigStepGain {
+    view: fake::PageView,
+    threshold: u32,
+    big: f64,
+    backs: u32,
+}
+
+impl Scroller for BigStepGain {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        let g = if amount_px > self.threshold {
+            self.big
+        } else {
+            1.0
+        };
+        self.view.scroll(d, (f64::from(amount_px) * g) as u32)
+    }
+    fn scroll_back(&mut self, d: Direction, amount_px: u32) -> Result<bool, CmError> {
+        let _ = d;
+        self.backs += 1;
+        self.view.back(amount_px);
+        Ok(true)
+    }
+}
+
+#[test]
+fn cap_6_a_wheel_that_moves_more_for_big_steps_does_not_need_the_ladder_every_time() {
+    for big in [1.25, 1.4, 1.6] {
+        let page = SyntheticPage::new(40, 30 * 300, 300);
+        let view = page.clone().view();
+        let mut src = view.clone();
+        let mut sc = BigStepGain {
+            view,
+            threshold: 120,
+            big,
+            backs: 0,
+        };
+        let r = auto_with(&mut src, &mut sc);
+        assert_eq!(r.end, EndReason::ReachedEnd, "big {big}");
+        assert_eq!(r.image.frame, page.expected(), "big {big}");
+        assert!(
+            sc.backs <= 4,
+            "big {big}: the ladder was needed {} times",
+            sc.backs
+        );
+    }
+}
+
 /// A frame source that draws something over what the page shows: a browser's toolbar, a noise
 /// block. `over` gets the page position, the frame's size and its pixels as RGBA.
 struct Overlaid<F: FnMut(u32, u32, u32, &mut [u8])> {
@@ -838,6 +936,119 @@ impl Scroller for Tracking {
         self.view.scroll(d, amount_px)?;
         self.pos.set(self.pos.get() + amount_px);
         Ok(())
+    }
+}
+
+/// A real page, docs.rs in Firefox on Linux (Nov 16, 2026): the browser's toolbar is a fixed band,
+/// but the first pair saw blank page rows under it as equal too (a header of 133 rows for a bar of
+/// 105). When the page showed text there, every later pair was refused ("a fixed band changed"),
+/// and the pair found again from itself had a footer of its own (blank rows at the bottom of the
+/// page, equal in both frames), which was refused as a wider band. Both are looked at again with
+/// the bands the capture had, and the run reaches the end of the page.
+#[test]
+fn cap_6_a_header_band_that_reached_into_blank_rows_and_a_blank_page_end_still_join() {
+    let chrome = |pos: u32, w: u32, h: u32, data: &mut [u8]| {
+        for y in 0..105 {
+            for x in 0..w {
+                let v = (x * 7 + y * 13) ^ (x >> 2);
+                let i = ((y * w + x) * 4) as usize;
+                data[i..i + 4].copy_from_slice(&[v as u8, (v >> 3) as u8, 90, 255]);
+            }
+        }
+        // The page's own first rows under the bar are blank at the top of the page.
+        let blank = |data: &mut [u8], from: u32, to: u32| {
+            for y in from..to {
+                for x in 0..w {
+                    let i = ((y * w + x) * 4) as usize;
+                    data[i..i + 4].copy_from_slice(&[255, 255, 255, 255]);
+                }
+            }
+        };
+        if pos < 400 {
+            blank(data, 105, 133);
+        }
+        // And its last rows are blank at the bottom.
+        if pos >= 1200 {
+            blank(data, h - 14, h);
+        }
+    };
+    let page = SyntheticPage::new(600, 6 * 600, 600);
+    let view = page.clone().view();
+    let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+    let mut src = Overlaid {
+        view: view.clone(),
+        pos: pos.clone(),
+        over: chrome,
+    };
+    let mut sc = Tracking { view, pos };
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert!(r.image.frames >= 5, "{} frames", r.image.frames);
+    assert!(r.image.frame.height() > 2500, "{}", r.image.frame.height());
+}
+
+/// A real page, Wikipedia on a Retina Chrome window (Nov 16, 2026, Linux and macOS: `no_overlap`
+/// after one frame): the text matches exactly at the true shift, but a column beside it (the
+/// infobox, drawn at a fraction of a pixel; a hover card; a thumbnail preview) differs in every
+/// frame, in a third of the width. No per-line tolerance covers a third of a line; the join is
+/// found on the columns that hold the text, and only then. A page that jumped past the overlap
+/// still ends `no_overlap` (the band matches nothing there).
+#[test]
+fn cap_6_a_third_of_the_width_that_changes_in_every_frame_does_not_stop_the_join() {
+    let over = |_: u32, w: u32, h: u32, data: &mut [u8]| {
+        // Noise that depends on where the page is (what the first rows show), so that two
+        // grabs of the same place are equal and two places never are.
+        let seed: u32 = data[..4 * 64].iter().map(|b| u32::from(*b)).sum();
+        for y in 0..h {
+            for x in (w * 7 / 10)..w {
+                let v = (seed * 31 + y * 17 + x * 5) % 251;
+                let i = ((y * w + x) * 4) as usize;
+                data[i..i + 4].copy_from_slice(&[v as u8, (v / 2) as u8, 40, 255]);
+            }
+        }
+    };
+    for jump in [false, true] {
+        let mut page = SyntheticPage::new(800, 8 * 600, 600);
+        if jump {
+            page = page.with_jump(2600, 1500);
+        }
+        let view = page.clone().view();
+        let pos = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut src = Overlaid {
+            view: view.clone(),
+            pos: pos.clone(),
+            over,
+        };
+        let mut sc = Tracking { view, pos };
+        let r = run_auto(
+            &mut src,
+            &mut sc,
+            &mut NoSleep::default(),
+            cfg(Direction::Vertical),
+            &mut || false,
+            &mut |_| {},
+        )
+        .unwrap();
+        if jump {
+            assert_eq!(r.end, EndReason::NoOverlap, "a jump is never joined");
+            continue;
+        }
+        assert_eq!(r.end, EndReason::ReachedEnd);
+        let want = page.expected();
+        assert_eq!(r.image.frame.height(), want.height());
+        for y in 0..want.height() {
+            for x in [0, 100, 300] {
+                assert_eq!(r.image.frame.pixel(x, y), want.pixel(x, y), "at {x},{y}");
+            }
+        }
     }
 }
 

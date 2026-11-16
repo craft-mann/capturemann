@@ -432,11 +432,19 @@ fn find_join_opt(
                     if same_but_for_a_region(a, b) {
                         return Err(NoJoin::Same);
                     }
-                    match find_join_robust(a, b, hint, bands) {
-                        Err(NoJoin::NoOverlap(robust)) => Err(NoJoin::NoOverlap(format!(
-                            "{strict}; with up to {} differing pixels per line allowed: {lenient}; with stretches of lines left out: {robust}",
-                            max_px.max(LENIENT_MIN_PX)
-                        ))),
+                    match find_join_robust(a, b, hint, bands, ROBUST_MIN_INK) {
+                        Err(NoJoin::NoOverlap(robust)) => {
+                            // A column that scrolls by another amount than the text (a table
+                            // beside it at a fraction of a pixel, a card the pointer opened):
+                            // the last look is at a band of columns that holds the text.
+                            if let Some(j) = find_join_banded(a, b, hint, bands) {
+                                return Ok(j);
+                            }
+                            Err(NoJoin::NoOverlap(format!(
+                                "{strict}; with up to {} differing pixels per line allowed: {lenient}; with stretches of lines left out: {robust}; with a band of columns: no shift matches",
+                                max_px.max(LENIENT_MIN_PX)
+                            )))
+                        }
                         other => other,
                     }
                 }
@@ -482,6 +490,7 @@ fn find_join_robust(
     b: &Lines,
     hint: Option<usize>,
     bands: Option<(usize, usize)>,
+    min_ink: usize,
 ) -> Result<Join, NoJoin> {
     let n = a.count;
     if a.data == b.data {
@@ -525,7 +534,7 @@ fn find_join_robust(
         let overlap = cw - s;
         let g = GUARD.min(overlap / 3);
         let compared = overlap - 2 * g;
-        if compared < ROBUST_MIN_INK {
+        if compared < min_ink {
             break;
         }
         let allowed = (compared as f64 * ROBUST_BAD_SHARE) as usize;
@@ -564,7 +573,7 @@ fn find_join_robust(
                 }
             }
         }
-        if ok && ink_ok >= ROBUST_MIN_INK && ink_ok >= ROBUST_INK_RATIO * ink_bad {
+        if ok && ink_ok >= min_ink && ink_ok >= ROBUST_INK_RATIO * ink_bad {
             found.push((s, ink_ok, ink_bad));
         }
     }
@@ -602,6 +611,75 @@ fn find_join_robust(
         header,
         footer,
     })
+}
+
+/// Bands of columns (as shares of the width) tried by [`find_join_banded`]: the left two thirds,
+/// the right two thirds, the middle and the two halves.
+const COLUMN_BANDS: [(f64, f64); 5] =
+    [(0.0, 0.65), (0.35, 1.0), (0.2, 0.8), (0.0, 0.5), (0.5, 1.0)];
+/// Ink lines that must match exactly in a band (more than for all columns: less is compared).
+const BANDED_MIN_INK: usize = 80;
+/// A band has to hold moving content: at least this share of the content lines differ in it
+/// between the two frames when they are not shifted (a fixed column matches at every shift).
+const BANDED_MIN_MOVING: f64 = 0.25;
+/// Share of the ink lines of a band's overlap that must differ from each other.
+const BANDED_MIN_DISTINCT: f64 = 0.8;
+/// The narrowest frame for which a band of columns means anything, in px.
+const BANDED_MIN_WIDTH: usize = 200;
+
+/// The last look at two frames that did not join: the join is looked for in a band of columns
+/// only, and believed when every line of it matches exactly (a few stretches excepted, as in
+/// [`find_join_robust`]) over at least [`BANDED_MIN_INK`] lines that carry ink, and that one shift
+/// beats the others clearly. For pages where a column scrolls by a slightly different amount than
+/// the text beside it (a real page, the Wikipedia infobox on a Retina Chrome window, Nov 16, 2026:
+/// the text matched exactly at a shift of 489 lines and the table's glyph edges did not), or where
+/// a hover card, a thumbnail preview or a floating panel changes a third of the width.
+///
+/// A band must hold moving content ([`BANDED_MIN_MOVING`]): fixed columns match at any shift and
+/// cannot tell one from another, which made a wrong join (doubled text) when the columns that
+/// differ were left out after a shift had been picked from the rest.
+fn find_join_banded(
+    a: &Lines,
+    b: &Lines,
+    hint: Option<usize>,
+    bands: Option<(usize, usize)>,
+) -> Option<Join> {
+    let cross = a.line_len / 4;
+    if cross < BANDED_MIN_WIDTH || a.count != b.count || a.line_len != b.line_len {
+        return None;
+    }
+    let (header, footer) = bands.unwrap_or((0, 0));
+    let n = a.count;
+    if header + footer >= n {
+        return None;
+    }
+    for (f0, f1) in COLUMN_BANDS {
+        let (c0, c1) = ((cross as f64 * f0) as usize, (cross as f64 * f1) as usize);
+        let (ac, bc) = (a.cropped(c0, c1), b.cropped(c0, c1));
+        let moving = (header..n - footer)
+            .filter(|&i| !ac.near(i, &bc, i) && (!flat(ac.line(i)) || !flat(bc.line(i))))
+            .count();
+        if (moving as f64) < BANDED_MIN_MOVING * (n - header - footer) as f64 {
+            continue;
+        }
+        if let Ok(j) = find_join_robust(&ac, &bc, hint, bands, BANDED_MIN_INK) {
+            // The lines the shift was believed on have to differ from each other: rows that
+            // repeat (a list of alike rows, tinted stripes) match at many shifts, and the band
+            // of columns that leaves out what tells them apart cannot say which is the true one.
+            let mut seen = std::collections::HashSet::new();
+            let mut ink = 0usize;
+            for i in header + j.shift..n - footer {
+                if !flat(ac.line(i)) {
+                    ink += 1;
+                    seen.insert(ac.hashes[i]);
+                }
+            }
+            if ink >= BANDED_MIN_INK && seen.len() as f64 >= BANDED_MIN_DISTINCT * ink as f64 {
+                return Some(j);
+            }
+        }
+    }
+    None
 }
 
 /// Rows between two differing stretches that still count as one.
@@ -1590,9 +1668,25 @@ impl Stitcher {
                 // A band that went away (a sticky header that hides while the page scrolls
                 // down): the bands are found again from this pair, and only narrower ones are
                 // accepted. The rows that were band become content.
-                let (Some((h, f)), Ok(j)) = (self.bands, find_join(prev, lines, hint, None)) else {
+                let again = find_join(prev, lines, hint, None);
+                if let (Some(_), Err(NoJoin::NoOverlap(why2))) = (self.bands, &again) {
+                    if let Some(r) = self.refusal.as_mut() {
+                        r.push_str(&format!("; with the bands found again: {why2}"));
+                    }
+                }
+                let (Some((h, f)), Ok(mut j)) = (self.bands, again) else {
                     return PushOutcome::NoOverlap;
                 };
+                // Rows at the bottom that are equal in this pair only (blank page, the window's
+                // edge) are not a footer the capture had: the join is looked for again with the
+                // footer it had (docs.rs in Firefox, Nov 16, 2026: a header band of 133 rows that
+                // reached into blank page rows, then a pair whose bottom 14 rows were equal).
+                if j.header <= h && j.footer > f {
+                    match find_join(prev, lines, hint, Some((j.header, f))) {
+                        Ok(j2) => j = j2,
+                        Err(_) => return PushOutcome::NoOverlap,
+                    }
+                }
                 if j.header > h || j.footer > f || (j.header == h && j.footer == f) {
                     return PushOutcome::NoOverlap;
                 }

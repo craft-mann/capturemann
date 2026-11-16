@@ -414,6 +414,7 @@ impl SyntheticPage {
             jumped: false,
             scrolls: 0,
             smooth: Vec::new(),
+            smooth_all: false,
             pending: None,
             gain: 1.0,
         })))
@@ -434,6 +435,8 @@ struct State {
     scrolls: u32,
     /// Smooth scrolling: the share of the scroll distance shown at each grab after a scroll.
     smooth: Vec<f64>,
+    /// Every scroll animates (not only the first).
+    smooth_all: bool,
     /// (start, target, next entry of `smooth`) of the scroll in flight.
     pending: Option<(u32, u32, usize)>,
     /// What the wheel moves per px asked (a real one differs from what was meant).
@@ -459,6 +462,27 @@ impl PageView {
     /// one per grab (a repeated share looks settled; the last one stays). Later scrolls are instant.
     pub fn with_smooth(self, shares: &[f64]) -> Self {
         self.0.borrow_mut().smooth = shares.to_vec();
+        self
+    }
+}
+
+impl PageView {
+    /// Moves the content back (up or left) by `amount_px` times the wheel's gain, instantly.
+    /// An inherent method: the view as a [`Scroller`] cannot scroll back, as before.
+    pub fn back(&self, amount_px: u32) {
+        let mut s = self.0.borrow_mut();
+        let by = (f64::from(amount_px) * s.gain).round() as u32;
+        s.pos = s.pos.saturating_sub(by);
+    }
+
+    /// [`PageView::with_smooth`] for every scroll: a browser animating each wheel step, with a
+    /// pause part-way that looks settled for a grab or two.
+    pub fn with_smooth_every_scroll(self, shares: &[f64]) -> Self {
+        {
+            let mut s = self.0.borrow_mut();
+            s.smooth = shares.to_vec();
+            s.smooth_all = true;
+        }
         self
     }
 }
@@ -491,7 +515,7 @@ impl Scroller for PageView {
             }
         }
         let target = pos.min(s.page.max_pos());
-        if s.smooth.is_empty() || s.scrolls > 1 {
+        if s.smooth.is_empty() || (s.scrolls > 1 && !s.smooth_all) {
             s.pos = target;
         } else {
             s.pending = Some((s.pos, target, 0));

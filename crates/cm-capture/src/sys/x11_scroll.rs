@@ -16,6 +16,8 @@ use crate::long_shot::{Direction, Scroller};
 /// per app (GTK, Qt, browsers) and is learned by the driver from the joins.
 const PX_PER_CLICK: u32 = 80;
 const CLICK_GAP: Duration = Duration::from_millis(3);
+/// How long the application gets to see the pointer arrive before the wheel clicks.
+const ENTER_WAIT: Duration = Duration::from_millis(60);
 
 /// True when an X server answers and has the XTEST extension.
 pub fn xtest_available() -> bool {
@@ -32,6 +34,8 @@ struct X11Scroller {
     conn: RustConnection,
     root: u32,
     anchor: Option<(i32, i32)>,
+    /// Where the pointer rests after the wheel (see [`Scroller::park_at`]).
+    park: Option<(i32, i32)>,
 }
 
 impl X11Scroller {
@@ -52,6 +56,10 @@ impl Scroller for X11Scroller {
         self.wheel(direction, amount_px, false)?;
         Ok(true)
     }
+
+    fn park_at(&mut self, point: Option<(i32, i32)>) {
+        self.park = point;
+    }
 }
 
 impl X11Scroller {
@@ -68,6 +76,16 @@ impl X11Scroller {
                 y.clamp(0, i32::from(i16::MAX)) as i16,
             );
             self.fake(MOTION_NOTIFY_EVENT, 0, x, y)?;
+            // A pointer that rests outside the window (see `park`) enters it with this motion:
+            // the application has to see the pointer arrive before the first wheel click, else
+            // the click goes to what was under the pointer (Firefox, Nov 16, 2026: scrolling
+            // stopped after a few steps once the pointer was parked outside the window).
+            if self.park.is_some() {
+                self.conn
+                    .flush()
+                    .map_err(|e| CmError::internal(format!("the X connection failed: {e}")))?;
+                std::thread::sleep(ENTER_WAIT);
+            }
         }
         // Forward is down (button 5) or right (button 7), back is up (4) or left (6).
         let button = match (direction, forward) {
@@ -84,6 +102,18 @@ impl X11Scroller {
                 .map_err(|e| CmError::internal(format!("the X connection failed: {e}")))?;
             std::thread::sleep(CLICK_GAP);
         }
+        if let Some((x, y)) = self.park {
+            // The wheel events are queued before the motion, so they reach the window that was
+            // under the anchor; the pointer then leaves, and nothing under it reacts.
+            let (x, y) = (
+                x.clamp(0, i32::from(i16::MAX)) as i16,
+                y.clamp(0, i32::from(i16::MAX)) as i16,
+            );
+            self.fake(MOTION_NOTIFY_EVENT, 0, x, y)?;
+            self.conn
+                .flush()
+                .map_err(|e| CmError::internal(format!("the X connection failed: {e}")))?;
+        }
         Ok(())
     }
 }
@@ -93,5 +123,10 @@ pub fn scroller(anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, 
     let (conn, screen) = RustConnection::connect(None)
         .map_err(|e| CmError::internal(format!("cannot reach the X server: {e}")))?;
     let root = conn.setup().roots[screen].root;
-    Ok(Box::new(X11Scroller { conn, root, anchor }))
+    Ok(Box::new(X11Scroller {
+        conn,
+        root,
+        anchor,
+        park: None,
+    }))
 }
