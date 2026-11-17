@@ -25,7 +25,7 @@ through MCP and a CLI.
 </p>
 
 <p align="center">
-  <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
+  <img alt="The CaptureMann editor: a screen recording with webcam, timeline and captions, the transcript, meeting minutes and publish options beside it, and a long screenshot and an agent request around the window" src="docs/images/editor.webp" width="900">
 </p>
 
 ## Features
