@@ -236,9 +236,11 @@ fn no_word_starts_before_the_speech_does() {
             "-f",
             "lavfi",
             "-i",
-            "sine=frequency=300:duration=2",
+            // 2 s of a quiet room (not exact zeros: digital silence of a second or more is never
+            // read, AI-1.AC15), then 2 s of a tone.
+            "aevalsrc=if(lt(t\\,2)\\,0.001*sin(2*PI*50*t)\\,0.5*sin(2*PI*300*t)):d=4:s=48000",
         ])
-        .args(["-af", "adelay=2000", "-ar", "48000", "-ac", "1", "-y"])
+        .args(["-ar", "48000", "-ac", "1", "-y"])
         .arg(dir.path().join("mic.wav"))
         .status()
         .unwrap()

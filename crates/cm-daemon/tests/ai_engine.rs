@@ -90,6 +90,7 @@ async fn rig() -> Option<Rig> {
         title: "AI fixture".into(),
         secs: 20,
         pause: None,
+        mic_room: true,
         ..FixtureSpec::default()
     };
     let fx = make_fixture(&tools, lib.path(), &spec).unwrap();

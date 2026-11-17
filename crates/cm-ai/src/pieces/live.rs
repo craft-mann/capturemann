@@ -109,7 +109,7 @@ impl LiveTranscription {
     /// left. `None` when the finished pieces are not a prefix of the batch plan of `samples` (the
     /// file is not the one that was followed), in which case the job starts from the first piece.
     pub fn to_batch_checkpoint(&self, samples: &[f32]) -> Option<super::Checkpoint> {
-        let plan = super::plan(samples);
+        let plan = super::plan_spans(samples);
         let done = if self.from == 0 {
             0
         } else {

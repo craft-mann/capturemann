@@ -171,6 +171,10 @@ pub struct FixtureSpec {
     /// An audio recording: microphone and system audio only, no screen, camera or cursor.
     pub audio_only: bool,
     pub pause: Option<FixturePause>,
+    /// The microphone between the beeps is a faint room noise instead of exact zeros. Digital
+    /// silence of a second or more is never given to the speech engine (AI-1.AC15), so a test that
+    /// wants one engine call over the whole file sets this.
+    pub mic_room: bool,
     /// `edits[0].layout.camera` (the bubble at stop).
     pub camera_layout: Value,
 }
@@ -191,6 +195,7 @@ impl Default for FixtureSpec {
                 at_s: 5.5,
                 len_s: 1.0,
             }),
+            mic_room: false,
             camera_layout: json!({
                 "visible": true, "shape": "circle", "rect": [0.70, 0.55, 0.20, 0.36],
                 "mirror": true, "size": "m"
@@ -505,7 +510,8 @@ pub fn make_fixture(tools: &Tools, library: &Path, spec: &FixtureSpec) -> Result
         ));
         a.push("-af".into());
         a.push(format!(
-            "volume=volume=0.6,volume=volume=0:enable='not({})',aformat=sample_fmts=flt:channel_layouts=mono",
+            "volume=volume=0.6,volume=volume={}:enable='not({})',aformat=sample_fmts=flt:channel_layouts=mono",
+            if spec.mic_room { "0.0005" } else { "0" },
             flash_enable(spec, shift)
         ));
         a.extend(s(&["-c:a", "pcm_f32le"]));

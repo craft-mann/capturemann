@@ -10,6 +10,16 @@ use cm_core::CmError;
 /// Sample rate Whisper expects.
 pub const SAMPLE_RATE: u32 = 16_000;
 
+/// A sample counts as digital silence (a muted microphone writes exact zeros) when its size is
+/// below one 16-bit step. The tolerance (instead of `== 0.0`) keeps zeros that a resampler or a
+/// float-to-integer conversion turned into values near 1e-9 inside the run.
+pub const DIGITAL_ZERO: f32 = 1.0 / 32768.0;
+
+/// Whether every sample of `frame` is digital silence ([`DIGITAL_ZERO`]).
+pub fn is_digital_silence(frame: &[f32]) -> bool {
+    frame.iter().all(|s| s.abs() < DIGITAL_ZERO)
+}
+
 /// Decodes the first audio stream of `file` to mono 16 kHz `f32` samples. Memory is 4 bytes per
 /// sample (about 230 MB for a one-hour recording).
 pub fn decode_16k_mono(file: &Path) -> Result<Vec<f32>, CmError> {
