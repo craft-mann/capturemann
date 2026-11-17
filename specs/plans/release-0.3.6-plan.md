@@ -24,6 +24,16 @@ Status: **scope only; nothing built.** Quick Capture was first added to 0.3.5 an
 
 The bugs and checks moved out of 0.3.5 (section 8 of the 0.3.5 plan), and whatever the QA agent passes and users report for 0.3.4 and 0.3.5.
 
+## 2b. Findings from QA pass 1 on macOS (0.3.4 files, Nov 17, 2026; report `verification/QA-0.3.5-pass1-macos-2026-11-17-claude.md`, PARTIAL: no P1 found, 5 polish)
+
+| Id | Finding | Seen |
+| --- | --- | --- |
+| F4 | `capture screenshot --window -` matches the first window whose title contains "-" with no ambiguity error, and captured an unrelated private window. Needed: an `ambiguous_target` error when more than one window matches. (Privacy-adjacent; offered to 0.3.5 for the maintainer's decision.) | once |
+| F1 | A text file named `.png` is rejected with "The video codec Png is not supported yet." (treated as video). | once |
+| F2 | `annotate` accepts a rect of width 5,000,000 with no warning and stores it as a revision. | once |
+| F5 | In Vietnamese the Click Guide tile label wraps to two lines and the "Xem trước" Preview pill touches the icon (related to D28, CG-11). | once |
+| F3 | Long Shot leaves the target page scrolled about 150 px (known, D13). | once |
+
 ## 3. To write before the build
 
 Tracks, order and exit criteria (as in the 0.3.5 plan: Phase 0 done, parallel tracks on disjoint files, one full gate, QA agent passes on the candidates, `cm-regress` on all three systems). Open points to check when the build starts: "Long Shot extends this area" and "Record exactly this area" from the after-capture bar start a capture from a region that already exists, which is more than adding a surface.
