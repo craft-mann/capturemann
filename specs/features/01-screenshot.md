@@ -21,6 +21,7 @@
 - **AC5** Given Region mode, when the pointer hovers a window and the user clicks without dragging (movement < 4 px), then that window is captured.
 - **AC6** Given the overlay is open, when the user presses Esc, then the overlay closes and nothing is saved.
 - **AC7** Given multiple displays, when Region mode opens, then each display gets its own frozen overlay and a selection can't cross displays.
+- **AC8** (agent interface, 0.3.5, BUG-9) Given a window chosen by title text (CLI `capture screenshot --window <text>`, and the same for Long Shot, `record start --window` and `guide start --window`), when more than one window title (or app name) contains the text and no window's title equals it case-insensitively, then the call fails with `invalid_input`, `error.data.reason` `ambiguous_target` and `error.data.matches` (`[{ id, app, title }]`), the message lists the matches, and nothing is captured; an exact title match wins over partial ones; exactly one match works; no match is `not_found`. A window id is never ambiguous. The MCP tools take window ids only. Choosing a window in the picker is unchanged.
 
 **Edge cases and errors**
 - Screen Recording permission missing (macOS) → overlay doesn't open; a dialog explains the permission with an "Open System Settings" button; MCP returns `permission_missing` (`screen`).

@@ -41,7 +41,7 @@ pub struct GuideStartArgs {
     /// Display id to follow (see `targets`; default: the primary display).
     #[arg(long, value_name = "ID", conflicts_with = "window")]
     pub display: Option<u32>,
-    /// Follow one window: its id, or a case-insensitive substring of its title or app name.
+    /// Follow one window: its id, or a case-insensitive substring of its title or app name. An exact title wins; several partial matches fail with `ambiguous_target` and list their ids.
     #[arg(long, value_name = "ID|TITLE", conflicts_with_all = ["display", "region"])]
     pub window: Option<String>,
     /// Follow a region `x,y,w,h` in physical px, relative to the display.

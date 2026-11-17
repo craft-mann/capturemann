@@ -221,6 +221,48 @@ async fn screenshot_unknown_window_is_not_found_exit_2() {
     assert!(o.err.starts_with("error[not_found]"), "{}", o.err);
 }
 
+/// CAP-1.AC8 (BUG-9): two windows whose titles contain the text are never guessed between:
+/// `invalid_input` (exit 2), `data.reason: ambiguous_target`, the matches listed; an exact
+/// title wins; one partial match works.
+#[tokio::test]
+async fn screenshot_window_ambiguous_title_is_invalid_input_exit_2() {
+    let backend = FakeBackend::new()
+        .with_display(1, 0, 0, 400, 300, 2.0)
+        .with_window(20, "Mail - work", "Mail", 100, 1, (0, 0, 50, 50), false)
+        .with_window(21, "Mail - private", "Mail", 100, 1, (0, 0, 60, 60), false)
+        .with_window(22, "Mail", "Mail", 100, 1, (0, 0, 70, 70), false)
+        .with_window(23, "Calendar", "Cal", 101, 1, (0, 0, 80, 80), false);
+    let r = rig_with(backend);
+    let amb = cli(
+        &r,
+        &["capture", "screenshot", "--window", "mail -", "--json"],
+    )
+    .await;
+    assert_eq!(amb.code, 2, "{}", amb.err);
+    let e = serde_json::from_str::<Value>(&amb.err).unwrap();
+    assert_eq!(e["error"]["code"], "invalid_input");
+    assert_eq!(e["error"]["data"]["reason"], "ambiguous_target");
+    let ids: Vec<u64> = e["error"]["data"]["matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["id"].as_u64().unwrap())
+        .collect();
+    assert!(ids.contains(&20) && ids.contains(&21), "{ids:?}");
+    let msg = e["error"]["message"].as_str().unwrap();
+    assert!(
+        msg.contains("Mail - private") && msg.contains("20"),
+        "{msg}"
+    );
+    // The exact title wins over the partial matches.
+    let exact = cli(&r, &["capture", "screenshot", "--window", "MAIL", "--json"]).await;
+    assert_eq!(exact.code, 0, "{}", exact.err);
+    assert_eq!(exact.json()["width"], 70);
+    // One partial match works.
+    let one = cli(&r, &["capture", "screenshot", "--window", "priv", "--json"]).await;
+    assert_eq!(one.code, 0, "{}", one.err);
+}
+
 /// CAP-5: delay outside 0..=30 s is invalid_input (exit 2); a valid delay works.
 #[tokio::test]
 async fn screenshot_delay_is_validated_by_the_daemon() {

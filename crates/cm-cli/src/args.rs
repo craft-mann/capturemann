@@ -630,7 +630,7 @@ pub struct ScreenshotArgs {
     /// Display id (see `targets`).
     #[arg(long, value_name = "ID", conflicts_with_all = ["window", "pick"])]
     pub display: Option<u32>,
-    /// Window id, or a case-insensitive substring of its title or app name.
+    /// Window id, or a case-insensitive substring of its title or app name. An exact title wins; several partial matches fail with `ambiguous_target` and list their ids.
     #[arg(long, value_name = "ID|TITLE", conflicts_with_all = ["display", "region", "pick"])]
     pub window: Option<String>,
     /// Region `x,y,w,h` in physical px, relative to the display (default: primary display).
@@ -1412,7 +1412,7 @@ pub struct RecordStartArgs {
     /// Display id to record (see `targets`; default: the primary display).
     #[arg(long, value_name = "ID", conflicts_with = "window")]
     pub display: Option<u32>,
-    /// Record one window: its id, or a case-insensitive substring of its title or app name.
+    /// Record one window: its id, or a case-insensitive substring of its title or app name. An exact title wins; several partial matches fail with `ambiguous_target` and list their ids.
     #[arg(long, value_name = "ID|TITLE", conflicts_with_all = ["display", "region"])]
     pub window: Option<String>,
     /// Record a region `x,y,w,h` in physical px, relative to the display.

@@ -210,7 +210,7 @@ Options (plus the [global flags](#global-flags)):
 | Flag | Value | Allowed values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--display` | `<ID>` |  |  | Display id (see `targets`) |
-| `--window` | `<ID\|TITLE>` |  |  | Window id, or a case-insensitive substring of its title or app name |
+| `--window` | `<ID\|TITLE>` |  |  | Window id, or a case-insensitive substring of its title or app name. An exact title wins; several partial matches fail with `ambiguous_target` and list their ids |
 | `--region` | `<X,Y,W,H>` |  |  | Region `x,y,w,h` in physical px, relative to the display (default: primary display) |
 | `--pick` | switch |  |  | Let the desktop's own picker choose a window, a region or a screen (Wayland sessions, where windows have no ids). A person at the screen must choose; Esc cancels (exit 3) |
 | `--delay` | `<SECONDS>` |  |  | Wait this many seconds (0 to 30) before capturing |
@@ -961,7 +961,7 @@ Options (plus the [global flags](#global-flags)):
 | `--preset` | `<PRESET>` | room, online, lecture, product, note |  | Use case of an audio recording: `room` (interview, 1:1, meeting around a laptop), `online` (call: adds system audio), `lecture`, `product` (demo call: adds system audio) or `note` (voice note) |
 | `--people` | `<N>` |  |  | How many people speak (1 to 8), for an audio recording: stored with it and used by the automatic speaker step. Leave it out when you do not know |
 | `--display` | `<ID>` |  |  | Display id to record (see `targets`; default: the primary display) |
-| `--window` | `<ID\|TITLE>` |  |  | Record one window: its id, or a case-insensitive substring of its title or app name |
+| `--window` | `<ID\|TITLE>` |  |  | Record one window: its id, or a case-insensitive substring of its title or app name. An exact title wins; several partial matches fail with `ambiguous_target` and list their ids |
 | `--region` | `<X,Y,W,H>` |  |  | Record a region `x,y,w,h` in physical px, relative to the display |
 | `--size` | `<SIZE>` | source, 2160p, 1440p, 1080p, 720p |  | Output size |
 | `--fps` | `<FPS>` | 30, 60 |  | Frame rate |
@@ -1266,7 +1266,7 @@ Options (plus the [global flags](#global-flags)):
 | Flag | Value | Allowed values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--display` | `<ID>` |  |  | Display id to follow (see `targets`; default: the primary display) |
-| `--window` | `<ID\|TITLE>` |  |  | Follow one window: its id, or a case-insensitive substring of its title or app name |
+| `--window` | `<ID\|TITLE>` |  |  | Follow one window: its id, or a case-insensitive substring of its title or app name. An exact title wins; several partial matches fail with `ambiguous_target` and list their ids |
 | `--region` | `<X,Y,W,H>` |  |  | Follow a region `x,y,w,h` in physical px, relative to the display |
 | `--title` | `<TITLE>` |  |  | The guide's title (default: `Click Guide <date time>`) |
 | `--countdown` | `<SECONDS>` |  |  | Seconds before the first click is listened to (0 to 10, default 3) |

@@ -66,8 +66,11 @@ pub(super) fn parse_region(s: &str) -> Result<[i64; 4], CliError> {
     Ok([x, y, w, h])
 }
 
-/// Window id, or the front-most non-minimized window whose title or app contains `needle`
-/// (case-insensitive).
+/// Window id, or the one window whose title or app contains `needle` (case-insensitive).
+/// A window whose title equals `needle` (case-insensitively) wins over partial matches. When
+/// several windows match and none is an exact title match the call fails with
+/// `invalid_input`, `data.reason: "ambiguous_target"` and `data.matches` (`id`, `app`,
+/// `title`), so the caller picks one by id (CAP-1.AC8, BUG-9). Never guesses.
 pub(super) fn resolve_window(targets: &Value, needle: &str) -> Result<u64, CliError> {
     let windows = targets["windows"].as_array().cloned().unwrap_or_default();
     if let Ok(id) = needle.parse::<u64>() {
@@ -76,29 +79,54 @@ pub(super) fn resolve_window(targets: &Value, needle: &str) -> Result<u64, CliEr
         }
     }
     let lower = needle.to_lowercase();
-    let hit = |w: &&Value| {
-        w["title"]
-            .as_str()
-            .unwrap_or("")
-            .to_lowercase()
-            .contains(&lower)
-            || w["app"]
-                .as_str()
-                .unwrap_or("")
-                .to_lowercase()
-                .contains(&lower)
-    };
-    let matches: Vec<&Value> = windows.iter().filter(hit).collect();
-    matches
+    let low = |w: &Value, k: &str| w[k].as_str().unwrap_or("").to_lowercase();
+    let exact: Vec<&Value> = windows
         .iter()
-        .find(|w| w["minimized"] != json!(true))
-        .or(matches.first())
-        .and_then(|w| w["id"].as_u64())
-        .ok_or_else(|| {
-            CliError::not_found(format!(
-                "no window matches `{needle}` (run `capturemann targets` to list windows)"
-            ))
-        })
+        .filter(|w| low(w, "title") == lower)
+        .collect();
+    let matches: Vec<&Value> = if exact.is_empty() {
+        windows
+            .iter()
+            .filter(|w| low(w, "title").contains(&lower) || low(w, "app").contains(&lower))
+            .collect()
+    } else {
+        exact
+    };
+    match matches.as_slice() {
+        [] => Err(CliError::not_found(format!(
+            "no window matches `{needle}` (run `capturemann targets` to list windows)"
+        ))),
+        [one] => one["id"]
+            .as_u64()
+            .ok_or_else(|| CliError::not_found(format!("no window matches `{needle}`"))),
+        many => {
+            let list: Vec<Value> = many
+                .iter()
+                .map(|w| {
+                    json!({ "id": w["id"], "app": w["app"].as_str().unwrap_or(""),
+                            "title": w["title"].as_str().unwrap_or("") })
+                })
+                .collect();
+            let lines: Vec<String> = list
+                .iter()
+                .map(|m| {
+                    format!(
+                        "{} ({}) \"{}\"",
+                        m["id"],
+                        m["app"].as_str().unwrap_or(""),
+                        m["title"].as_str().unwrap_or("")
+                    )
+                })
+                .collect();
+            let mut e = CliError::invalid_input(format!(
+                "`{needle}` matches {} windows: {}. Pass the window id to choose one.",
+                many.len(),
+                lines.join("; ")
+            ));
+            e.data = json!({ "reason": "ambiguous_target", "matches": list });
+            Err(e)
+        }
+    }
 }
 
 pub(super) fn primary_display(targets: &Value) -> Result<u64, CliError> {
@@ -467,4 +495,56 @@ pub(super) async fn undo_redo(
         }
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod resolve_window_tests {
+    use super::resolve_window;
+    use serde_json::json;
+
+    fn targets() -> serde_json::Value {
+        json!({ "windows": [
+            { "id": 1, "title": "Mail - work", "app": "Mail", "minimized": false },
+            { "id": 2, "title": "Mail - private", "app": "Mail", "minimized": false },
+            { "id": 3, "title": "Mail", "app": "Mail", "minimized": false },
+            { "id": 4, "title": "Calendar", "app": "Cal", "minimized": true },
+        ]})
+    }
+
+    /// CAP-1.AC8: two partial matches are ambiguous and both are listed.
+    #[test]
+    fn two_partial_matches_are_ambiguous() {
+        let e = resolve_window(&targets(), "mail -").unwrap_err();
+        assert_eq!(e.code, "invalid_input");
+        assert_eq!(e.exit, 2);
+        assert_eq!(e.data["reason"], "ambiguous_target");
+        assert_eq!(e.data["matches"].as_array().unwrap().len(), 2);
+        assert_eq!(e.data["matches"][1]["title"], "Mail - private");
+        assert!(
+            e.message.contains("1 (Mail) \"Mail - work\""),
+            "{}",
+            e.message
+        );
+    }
+
+    /// CAP-1.AC8: an exact title (any case) wins among several partial matches.
+    #[test]
+    fn an_exact_title_wins() {
+        assert_eq!(resolve_window(&targets(), "MAIL").unwrap(), 3);
+    }
+
+    /// CAP-1.AC8: one partial match works, as does an id.
+    #[test]
+    fn one_partial_match_and_ids_work() {
+        assert_eq!(resolve_window(&targets(), "private").unwrap(), 2);
+        assert_eq!(resolve_window(&targets(), "calen").unwrap(), 4);
+        assert_eq!(resolve_window(&targets(), "2").unwrap(), 2);
+    }
+
+    /// CAP-1.AC8: no match stays `not_found`.
+    #[test]
+    fn no_match_is_not_found() {
+        let e = resolve_window(&targets(), "nothing").unwrap_err();
+        assert_eq!((e.code.as_str(), e.exit), ("not_found", 2));
+    }
 }
