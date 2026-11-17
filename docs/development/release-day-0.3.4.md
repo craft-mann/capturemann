@@ -4,7 +4,7 @@ Written on Nov 15, 2026 from `release-day-0.3.3.md` (the pattern) with the versi
 "[M]" = only the maintainer does this (push, tag, sign, notarize, publish, accounts, decisions). "[A]" = an agent can do it
 from this file. Run commands from the repo root. Text to publish: `release-0.3.4-github-text.md` (its `<FILL: ...>` items need the
 final files and their reports). Plan: `specs/plans/release-0.3.4-plan.md`; state of the night: `release-0.3.4-morning-report.md`.
-Nothing in this file has been run on a release day yet. **Blanks to fill on the day are written `<FILL: ...>`, `<date>`, `<sha>`, `<run id>`.**
+**Run on Nov 17, 2026: the release was published (tag `v0.3.4` on `1a1586d0`, 03:34 UTC); see "Done on Nov 17" at the end for what was done, what is still open and the lessons.** **Blanks to fill on the day are written `<FILL: ...>`, `<date>`, `<sha>`, `<run id>`.**
 
 **The gate** (the same as 0.3.3, with what exists today written next to it):
 
@@ -136,3 +136,20 @@ GDE-1 to GDE-4, BRD-1, BLK-1 (`In progress (...)`, or `Ready` only as the wordin
 not delete assets others have sums for; dangerous (data loss, leaked secret), delete the assets, say so, publish 0.3.5 (never reuse a tag). A bad file is replaced by a new tag, never an edited asset.
 Homebrew: revert the cask commit in `homebrew-tap` and push. winget: close or update the pull request. APT: re-run `make-apt-repo.sh` without the bad `.deb`
 and upload with `--clobber`. Update the website download link to 0.3.3 meanwhile. A Developer ID key that leaked is revoked at Apple.
+
+## Done on Nov 17, 2026 (release day record)
+
+**Done:** Linux ships (decision 1); candidates and final files built from `1a1586d0`; regression on the final files of all four targets (macOS DMG app copy, Windows installed CI setup, Linux x86_64, Linux aarch64; reports `L1-*-0.3.4-1a1586d0-*` in `verification/`); CI and the Security scan green on `1a1586d0`; macOS DMGs signed, notarized and stapled (section 3, step 1); Linux `.minisig` files; draft release, `scripts/check-release-assets.sh`, publish (full release, 25 files); Homebrew cask at 0.3.4 (tap commit `7789f42`, verified through the API); the release text filled from the reports.
+
+**Still open [M]:** winget (PRs 472327 and 477195), the APT repository update with the 0.3.0 to 0.3.4 `.deb` files, the plugin line, the website, the README badge and status paragraphs, `CHANGELOG.md` date, `release-0.3.5-plan.md`, the Windows licence list (decision 3), Windows signing.
+
+**Lessons:**
+
+- The GitHub "Windows package" workflow gives the Windows files **with** the speaker engine; the lab build uses `CM_NO_SPEAKER_MODELS=1`. The CI files are the shipping source.
+- A draft release creates no tag; publishing it creates a lightweight tag on the target commit. Make sure the target is the release commit before publishing.
+- `scripts/check-release-assets.sh` expects both Linux architectures; run it on the folder before the draft.
+- The first CI run found real defects: `cm-mcp` overflowed the 1 MB main-thread stack on Windows in a debug build (now 8 MB worker stacks), plus Linux clippy and test thresholds (see the morning report).
+- The first launch of each new macOS binary is slow (`syspolicyd`, XProtect scanning): run `cm-regress` with `--timeout-scale 3`.
+- A locked Mac screen skips every desktop-session case and can fail `desktop.hotkey_overlay` ("no displays") mid-run: unlock and run under `caffeinate -d -i`; the locked-screen reports are kept but labelled.
+- macOS notarization needs the Apple developer agreement accepted in the account first.
+- The ThinkPad has no auto-logon: after each reboot the maintainer logs in to Windows once, or the session cases cannot run.
