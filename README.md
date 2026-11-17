@@ -99,8 +99,8 @@ and
 
 **Known limits.** Memory is not flat yet: the whole file is decoded into memory (about 1 GB per 4 hours on top of the
 model), and the speaker job at the same time more than doubles the peak, so on a 16 GB computer run the speakers after
-the transcript. Vietnamese with large-v3 is much less confident than English; the Vietnamese-specific models
-(PhoWhisper) or a re-read of doubtful stretches help, and word times are stacked in some places. These numbers are from
+the transcript. Vietnamese with large-v3 is much less confident than English; a re-read of doubtful stretches
+helps, and word times are stacked in some places. These numbers are from
 one Mac: Windows and Linux have not been measured on a long file.
 
 ## Find personal data before you share a screenshot
