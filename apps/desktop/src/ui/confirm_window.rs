@@ -59,15 +59,25 @@ impl ConfirmDialog {
     }
 }
 
+/// The accessible name of one detail row: its label and its value.
+fn detail_aria(key: &str, value: &str) -> String {
+    format!("{key}: {value}")
+}
+
 impl Render for ConfirmDialog {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::overlay();
         let m = self.model.clone();
         let checked = self.session_checked;
         let tool_label = crate::daemon_text::row_label("tool");
-        let details = m.details.iter().map(|(k, v)| {
+        let details = m.details.iter().enumerate().map(|(i, (k, v))| {
             let mono = *k == tool_label;
             div()
+                // Text is not read by assistive technology on its own: each row is a named group
+                // ("Destination: /path"), so the exact path reaches a screen reader (Q-8).
+                .id(SharedString::from(format!("confirm-detail-{i}")))
+                .role(Role::Group)
+                .aria_label(SharedString::from(detail_aria(k, v)))
                 .flex()
                 .gap(px(12.))
                 .text_size(px(13.))
@@ -165,6 +175,9 @@ impl Render for ConfirmDialog {
             )
             .child(
                 div()
+                    .id("confirm-summary")
+                    .role(Role::Group)
+                    .aria_label(SharedString::from(m.summary.clone()))
                     .text_size(px(type_scale::UI))
                     .text_color(rgba_of(t.text_2))
                     .child(SharedString::from(m.summary.clone())),
@@ -295,5 +308,18 @@ impl Render for ConfirmDialog {
                 }
             }))
             .child(panel)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::detail_aria;
+
+    #[test]
+    fn q8_a_detail_row_is_named_with_its_value() {
+        assert_eq!(
+            detail_aria("Destination", "/Users/a/Documents/guides"),
+            "Destination: /Users/a/Documents/guides"
+        );
     }
 }

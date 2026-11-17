@@ -77,8 +77,10 @@ pub fn sidebar(
         .flex()
         .flex_col()
         .gap(px(4.))
+        // The rail holds fourteen 44 px buttons: on a short window (a 150 % screen gives about
+        // 660 px) it scrolls instead of letting Settings fall below the window (0.3.5 Q-7).
         .when(mode == SidebarMode::Rail, |d| {
-            d.items_center().px(px(8.)).py(px(14.))
+            d.items_center().px(px(8.)).py(px(10.)).overflow_y_scroll()
         })
         .when(mode != SidebarMode::Rail, |d| d.px(px(12.)).py(px(18.)))
         .bg(rgba_of(t.sidebar))
@@ -625,6 +627,7 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
         .map(|slot| match slot {
             RailEntry::Brand => div()
                 .h(px(scale::TARGET))
+                .flex_none()
                 .flex()
                 .items_center()
                 .justify_center()
@@ -688,6 +691,7 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                 })
                 .into_any_element(),
             RailEntry::Divider => div()
+                .flex_none()
                 .w(px(32.))
                 .h(px(1.))
                 .my(px(8.))
@@ -738,7 +742,7 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                 }
             }
             RailEntry::Extra(tile) => extra_tile(t, p, app, tile, true).into_any_element(),
-            RailEntry::Spacer => div().flex_1().into_any_element(),
+            RailEntry::Spacer => div().flex_1().min_h(px(8.)).into_any_element(),
         })
         .collect()
 }

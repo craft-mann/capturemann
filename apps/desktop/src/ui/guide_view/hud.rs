@@ -459,8 +459,18 @@ fn passive_line(client: Option<&str>) -> String {
     }
 }
 
+/// The second line of the passive bar: the agent line, led by "Paused" while the guide waits (the
+/// followed window moved or closed, BUG-5), so the bar says why nothing is recorded.
+fn passive_second(mode: Mode, line: &str) -> String {
+    match mode {
+        Mode::Paused => tr!("Paused \u{b7} {rest}", rest = line),
+        Mode::Closed => tr!("Paused \u{b7} the followed window closed"),
+        _ => line.to_owned(),
+    }
+}
+
 /// The bar for a guide started elsewhere (CG-2): Stop, the step count and an Agent chip; no Pause,
-/// Note or Undo. It follows the display under the pointer and keeps its own rectangle clear of
+/// Note or Undo (while the guide is paused the chip gives way to Resume, 0.3.5 Q-3). It follows the display under the pointer and keeps its own rectangle clear of
 /// clicks, like the full bar.
 fn open_passive(app: &Entity<AppModel>, guide_id: String, by: &str, cx: &mut App) {
     let backend = app.read(cx).backend.clone();
@@ -1215,6 +1225,7 @@ impl GuideHud {
         let mode = self.mode();
         let p = parts(mode, self.shown.steps + 1, self.remaining(), None);
         let line = passive_line(client.as_deref());
+        let second = passive_second(mode, &line);
         let mark = match mode {
             Mode::Paused | Mode::Closed => dot(t.mist, 8.).into_any_element(),
             _ => rec_dot(t, 8.).into_any_element(),
@@ -1279,10 +1290,24 @@ impl GuideHud {
                             .overflow_hidden()
                             .text_size(px(SECOND_SIZE))
                             .text_color(rgba_of(t.text_3))
-                            .child(SharedString::from(line.clone())),
+                            .child(SharedString::from(second)),
                     ),
             )
-            .child(
+            .child(if mode == Mode::Paused {
+                // The same daemon action as `guide set --resume` and the full bar's Resume.
+                hud_button(
+                    t,
+                    "guide-hud-pause",
+                    "rec-play",
+                    tr!("Resume"),
+                    false,
+                    false,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.act("set_guide", json!({ "paused": false }), cx);
+                }))
+                .into_any_element()
+            } else {
                 div()
                     .id("guide-hud-agent-chip")
                     .role(Role::Status)
@@ -1294,8 +1319,9 @@ impl GuideHud {
                         crate::ui::kit::Tone::Agent,
                         Some(crate::recording::hud_layout::AGENT_ICON),
                         crate::ui::long_shot::bar::agent_chip_text(),
-                    )),
-            )
+                    ))
+                    .into_any_element()
+            })
     }
 }
 
@@ -1309,6 +1335,19 @@ mod tests {
     /// window-closed toast's two buttons alike (they share one flow that does not need the bar's
     /// window): a saved guide is opened (or the picker follows), an empty one is reported, and
     /// a guide another client stopped first only closes the bar.
+    #[test]
+    fn q3_the_passive_bar_says_paused() {
+        with_language(Lang::En, || {
+            let line = passive_line(Some("capturemann-cli"));
+            assert_eq!(passive_second(Mode::Recording, &line), line);
+            assert_eq!(
+                passive_second(Mode::Paused, &line),
+                format!("Paused \u{b7} {line}")
+            );
+            assert!(passive_second(Mode::Closed, &line).contains("window closed"));
+        });
+    }
+
     #[test]
     fn c2_stop_outcomes() {
         assert_eq!(

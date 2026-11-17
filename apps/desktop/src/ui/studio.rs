@@ -521,22 +521,22 @@ impl Render for Studio {
                     .drag_over::<gpui::ExternalPaths>(|s, _, _, _| s.visible()),
             )
             .when(self.app.read(cx).import.sheet.is_some(), |d| {
-                d.child(self.import_sheet.clone())
+                d.child(modal_layer(self.import_sheet.clone()))
             })
             .when(self.app.read(cx).bulk.sheet.is_some(), |d| {
-                d.child(self.bulk_sheet.clone())
+                d.child(modal_layer(self.bulk_sheet.clone()))
             })
             .when(self.app.read(cx).bulk.board.is_some(), |d| {
-                d.child(self.board_sheet.clone())
+                d.child(modal_layer(self.board_sheet.clone()))
             })
             .when(self.app.read(cx).export_popover.is_some(), |d| {
-                d.child(self.export_popover.clone())
+                d.child(modal_layer(self.export_popover.clone()))
             })
-            .children(crate::ui::preview_label::card_overlay(&self.app, &t, cx))
+            .children(crate::ui::preview_label::card_overlay(&self.app, &t, cx).map(modal_layer))
             // Board R9/R20: the app behind a pop-up sheet or dialog is greyed out, and a click on
             // it does nothing (the pop-up is a window of its own, so this is only a tint here).
             .when(dim, |d| {
-                d.child(
+                d.child(modal_layer(
                     div()
                         .id("modal-scrim")
                         .absolute()
@@ -545,7 +545,7 @@ impl Render for Studio {
                         .size_full()
                         .bg(rgba_of(t.modal_scrim))
                         .occlude(),
-                )
+                ))
             })
             // Wayland: toasts are banners in this window while it exists (a separate
             // toast window would take focus there). The host draws only the cards.
@@ -569,6 +569,15 @@ impl Render for Studio {
 pub(crate) fn modal_dim_wanted(sheet_open: bool, confirms_open: usize) -> bool {
     sheet_open || confirms_open > 0
 }
+
+/// Sheets, popovers and the scrim are drawn in a deferred layer above the sidebar's own deferred
+/// Preview tags (priority 1), so those tags never show through a sheet (0.3.5 Q-2).
+fn modal_layer(el: impl gpui::IntoElement) -> impl gpui::IntoElement {
+    gpui::deferred(el).with_priority(MODAL_PRIORITY)
+}
+
+/// Above the sidebar's tags (1) and below nothing else in this window.
+const MODAL_PRIORITY: usize = 10;
 
 #[cfg(test)]
 mod tests {

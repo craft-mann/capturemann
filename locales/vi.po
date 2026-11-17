@@ -11913,8 +11913,8 @@ msgid "{n} steps left"
 msgstr "Còn {n} bước"
 
 #, fuzzy
-msgid "A board takes screenshots only. Deselect the recordings and audio."
-msgstr "Bảng ảnh chỉ nhận ảnh chụp màn hình. Hãy bỏ chọn bản ghi hình và âm thanh."
+msgid "A board takes screenshots only. Deselect the recordings, audio and Click Guides."
+msgstr "Bảng ảnh chỉ nhận ảnh chụp màn hình. Hãy bỏ chọn bản ghi hình, âm thanh và hướng dẫn Click Guide."
 
 #, fuzzy
 msgid "Select at least 2 screenshots to make a board."
