@@ -1,6 +1,5 @@
 name: Feedback
 description: Tell us what works and what does not
-labels: [feedback]
 body:
   - type: input
     id: version
