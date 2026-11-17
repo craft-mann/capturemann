@@ -336,6 +336,8 @@ $ capturemann annotate shot_06GYEY0TM4JZ7KGH --suggest-blueprint
 0 text line(s) in shot_06GYEY0TM4JZ7KGH (nothing applied)
 ```
 
+An `arrow`, `line`, `rect` or `ellipse` op takes an optional `style` (`"solid"` by default, `"dashed"` or `"dotted"`; ANN-12), for example `--ops '[{"op":"rect","rect":[20,20,200,80],"style":"dashed"}]'`. Any other value is `invalid_input` naming the op (`ops[0]`).
+
 The output above was run against a headless daemon with an empty throw-away library.
 
 ### `capturemann undo`

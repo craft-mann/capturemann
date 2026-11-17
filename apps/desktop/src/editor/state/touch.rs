@@ -1273,6 +1273,7 @@ mod tests {
             to: Pt::new(60.0, 40.0),
             color: Color::BLACK,
             width: 4.0,
+            style: Default::default(),
         }
     }
 

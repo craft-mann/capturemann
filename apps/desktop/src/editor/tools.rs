@@ -1,5 +1,6 @@
 //! Tools, their shortcuts and the per-tool style that persists between uses (ANN-1, ANN-2).
 
+use cm_core::annotation::LineStyle;
 use cm_core::annotation::{
     CalloutStyle, MagnifyShape, SpotMode, SpotShapeKind, StepStyle, TextAlign,
     DEFAULT_BLUR_STRENGTH, DEFAULT_CALLOUT_RADIUS, DEFAULT_CALLOUT_SIZE, DEFAULT_COLOR,
@@ -202,7 +203,9 @@ impl Tool {
             Tool::Magnify => &[Param::Zoom, Param::Color, Param::BorderWidth],
             Tool::Retype => &[Param::Color, Param::TextSize],
             Tool::Select | Tool::Crop | Tool::SelectText | Tool::MoveArea => &[],
-            Tool::Arrow | Tool::Line | Tool::Rect | Tool::Ellipse => &[Param::Color, Param::Width],
+            Tool::Arrow | Tool::Line | Tool::Rect | Tool::Ellipse => {
+                &[Param::Color, Param::Width, Param::LineStyle]
+            }
             Tool::Text => &[Param::Color, Param::TextSize],
             Tool::Highlight => &[Param::Color, Param::Opacity],
             Tool::Step => &[Param::Color, Param::StepSize],
@@ -232,6 +235,8 @@ pub enum Param {
     Zoom,
     /// Zoom Lens border width (0 to 32 px).
     BorderWidth,
+    /// Solid, dashed or dotted line of an arrow, line, rectangle or ellipse (ANN-12).
+    LineStyle,
 }
 
 impl Param {
@@ -249,6 +254,7 @@ impl Param {
             Param::StampSize => tr_ctx!("annotation setting", "Size"),
             Param::Zoom => tr_ctx!("annotation setting", "Zoom"),
             Param::BorderWidth => tr_ctx!("annotation setting", "Border width"),
+            Param::LineStyle => tr_ctx!("annotation setting", "Line style"),
         }
     }
 }
@@ -268,6 +274,7 @@ pub enum ParamValue {
     StampSize(f64),
     Zoom(f64),
     BorderWidth(f64),
+    LineStyle(LineStyle),
 }
 
 impl ParamValue {
@@ -285,6 +292,7 @@ impl ParamValue {
             ParamValue::StampSize(_) => Param::StampSize,
             ParamValue::Zoom(_) => Param::Zoom,
             ParamValue::BorderWidth(_) => Param::BorderWidth,
+            ParamValue::LineStyle(_) => Param::LineStyle,
         }
     }
 }
@@ -368,6 +376,8 @@ pub const WEIGHTS: [u16; 3] = [400, 500, 700];
 pub struct ToolStyle {
     pub color: Color,
     pub width: f64,
+    /// Solid, dashed or dotted line of new arrows, lines, rectangles and ellipses (ANN-12).
+    pub line_style: LineStyle,
     pub size: f64,
     pub opacity: f64,
     pub strength: u32,
@@ -408,6 +418,7 @@ impl ToolStyle {
         let base = ToolStyle {
             color: DEFAULT_COLOR,
             width: DEFAULT_WIDTH,
+            line_style: LineStyle::Solid,
             size: DEFAULT_TEXT_SIZE,
             opacity: DEFAULT_HIGHLIGHT_OPACITY,
             strength: DEFAULT_BLUR_STRENGTH,
@@ -475,6 +486,7 @@ impl ToolStyle {
             ParamValue::Dim(d) => self.dim = d,
             ParamValue::Zoom(z) => self.zoom = z,
             ParamValue::BorderWidth(w) => self.width = w,
+            ParamValue::LineStyle(l) => self.line_style = l,
         }
     }
 
@@ -492,6 +504,7 @@ impl ToolStyle {
             Param::StampSize => ParamValue::StampSize(self.size),
             Param::Zoom => ParamValue::Zoom(self.zoom),
             Param::BorderWidth => ParamValue::BorderWidth(self.width),
+            Param::LineStyle => ParamValue::LineStyle(self.line_style),
         }
     }
 }
@@ -615,6 +628,11 @@ impl Styles {
                 t.id().to_owned(),
                 json!({
                     "color": s.color.to_hex(), "width": s.width, "size": s.size,
+                    "line_style": match s.line_style {
+                        LineStyle::Solid => "solid",
+                        LineStyle::Dashed => "dashed",
+                        LineStyle::Dotted => "dotted",
+                    },
                     "opacity": s.opacity, "strength": s.strength, "block": s.block,
                     "radius": s.radius, "dim": s.dim,
                     "spot_mode": match s.spot_mode {
@@ -710,6 +728,12 @@ impl Styles {
                 if let Some(b) = o.get("auto").and_then(Value::as_bool) {
                     s.auto_color = b;
                 }
+            }
+            match o.get("line_style").and_then(Value::as_str) {
+                Some("solid") => s.line_style = LineStyle::Solid,
+                Some("dashed") => s.line_style = LineStyle::Dashed,
+                Some("dotted") => s.line_style = LineStyle::Dotted,
+                _ => {}
             }
             match o.get("stamp_word").and_then(Value::as_str) {
                 Some("before") => s.stamp_word = StampWord::Before,
@@ -827,6 +851,30 @@ mod tests {
         assert_eq!(s.get(Tool::Blur).strength, 12);
         assert_eq!(s.get(Tool::Pixelate).block, 12);
         assert_eq!(s.get(Tool::Step).size, 28.0);
+    }
+
+    /// ANN-12: the line style is remembered per tool, defaults to solid, only the four shape
+    /// tools offer it, and it survives the settings round trip.
+    #[test]
+    fn line_style_persists_per_tool() {
+        let mut s = Styles::default();
+        assert_eq!(s.get(Tool::Rect).line_style, LineStyle::Solid);
+        s.apply(Tool::Rect, ParamValue::LineStyle(LineStyle::Dotted));
+        assert_eq!(s.get(Tool::Rect).line_style, LineStyle::Dotted);
+        assert_eq!(s.get(Tool::Arrow).line_style, LineStyle::Solid);
+        let back = Styles::from_json(&s.to_json());
+        assert_eq!(back, s);
+        for t in [Tool::Arrow, Tool::Line, Tool::Rect, Tool::Ellipse] {
+            assert!(t.params().contains(&Param::LineStyle));
+        }
+        assert!(!Tool::Highlight.params().contains(&Param::LineStyle));
+        assert!(!Tool::Callout.params().contains(&Param::LineStyle));
+        assert_eq!(Param::LineStyle.label(), "Line style");
+        let bad = serde_json::json!({ "rect": { "line_style": "wavy" } });
+        assert_eq!(
+            Styles::from_json(&bad).get(Tool::Rect).line_style,
+            LineStyle::Solid
+        );
     }
 
     /// ANN-1: last used color and width persist per tool (and survive the settings round trip).

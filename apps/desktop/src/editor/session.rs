@@ -299,6 +299,7 @@ mod tests {
                 width: 4.0,
                 fill: None,
                 radius: 0.0,
+                style: Default::default(),
             },
         )
     }

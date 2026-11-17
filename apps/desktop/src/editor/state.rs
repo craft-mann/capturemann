@@ -886,6 +886,7 @@ impl EditorState {
                     width: 1.5,
                     fill: None,
                     radius: 0.0,
+                    style: Default::default(),
                 },
                 other => other,
             }),
@@ -1751,12 +1752,14 @@ impl EditorState {
                 to: Pt::new(center.x + s, center.y - s / 2.0),
                 color: style.color,
                 width: style.width,
+                style: style.line_style,
             },
             Tool::Line => OpKind::Line {
                 from: Pt::new(center.x - s, center.y),
                 to: Pt::new(center.x + s, center.y),
                 color: style.color,
                 width: style.width,
+                style: style.line_style,
             },
             Tool::Rect => OpKind::Rect {
                 rect: rect(s * 1.6, s),
@@ -1764,12 +1767,14 @@ impl EditorState {
                 width: style.width,
                 fill: None,
                 radius: 0.0,
+                style: style.line_style,
             },
             Tool::Ellipse => OpKind::Ellipse {
                 rect: rect(s * 1.6, s),
                 color: style.color,
                 width: style.width,
                 glow: 0.0,
+                style: style.line_style,
             },
             Tool::Highlight => OpKind::Highlight {
                 rect: rect(s * 2.0, s / 2.0),
@@ -2600,7 +2605,8 @@ mod tests {
                 from: Pt::new(120.0, 300.0),
                 to: Pt::new(380.0, 210.0),
                 color: Color::rgb(0xFF, 0x3B, 0x3B),
-                width: 4.0
+                width: 4.0,
+                style: Default::default()
             }
         );
         assert_eq!(s.ops.len(), 1);
@@ -2774,6 +2780,39 @@ mod tests {
         s.selected = None;
         let edits = drag(&mut s, (300.0, 300.0), (360.0, 360.0), NONE);
         assert!(matches!(&only_append(&edits).kind, OpKind::Rect { color, .. } if *color == blue));
+    }
+
+    /// ANN-12.AC5: changing the line style of the selected shape changes only that op, in one
+    /// edit (one undo step), and the tool remembers the style for the next shape.
+    #[test]
+    fn line_style_changes_only_the_selected_op_in_one_edit() {
+        use cm_core::annotation::LineStyle;
+        for tool in [Tool::Arrow, Tool::Line, Tool::Rect, Tool::Ellipse] {
+            let mut s = st();
+            s.set_tool(tool);
+            assert!(s.inspector_params().contains(&Param::LineStyle));
+            drag(&mut s, (10.0, 10.0), (60.0, 60.0), NONE);
+            drag(&mut s, (100.0, 10.0), (160.0, 60.0), NONE);
+            let first = s.ops[0].clone();
+            let edit = s
+                .set_param(ParamValue::LineStyle(LineStyle::Dashed))
+                .unwrap();
+            let Edit::Replace(ops) = edit else { panic!() };
+            assert_eq!(ops[0], first, "other op untouched");
+            assert_eq!(ops[1].kind.line_style(), Some(LineStyle::Dashed));
+            assert_eq!(
+                s.inspector_value(Param::LineStyle),
+                Some(ParamValue::LineStyle(LineStyle::Dashed))
+            );
+            assert!(s.take_styles_dirty());
+            assert_eq!(s.styles.get(tool).line_style, LineStyle::Dashed);
+            s.selected = None;
+            let edits = drag(&mut s, (300.0, 300.0), (360.0, 360.0), NONE);
+            assert_eq!(
+                only_append(&edits).kind.line_style(),
+                Some(LineStyle::Dashed)
+            );
+        }
     }
 
     #[test]

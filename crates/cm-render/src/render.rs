@@ -4,12 +4,14 @@ use cm_core::CmError;
 use image::RgbaImage;
 use tiny_skia::{
     FillRule, LineCap, LineJoin, Paint, Path, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke,
-    Transform,
+    StrokeDash, Transform,
 };
 
 use crate::annot;
 use crate::magnify::{transform_op, Xf};
-use crate::ops::{sort_base_edits_first, validate_list, validate_op, AnnotationOp, Color, OpKind};
+use crate::ops::{
+    sort_base_edits_first, validate_list, validate_op, AnnotationOp, Color, LineStyle, OpKind,
+};
 use crate::redact::{self, ordered, Region};
 use crate::text::{self, Fonts, TextStyle};
 use crate::touchup;
@@ -173,17 +175,19 @@ impl Renderer {
                 to,
                 color,
                 width,
-            } => draw_arrow(pm, from.to_array(), to.to_array(), *color, *width),
+                style,
+            } => draw_arrow(pm, from.to_array(), to.to_array(), *color, *width, *style),
             OpKind::Line {
                 from,
                 to,
                 color,
                 width,
+                style,
             } => {
                 let mut pb = PathBuilder::new();
                 pb.move_to(from.x as f32, from.y as f32);
                 pb.line_to(to.x as f32, to.y as f32);
-                stroke(pm, pb.finish(), *color, *width, LineCap::Round);
+                stroke_styled(pm, pb.finish(), *color, *width, LineCap::Round, *style);
             }
             OpKind::Rect {
                 rect,
@@ -191,18 +195,20 @@ impl Renderer {
                 width,
                 fill,
                 radius,
+                style,
             } => {
                 let path = rounded_rect(&rect.to_array(), *radius);
                 if let (Some(f), Some(p)) = (fill, path.as_ref()) {
                     fill_path(pm, p, *f, 255);
                 }
-                stroke_opt(pm, path, *color, *width, LineCap::Butt);
+                stroke_styled(pm, path, *color, *width, LineCap::Butt, *style);
             }
             OpKind::Ellipse {
                 rect,
                 color,
                 width,
                 glow,
+                style,
             } => {
                 let r = norm_rect(&rect.to_array())
                     .and_then(|(x, y, w, h)| Rect::from_xywh(x, y, w, h));
@@ -221,12 +227,13 @@ impl Renderer {
                         }
                     }
                 }
-                stroke_opt(
+                stroke_styled(
                     pm,
                     r.and_then(PathBuilder::from_oval),
                     *color,
                     *width,
                     LineCap::Butt,
+                    *style,
                 );
             }
             OpKind::Highlight {
@@ -385,8 +392,45 @@ fn stroke_opt(pm: &mut Pixmap, path: Option<Path>, c: Color, width: f64, cap: Li
     }
 }
 
-fn stroke(pm: &mut Pixmap, path: Option<Path>, c: Color, width: f64, cap: LineCap) {
-    stroke_opt(pm, path, c, width, cap);
+/// Smallest stroke width of a dotted line, in px, so a dot stays visible (ANN-12).
+const MIN_DOT_WIDTH: f64 = 2.0;
+
+/// A stroke in the op's line style (ANN-12). Solid is exactly [`stroke_opt`]. Dashed: dash
+/// 4 x width, gap 2.5 x width, butt caps. Dotted: round dots (dash 0), gap 2 x width, at least
+/// 2 px wide. The pattern starts at the path's first point and runs on round corners.
+fn stroke_styled(
+    pm: &mut Pixmap,
+    path: Option<Path>,
+    c: Color,
+    width: f64,
+    cap: LineCap,
+    style: LineStyle,
+) {
+    let Some(p) = path else { return };
+    let (width, cap, dash) = match style {
+        LineStyle::Solid => return stroke_opt(pm, Some(p), c, width, cap),
+        LineStyle::Dashed => (
+            width,
+            LineCap::Butt,
+            StrokeDash::new(vec![(4.0 * width) as f32, (2.5 * width) as f32], 0.0),
+        ),
+        LineStyle::Dotted => {
+            let w = width.max(MIN_DOT_WIDTH);
+            (
+                w,
+                LineCap::Round,
+                StrokeDash::new(vec![0.0, (2.0 * w) as f32], 0.0),
+            )
+        }
+    };
+    let s = Stroke {
+        width: width as f32,
+        line_cap: cap,
+        line_join: LineJoin::Miter,
+        dash,
+        ..Stroke::default()
+    };
+    pm.stroke_path(&p, &paint(c, 255), &s, Transform::identity(), None);
 }
 
 /// Normalizes a possibly negative-extent `[x, y, w, h]`.
@@ -420,7 +464,14 @@ pub(crate) fn rounded_rect(rect: &[f64; 4], radius: f64) -> Option<Path> {
 
 /// Arrow: shaft plus a filled triangular head at `to`.
 /// Head length `max(4*width, 8)` (clamped to the arrow length), half-width `2*width`.
-fn draw_arrow(pm: &mut Pixmap, from: [f64; 2], to: [f64; 2], color: Color, width: f64) {
+fn draw_arrow(
+    pm: &mut Pixmap,
+    from: [f64; 2],
+    to: [f64; 2],
+    color: Color,
+    width: f64,
+    style: LineStyle,
+) {
     let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
     let len = dx.hypot(dy);
     if len < 1e-6 {
@@ -435,7 +486,7 @@ fn draw_arrow(pm: &mut Pixmap, from: [f64; 2], to: [f64; 2], color: Color, width
     let mut pb = PathBuilder::new();
     pb.move_to(from[0] as f32, from[1] as f32);
     pb.line_to(sx as f32, sy as f32);
-    stroke(pm, pb.finish(), color, width, LineCap::Butt);
+    stroke_styled(pm, pb.finish(), color, width, LineCap::Butt, style);
 
     let (px, py) = (-uy, ux);
     let mut pb = PathBuilder::new();

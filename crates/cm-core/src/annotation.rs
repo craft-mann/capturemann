@@ -349,11 +349,30 @@ impl<'de> Deserialize<'de> for AnnotationOp {
         let Value::Object(typed) = serde_json::to_value(&kind).map_err(D::Error::custom)? else {
             return Err(D::Error::custom("op must serialize as an object"));
         };
+        // An explicit `"style": "solid"` on a shape is the default: it is not kept as an extra.
+        let drop_style = kind.line_style().is_some_and(|s| s.is_solid());
         let extra = map
             .into_iter()
-            .filter(|(k, _)| k != "id" && !typed.contains_key(k))
+            .filter(|(k, _)| k != "id" && !typed.contains_key(k) && !(drop_style && k == "style"))
             .collect();
         Ok(AnnotationOp { id, kind, extra })
+    }
+}
+
+/// Line style of the `arrow`, `line`, `rect` and `ellipse` ops (ANN-12). Solid is the default
+/// and is never written, so older manifests and renders do not change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LineStyle {
+    #[default]
+    Solid,
+    Dashed,
+    Dotted,
+}
+
+impl LineStyle {
+    pub fn is_solid(&self) -> bool {
+        *self == LineStyle::Solid
     }
 }
 
@@ -368,6 +387,8 @@ pub enum OpKind {
         color: Color,
         #[serde(default = "d_width", serialize_with = "ser_num")]
         width: f64,
+        #[serde(default, skip_serializing_if = "LineStyle::is_solid")]
+        style: LineStyle,
     },
     Line {
         from: Pt,
@@ -376,6 +397,8 @@ pub enum OpKind {
         color: Color,
         #[serde(default = "d_width", serialize_with = "ser_num")]
         width: f64,
+        #[serde(default, skip_serializing_if = "LineStyle::is_solid")]
+        style: LineStyle,
     },
     Rect {
         rect: Rc,
@@ -389,6 +412,8 @@ pub enum OpKind {
         /// Corner radius in px (clamped to half the shorter side at render time).
         #[serde(default, serialize_with = "ser_num")]
         radius: f64,
+        #[serde(default, skip_serializing_if = "LineStyle::is_solid")]
+        style: LineStyle,
     },
     Ellipse {
         rect: Rc,
@@ -399,6 +424,8 @@ pub enum OpKind {
         /// Width in px of a soft translucent halo around the ring (the click marker); 0 = none.
         #[serde(default, skip_serializing_if = "is_zero", serialize_with = "ser_num")]
         glow: f64,
+        #[serde(default, skip_serializing_if = "LineStyle::is_solid")]
+        style: LineStyle,
     },
     Text {
         /// Top-left of the text box (first line).
@@ -844,6 +871,17 @@ impl OpKind {
             OpKind::Retype { .. } => "retype",
             OpKind::MoveArea { .. } => "move_area",
             OpKind::Blueprint { .. } => "blueprint",
+        }
+    }
+
+    /// The line style of an `arrow`, `line`, `rect` or `ellipse` (ANN-12); `None` for other ops.
+    pub fn line_style(&self) -> Option<LineStyle> {
+        match self {
+            OpKind::Arrow { style, .. }
+            | OpKind::Line { style, .. }
+            | OpKind::Rect { style, .. }
+            | OpKind::Ellipse { style, .. } => Some(*style),
+            _ => None,
         }
     }
 
@@ -1546,6 +1584,50 @@ mod tests {
     }
 
     /// Unknown fields inside a known op survive a read and a write (0.3.3 pass-through).
+    /// ANN-12: `style` is optional, solid is not written, dashed and dotted round-trip.
+    #[test]
+    fn ann_12_line_style_wire_shape() {
+        let plain = parse_ops(&json!([
+            { "op": "rect", "rect": [0, 0, 10, 10] },
+            { "op": "line", "from": [0, 0], "to": [5, 5], "style": "solid" }
+        ]))
+        .unwrap();
+        for op in &plain {
+            assert_eq!(op.kind.line_style(), Some(LineStyle::Solid));
+            assert!(
+                op.extra.is_empty(),
+                "an explicit solid is not kept as an extra"
+            );
+            assert!(serde_json::to_value(op).unwrap().get("style").is_none());
+        }
+        for (name, want) in [("dashed", LineStyle::Dashed), ("dotted", LineStyle::Dotted)] {
+            for kind in ["arrow", "line"] {
+                let v = json!([{ "op": kind, "from": [0, 0], "to": [5, 5], "style": name }]);
+                let ops = parse_ops(&v).unwrap();
+                assert_eq!(ops[0].kind.line_style(), Some(want));
+                assert_eq!(serde_json::to_value(&ops).unwrap()[0]["style"], name);
+            }
+            for kind in ["rect", "ellipse"] {
+                let v = json!([{ "op": kind, "rect": [0, 0, 5, 5], "style": name }]);
+                let ops = parse_ops(&v).unwrap();
+                assert_eq!(ops[0].kind.line_style(), Some(want));
+                assert_eq!(serde_json::to_value(&ops).unwrap()[0]["style"], name);
+            }
+        }
+    }
+
+    /// ANN-12.AC8: any other value is `invalid_input` naming the op index.
+    #[test]
+    fn ann_12_ac8_unknown_style_is_invalid_input() {
+        let err = parse_ops(&json!([
+            { "op": "arrow", "from": [0, 0], "to": [5, 5] },
+            { "op": "ellipse", "rect": [0, 0, 5, 5], "style": "wavy" }
+        ]))
+        .unwrap_err();
+        assert_eq!(err.code(), crate::ErrorCode::InvalidInput);
+        assert!(err.to_string().contains("ops[1]"), "{err}");
+    }
+
     #[test]
     fn unknown_fields_in_known_ops_pass_through() {
         let input = json!([

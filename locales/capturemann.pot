@@ -8463,6 +8463,10 @@ msgid "Kind"
 msgstr ""
 
 msgctxt "annotation setting"
+msgid "Line style"
+msgstr ""
+
+msgctxt "annotation setting"
 msgid "Numbering"
 msgstr ""
 
@@ -9956,6 +9960,18 @@ msgstr ""
 
 msgctxt "lens shape"
 msgid "Rounded"
+msgstr ""
+
+msgctxt "line style"
+msgid "Dashed"
+msgstr ""
+
+msgctxt "line style"
+msgid "Dotted"
+msgstr ""
+
+msgctxt "line style"
+msgid "Solid"
 msgstr ""
 
 msgctxt "list"

@@ -10122,6 +10122,11 @@ msgstr "Loại"
 
 #, fuzzy
 msgctxt "annotation setting"
+msgid "Line style"
+msgstr "Kiểu nét"
+
+#, fuzzy
+msgctxt "annotation setting"
 msgid "Numbering"
 msgstr "Cách đánh số"
 
@@ -11470,6 +11475,21 @@ msgstr "Chữ nhật"
 msgctxt "lens shape"
 msgid "Rounded"
 msgstr "Bo tròn"
+
+#, fuzzy
+msgctxt "line style"
+msgid "Dashed"
+msgstr "Nét đứt"
+
+#, fuzzy
+msgctxt "line style"
+msgid "Dotted"
+msgstr "Nét chấm"
+
+#, fuzzy
+msgctxt "line style"
+msgid "Solid"
+msgstr "Nét liền"
 
 msgctxt "menu"
 msgid "Click Guide of a window…"

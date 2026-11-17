@@ -1,4 +1,5 @@
 use super::*;
+use cm_core::annotation::LineStyle;
 
 impl EditorView {
     pub(super) fn doc_action(
@@ -446,6 +447,40 @@ impl EditorView {
                 ParamValue::Block,
                 cx,
             ),
+            (Param::LineStyle, ParamValue::LineStyle(cur)) => div()
+                .flex()
+                .gap(px(6.))
+                .children(
+                    [
+                        (
+                            LineStyle::Solid,
+                            "line-style-solid",
+                            tr_ctx!("line style", "Solid"),
+                        ),
+                        (
+                            LineStyle::Dashed,
+                            "line-style-dashed",
+                            tr_ctx!("line style", "Dashed"),
+                        ),
+                        (
+                            LineStyle::Dotted,
+                            "line-style-dotted",
+                            tr_ctx!("line style", "Dotted"),
+                        ),
+                    ]
+                    .into_iter()
+                    .map(|(v, id, text)| {
+                        self.seg_button(
+                            t,
+                            ElementId::from(id),
+                            text.clone(),
+                            text,
+                            v == cur,
+                            self.set_param_action(ParamValue::LineStyle(v)),
+                        )
+                    }),
+                )
+                .into_any_element(),
             _ => return None,
         };
         let label = match p {

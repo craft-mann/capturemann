@@ -271,6 +271,7 @@ fn ann1_ac6_agent_json_equals_native_ops() {
             to: Pt::new(90.0, 60.0),
             color: Color::rgb(0xFF, 0x3B, 0x3B),
             width: 4.0,
+            style: Default::default(),
         },
     )];
     let base = base_image(120, 80);

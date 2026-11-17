@@ -729,6 +729,7 @@ pub fn shape_from_drag(
                     to,
                     color: style.color,
                     width: style.width,
+                    style: style.line_style,
                 }
             } else {
                 OpKind::Line {
@@ -736,6 +737,7 @@ pub fn shape_from_drag(
                     to,
                     color: style.color,
                     width: style.width,
+                    style: style.line_style,
                 }
             })
         }
@@ -767,12 +769,14 @@ pub fn shape_from_drag(
                     width: style.width,
                     fill: None,
                     radius: 0.0,
+                    style: style.line_style,
                 },
                 Tool::Ellipse => OpKind::Ellipse {
                     rect,
                     color: style.color,
                     width: style.width,
                     glow: 0.0,
+                    style: style.line_style,
                 },
                 Tool::Highlight => OpKind::Highlight {
                     rect,
@@ -1057,6 +1061,13 @@ pub fn param_value(kind: &OpKind, p: Param) -> Option<ParamValue> {
             | OpKind::Ellipse { width, .. },
             Param::Width,
         ) => Some(ParamValue::Width(*width)),
+        (
+            OpKind::Arrow { style, .. }
+            | OpKind::Line { style, .. }
+            | OpKind::Rect { style, .. }
+            | OpKind::Ellipse { style, .. },
+            Param::LineStyle,
+        ) => Some(ParamValue::LineStyle(*style)),
         (OpKind::Text { size, .. }, Param::TextSize) => Some(ParamValue::TextSize(*size)),
         (OpKind::Stamp { size, .. }, Param::StampSize) => Some(ParamValue::StampSize(*size)),
         (OpKind::Step { size, .. }, Param::StepSize) => Some(ParamValue::StepSize(*size)),
@@ -1091,6 +1102,13 @@ pub fn with_param(kind: &OpKind, v: ParamValue) -> Option<OpKind> {
             | OpKind::Ellipse { width, .. },
             ParamValue::Width(w),
         ) => *width = w.clamp(1.0, 64.0),
+        (
+            OpKind::Arrow { style, .. }
+            | OpKind::Line { style, .. }
+            | OpKind::Rect { style, .. }
+            | OpKind::Ellipse { style, .. },
+            ParamValue::LineStyle(l),
+        ) => *style = l,
         (OpKind::Callout { bg, color, .. }, ParamValue::Color(c)) => {
             *bg = c;
             *color = text_on(c);
@@ -1145,6 +1163,7 @@ mod tests {
             width: 4.0,
             fill: None,
             radius: 0.0,
+            style: Default::default(),
         }
     }
 
@@ -1167,7 +1186,8 @@ mod tests {
                 from: Pt::new(120.0, 300.0),
                 to: Pt::new(380.0, 210.0),
                 color: Color::rgb(0xFF, 0x3B, 0x3B),
-                width: 4.0
+                width: 4.0,
+                style: Default::default()
             }
         );
     }
@@ -1308,6 +1328,7 @@ mod tests {
             to: Pt::new(100.0, 0.0),
             color: Color::BLACK,
             width: 4.0,
+            style: Default::default(),
         };
         assert!(hit(&a, Pt::new(50.0, 4.0), 3.0, &mut tm));
         assert!(!hit(&a, Pt::new(50.0, 20.0), 3.0, &mut tm));
@@ -1316,6 +1337,7 @@ mod tests {
             color: Color::BLACK,
             width: 4.0,
             glow: 0.0,
+            style: Default::default(),
         };
         assert!(hit(&e, Pt::new(0.0, 50.0), 3.0, &mut tm));
         assert!(hit(&e, Pt::new(100.0, 0.0), 3.0, &mut tm));
@@ -1412,6 +1434,7 @@ mod tests {
             to: Pt::new(10.0, 10.0),
             color: Color::BLACK,
             width: 4.0,
+            style: Default::default(),
         };
         let k = resize(&a, Handle::To, Pt::new(50.0, 7.0), false, &mut tm);
         assert!(
@@ -1441,6 +1464,7 @@ mod tests {
             to: Pt::new(5.0, 5.0),
             color: Color::BLACK,
             width: 2.0,
+            style: Default::default(),
         };
         assert_eq!(handles(&arrow, &mut tm).len(), 2);
         let blur = OpKind::Blur {
@@ -1499,7 +1523,8 @@ mod tests {
                 color: blue,
                 width: 4.0,
                 fill: None,
-                radius: 0.0
+                radius: 0.0,
+                style: Default::default()
             }
         );
         assert!(
@@ -1539,6 +1564,7 @@ mod tests {
             to: Pt::new(2.0, 2.0),
             color: Color::BLACK,
             width: 4.0,
+            style: Default::default(),
         };
         assert!(
             matches!(translate(&a, 10.0, 5.0), OpKind::Arrow { from, to, .. } if from == Pt::new(11.0, 6.0) && to == Pt::new(12.0, 7.0))
@@ -1754,5 +1780,31 @@ mod tests {
         assert!(text_hover_target(&ops, Some("t1"), over, &mut tm).is_none());
         assert!(text_hover_target(&ops, None, Pt::new(320.0, 320.0), &mut tm).is_none());
         assert!(text_hover_target(&ops, None, Pt::new(900.0, 900.0), &mut tm).is_none());
+    }
+
+    /// ANN-12.AC5: `with_param` changes only the style, and only for the four shape ops.
+    #[test]
+    fn line_style_param_touches_only_the_style() {
+        use cm_core::annotation::LineStyle;
+        let r = OpKind::Rect {
+            rect: Rc::new(0.0, 0.0, 10.0, 10.0),
+            color: Color::WHITE,
+            width: 4.0,
+            fill: None,
+            radius: 3.0,
+            style: LineStyle::Solid,
+        };
+        let new = with_param(&r, ParamValue::LineStyle(LineStyle::Dotted)).unwrap();
+        let mut expect = r.clone();
+        if let OpKind::Rect { style, .. } = &mut expect {
+            *style = LineStyle::Dotted;
+        }
+        assert_eq!(new, expect);
+        let t = OpKind::Highlight {
+            rect: Rc::new(0.0, 0.0, 10.0, 10.0),
+            color: Color::WHITE,
+            opacity: 0.5,
+        };
+        assert!(with_param(&t, ParamValue::LineStyle(LineStyle::Dashed)).is_none());
     }
 }

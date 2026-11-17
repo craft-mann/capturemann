@@ -130,6 +130,8 @@ pub fn op_schema() -> Value {
     let id = json!({ "type": "string", "description": "Optional unique op id." });
     let width = json!({ "type": "number", "exclusiveMinimum": 0, "default": 4 });
     let color = rgb();
+    let line_style = json!({ "enum": ["solid", "dashed", "dotted"], "default": "solid",
+                             "description": "Line style (ANN-12): dashed is dash 4 x width, gap 2.5 x width; dotted is round dots 2 x width apart (width at least 2 px). An arrow's head stays solid." });
     let variant = |name: &str, props: Value, required: &[&str]| {
         let mut p = props;
         if let Some(m) = p.as_object_mut() {
@@ -142,11 +144,11 @@ pub fn op_schema() -> Value {
     };
     let mut schema = json!({
         "oneOf": [
-            variant("arrow", json!({ "from": point(), "to": point(), "color": color, "width": width }), &["from", "to"]),
-            variant("line", json!({ "from": point(), "to": point(), "color": color, "width": width }), &["from", "to"]),
+            variant("arrow", json!({ "from": point(), "to": point(), "color": color, "width": width, "style": line_style }), &["from", "to"]),
+            variant("line", json!({ "from": point(), "to": point(), "color": color, "width": width, "style": line_style }), &["from", "to"]),
             variant("rect", json!({ "rect": rect(), "color": color, "width": width,
-                                    "fill": rgb(), "radius": { "type": "number", "minimum": 0 } }), &["rect"]),
-            variant("ellipse", json!({ "rect": rect(), "color": color, "width": width }), &["rect"]),
+                                    "fill": rgb(), "radius": { "type": "number", "minimum": 0 }, "style": line_style }), &["rect"]),
+            variant("ellipse", json!({ "rect": rect(), "color": color, "width": width, "style": line_style }), &["rect"]),
             variant("text", json!({ "at": point(), "text": { "type": "string" },
                                     "size": { "type": "number", "exclusiveMinimum": 0, "maximum": 2000, "default": 24 },
                                     "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$",
@@ -579,7 +581,7 @@ pub fn all() -> Vec<ToolSpec> {
             mutating: true,
             destructive: false,
             spec: "ANN-1, ANN-2",
-            summary: "Add annotation ops (arrow, line, rect, ellipse, text, highlight, step, callout, spotlight, stamp, magnify, retype, move_area, blueprint, blur, pixelate, crop) to a screenshot. `magnify` is the Zoom Lens (at most 4; rendered from the original with the ops listed before it inside, and with every blur or pixelate applied to it); `retype`, `move_area` and `blueprint` are BASE EDITS that change pixels and must come before every other op (`invalid_input` naming `ops[i]` otherwise; to add one to an image that already has ops, send the whole list with `replace: true`), they are not redaction (use blur or pixelate for secrets), and their `fill` is measured once and stored in the op (`suggest_blueprint` returns measured fills and colours). `callout` is a text box with a pointer (its `rect` is the minimum size: the box grows to fit the text); `spotlight` dims or blurs everything outside its shapes (at most one per image; `blur` mode is a look, not a redaction); `stamp` is a check, cross, exclaim, question mark or a `label` word; `step` can carry a `style` (number, upper, lower), a `start` and a `text` label. A `text` op with no `color` gets Auto (ANN-1.AC8): #111111 or #FFFFFF, whichever reads better on the picture under it, plus a 2 px outline on a busy picture; the stored values are returned in `auto_text`. Ops are drawn in list order. One call is one revision and one undo step. Coordinates are physical px of the original image. Returns the revision and the rendered image.",
+            summary: "Add annotation ops (arrow, line, rect, ellipse (these four take `style`: solid, dashed or dotted), text, highlight, step, callout, spotlight, stamp, magnify, retype, move_area, blueprint, blur, pixelate, crop) to a screenshot. `magnify` is the Zoom Lens (at most 4; rendered from the original with the ops listed before it inside, and with every blur or pixelate applied to it); `retype`, `move_area` and `blueprint` are BASE EDITS that change pixels and must come before every other op (`invalid_input` naming `ops[i]` otherwise; to add one to an image that already has ops, send the whole list with `replace: true`), they are not redaction (use blur or pixelate for secrets), and their `fill` is measured once and stored in the op (`suggest_blueprint` returns measured fills and colours). `callout` is a text box with a pointer (its `rect` is the minimum size: the box grows to fit the text); `spotlight` dims or blurs everything outside its shapes (at most one per image; `blur` mode is a look, not a redaction); `stamp` is a check, cross, exclaim, question mark or a `label` word; `step` can carry a `style` (number, upper, lower), a `start` and a `text` label. A `text` op with no `color` gets Auto (ANN-1.AC8): #111111 or #FFFFFF, whichever reads better on the picture under it, plus a 2 px outline on a busy picture; the stored values are returned in `auto_text`. Ops are drawn in list order. One call is one revision and one undo step. Coordinates are physical px of the original image. Returns the revision and the rendered image.",
             input: json!({ "type": "object", "properties": {
                 "capture_id": capture_id(),
                 "ops": { "type": "array", "items": op_schema(), "description": "The ops to add. Empty is allowed only with `replace: true`, which clears every annotation (revert to the original)." },
