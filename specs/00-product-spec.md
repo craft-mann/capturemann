@@ -154,10 +154,10 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | GDE-4 | Click Guide for agents: `start_guide`, `stop_guide`, `get_guide`, `set_guide`, `export_guide` | P1 | Yes |
 | BRD-1 | Boards: 2 to 12 screenshots in one layout (pair, grid, strip, free) | P1 | Yes |
 | BLK-1 | Bulk export: resize, convert, watermark and rename many screenshots as one job | P1 | Yes |
-| QC-1 | Quick Capture panel: kind, target, options and one button (0.3.5, Preview) | P1 | Yes |
-| QC-3 | After-capture bar: Edit, Copy, Save, Text, Long Shot, Record (0.3.5) | P1 | Yes |
-| QC-4 | Presets: named setups, starter set, `presets.json` (0.3.5) | P1 | Yes |
-| QC-5 | Presets for agents and the CLI: `preset` argument, `list_presets` (0.3.5) | P2 | Yes |
+| QC-1 | Quick Capture panel: kind, target, options and one button (0.3.6, Preview) | P1 | Yes |
+| QC-3 | After-capture bar: Edit, Copy, Save, Text, Long Shot, Record (0.3.6) | P1 | Yes |
+| QC-4 | Presets: named setups, starter set, `presets.json` (0.3.6) | P1 | Yes |
+| QC-5 | Presets for agents and the CLI: `preset` argument, `list_presets` (0.3.6) | P2 | Yes |
 | **Storage** |  |  |  |
 | STO-1 | Destinations: local folder, external drive, NAS (SMB path) | P0 | Yes |
 | STO-2 | Google Drive via OAuth; pick a target folder (OneDrive and Dropbox: built, "Coming soon", later release) | P0 | Yes |

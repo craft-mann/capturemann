@@ -1,8 +1,8 @@
 # Quick Capture (QC)
 
-**0.3.5, maintainer decision of Nov 17, 2026** (`specs/plans/release-0.3.5-plan.md`, section 5b). UI name: **Quick Capture**. Design pack: `capturemann-0.3.6-quick-capture/` (local; boards Q036Brief, Q036Panel, Q036After, Q036Presets, Q036Scope). This file is the source of truth for the build; where the pack and this file differ, this file wins. **Preview** (label and Send feedback button, no Settings switch).
+**0.3.6, maintainer decision of Nov 17, 2026** (`specs/plans/release-0.3.6-plan.md`; brought into 0.3.5 and moved back to 0.3.6 the same day). UI name: **Quick Capture**. Design pack: `capturemann-0.3.6-quick-capture/` (local; boards Q036Brief, Q036Panel, Q036After, Q036Presets, Q036Scope). This file is the source of truth for the build; where the pack and this file differ, this file wins. **Preview** (label and Send feedback button, no Settings switch).
 
-QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock) are **not** in 0.3.5; the IDs stay reserved.
+QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock) are **not** in 0.3.6; the IDs stay reserved.
 
 **Rules that apply to the whole file**
 - **Nothing existing changes.** The five dock tiles, the tray items, the Launcher (its hotkey stays ⌥⇧Space on macOS and Ctrl+Alt+Shift+Space on Windows and Linux) and every shortcut (⌥⇧1 to 4, R, M, L) work exactly as before. Quick Capture adds a way in; it does not replace one.

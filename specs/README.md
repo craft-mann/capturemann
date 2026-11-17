@@ -48,7 +48,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `features/15-voice.md` | Voice and meetings | VOC-1 … VOC-3 |
 | `features/19-click-guide.md` | Click Guide (0.3.4) | GDE-1 … GDE-4 |
 | `features/20-boards-and-bulk.md` | Boards and Bulk export (0.3.4) | BRD-1, BLK-1 |
-| `features/21-quick-capture.md` | Quick Capture: panel, after-capture bar, presets, agent presets (0.3.5, Preview) | QC-1, QC-3, QC-4, QC-5 |
+| `features/21-quick-capture.md` | Quick Capture: panel, after-capture bar, presets, agent presets (0.3.6, Preview) | QC-1, QC-3, QC-4, QC-5 |
 | `features/17-redaction.md` | Redaction (Auto-redact kinds, benchmark, generated docs) | RED-1 … RED-3 |
 | `features/18-import.md` | Import media (probe, bundle, the `import` job and `import_media`, remove originals, the app's sheet) | IMP-1 … IMP-5 |
 
