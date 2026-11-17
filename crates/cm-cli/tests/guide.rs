@@ -130,7 +130,19 @@ async fn gde_4_the_cli_runs_the_whole_flow() {
     )
     .await;
     assert_eq!(r.code, 0, "{}", r.err);
-    assert!(dest.join("guide.md").is_file());
+    // 0.3.5 (BUG-2): the Markdown file is named with the local date and time, and its pictures
+    // go to a folder with the same stamp.
+    let names: Vec<String> = std::fs::read_dir(&dest)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        names
+            .iter()
+            .any(|n| n.starts_with("guide-") && n.ends_with(".md")),
+        "{names:?}"
+    );
+    assert!(names.iter().any(|n| n.starts_with("images-")), "{names:?}");
     let r = cli(
         &endpoint,
         &[
