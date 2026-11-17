@@ -1,12 +1,13 @@
 # Release 0.3.5: a light release (plan, draft, Nov 17, 2026)
 
-Status: **final draft for review (Nov 17, 2026); nothing built, no open decision.** Scope set by the maintainer on Nov 17, 2026: a **light** release with four parts, each labelled **BUG**, **FEATURE** or **PROCESS** below:
+Status: **final draft for review (Nov 17, 2026); nothing built, no open decision.** Scope set by the maintainer on Nov 17, 2026: a **light** release with five parts, each labelled **BUG**, **FEATURE** or **PROCESS** below:
 
 | Part | Label | What |
 | --- | --- | --- |
 | 1 | BUG | 9 known bugs of 0.3.4 (section 2) |
 | 2 | FEATURE | Line styles (solid, dashed, dotted) for arrow, line, rectangle, ellipse (ANN-12, section 3) |
 | 3 | FEATURE | A Send feedback button on the About page, next to Source on GitHub (section 4) |
+| 5 | FEATURE | Boards marked **Preview** (label and Send feedback button, section 4b) |
 | 4 | PROCESS | A QA agent pass: an agent tests the app on each system and reports bugs (section 5) |
 
 **Everything else is moved out of 0.3.5** (section 8). Bugs found by the QA pass or reported by users can enter the release only if they are P1 (safety or data loss) or a one-line fix; the rest go to 0.3.6. No other feature is added without the maintainer's word.
@@ -15,7 +16,7 @@ Sources: the Known limits of `docs/development/release-0.3.4-github-text.md`, `r
 
 ## 1. Rules
 
-1. **Light means light:** the only new features are ANN-12 and the About feedback button. MCP stays at **89 tools**; ANN-12 adds a field to existing ops, not a tool. Quick Capture was moved to 0.3.6 on Nov 17, 2026 (section 8).
+1. **Light means light:** the only new features are ANN-12, the About feedback button and the Preview label on Boards. MCP stays at **89 tools**; ANN-12 adds a field to existing ops, not a tool. Quick Capture was moved to 0.3.6 on Nov 17, 2026 (section 8).
 2. **Every fix has a test or a stored check** that fails before and passes after (a unit test, a `cm-regress` case, or a `tests/manual/` script with a report). Say "verified" only with a report in `verification/`.
 3. **Scoped tests while developing, the full gate once on the final tree** ([[feedback-full-gate-once-before-release]]); clippy with the CI toolchain; Trivy gate and `cargo deny` before each merge to `main`.
 4. **Windows files come from the GitHub "Windows package" workflow** (it has the speaker engine); the lab build does not.
@@ -67,6 +68,17 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 - One unit test modelled on `the_feedback_url_carries_the_feature_and_the_version_only`.
 - Optional icon: `message-square.svg` exists in `apps/desktop/assets/icons/` but is not registered in `ui/paint.rs`; skip the icon if registering it takes more than a few lines.
 - The link target depends on BUG-8 (the template chooser).
+
+## 4b. Part 5, FEATURE: Boards marked Preview
+
+Added by the maintainer on Nov 17, 2026. Long Shot and Click Guide already carry the Preview label since 0.3.4 (design S24: a label plus a Send feedback button, no Settings switch; the stage registry is `crates/cm-core/src/features.rs`, the UI side is `apps/desktop/src/ui/preview_label.rs`). Boards (BRD-1: Pair, Grid, Strip and Free layouts, the Make a board sheet, the library cards and `create_board`; UI name **Boards**) get the same treatment:
+
+- A `Feature` entry in the registry: id `boards`, name `Boards`, stage Preview, with its MCP tool (`create_board`) and CLI command (`board`), so the MCP tool listing shows "(preview)" and the CLI help shows `[preview]` for them, as for the other two.
+- A `PreviewFeature::Boards` in the app with everything the other two have: the Preview label on the Make a board sheet and on the board's menu and library entries where a feature name appears, the Preview popover with its text and a **Send feedback** button (the feedback form of the About button, feature name Boards), and the first-use intro card (once per feature, remembered like the others).
+- Text for the popover and the intro, in the style of the existing two: what it is (several screenshots in one picture), that it is new and still changing, that existing boards and screenshots stay readable.
+- All strings through `cm_i18n` with Vietnamese entries; the existing registry tests (`every_registered_preview_has_a_preview_feature` and the tool/CLI marker tests) cover it.
+- `specs/features/20-boards-and-bulk.md` and the Preview design note (`docs/development/design-s24-preview-label.md`) say Boards is Preview in 0.3.5; `docs/reference/` is regenerated (the tool description gets the preview marker). Bulk export is not marked.
+- Moving Boards to stable later is a one-line change in the registry.
 
 ## 5. Part 4, PROCESS: QA agent pass
 
