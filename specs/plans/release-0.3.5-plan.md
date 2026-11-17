@@ -1,12 +1,12 @@
 # Release 0.3.5: bug fixes and stabilisation (plan, draft, Nov 17, 2026)
 
-Status: **draft, nothing built, waiting for the maintainer's review.** Scope decided by the maintainer on Nov 17, 2026, right after 0.3.4 was published: **bug fixes, stabilisation and feedback from 0.3.4 only; no new features.** Every item below is a defect, a safety gap or a missing check in something that already shipped. Where a fix needs a product decision (D1 to D31 in `docs/development/ux-proposals-0.3.4-for-design.md`), the plan proposes a default and lists it in section 6; a default is not a decision until the maintainer says so.
+Status: **draft, nothing built, waiting for the maintainer's review.** Scope decided by the maintainer on Nov 17, 2026, right after 0.3.4 was published: **bug fixes, stabilisation and feedback from 0.3.4; no new features, with one enhancement added the same day: line styles for the drawing shapes (track E, ANN-12).** Every other item below is a defect, a safety gap or a missing check in something that already shipped. Where a fix needs a product decision (D1 to D31 in `docs/development/ux-proposals-0.3.4-for-design.md`), the plan proposes a default and lists it in section 6; a default is not a decision until the maintainer says so.
 
 Sources: the Known limits of `docs/development/release-0.3.4-github-text.md`, `docs/development/release-0.3.4-morning-report.md`, the two UX audits (`ux-audit-long-shot-click-guide-0.3.4.md`, `ux-audit-boards-bulk-0.3.4.md`), the UX proposal list (131 items: 14 P1, 54 P2, 63 P3), `docs/project/status.md`, and the `QA-0.3.4-*` and `L1-*-0.3.4-*` reports in `verification/`. No user report of 0.3.4 had arrived when this was written; section 5 is the intake for those.
 
 ## 1. Rules for this release
 
-1. **No new features, no new tools, no new ops.** MCP stays at 89 tools; spec IDs are not added. A fix may add an error code or a toast, not a surface. If a fix cannot be done without a feature, it moves to section 7.
+1. **No new features except track E (ANN-12), no new tools, no new ops.** MCP stays at 89 tools (ANN-12 adds a field to existing ops, not a tool); the only new spec ID is ANN-12. A fix may add an error code or a toast, not a surface. If a fix cannot be done without a feature, it moves to section 7. Further enhancements need the maintainer's word.
 2. **Safety first.** Items where the user cannot see or stop a capture, or where data is overwritten or leaked, come before polish.
 3. **Every fix has a test or a stored check** that fails before and passes after (a unit test, a `cm-regress` case, or a `tests/manual/` script with a report). "Verified" only with a report in `verification/`.
 4. **Scoped tests while developing, the full gate once on the final tree** ([[feedback-full-gate-once-before-release]]); run clippy with the CI toolchain; run the Trivy gate and `cargo deny` before each merge to `main`.
@@ -49,6 +49,35 @@ The audit rated 6 board items P1. Boards stay as built (flat band label, no drop
 | C6 | Click Guide editor fields commit only on Enter; Back or quit loses typing | Commit on blur, row change, Back and quit. | S | CG-20 |
 | C7 | Click Guide export sheet switches drawn as plain squares | Use the app's switch style. | S | CG-30 |
 
+## 4b. Track E: line styles for shapes (enhancement, ANN-12)
+
+**What exists today.** Arrow, Line, Rectangle and Ellipse are already built (ANN-1: tools A, L, R, E; ops `arrow`, `line`, `rect`, `ellipse` in `crates/cm-core/src/annotation.rs`). They have colour and width but only a solid stroke; the renderer (`crates/cm-render/src/annot.rs`, `stroke_round`) has no dash support. So the request is **a stroke style: solid, dashed or dotted**, on all four shapes.
+
+**Design (proposal, nothing built):**
+
+| Point | Proposal |
+| --- | --- |
+| Op field | New optional `style` on `arrow`, `line`, `rect` and `ellipse`: `"solid"` (default), `"dashed"`, `"dotted"`. Absent means solid and solid is not written, so existing manifests and goldens do not change. |
+| Older apps | An app without ANN-12 draws the op solid and keeps the unknown field (the op's `extra` is preserved), so a 0.3.4 app does not lose the style when it saves. Add the AC for this as in ANN-9 AC7. |
+| Look | Dashed: dash 4 x width, gap 2.5 x width, butt caps. Dotted: round dots (dash 0, gap 2 x width, round cap). Both scale with the width and are measured along the path, starting at the first point. Corners of a rectangle keep the dash phase running (no reset per side). Minimum width 2 px for dotted so a dot stays visible. |
+| Arrow | The shaft takes the style; **the head is always drawn solid** so it stays readable. |
+| Ellipse glow | The click-marker halo (`glow`) stays as is; style applies to the ring. |
+| Editor | A three-button style control in the shape panel (solid, dashed, dotted) for the four tools and for a selected shape; the last style is remembered per tool like colour and width (ANN-1 defaults); changing it is one undo step (ANN-1 AC5). |
+| Agents | `annotate` ops take `style`; the MCP schema, CLI `--ops` docs and `docs/reference/` (regenerate with `docs/reference/gen_agent_reference.py`) are updated; `tools.json` changes, the tool count does not. Unknown value: `invalid_input` naming the op index. |
+| Export | The same renderer drives preview and export, so parity holds without extra work; add goldens at 1x and 2x for each shape and style. |
+| Not in scope | Custom dash lengths, double lines, arrow-head styles, freehand pen (still P2 in ANN-1), line styles on Highlighter, Callout or Spotlight. |
+
+**Acceptance criteria to write in Phase 0 (`specs/features/02-annotation.md`, ANN-12):**
+- AC1 a dashed rectangle exports with the dash pattern and the same golden at 1x and 2x;
+- AC2 a dotted line is round dots, spaced 2 x width;
+- AC3 an arrow with `dashed` has a solid head;
+- AC4 `style` absent renders exactly as before (existing goldens unchanged);
+- AC5 changing the style of a selected shape is one undo step and changes only that op;
+- AC6 an agent op with `style: "dashed"` renders the same as the GUI;
+- AC7 a build without ANN-12 draws it solid and writes the field back unchanged.
+
+**Size:** M (core field and validation S, renderer M with the dash phase around corners and ellipse, editor control S, schema, docs and goldens S). Files: `cm-core/src/annotation.rs`, `cm-render/src/annot.rs`, `apps/desktop/src/editor/**` (shape panel), `cm-mcp` schema, `locales/` (three labels, EN and VI), `tests/golden/annotation/`. A separate track from A to D; it does not touch the guide or capture code.
+
 ## 5. Track D: intake, carry-over and checks that were never run
 
 1. **0.3.4 user feedback.** Triage every new GitHub issue and message into this plan or section 7. Reserve about a third of the time for it. Nothing has arrived yet.
@@ -81,8 +110,9 @@ Board drop tile and drag handle, Edit board after creation, the S10 stamp label 
 
 ## 8. Order, parallel work and gates
 
-1. **Day 0: triage and reproduction.** Reproduce B1 on the ThinkPad and A1, A5, A6 on the Mac and Windows; write the failing test or `cm-regress` case for each fix first. Collect the maintainer's answers to section 6.
-2. **Tracks run in parallel, disjoint files, one `target/` per agent** (worktrees, remove them when merged): A (`cm-daemon`, `cm-library` guide code, `ui/guide_view`, `cm-mcp` guide tools), B (`cm-capture`, Long Shot stitching, locales), C (`cm-render` compose, library and editor views, locales), D (checks and docs). Merge each track as it is green; I merge and retest myself.
+1. **Phase 0 (half a day): ANN-12 spec text and the frozen `style` field** in `specs/features/02-annotation.md` and the FR table (P1), spec text only.
+   **Day 0: triage and reproduction.** Reproduce B1 on the ThinkPad and A1, A5, A6 on the Mac and Windows; write the failing test or `cm-regress` case for each fix first. Collect the maintainer's answers to section 6.
+2. **Tracks run in parallel, disjoint files, one `target/` per agent** (worktrees, remove them when merged): A (`cm-daemon`, `cm-library` guide code, `ui/guide_view`, `cm-mcp` guide tools), B (`cm-capture`, Long Shot stitching, locales), C (`cm-render` compose, library and editor views, locales), D (checks and docs), E (`cm-core` annotation, `cm-render/src/annot.rs`, the editor shape panel; touches `cm-mcp` schema, so merge after A to avoid a conflict in `tools.rs`). Merge each track as it is green; I merge and retest myself.
 3. **Full gate once** on the final tree (`fmt`, clippy with the CI toolchain, `cargo test --workspace --locked`, `cargo deny`, Trivy, `cargo run -p cm-i18n -- check`, `python3 scripts/check_target_os.py`).
 4. **Release candidates** on all three systems: macOS DMGs built and notarized by the maintainer, Windows from the CI workflow, Linux tarballs and `.deb` files signed with minisign.
 5. **Regression** with `cm-regress` on the final files of each system (macOS with the screen unlocked, `caffeinate -d -i`; Windows needs the ThinkPad booted and logged in; Linux x86_64 and the aarch64 VM), reports stored in `verification/` as `L1-*-0.3.5-*`.
@@ -93,6 +123,7 @@ Board drop tile and drag handle, Edit board after creation, the S10 stamp label 
 - Section 2 (A1 to A8) fixed, each with a test or stored check, or moved to section 7 with the maintainer's agreement.
 - B1: fixed with a check, or named in the release text as a known limit with what was tried.
 - No regression failure on any system; skipped cases listed by name.
+- Track E: ANN-12 acceptance criteria cited by tests, goldens for each shape and style, one look at the editor control on macOS and Windows with a stored report; existing goldens unchanged.
 - Version 0.3.5 in `Cargo.toml`, the bundle and the installers; MCP tool count unchanged at 89.
 - Release text says only what a stored report supports.
 
