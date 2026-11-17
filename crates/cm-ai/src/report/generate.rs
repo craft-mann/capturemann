@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use serde_json::{json, Map, Value};
 
 use super::check::{self, Checker};
+use super::langcheck;
 use super::prompt;
 use super::{Line, MarkerIn, ReportContext, Source, Template};
 use crate::text_model::chunk::{estimate_tokens, map_reduce, split_chunks, CHARS_PER_TOKEN};
@@ -39,10 +40,16 @@ pub struct Generated {
     pub dropped_uncited: usize,
     pub reassigned_names: usize,
     pub dropped_names: usize,
+    /// Sections whose text the language check could not get into the output language: the first
+    /// version stays (AI-9.AC10).
+    pub language_unsure: usize,
     /// Pieces the transcript was cut into (1 for a short recording).
     pub chunks: usize,
-    /// Calls made to the model.
+    /// Calls made to the model for the notes and their merges.
     pub model_calls: usize,
+    /// Calls made to the model by the language check (the question, the rewrites and the second
+    /// question; none when every section is empty).
+    pub language_calls: usize,
 }
 
 /// Why a run ended without a report.
@@ -212,7 +219,8 @@ fn notes_for(
     slice: (f32, f32),
     depth: usize,
 ) -> Result<Value, Error> {
-    let user = prompt::notes_prompt(preamble, chunk, part);
+    let lang = prompt::output_language(input.language, input.source_language);
+    let user = prompt::notes_prompt(preamble, chunk, part, lang.as_deref());
     match ask(model, input, system, user, checker, totals, progress, slice) {
         Err(e) if too_big(&e) && depth < 3 && chunk.chars().count() > 400 => {
             let (a, b) = halve(chunk);
@@ -301,7 +309,8 @@ fn merge_all(
                 next.extend(g);
                 continue;
             }
-            let user = prompt::merge_prompt(preamble, &g);
+            let lang = prompt::output_language(input.language, input.source_language);
+            let user = prompt::merge_prompt(preamble, &g, lang.as_deref());
             let slice = (at(i), at(i + 1));
             match ask(model, input, system, user, checker, totals, progress, slice) {
                 Ok(v) => next.push(v),
@@ -362,6 +371,18 @@ pub fn generate(
         },
     )?;
     let model_notes = if notes.is_object() { notes } else { json!({}) };
+    // The language check (AI-9.AC10): its calls are the last 4 % of the bar.
+    let check_from = if n_chunks > 1 { 0.96 } else { 0.95 };
+    let mut keep_going = || progress.borrow_mut().report(check_from);
+    let lang_out = langcheck::run(
+        model,
+        input,
+        &system,
+        &model_notes,
+        &checker,
+        &mut keep_going,
+    )?;
+    let model_notes = lang_out.notes;
     let content = assemble(input, &model_notes);
     let t = totals.into_inner();
     let _ = (progress.borrow_mut().f)(1.0);
@@ -370,8 +391,10 @@ pub fn generate(
         dropped_uncited: t.dropped_uncited,
         reassigned_names: t.reassigned_names,
         dropped_names: t.dropped_names,
+        language_unsure: lang_out.unsure,
         chunks: n_chunks,
         model_calls: t.calls,
+        language_calls: lang_out.calls,
     })
 }
 

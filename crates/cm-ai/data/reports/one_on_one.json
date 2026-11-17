@@ -95,7 +95,8 @@
         {
           "id": "due",
           "label": "Due",
-          "optional": true
+          "optional": true,
+          "prose": false
         }
       ]
     },

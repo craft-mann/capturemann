@@ -758,14 +758,16 @@ impl Inner {
         );
         let result = json!({
             "capture_id": capture_id, "report_id": r.id, "template": r.template,
-            "dropped_uncited": r.dropped_uncited, "reassigned_names": r.reassigned_names,
+            "dropped_uncited": r.dropped_uncited, "language_unsure": r.language_unsure,
+            "reassigned_names": r.reassigned_names,
             "chunks": r.chunks, "language": r.language, "model": r.model,
             "revision": rev.revision.rev,
         });
         self.events.publish(
             events::REPORT_READY,
             json!({ "capture_id": capture_id, "report_id": r.id, "template": r.template,
-                    "dropped_uncited": r.dropped_uncited, "chunks": r.chunks }),
+                    "dropped_uncited": r.dropped_uncited, "language_unsure": r.language_unsure,
+                    "chunks": r.chunks }),
         );
         Ok(result)
     }

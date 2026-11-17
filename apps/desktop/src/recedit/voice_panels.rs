@@ -561,6 +561,7 @@ mod tests {
             content,
             dropped_uncited: 2,
             reassigned_names: 0,
+            language_unsure: 0,
             chunks: 1,
             edited: false,
             checked: Vec::new(),

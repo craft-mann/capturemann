@@ -215,7 +215,9 @@ fn main() {
                     out["template"] = json!(template.id);
                     out["chunks"] = json!(g.chunks);
                     out["model_calls"] = json!(g.model_calls);
+                    out["language_calls"] = json!(g.language_calls);
                     out["dropped_uncited"] = json!(g.dropped_uncited);
+                    out["language_unsure"] = json!(g.language_unsure);
                     out["reassigned_names"] = json!(g.reassigned_names);
                     out["rubric"] = json!({
                         "items": s.items, "items_with_valid_time": s.items_with_valid_time,

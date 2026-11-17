@@ -23,6 +23,8 @@
 
 pub mod check;
 pub mod generate;
+pub mod labels;
+pub mod langcheck;
 pub mod prompt;
 pub mod render;
 pub mod rubric;
@@ -105,6 +107,19 @@ pub struct Field {
     /// May be missing from a model item.
     #[serde(default)]
     pub optional: bool,
+    /// Free text the language check looks at. `false` for what is not the model's own prose: a
+    /// quote (stays as spoken), a date, a role or product name, a competency the user typed.
+    /// Person fields are never checked either.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub prose: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
 }
 
 /// How [`render`] lays an item out.

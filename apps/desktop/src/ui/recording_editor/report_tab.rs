@@ -16,8 +16,9 @@
 //! `report_left.rs`, with the task checkboxes' send (`check_report_item`, stored in the report,
 //! one undo step).
 
+use cm_ai::report::labels;
 use cm_ai::report::store::Report;
-use cm_i18n::{tr, tr_ctx, trn};
+use cm_i18n::{tr, tr_ctx, trn, Lang};
 use gpui::{
     div, prelude::*, px, AnyElement, ClipboardItem, Context, FontWeight, Role, SharedString,
 };
@@ -55,17 +56,9 @@ fn text_model_label(id: &str) -> String {
         .map_or_else(|| id.to_owned(), |m| m.base.label.clone())
 }
 
-/// The template's name in the current language.
+/// The template's name in the current language (the UI's: the picker and the switcher).
 pub(crate) fn template_name(id: &str, fallback: &str) -> String {
-    match id {
-        "summary" => tr_ctx!("report template", "Summary"),
-        "minutes" => tr_ctx!("report template", "Meeting minutes"),
-        "one_on_one" => tr_ctx!("report template", "One-on-one notes"),
-        "interview" => tr_ctx!("report template", "Interview notes"),
-        "product_recap" => tr_ctx!("report template", "Product recap"),
-        "lecture" => tr_ctx!("report template", "Lecture notes"),
-        _ => fallback.to_owned(),
-    }
+    labels::template_name_in(cm_i18n::language(), id, fallback)
 }
 
 fn template_glyph(id: &str) -> &'static str {
@@ -80,64 +73,20 @@ fn template_glyph(id: &str) -> &'static str {
     }
 }
 
-/// The section's title in the current language.
-fn section_title(id: &str, fallback: &str) -> String {
-    match id {
-        "summary" => tr_ctx!("report section", "Summary"),
-        "attendees" => tr_ctx!("report section", "Attendees"),
-        "topics" => tr_ctx!("report section", "Topics"),
-        "decisions" => tr_ctx!("report section", "Decisions"),
-        "action_items" => tr_ctx!("report section", "Action items"),
-        "open_questions" => tr_ctx!("report section", "Open questions"),
-        "marked_moments" => tr_ctx!("report section", "Marked moments"),
-        "updates" => tr_ctx!("report section", "Updates"),
-        "wins" => tr_ctx!("report section", "Wins"),
-        "concerns" => tr_ctx!("report section", "Concerns"),
-        "feedback_given" => tr_ctx!("report section", "Feedback given"),
-        "feedback_received" => tr_ctx!("report section", "Feedback received"),
-        "agreed_actions" => tr_ctx!("report section", "Agreed actions"),
-        "follow_ups" => tr_ctx!("report section", "Follow-ups"),
-        "role_candidate" => tr_ctx!("report section", "Role and candidate"),
-        "questions_answers" => tr_ctx!("report section", "Questions and answers"),
-        "evidence" => tr_ctx!("report section", "Evidence per competency"),
-        "candidate_questions" => tr_ctx!("report section", "Candidate\u{2019}s questions"),
-        "product_audience" => tr_ctx!("report section", "Product and audience"),
-        "features_shown" => tr_ctx!("report section", "Features shown"),
-        "questions_asked" => tr_ctx!("report section", "Questions asked"),
-        "concerns_raised" => tr_ctx!("report section", "Concerns raised"),
-        "next_steps" => tr_ctx!("report section", "Next steps"),
-        "key_points" => tr_ctx!("report section", "Key points"),
-        "definitions" => tr_ctx!("report section", "Definitions"),
-        "examples" => tr_ctx!("report section", "Examples"),
-        "review_questions" => tr_ctx!("report section", "Review questions"),
-        _ => fallback.to_owned(),
-    }
+/// The section's title in the language of the report (not the app's).
+fn section_title(lang: Lang, id: &str, fallback: &str) -> String {
+    labels::section_title_by_id_in(lang, id, fallback)
 }
 
-/// The label of an item's other field in the current language.
-fn field_label(id: &str, fallback: &str) -> String {
-    match id {
-        "role" => tr_ctx!("report field", "Role"),
-        "due" => tr_ctx!("report field", "Due"),
-        "key_points" => tr_ctx!("report field", "Key points"),
-        "answer" => tr_ctx!("report field", "Answer"),
-        "quote" => tr_ctx!("report field", "Quote"),
-        "note" => tr_ctx!("report field", "What it shows"),
-        "competency" => tr_ctx!("report field", "Competency"),
-        "audience" => tr_ctx!("report field", "Audience"),
-        "product" => tr_ctx!("report field", "Product"),
-        "definition" => tr_ctx!("report field", "Definition"),
-        "people" => tr_ctx!("report field", "People"),
-        "question" => tr_ctx!("report field", "Question"),
-        "topic" => tr_ctx!("report field", "Topic"),
-        _ => fallback.to_owned(),
-    }
+/// The label of an item's other field in the language of the report.
+fn field_label(lang: Lang, label: &str) -> String {
+    labels::field_label_in(lang, label)
 }
 
-/// "Unassigned" as the daemon writes it, in the current language.
-fn person_label(name: &str) -> String {
+/// "Unassigned" as the daemon writes it, in the language of the report.
+fn person_label(lang: Lang, name: &str) -> String {
     if name.eq_ignore_ascii_case("unassigned") {
-        tr_ctx!("report owner", "Unassigned")
+        labels::unassigned_in(lang)
     } else {
         name.to_owned()
     }
@@ -1044,6 +993,14 @@ impl RecordingEditor {
                 ))
                 .text_color(rgba_of(t.warning))
             }))
+            .children((r.language_unsure > 0).then(|| {
+                shrink_text(trn!(
+                    "{n} section may not be in the report language",
+                    "{n} sections may not be in the report language",
+                    r.language_unsure
+                ))
+                .text_color(rgba_of(t.warning))
+            }))
             .into_any_element()
     }
 
@@ -1096,7 +1053,8 @@ impl RecordingEditor {
         sec: &SectionView,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let title = section_title(&sec.id, &sec.title).to_uppercase();
+        let lang = labels::lang_of(&r.language);
+        let title = labels::section_title_in(lang, &sec.title).to_uppercase();
         let head = div()
             .text_size(px(12.))
             .font_weight(FontWeight::MEDIUM)
@@ -1107,7 +1065,7 @@ impl RecordingEditor {
             vec![div()
                 .text_size(px(13.))
                 .text_color(rgba_of(t.mist))
-                .child(tr!("Nothing found"))
+                .child(labels::nothing_found_in(lang))
                 .into_any_element()]
         } else if sec.from_markers {
             vec![div()
@@ -1118,7 +1076,7 @@ impl RecordingEditor {
                     sec.items
                         .iter()
                         .enumerate()
-                        .map(|(i, it)| self.moment_chip(t, &sec.id, i, it, cx)),
+                        .map(|(i, it)| self.moment_chip(t, lang, &sec.id, i, it, cx)),
                 )
                 .into_any_element()]
         } else {
@@ -1128,7 +1086,7 @@ impl RecordingEditor {
                 .map(|(i, it)| {
                     let tick =
                         cm_ai::report::is_checkable(&sec.id).then(|| r.is_checked(&sec.id, i));
-                    self.item_row(t, s, &r.id, &sec.id, i, it, owner, tick, cx)
+                    self.item_row(t, s, lang, &r.id, &sec.id, i, it, owner, tick, cx)
                 })
                 .collect()
         };
@@ -1146,6 +1104,7 @@ impl RecordingEditor {
     fn moment_chip(
         &self,
         t: &Theme,
+        lang: Lang,
         sec: &str,
         i: usize,
         it: &ItemView,
@@ -1180,7 +1139,7 @@ impl RecordingEditor {
         match at {
             Some(a) => chip
                 .on_click({
-                    let (sec, title) = (sec.to_owned(), section_title(sec, sec));
+                    let (sec, title) = (sec.to_owned(), section_title(lang, sec, sec));
                     cx.listener(move |this, _, _, cx| this.report_cite(&sec, &title, i, a, cx))
                 })
                 .into_any_element(),
@@ -1194,6 +1153,7 @@ impl RecordingEditor {
         &self,
         t: &Theme,
         s: &Session,
+        lang: Lang,
         rid: &str,
         sec: &str,
         i: usize,
@@ -1221,13 +1181,13 @@ impl RecordingEditor {
                     t.text_2
                 }))
                 .child(dot(colour.unwrap_or(t.line), 10.))
-                .child(SharedString::from(person_label(name)))
+                .child(SharedString::from(person_label(lang, name)))
         });
         let extra = it
             .extra
             .iter()
-            .map(|(id, label, value)| {
-                SharedString::from(format!("{}: {value}", field_label(id, label)))
+            .map(|(_, label, value)| {
+                SharedString::from(format!("{}: {value}", field_label(lang, label)))
             })
             .collect::<Vec<_>>();
         let chips = it.at.iter().enumerate().map(|(k, &a)| {
@@ -1262,7 +1222,7 @@ impl RecordingEditor {
                         .child(SharedString::from(rules::at_label(a))),
                 )
                 .on_click({
-                    let (sec, title) = (sec.to_owned(), section_title(sec, sec));
+                    let (sec, title) = (sec.to_owned(), section_title(lang, sec, sec));
                     cx.listener(move |this, _, _, cx| this.report_cite(&sec, &title, i, a, cx))
                 })
         });

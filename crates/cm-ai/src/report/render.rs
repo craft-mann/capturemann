@@ -8,8 +8,9 @@
 
 use serde_json::Value;
 
+use super::labels::Words;
 use super::store::Report;
-use super::{find_template, FieldKind, Layout, Section, Source, Template, NOTHING_FOUND};
+use super::{find_template, FieldKind, Layout, Person, Section, Source, Template};
 
 /// `mm:ss`, or `h:mm:ss` from an hour on.
 pub fn stamp(seconds: f64) -> String {
@@ -55,8 +56,9 @@ fn list_of(item: &Value, id: &str) -> Vec<String> {
 }
 
 /// One field of an item as text (a list joins with `; `).
-fn field_text(item: &Value, f: &super::Field) -> String {
+fn field_text(item: &Value, f: &super::Field, words: &Words) -> String {
     match f.kind {
+        FieldKind::Text if f.person == Some(Person::Owner) => words.owner(&text_of(item, &f.id)),
         FieldKind::Text => text_of(item, &f.id),
         FieldKind::List => list_of(item, &f.id).join("; "),
     }
@@ -67,6 +69,7 @@ fn render_item(
     item: &Value,
     tick: Option<bool>,
     include_times: bool,
+    words: &Words,
     out: &mut String,
 ) {
     // Times print when asked for, and always in the marked moments, where they are the content.
@@ -86,7 +89,7 @@ fn render_item(
     let Some(first) = section.fields.first() else {
         return;
     };
-    let head = field_text(item, first);
+    let head = field_text(item, first, words);
     let rest: Vec<&super::Field> = section.fields.iter().skip(1).collect();
     // A section with one field and a few items reads as paragraphs (the summary).
     if rest.is_empty() && section.max_items > 0 && section.max_items <= 3 {
@@ -98,8 +101,8 @@ fn render_item(
             let parts: Vec<String> = rest
                 .iter()
                 .filter_map(|f| {
-                    let v = field_text(item, f);
-                    (!v.is_empty()).then(|| format!("{}: {v}", f.label))
+                    let v = field_text(item, f, words);
+                    (!v.is_empty()).then(|| format!("{}: {v}", words.field_label(&f.label)))
                 })
                 .collect();
             let tail = if parts.is_empty() {
@@ -117,21 +120,24 @@ fn render_item(
             };
             out.push_str(&format!(
                 "{bullet}**{}:** {head}{}\n",
-                first.label,
+                words.field_label(&first.label),
                 cites(item)
             ));
             for f in rest {
                 match f.kind {
                     FieldKind::Text => {
-                        let v = text_of(item, &f.id);
+                        let v = field_text(item, f, words);
                         if !v.is_empty() {
-                            out.push_str(&format!("  - **{}:** {v}\n", f.label));
+                            out.push_str(&format!(
+                                "  - **{}:** {v}\n",
+                                words.field_label(&f.label)
+                            ));
                         }
                     }
                     FieldKind::List => {
                         let l = list_of(item, &f.id);
                         if !l.is_empty() {
-                            out.push_str(&format!("  - **{}:**\n", f.label));
+                            out.push_str(&format!("  - **{}:**\n", words.field_label(&f.label)));
                             for x in l {
                                 out.push_str(&format!("    - {x}\n"));
                             }
@@ -152,12 +158,13 @@ pub fn markdown(template: &Template, report: &Report) -> String {
 /// (from [`Report::checked`]); citation times follow each item when `include_times`. The edited
 /// text of a report the user changed is [`Report::markdown`], not this.
 pub fn markdown_with(template: &Template, report: &Report, include_times: bool) -> String {
+    let words = Words::for_code(&report.language);
     let title = report
         .context
         .title
         .clone()
         .filter(|t| !t.is_empty())
-        .unwrap_or_else(|| template.name.clone());
+        .unwrap_or_else(|| words.template_name(&template.id, &template.name));
     let day = report.created.split('T').next().unwrap_or(&report.created);
     let mut out = format!("# {title}\n\n");
     let model = if report.model.is_empty() {
@@ -165,25 +172,28 @@ pub fn markdown_with(template: &Template, report: &Report, include_times: bool) 
     } else {
         format!(" \u{b7} {}", report.model)
     };
-    out.push_str(&format!("*{} \u{b7} {day}{model}*\n\n", template.name));
+    out.push_str(&format!(
+        "*{} \u{b7} {day}{model}*\n\n",
+        words.template_name(&template.id, &template.name)
+    ));
     if let Some(n) = &template.notes_only {
         out.push_str(&format!("> {n}\n\n"));
     }
     for section in &template.sections {
-        out.push_str(&format!("## {}\n\n", section.title));
+        out.push_str(&format!("## {}\n\n", words.section_title(section)));
         let items = report
             .content
             .get(&section.id)
             .and_then(Value::as_array)
             .map_or(&[][..], Vec::as_slice);
         if items.is_empty() {
-            out.push_str(&format!("*{NOTHING_FOUND}*\n\n"));
+            out.push_str(&format!("*{}*\n\n", words.nothing_found()));
             continue;
         }
         let ticks = super::is_checkable(&section.id);
         for (i, item) in items.iter().enumerate() {
             let tick = ticks.then(|| report.is_checked(&section.id, i));
-            render_item(section, item, tick, include_times, &mut out);
+            render_item(section, item, tick, include_times, &words, &mut out);
         }
         if !out.ends_with("\n\n") {
             out.push('\n');

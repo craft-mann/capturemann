@@ -125,7 +125,7 @@ pub const SPEAKERS_READY: &str = "speakers.ready";
 pub const TRANSCRIPT_NORMALIZED: &str = "transcript.normalized";
 /// A normalisation run failed (AI-10): `{ capture_id, reason, message }`.
 pub const NORMALIZE_FAILED: &str = "transcript.normalize_failed";
-/// A report was written (AI-9): `{ capture_id, report_id, template, dropped_uncited, chunks }`.
+/// A report was written (AI-9): `{ capture_id, report_id, template, dropped_uncited, language_unsure, chunks }`.
 pub const REPORT_READY: &str = "report.ready";
 /// A report run failed (AI-9): `{ capture_id, template, reason, message }`.
 pub const REPORT_FAILED: &str = "report.failed";

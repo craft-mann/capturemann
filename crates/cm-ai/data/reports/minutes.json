@@ -43,7 +43,8 @@
         {
           "id": "role",
           "label": "Role",
-          "optional": true
+          "optional": true,
+          "prose": false
         }
       ]
     },
@@ -97,7 +98,8 @@
         {
           "id": "due",
           "label": "Due",
-          "optional": true
+          "optional": true,
+          "prose": false
         }
       ]
     },
