@@ -4,7 +4,7 @@ Status: **final draft for review (Nov 17, 2026); nothing built, no open decision
 
 | Part | Label | What |
 | --- | --- | --- |
-| 1 | BUG | 8 known bugs of 0.3.4 (section 2) |
+| 1 | BUG | 9 known bugs of 0.3.4 (section 2) |
 | 2 | FEATURE | Line styles (solid, dashed, dotted) for arrow, line, rectangle, ellipse (ANN-12, section 3) |
 | 3 | FEATURE | A Send feedback button on the About page, next to Source on GitHub (section 4) |
 | 4 | PROCESS | A QA agent pass: an agent tests the app on each system and reports bugs (section 5) |
@@ -20,7 +20,7 @@ Sources: the Known limits of `docs/development/release-0.3.4-github-text.md`, `r
 3. **Scoped tests while developing, the full gate once on the final tree** ([[feedback-full-gate-once-before-release]]); clippy with the CI toolchain; Trivy gate and `cargo deny` before each merge to `main`.
 4. **Windows files come from the GitHub "Windows package" workflow** (it has the speaker engine); the lab build does not.
 
-## 2. Part 1, BUGS (8 items)
+## 2. Part 1, BUGS (9 items)
 
 All are defects or safety gaps in features that already shipped. Order: safety and data first. Each row is the full requirement: what is wrong, and exactly what to build.
 
@@ -34,6 +34,7 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 | BUG-6 | **Long Shot on Windows ends after 2 frames** on YouTube and carchargeos.com (Edge, 1280x900). Wikipedia, docs.rs and the essay page work. | Known limit of 0.3.4; cause unknown | Limited effort: reproduce on the ThinkPad, find why the scroll settle or frame compare stops, fix it, and add a `cm-regress` case on a local tall page with a sticky header and lazy images (no internet needed). If the cause is not found and fixed after a reproduction and one real fix attempt, it stays a named known limit in the release text and moves to 0.3.6. |
 | BUG-7 | **The board sheet says "drag order = list order"** (Vietnamese "kéo để đổi thứ tự") but the order changes only with the arrow buttons; the pill says "Layout editable until Finish". | Observed on macOS (library-boards pass) | Copy only: the hint reads "Use the arrows to change the order" (EN and VI) and the pill reads "Preview". No drag handle is added. |
 | BUG-8 | **The 0.3.4 Preview feedback link may lose its pre-filled text:** `.github/ISSUE_TEMPLATE/config.yml` has `blank_issues_enabled: false`, so `issues/new?title=...&body=...` can land on the template chooser. | Suspected; check first by opening the link as a user would | If the pre-filled text arrives, change nothing. If it is dropped, point the link at an issue template (`template=bug_report.yml` or `feature_request.yml`) or add a "Feedback" issue form. The same link is used by the About button (section 4). |
+| BUG-9 | **A window given by a partial title can match the wrong window:** `capture screenshot --window -` (CLI and the same argument over MCP) takes the first window whose title contains the text, with no ambiguity error; it captured an unrelated private window. | Observed once (QA pass 1 on macOS, finding F4) | When more than one window title contains the given text, the call fails with the error code `ambiguous_target` (a new shared code in `specs/README.md`, CLI exit code like `invalid_input`) and the message lists the matches (window id, app name, title) so the caller can pick one by id; an exact title match still wins over partial matches; one partial match works as today; no match is an error as today. Applies everywhere a window is chosen by title text (screenshot, Long Shot, recording and Click Guide targets in the CLI and MCP). Choosing a window in the app is unchanged. |
 
 ## 3. Part 2, FEATURE: line styles for shapes (ANN-12)
 

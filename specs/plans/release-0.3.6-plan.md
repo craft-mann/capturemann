@@ -28,7 +28,7 @@ The bugs and checks moved out of 0.3.5 (section 8 of the 0.3.5 plan), and whatev
 
 | Id | Finding | Seen |
 | --- | --- | --- |
-| F4 | `capture screenshot --window -` matches the first window whose title contains "-" with no ambiguity error, and captured an unrelated private window. Needed: an `ambiguous_target` error when more than one window matches. (Privacy-adjacent; offered to 0.3.5 for the maintainer's decision.) | once |
+| F4 | `capture screenshot --window -` matches the first window whose title contains "-" with no ambiguity error, and captured an unrelated private window. Fixed in 0.3.5 as BUG-9 (the maintainer included it on Nov 17, 2026). | once |
 | F1 | A text file named `.png` is rejected with "The video codec Png is not supported yet." (treated as video). | once |
 | F2 | `annotate` accepts a rect of width 5,000,000 with no warning and stores it as a revision. | once |
 | F5 | In Vietnamese the Click Guide tile label wraps to two lines and the "Xem trước" Preview pill touches the icon (related to D28, CG-11). | once |
