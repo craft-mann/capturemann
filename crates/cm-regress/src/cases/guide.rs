@@ -171,7 +171,7 @@ fn edit_export(ctx: &mut Ctx) -> R {
     );
 
     // Markdown: guide.md and images/, relative links, the two PNGs in the guide's order.
-    let md_dir = ctx.root.join("guide-md");
+    let md_dir = ctx.library.join("guide-md");
     let md = md_dir.to_string_lossy().into_owned();
     ctx.cli_ok(&[
         "guide", "export", GUIDE_ID, "--format", "markdown", "--dest", &md,
@@ -204,7 +204,7 @@ fn edit_export(ctx: &mut Ctx) -> R {
     );
 
     // HTML: one file, images embedded, light and dark styles.
-    let html_path = ctx.root.join("guide.html");
+    let html_path = ctx.library.join("guide.html");
     let html_arg = html_path.to_string_lossy().into_owned();
     ctx.cli_ok(&[
         "guide", "export", GUIDE_ID, "--format", "html", "--dest", &html_arg,
@@ -224,7 +224,7 @@ fn edit_export(ctx: &mut Ctx) -> R {
     );
 
     // PDF: a PDF file with a page.
-    let pdf_path = ctx.root.join("guide.pdf");
+    let pdf_path = ctx.library.join("guide.pdf");
     let pdf_arg = pdf_path.to_string_lossy().into_owned();
     ctx.cli_ok(&[
         "guide", "export", GUIDE_ID, "--format", "pdf", "--dest", &pdf_arg,
@@ -389,7 +389,7 @@ fn real_clicks(ctx: &mut Ctx) -> R {
             "a step's click point is ({x:.0}, {y:.0}), the injected click was at ({ex:.0}, {ey:.0}) physical px"
         );
     }
-    let md_dir = ctx.root.join("guide-real-md");
+    let md_dir = ctx.library.join("guide-real-md");
     let md = md_dir.to_string_lossy().into_owned();
     ctx.cli_ok(&[
         "guide", "export", &guide_id, "--format", "markdown", "--dest", &md,
