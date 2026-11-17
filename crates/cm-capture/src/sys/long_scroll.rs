@@ -402,6 +402,34 @@ pub(crate) fn wheel_deltas(amount_px: u32, px_per_notch: u32, max_event: u32) ->
     out
 }
 
+/// `SendInput` wheel deltas in proportion to `amount_px` (any number of units, at least
+/// [`MIN_FINE_UNITS`]), for a target that takes a part of a notch: a browser moves the page by
+/// the fraction of its notch distance. Whole notches cannot be smaller than one notch, and Edge
+/// at 150 % moves 300 px for one, so a request of 165 px became 2 notches = 600 px with a sticky
+/// header and tab bar leaving 385 px of content in view: the two frames shared no row and the
+/// run ended after 2 frames (BUG-6, YouTube). The value is split into events of at most
+/// `max_event` units.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn wheel_deltas_fine(amount_px: u32, px_per_notch: u32, max_event: u32) -> Vec<u32> {
+    if amount_px == 0 {
+        return Vec::new();
+    }
+    let total = (f64::from(amount_px) * 120.0 / f64::from(px_per_notch.max(1))).round() as u32;
+    let mut left = total.max(MIN_FINE_UNITS);
+    let per_event = max_event.max(1);
+    let mut out = Vec::new();
+    while left > 0 {
+        let part = left.min(per_event);
+        out.push(part);
+        left -= part;
+    }
+    out
+}
+
+/// The smallest wheel delta sent in proportion (a tenth of a notch).
+#[cfg_attr(not(windows), allow(dead_code))]
+const MIN_FINE_UNITS: u32 = 12;
+
 #[cfg(target_os = "linux")]
 mod imp {
     use super::super::session::{self, DisplayServer};
@@ -543,7 +571,13 @@ mod imp {
                 Direction::Vertical => MOUSEEVENTF_WHEEL,
                 Direction::Horizontal => MOUSEEVENTF_HWHEEL,
             };
-            for delta in wheel_deltas(amount_px, PX_PER_NOTCH, MAX_EVENT) {
+            // Everything but a console takes a part of a notch (see `wheel_deltas_fine`).
+            let deltas = if self.console.is_none() {
+                wheel_deltas_fine(amount_px, PX_PER_NOTCH, MAX_EVENT)
+            } else {
+                wheel_deltas(amount_px, PX_PER_NOTCH, MAX_EVENT)
+            };
+            for delta in deltas {
                 let input = INPUT {
                     r#type: INPUT_MOUSE,
                     Anonymous: INPUT_0 {
@@ -731,6 +765,21 @@ mod tests {
             }
         }
         assert_eq!(wheel_deltas(5, 100, 240), vec![120]);
+    }
+
+    /// A target that takes a part of a notch gets a wheel in proportion to the request, so the
+    /// learned distance can make a step smaller than one notch (BUG-6).
+    #[test]
+    fn fine_wheel_deltas_follow_the_request() {
+        assert!(wheel_deltas_fine(0, 100, 240).is_empty());
+        assert_eq!(wheel_deltas_fine(165, 100, 240), vec![198]);
+        assert_eq!(wheel_deltas_fine(480, 100, 240), vec![240, 240, 96]);
+        assert_eq!(wheel_deltas_fine(1, 100, 240), vec![12]);
+        for amount in [1u32, 30, 99, 234, 777, 5000] {
+            let sum: u32 = wheel_deltas_fine(amount, 100, 240).iter().sum();
+            let want = (amount as f64 * 1.2).round() as u32;
+            assert!(sum == want.max(12), "{amount}: {sum} vs {want}");
+        }
     }
 
     /// A wheel that ignores a delta below one notch (the console host) still moves for every
