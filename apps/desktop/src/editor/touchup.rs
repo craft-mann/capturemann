@@ -496,6 +496,7 @@ mod tests {
             to: Pt::new(5.0, 5.0),
             color: Color::BLACK,
             width: 4.0,
+            style: Default::default(),
         }
     }
 

@@ -321,7 +321,7 @@ These three ops change pixels before anything is drawn on them. Rules, decided N
 **Out of scope:** replacing icons and images (it needs detection); turning a whole UI into a wireframe.
 
 ### ANN-12 Line styles: solid, dashed, dotted
-**Priority** P1 · **Status** Ready · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-1, ANN-3
+**Priority** P1 · **Status** In progress (built on branch `track/ann12`, Nov 17, 2026, tested with fakes and not seen on a screen: `style` on arrow, line, rect and ellipse in `cm-core` (an explicit `solid` is dropped, so it is never written; any other value is `invalid_input` naming `ops[i]`) and the other ops keep unknown fields in `extra`; dash and dot rendering in `cm-render` with goldens `ann12_<shape>_<style>_<1x|2x>.png` (`crates/cm-render/tests/golden_ann12.rs`, AC1 to AC4, AC8); the Line style row in the editor inspector (`Param::LineStyle`, remembered per tool in `editor.tool_styles`, one edit for a selected shape, AC5); `style` in the `annotate` schema and `docs/reference/` (AC6; same op, same renderer). Not built: the live drag draft in the editor canvas is still drawn solid until the shape is committed; AC7 is the `extra` rule, covered by `ann_12_line_style_wire_shape` for the solid case only, with no 0.3.4 build run) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-1, ANN-3
 
 **User story** — As someone marking up a screenshot, I want dashed and dotted lines, so that I can show an optional step, a boundary or a path without a solid line.
 

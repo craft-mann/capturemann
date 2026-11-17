@@ -447,7 +447,7 @@ Errors: `not_implemented`, `not_found` (plus the common errors above).
 
 #### `annotate`
 
-Add annotation ops (arrow, line, rect, ellipse, text, highlight, step, callout, spotlight, stamp, magnify, retype, move_area, blueprint, blur, pixelate, crop) to a screenshot.
+Add annotation ops (arrow, line, rect, ellipse (these four take `style`: solid, dashed or dotted), text, highlight, step, callout, spotlight, stamp, magnify, retype, move_area, blueprint, blur, pixelate, crop) to a screenshot.
 
 - **Tier:** Free, changes something: runs at once; the user can set it to Ask first.
 - **Read-only:** no

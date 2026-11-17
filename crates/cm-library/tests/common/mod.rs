@@ -32,6 +32,7 @@ pub fn arrow() -> AnnotationOp {
             to: Pt { x: 380.0, y: 210.0 },
             color: red(),
             width: 4.0,
+            style: Default::default(),
         },
     )
 }
@@ -68,6 +69,7 @@ pub fn rect_op() -> AnnotationOp {
             width: 4.0,
             fill: None,
             radius: 6.0,
+            style: Default::default(),
         },
     )
 }

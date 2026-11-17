@@ -882,12 +882,14 @@ fn paint_draft(
             to,
             color,
             width,
+            ..
         }
         | OpKind::Line {
             from,
             to,
             color,
             width,
+            ..
         } => {
             let c = Hsla::from(gpui_rgb(*color));
             let w = (*width * z) as f32;

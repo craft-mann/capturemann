@@ -24,6 +24,7 @@ fn rect(id: &str, x: f64) -> AnnotationOp {
             width: 4.0,
             fill: None,
             radius: 6.0,
+            style: Default::default(),
         },
     )
 }

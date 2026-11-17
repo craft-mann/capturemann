@@ -324,6 +324,7 @@ pub fn click_ops(
                 width: 5.0,
                 // The design's 6 px glow around the 52 px ring, scaled with the ring.
                 glow: (r * 0.23).round(),
+                style: Default::default(),
             },
         ),
         AnnotationOp::new(

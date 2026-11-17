@@ -51,6 +51,7 @@ mod tests {
                     to: Pt::new(50.0, 30.0),
                     color: Color::WHITE,
                     width: 4.0,
+                    style: Default::default(),
                 },
             ),
             AnnotationOp::new(
