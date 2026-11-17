@@ -1,6 +1,6 @@
 # Quick Capture (QC)
 
-**0.3.6, maintainer decision of Nov 17, 2026** (`specs/plans/release-0.3.6-plan.md`; brought into 0.3.5 and moved back to 0.3.6 the same day). UI name: **Quick Capture**. Design pack: `capturemann-0.3.6-quick-capture/` (local; boards Q036Brief, Q036Panel, Q036After, Q036Presets, Q036Scope). This file is the source of truth for the build; where the pack and this file differ, this file wins. **Preview** (label and Send feedback button, no Settings switch).
+**0.3.6, maintainer decision of Nov 17, 2026** (`specs/plans/release-0.3.6-plan.md`; brought into 0.3.5 and moved back to 0.3.6 the same day). UI name: **Quick Capture**. Design pack: `specs/capturemann-0.3.6-quick-capture/` (local, git-ignored; boards Q036Brief, Q036Panel, Q036After, Q036Presets, Q036Scope). This file is the source of truth for the build; where the pack and this file differ, this file wins. **Preview** (label and Send feedback button, no Settings switch).
 
 QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock) are **not** in 0.3.6; the IDs stay reserved.
 

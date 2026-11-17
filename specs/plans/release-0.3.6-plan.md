@@ -5,7 +5,7 @@ Status: **scope only; nothing built.** Quick Capture was first added to 0.3.5 an
 ## 1. FEATURE: Quick Capture (QC-1, QC-3, QC-4, QC-5)
 
 - **Spec:** `specs/features/21-quick-capture.md` (Phase 0 text is written, with acceptance criteria; Preview label). FR rows are in `specs/00-product-spec.md`.
-- **Design pack:** `capturemann-0.3.6-quick-capture/` at the repository root (local, untracked): boards Q036Brief, Q036Panel, Q036After, Q036Presets, Q036Scope. The spec file wins where they differ.
+- **Design pack:** `specs/capturemann-0.3.6-quick-capture/` (local, git-ignored): boards Q036Brief, Q036Panel, Q036After, Q036Presets, Q036Scope. The spec file wins where they differ.
 - **Not in this release:** QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock).
 - **MCP:** one new read tool, `list_presets`, so the count goes from 89 to 90; the assertion in `crates/cm-mcp/tests/stdio.rs` and `docs/reference/` change with it.
 
