@@ -26,10 +26,10 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 
 | # | Bug | Evidence | Fix (proposed default) | Size | Old ref |
 | --- | --- | --- | --- | --- | --- |
-| BUG-1 | **A Click Guide started by an agent or the CLI shows no bar, no Stop and no indicator** (only a toast). Breaks "the user can always see and stop recording". | Observed on macOS and Windows (QA pass 6) | Passive bar like the Long Shot HUD: dot, step count, "Started by agent {client}", Stop (no Note, no Undo); the sidebar tile shows running; the real source (CLI or MCP) is named. | M | A1, CG-01, D4 |
-| BUG-2 | **Markdown export overwrites silently:** two guides in one folder overwrite each other's `guide.md` and leave stale `images/`; a guide with 0 steps reports success. | Observed on Windows (a second export to the same place, `warnings: []`) | Export into a subfolder named after the guide; if it exists ask Replace or Keep both; refuse a 0-step guide; "Open folder" on the success toast. | S to M | A2, CG-23, D30 |
+| BUG-1 | **A Click Guide started by an agent or the CLI shows no bar, no Stop and no indicator** (only a toast; a guide the user starts in the app does have its bar, so this is only the agent and CLI start). Breaks "the user can always see and stop recording"; the 0.3.4 release text lists it as a known limit (stop it with `capturemann guide stop`). | Observed on macOS and Windows (QA pass 6) | The same bar as a user-started guide, in a passive form like the Long Shot HUD: dot, step count, "Started by agent {client}", Stop (no Note, no Undo); the sidebar tile shows running; the real source (CLI or MCP) is named. | M | A1, CG-01, D4 |
+| BUG-2 | **Markdown export overwrites silently:** two exports into one folder overwrite the first's `guide.md` and leave stale `images/`; a guide with 0 steps reports success. | Observed on Windows (a second export to the same place, `warnings: []`) | **Decided Nov 17, 2026 (D30):** keep writing straight into the chosen folder, but put the local date and time in the names so nothing is overwritten: `guide-YYYY-MM-DD-HHMMSS.md` and `images-YYYY-MM-DD-HHMMSS/step-NN.png` (the links in the file use that folder); same local-time rule as the default titles. Refuse a 0-step guide; "Open folder" on the success toast. No Replace or Keep both question is needed. The agent path (BUG-3) uses the same names. | S to M | A2, CG-23, D30 |
 | BUG-3 | **`export_guide` lets an agent write over any file** at Free tier (for example `~/Documents/report.docx`). | From the audit (not run) | Refuse an existing file; a path outside the library or the user's export folders needs Confirm showing the exact path. | S to M | A3, CG-24, D12 |
-| BUG-4 | **Step titles can carry personal data:** the nearest text within 80 px becomes the title (`Click "jane.doe@example.com"`) and reaches Markdown, HTML, clipboard and agent results; hostile text can inject Markdown. | Observed on macOS and Windows | Use the clicked control's accessibility name (AX or UI Automation) when there is one, else `Click here`; escape Markdown; keep titles out of broadcast events. Titles only; the shipped redaction decisions stay. | M | A4, CG-12, D3 |
+| BUG-4 | **Step titles can carry personal data:** the nearest text within 80 px becomes the title (`Click "jane.doe@example.com"`) and reaches Markdown, HTML, clipboard and agent results; hostile text can inject Markdown. | Observed on macOS and Windows | **Decided Nov 17, 2026 (D3):** if the clicked button or object has an accessibility name (AX or UI Automation), use it; otherwise **keep the current logic** (the nearest text on screen). The fallback can still pick up personal text; this is accepted for 0.3.5 (it is already in the 0.3.4 text: check a guide before you share it). Cheap extras that do not change titles: escape Markdown in exports. | M | A4, CG-12, D3 |
 | BUG-5 | **Click Guide ignores a moved window:** the followed window's rectangle is read once, so after a move the ring and title are wrong (a step was titled Export after clicking Save); a click on a window covering the guided one becomes a step. | Observed on macOS | Re-read the rectangle at each click; pause with a notice when it moves; ignore a click that lands on another window. | M | A5, CG-03 |
 | BUG-6 | **Long Shot on Windows ends after 2 frames** on YouTube and carchargeos.com (Edge, 1280x900). Wikipedia, docs.rs and the essay page work. | Known limit shipped in 0.3.4; cause unknown | **Time-boxed to 1 day:** reproduce on the ThinkPad, find why the scroll settle or frame compare stops, add a `cm-regress` case on a local tall page with a sticky header and lazy images (no internet). If it is not fixed in the box, it stays a named known limit and moves to 0.3.6. | M to L | B1 |
 | BUG-7 | **The board sheet says "drag order = list order"** (Vietnamese "kéo để đổi thứ tự") but the order changes only with the arrow buttons; the pill says "Layout editable until Finish". | Observed on macOS (library-boards pass) | Copy fix only: "Use the arrows to change the order" (EN, VI), pill "Preview". No drag handle. | S | C1, BR-05 |
@@ -39,9 +39,10 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 
 | D | Question | Default |
 | --- | --- | --- |
-| D3 | BUG-4: accessibility name, else `Click here`? | Yes |
-| D4 | BUG-1: passive bar with Stop, no Pause? | Yes |
-| D12 / D30 | BUG-2, BUG-3: refuse existing files; Confirm outside known folders; subfolder and Replace or Keep both in the app? | Yes |
+| D3 | BUG-4: accessibility name, else the current nearest-text logic | **Decided Nov 17** (revised) |
+| D4 | BUG-1: passive bar with Stop, no Pause, for agent- and CLI-started guides | Default; **waiting for the maintainer to confirm** after the clarification above |
+| D12 | BUG-3: refuse an existing file; Confirm with the exact path outside known folders | **Decided Nov 17**: default |
+| D30 | BUG-2: write into the chosen folder with date and time in the names | **Decided Nov 17** (revised) |
 
 ## 3. Part 2, FEATURE: line styles for shapes (ANN-12)
 
@@ -63,7 +64,7 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 
 **Files:** `cm-core/src/annotation.rs`, `cm-render/src/annot.rs`, `apps/desktop/src/editor/**` (shape panel), `cm-mcp` schema, `locales/` (three labels, EN and VI), `tests/golden/annotation/`. Merge after BUG-1 to BUG-5 touch `cm-mcp/src/tools.rs`, to avoid a conflict.
 
-**Open points for the maintainer:** the dash numbers, the solid arrow head, and "remember the last style per tool" (all defaults above).
+**Decided Nov 17, 2026:** all the defaults above (dash numbers, solid arrow head, last style remembered per tool).
 
 ## 4. Part 3, FEATURE: Send feedback button on the About page
 
@@ -125,4 +126,4 @@ An agent tests the 0.3.4 and 0.3.5 builds the way the `QA-0.3.4-*` passes did, a
 
 ## 9. For the maintainer outside the code
 
-winget pull requests 472327 and 477195; the APT repository update with the 0.3.0 to 0.3.5 `.deb` files; the plugin line (held by the directory until the organization is Verified); the Windows licence list; the ThinkPad booted and logged in before QA pass 2 and the Windows regression; and your answers to D3, D4, D12 and D30 and the ANN-12 open points.
+winget pull requests 472327 and 477195; the APT repository update with the 0.3.0 to 0.3.5 `.deb` files; the plugin line (held by the directory until the organization is Verified); the Windows licence list; the ThinkPad booted and logged in before QA pass 2 and the Windows regression; and your confirmation of D4.
