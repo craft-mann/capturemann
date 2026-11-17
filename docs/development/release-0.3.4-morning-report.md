@@ -41,3 +41,24 @@ As in the Known limits of the release text: Long Shot on Windows (YouTube 2 fram
 
 - macOS dev bundle of `19f64bb3`: `target/bundle/CaptureMann-dev.app` and `~/Applications/CaptureMann-dev.app` (signed with the local dev identity, `codesign --verify` ok). No signed or notarized DMG exists.
 - Windows (unsigned, untested): see above. Linux: none for the final commit.
+
+## Release day (Nov 17, 2026)
+
+Facts from the published release, the stored reports and the release text. All reports are PARTIAL.
+
+- **Published by the maintainer** at 03:34 UTC on Nov 17, 2026: <https://github.com/craft-mann/capturemann/releases/tag/v0.3.4>, tag `v0.3.4` on `1a1586d0`, a full release (not a pre-release), 25 files. The tag was created by publishing (lightweight tag).
+- **Files:** macOS arm64 and x86_64 DMGs, signed, notarized and stapled (arm64 SHA-256 `68571d0f…104c`, x86_64 `2234ac54…2db1`); Windows setup and zip, unsigned, from the GitHub "Windows package" workflow on `1a1586d0`, with the speaker engine (setup `88f0c432…9897df`); Linux x86_64 and aarch64 tarballs and `.deb` files, signed with minisign. Homebrew cask at 0.3.4 (tap commit `7789f42`, push checked through the API).
+- **Final reports (all on `1a1586d0`, 0 failed):**
+
+| System | Result | Reports |
+|---|---|---|
+| macOS arm64, app copied from the notarized DMG, screen unlocked | standard 52 (12 skipped), full 59 (21), hardware 58 (30) | `L1-macos-0.3.4-dmg-1a1586d0-screen-regression-*` |
+| macOS, same, screen locked | standard 43, full 45, hardware 44 (desktop cases skipped) | `L1-macos-0.3.4-dmg-1a1586d0-regression-*` |
+| Windows 11, installed CI setup | full 66 (14 skipped), hardware 68 (20) | `L1-windows-0.3.4-1a1586d0-final-regression-{full,hardware}-*` |
+| Linux x86_64, ThinkPad, X11 | standard 57 (7), full 65 (15), `.deb` install 1 | `L1-linux-0.3.4-1a1586d0-regression-*` |
+| Linux aarch64, headless VM | standard 42 (22), full 44 (36), `.deb` install 1 (run alone) | `L1-linux-aarch64-0.3.4-1a1586d0-regression-*` |
+
+- **CI:** green on `1a1586d0`: CI run 43970813077 and Security scan 43970812991. The Intel DMG was checked for signature, notarization, version and architecture only.
+- **What remains (maintainer):** winget (PRs 472327 and 477195), the APT repository update with the 0.3.0 to 0.3.4 `.deb` files, the plugin line (held by the directory until the organization is Verified), the audit P1 items and decisions D1 to D31, `release-0.3.5-plan.md`.
+- **Not run:** Intel Mac hardware, Windows 10, SmartScreen, a second monitor, mixed DPI, NVIDIA/AMD encoders, Linux Wayland and the Linux hardware tier, aarch64 desktop-session cases, the Windows soak, a Drive account for B1, the Windows zip.
+- **Known limit that shipped:** Long Shot on Windows (Edge, 1280x900) ended after 2 frames on YouTube and carchargeos.com; Wikipedia, docs.rs and the essay joined.
