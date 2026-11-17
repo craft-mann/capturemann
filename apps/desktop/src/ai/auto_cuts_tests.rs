@@ -57,6 +57,7 @@ async fn rig() -> Option<Rig> {
         title: "Auto cuts".into(),
         secs: 12,
         pause: None,
+        mic_room: true,
         ..FixtureSpec::default()
     };
     let fx = make_fixture(&tools, lib.path(), &spec).unwrap();

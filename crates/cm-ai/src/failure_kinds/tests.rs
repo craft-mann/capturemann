@@ -22,9 +22,12 @@ fn w(text: &str, at: f64, conf: f32) -> Word {
     }
 }
 
-/// Tone at `amp` for each `(from, to)` second span, silence elsewhere, `secs` long.
+/// Tone at `amp` for each `(from, to)` second span, a quiet room elsewhere (not exact zeros: a
+/// stretch of digital silence of a second or more is never read, AI-1.AC15), `secs` long.
 fn signal(secs: f64, spans: &[(f64, f64, f32)]) -> Vec<f32> {
-    let mut x = vec![0.0f32; (secs * RATE as f64) as usize];
+    let mut x: Vec<f32> = (0..(secs * RATE as f64) as usize)
+        .map(|i| 1e-3 * (i as f32 * 0.7).sin())
+        .collect();
     for &(a, b, amp) in spans {
         for (i, v) in x
             .iter_mut()

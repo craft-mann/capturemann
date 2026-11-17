@@ -90,6 +90,70 @@ pub fn plan(samples: &[f32]) -> Vec<Range<usize>> {
     out
 }
 
+/// A run of digital silence ([`crate::audio::DIGITAL_ZERO`]) at least this long (seconds) is not
+/// given to Whisper (BUG-10: after a long muted stretch, which is exact zeros, Whisper wrote text
+/// nobody said). Shorter runs stay in the audio. Only digital silence is cut: a quiet stretch found
+/// by level is not (an earlier trial removed real speech, see the transcription study 0.2.7, c).
+pub const MIN_ZERO_RUN_SECS: f64 = 1.0;
+/// When runs were cut, a span between them shorter than this (seconds) holds no speech worth a
+/// reading and is skipped.
+const MIN_SPAN_SECS: f64 = 0.2;
+
+/// The runs of digital silence of at least [`MIN_ZERO_RUN_SECS`] in `samples`.
+pub fn zero_runs(samples: &[f32]) -> Vec<Range<usize>> {
+    let min = samples_of(MIN_ZERO_RUN_SECS);
+    let mut out = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, s) in samples.iter().enumerate() {
+        let zero = s.abs() < crate::audio::DIGITAL_ZERO;
+        match (zero, start) {
+            (true, None) => start = Some(i),
+            (false, Some(a)) => {
+                if i - a >= min {
+                    out.push(a..i);
+                }
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    if let Some(a) = start {
+        if samples.len() - a >= min {
+            out.push(a..samples.len());
+        }
+    }
+    out
+}
+
+/// [`plan`] over the spans between the long runs of digital silence ([`zero_runs`]): each span is
+/// planned on its own, so no piece contains a long zero run, and the ranges index `samples` (times
+/// stay in file time). Audio without such a run is planned exactly as [`plan`]; audio that is all
+/// silence has no piece.
+pub fn plan_spans(samples: &[f32]) -> Vec<Range<usize>> {
+    let runs = zero_runs(samples);
+    if runs.is_empty() {
+        return plan(samples);
+    }
+    let mut spans = Vec::new();
+    let mut at = 0usize;
+    for r in &runs {
+        spans.push(at..r.start);
+        at = r.end;
+    }
+    spans.push(at..samples.len());
+    let min = samples_of(MIN_SPAN_SECS);
+    let mut out = Vec::new();
+    for span in spans.into_iter().filter(|s| s.len() >= min) {
+        let offset = span.start;
+        out.extend(
+            plan(&samples[span])
+                .into_iter()
+                .map(|r| r.start + offset..r.end + offset),
+        );
+    }
+    out
+}
+
 /// Where the piece that starts at `from` ends, when more than one and a half pieces remain in
 /// `samples` (the rule of [`plan`]): the quietest spot within [`SEARCH_SECS`] of the target.
 /// `None`: the rest is the last piece. Only the first one and a half pieces' worth of audio after
@@ -1045,7 +1109,7 @@ pub fn transcribe_pieces_resumable<'p>(
     cm_core::perf::begin("transcribe");
     let pieces = {
         let _t = cm_core::perf::span("transcribe", "plan");
-        plan(audio.samples)
+        plan_spans(audio.samples)
     };
     let asked = language
         .map(str::trim)

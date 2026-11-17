@@ -134,7 +134,21 @@ impl Reference {
             .iter()
             .map(|c| 10.0 * (c.iter().map(|s| s * s).sum::<f32>() / FRAME as f32 + 1e-12).log10())
             .collect();
-        let mut sorted = db.clone();
+        // The room is estimated from frames that are not digital silence: muted time is exact
+        // zeros (-120 dB) and would pull the 10th percentile far under any real room, so every
+        // line would look 100 dB above it (BUG-10, AI-1.AC15). With too few other frames there is
+        // no reference, as for short audio.
+        let mut sorted: Vec<f32> = samples
+            .as_chunks::<FRAME>()
+            .0
+            .iter()
+            .zip(&db)
+            .filter(|(c, _)| !crate::audio::is_digital_silence(&c[..]))
+            .map(|(_, d)| *d)
+            .collect();
+        if (sorted.len() as f64) * 0.02 < MIN_AUDIO_SECS {
+            return None;
+        }
         sorted.sort_by(f32::total_cmp);
         let floor = sorted[sorted.len() / 10];
         let speech = sorted[sorted.len() * 9 / 10];
@@ -360,6 +374,43 @@ mod tests {
         assert!((dropped[0].start.as_secs_f64() - 25.0).abs() < 1e-6);
         assert_eq!(kept.len(), words.len() - 11);
         assert!(kept.iter().all(|k| k.text != "subscribe"));
+    }
+
+    #[test]
+    fn a_muted_recording_keeps_a_room_level_and_the_guard_still_works() {
+        // 120 s: 0..60 s muted (exact zeros), speech-level noise 60..80 s and 100..120 s, the room
+        // only 80..100 s (BUG-10: the zeros used to set the room level to -120 dB).
+        let x: Vec<f32> = (0..120 * 16_000)
+            .map(|i| {
+                let s = i / 16_000;
+                let a = match s {
+                    0..=59 => 0.0,
+                    80..=99 => 0.002,
+                    _ => 0.2,
+                };
+                a * ((i as f32) * 0.37).sin()
+            })
+            .collect();
+        let mut words = say("so the numbers look fine this quarter.", 65.0, 0.8);
+        words.extend(say(
+            "Hãy subscribe cho kênh La La School để không bỏ lỡ",
+            85.0,
+            0.99,
+        ));
+        let (kept, dropped) = drop_unsupported(words.clone(), &x, MediaTime::ZERO);
+        assert_eq!(dropped.len(), 1);
+        assert!((dropped[0].start.as_secs_f64() - 85.0).abs() < 1e-6);
+        assert_eq!(kept.len(), words.len() - dropped[0].words as usize);
+        // Too few frames that are not silent: no reference, everything stays.
+        let mostly_muted: Vec<f32> = x
+            .iter()
+            .enumerate()
+            .map(|(i, v)| if i < 100 * 16_000 { 0.0 } else { *v })
+            .collect();
+        assert!(Reference::new(&mostly_muted).is_none());
+        let (kept, dropped) = drop_unsupported(words.clone(), &mostly_muted, MediaTime::ZERO);
+        assert!(dropped.is_empty());
+        assert_eq!(kept.len(), words.len());
     }
 
     #[test]

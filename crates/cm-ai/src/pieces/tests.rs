@@ -882,3 +882,227 @@ fn a_cancel_during_the_checks_still_stops_the_run() {
     .unwrap_err();
     assert_eq!(err.to_string(), cancelled().to_string());
 }
+
+// BUG-10 / AI-1.AC15: runs of digital silence are not given to the engine.
+
+/// A scripted engine that records, for every call, where the audio starts (seconds in file time),
+/// how long it is and its longest run of digital silence, and returns one word at the start.
+struct Spy {
+    calls: Mutex<Vec<(f64, f64, f64)>>,
+}
+
+impl Spy {
+    fn new() -> Spy {
+        Spy {
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+fn longest_zero_run(x: &[f32]) -> f64 {
+    let (mut best, mut cur) = (0usize, 0usize);
+    for s in x {
+        if s.abs() < crate::audio::DIGITAL_ZERO {
+            cur += 1;
+            best = best.max(cur);
+        } else {
+            cur = 0;
+        }
+    }
+    best as f64 / RATE as f64
+}
+
+impl Transcriber for Spy {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        self.calls.lock().unwrap().push((
+            audio.start.as_secs_f64(),
+            audio.samples.len() as f64 / RATE as f64,
+            longest_zero_run(audio.samples),
+        ));
+        if !progress(1.0) {
+            return Err(cancelled());
+        }
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "vi".into(),
+            model: "scripted".into(),
+            words: vec![word("x", audio.start.as_secs_f64() + 1.0)],
+            note: None,
+            sounds: Vec::new(),
+            segments: Vec::new(),
+            dropped: Vec::new(),
+        })
+    }
+}
+
+/// Tone bursts `(at, len)` in seconds over zeros, `secs` long.
+fn bursts(secs: f64, tones: &[(f64, f64)]) -> Vec<f32> {
+    let mut x = vec![0.0f32; (secs * RATE as f64) as usize];
+    for (at, len) in tones {
+        let a = (at * RATE as f64) as usize;
+        let b = (((at + len) * RATE as f64) as usize).min(x.len());
+        for (i, v) in x[a..b].iter_mut().enumerate() {
+            *v = 0.3 * (i as f32 * 0.05).sin() + 0.05;
+        }
+    }
+    x
+}
+
+#[test]
+fn zero_runs_are_found_from_one_second_and_tiny_values_count_as_zero() {
+    let mut x = bursts(30.0, &[(0.0, 5.0), (8.0, 4.0), (13.0, 2.0), (17.0, 13.0)]);
+    // 5..8 is 3 s of zeros, 12..13 exactly 1 s, 15..17 2 s. Make the 2 s run near-zero noise
+    // (under one 16-bit step) and put a 0.5 s zero gap inside the last burst.
+    for v in &mut x[15 * RATE..17 * RATE] {
+        *v = 1e-6;
+    }
+    for v in &mut x[20 * RATE..20 * RATE + RATE / 2] {
+        *v = 0.0;
+    }
+    let secs: Vec<(f64, f64)> = zero_runs(&x)
+        .iter()
+        .map(|r| (r.start as f64 / RATE as f64, r.end as f64 / RATE as f64))
+        .collect();
+    assert_eq!(secs, vec![(5.0, 8.0), (12.0, 13.0), (15.0, 17.0)]);
+    // A value of one 16-bit step is sound.
+    assert!(zero_runs(&vec![1.0 / 32768.0; 3 * RATE]).is_empty());
+}
+
+#[test]
+fn long_zero_runs_are_never_inside_a_call_and_short_ones_stay() {
+    // Bursts at 0..20, 25..60 (with a 0.5 s zero gap at 40..40.5), 70..80, over zeros.
+    let mut x = bursts(80.0, &[(0.0, 20.0), (25.0, 35.0), (70.0, 10.0)]);
+    for v in &mut x[40 * RATE..40 * RATE + RATE / 2] {
+        *v = 0.0;
+    }
+    let spy = Spy::new();
+    let audio = Pcm16k {
+        samples: &x,
+        start: MediaTime::from_ticks(1200),
+    };
+    let (t, _) = transcribe_pieces(&spy, audio, None, None, &mut |_| true).unwrap();
+    let calls = spy.calls.lock().unwrap().clone();
+    assert_eq!(calls.len(), 3, "{calls:?}");
+    // The audio starts at 0.01 s: each span starts at its file position plus that.
+    let starts: Vec<f64> = calls.iter().map(|c| (c.0 - 0.01).round()).collect();
+    assert_eq!(starts, vec![0.0, 25.0, 70.0]);
+    assert!(calls.iter().all(|c| c.2 < 1.0), "no long zero run inside");
+    // The short gap stayed in the second call.
+    assert!((calls[1].2 - 0.5).abs() < 1e-3, "{calls:?}");
+    // Word times are in session time (file time plus the audio's start).
+    let times: Vec<f64> = t.words.iter().map(|w| w.start.as_secs_f64()).collect();
+    assert_eq!(times.len(), 3);
+    for (got, want) in times.iter().zip([1.01, 26.01, 71.01]) {
+        assert!((got - want).abs() < 1e-3, "{times:?}");
+    }
+}
+
+#[test]
+fn spans_are_planned_on_their_own_and_tile_the_non_silent_audio() {
+    // 1500 s of tone with 30 s of zeros at 700..730: pieces never cross the run.
+    let mut x = audio(1500.0, &[]);
+    for v in &mut x[700 * RATE..730 * RATE] {
+        *v = 0.0;
+    }
+    let plan = plan_spans(&x);
+    assert!(plan
+        .iter()
+        .all(|r| r.end <= 700 * RATE || r.start >= 730 * RATE));
+    let covered: usize = plan.iter().map(std::ops::Range::len).sum();
+    assert_eq!(covered, x.len() - 30 * RATE);
+    assert!(plan.windows(2).all(|w| w[0].end <= w[1].start));
+}
+
+#[test]
+fn audio_without_a_long_zero_run_is_planned_as_before() {
+    // Short zero gaps only (0.9 s): the same plan as `plan`.
+    let mut x = audio(1500.0, &[]);
+    for k in 1..10 {
+        let a = k * 100 * RATE;
+        for v in &mut x[a..a + 14_400] {
+            *v = 0.0;
+        }
+    }
+    assert!(zero_runs(&x).is_empty());
+    assert_eq!(plan_spans(&x), plan(&x));
+    let short = audio(30.0, &[]);
+    assert_eq!(plan_spans(&short), plan(&short));
+    assert_eq!(plan_spans(&[]), plan(&[]));
+}
+
+#[test]
+fn an_all_zero_file_gives_an_empty_transcript_without_a_call() {
+    let x = vec![0.0f32; 120 * RATE];
+    let spy = Spy::new();
+    let audio = Pcm16k {
+        samples: &x,
+        start: MediaTime::ZERO,
+    };
+    let (t, report) = transcribe_pieces(&spy, audio, None, None, &mut |_| true).unwrap();
+    assert!(t.words.is_empty());
+    assert_eq!(report.pieces, 0);
+    assert!(spy.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_run_over_spans_resumes_from_its_checkpoint() {
+    // Long audio with a long zero run in the middle: pieces on both sides.
+    let mut x = audio(1500.0, &[]);
+    for v in &mut x[700 * RATE..760 * RATE] {
+        *v = 0.0;
+    }
+    fn audio_of(x: &[f32]) -> Pcm16k<'_> {
+        Pcm16k {
+            samples: x,
+            start: MediaTime::from_ticks(1200),
+        }
+    }
+    let whole = Engine::new(1e9);
+    let (expected, report) =
+        transcribe_pieces(&whole, audio_of(&x), None, None, &mut |_| true).unwrap();
+    let pieces = report.pieces;
+    assert!(pieces >= 4);
+    assert!(plan_spans(&x)
+        .iter()
+        .all(|r| r.end <= 700 * RATE || r.start >= 760 * RATE));
+
+    let first = Engine::new(1e9);
+    let mut checkpoints: Vec<Checkpoint> = Vec::new();
+    let mut n = 0;
+    let err = transcribe_pieces_resumable(
+        &first,
+        audio_of(&x),
+        None,
+        None,
+        None,
+        &mut |c| checkpoints.push(c.clone()),
+        None,
+        &mut |_| {
+            n += 1;
+            n < 10
+        },
+    )
+    .unwrap_err();
+    assert!(crate::transcribe::is_cancelled(&err));
+    let last = checkpoints.last().unwrap().clone();
+    assert_eq!(last.pieces, pieces);
+    let second = Engine::new(1e9);
+    let (t, _) = transcribe_pieces_resumable(
+        &second,
+        audio_of(&x),
+        None,
+        None,
+        Some(last.clone()),
+        &mut |_| {},
+        None,
+        &mut |_| true,
+    )
+    .unwrap();
+    assert_eq!(second.calls.lock().unwrap().len(), pieces - last.done);
+    assert_eq!(t.words, expected.words);
+}
