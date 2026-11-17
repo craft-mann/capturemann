@@ -922,7 +922,7 @@ pub(crate) fn selection_texts(n: u64) -> (String, [String; 3]) {
 pub(crate) fn board_disabled_reason(shots: usize, n: usize) -> Option<String> {
     if shots != n {
         Some(tr!(
-            "A board takes screenshots only. Deselect the recordings and audio."
+            "A board takes screenshots only. Deselect the recordings, audio and Click Guides."
         ))
     } else if shots < 2 {
         Some(tr!("Select at least 2 screenshots to make a board."))

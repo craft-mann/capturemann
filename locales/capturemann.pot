@@ -64,7 +64,7 @@ msgstr ""
 msgid "A board needs 2 to 12 screenshots."
 msgstr ""
 
-msgid "A board takes screenshots only. Deselect the recordings and audio."
+msgid "A board takes screenshots only. Deselect the recordings, audio and Click Guides."
 msgstr ""
 
 msgid "A browser window opened. Sign in there and allow access; this page continues by itself. Closing the window without allowing it ends the attempt after a few minutes, or press Cancel."
