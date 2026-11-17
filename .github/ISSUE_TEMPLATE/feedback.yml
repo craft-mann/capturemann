@@ -1,0 +1,21 @@
+name: Feedback
+description: Tell us what works and what does not
+labels: [feedback]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Filled in by the Send feedback button.
+  - type: input
+    id: feature
+    attributes:
+      label: Feature
+      description: For example Long Shot or Click Guide. Leave empty for general feedback.
+  - type: textarea
+    id: feedback
+    attributes:
+      label: What works, and what does not
+      description: Please do not include passwords, private screenshots or personal data.
+    validations:
+      required: true

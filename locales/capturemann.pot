@@ -2798,9 +2798,6 @@ msgstr ""
 msgid "Layout"
 msgstr ""
 
-msgid "Layout editable until Finish"
-msgstr ""
-
 msgid "Leave out lines the audio does not hold"
 msgstr ""
 
