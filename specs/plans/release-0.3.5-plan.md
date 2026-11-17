@@ -1,6 +1,6 @@
 # Release 0.3.5: a light release (plan, draft, Nov 17, 2026)
 
-Status: **final draft for review (Nov 17, 2026); all decisions made (D3, D4, D12, D30, ANN-12); nothing built.** Scope set by the maintainer on Nov 17, 2026: a **light** release with four parts, each labelled **BUG** or **FEATURE** below:
+Status: **final draft for review (Nov 17, 2026); nothing built, no open decision.** Scope set by the maintainer on Nov 17, 2026: a **light** release with four parts, each labelled **BUG** or **FEATURE** below:
 
 | Part | Label | What | Size |
 | --- | --- | --- | --- |
@@ -22,33 +22,24 @@ Sources: the Known limits of `docs/development/release-0.3.4-github-text.md`, `r
 
 ## 2. Part 1, BUGS (8 items)
 
-All are defects or safety gaps in features that already shipped. Order: safety and data first.
+All are defects or safety gaps in features that already shipped. Order: safety and data first. Each row is the full requirement: what is wrong, and exactly what to build.
 
-| # | Bug | Evidence | Fix (proposed default) | Size | Old ref |
-| --- | --- | --- | --- | --- | --- |
-| BUG-1 | **A Click Guide started by an agent or the CLI shows no bar, no Stop and no indicator** (only a toast; a guide the user starts in the app does have its bar, so this is only the agent and CLI start). Breaks "the user can always see and stop recording"; the 0.3.4 release text lists it as a known limit (stop it with `capturemann guide stop`). | Observed on macOS and Windows (QA pass 6) | The same bar as a user-started guide, in a passive form like the Long Shot HUD: dot, step count, "Started by agent {client}", Stop (no Note, no Undo); the sidebar tile shows running; the real source (CLI or MCP) is named. | M | A1, CG-01, D4 |
-| BUG-2 | **Markdown export overwrites silently:** two exports into one folder overwrite the first's `guide.md` and leave stale `images/`; a guide with 0 steps reports success. | Observed on Windows (a second export to the same place, `warnings: []`) | **Decided Nov 17, 2026 (D30):** keep writing straight into the chosen folder, but put the local date and time in the names so nothing is overwritten: `guide-YYYY-MM-DD-HHMMSS.md` and `images-YYYY-MM-DD-HHMMSS/step-NN.png` (the links in the file use that folder); same local-time rule as the default titles. Refuse a 0-step guide; "Open folder" on the success toast. No Replace or Keep both question is needed. The agent path (BUG-3) uses the same names. | S to M | A2, CG-23, D30 |
-| BUG-3 | **`export_guide` lets an agent write over any file** at Free tier (for example `~/Documents/report.docx`). | From the audit (not run) | Refuse an existing file; a path outside the library or the user's export folders needs Confirm showing the exact path. | S to M | A3, CG-24, D12 |
-| BUG-4 | **Step titles can carry personal data:** the nearest text within 80 px becomes the title (`Click "jane.doe@example.com"`) and reaches Markdown, HTML, clipboard and agent results; hostile text can inject Markdown. | Observed on macOS and Windows | **Decided Nov 17, 2026 (D3):** if the clicked button or object has an accessibility name (AX or UI Automation), use it; otherwise **keep the current logic** (the nearest text on screen). The fallback can still pick up personal text; this is accepted for 0.3.5 (it is already in the 0.3.4 text: check a guide before you share it). Cheap extras that do not change titles: escape Markdown in exports. | M | A4, CG-12, D3 |
-| BUG-5 | **Click Guide ignores a moved window:** the followed window's rectangle is read once, so after a move the ring and title are wrong (a step was titled Export after clicking Save); a click on a window covering the guided one becomes a step. | Observed on macOS | Re-read the rectangle at each click; pause with a notice when it moves; ignore a click that lands on another window. | M | A5, CG-03 |
-| BUG-6 | **Long Shot on Windows ends after 2 frames** on YouTube and carchargeos.com (Edge, 1280x900). Wikipedia, docs.rs and the essay page work. | Known limit shipped in 0.3.4; cause unknown | **Time-boxed to 1 day:** reproduce on the ThinkPad, find why the scroll settle or frame compare stops, add a `cm-regress` case on a local tall page with a sticky header and lazy images (no internet). If it is not fixed in the box, it stays a named known limit and moves to 0.3.6. | M to L | B1 |
-| BUG-7 | **The board sheet says "drag order = list order"** (Vietnamese "kéo để đổi thứ tự") but the order changes only with the arrow buttons; the pill says "Layout editable until Finish". | Observed on macOS (library-boards pass) | Copy fix only: "Use the arrows to change the order" (EN, VI), pill "Preview". No drag handle. | S | C1, BR-05 |
-| BUG-8 | **The 0.3.4 Preview feedback link may lose its pre-filled text:** `.github/ISSUE_TEMPLATE/config.yml` has `blank_issues_enabled: false`, so `issues/new?title=...&body=...` can land on the template chooser. | Suspected; **check first** (open the link as a user would) | If the text is dropped, point the link at a template (`template=bug_report.yml` or `feature_request.yml`) or add a "Feedback" issue form. Also decides the link for the About button (section 4). | S | new |
-
-**Decisions the bugs need (defaults proposed; "ok" accepts):**
-
-| D | Question | Default |
-| --- | --- | --- |
-| D3 | BUG-4: accessibility name, else the current nearest-text logic | **Decided Nov 17** (revised) |
-| D4 | BUG-1: passive bar with Stop, no Pause, for agent- and CLI-started guides | **Decided Nov 17**: in 0.3.5 |
-| D12 | BUG-3: refuse an existing file; Confirm with the exact path outside known folders | **Decided Nov 17**: default |
-| D30 | BUG-2: write into the chosen folder with date and time in the names | **Decided Nov 17** (revised) |
+| # | Bug | Evidence | Required behaviour after the fix | Size |
+| --- | --- | --- | --- | --- |
+| BUG-1 | **A Click Guide started by an agent or the CLI shows no bar, no Stop and no indicator** (only a toast). A guide the user starts in the app already has its bar; this is only the agent and CLI start. It breaks "the user can always see and stop recording". Known limit of 0.3.4 (the only way to stop it today is `capturemann guide stop`). | Observed on macOS and Windows (QA pass 6) | After the confirm dialog, an agent- or CLI-started guide shows the guide bar in a passive form, like the Long Shot HUD: recording dot, step count, the text "Started by agent {client}" (the real client, CLI or MCP) and a **Stop** button. No Pause, Note or Undo. The sidebar tile shows the guide as running, and the toast has a Stop button. A user-started guide is unchanged. | M |
+| BUG-2 | **Markdown export overwrites silently:** two exports into one folder overwrite the first's `guide.md` and leave stale `images/`; a guide with 0 steps reports success. | Observed on Windows (a second export to the same place, `warnings: []`) | The export still writes straight into the folder the user picks, but every name carries the local date and time: `guide-YYYY-MM-DD-HHMMSS.md` and `images-YYYY-MM-DD-HHMMSS/step-NN.png`, and the links inside the Markdown point to that images folder. Nothing existing is overwritten, so there is no Replace question. A guide with 0 steps is refused with an error. The success toast has an **Open folder** button. The agent path (`export_guide`, BUG-3) uses the same names. | S to M |
+| BUG-3 | **`export_guide` lets an agent write over any file** at Free tier (for example `~/Documents/report.docx`). | From the audit (not run) | `export_guide` refuses to write to a path where a file already exists. A path outside the library and the user's export folders needs a Confirm dialog that shows the exact path; inside them it runs immediately. | S to M |
+| BUG-4 | **Step titles can carry personal data:** the nearest text within 80 px becomes the title (`Click "jane.doe@example.com"`) and reaches Markdown, HTML, the clipboard and agent results; hostile text can inject Markdown. | Observed on macOS and Windows | When the clicked button or object has an accessibility name (AX on macOS, UI Automation on Windows; on Linux the same if the platform gives one), the title is `Click "{that name}"`. When it has none, the title is built exactly as today (the nearest on-screen text). Markdown special characters in any title are escaped on export. Nothing else about titles changes. | M |
+| BUG-5 | **Click Guide ignores a moved window:** the followed window's rectangle is read once, so after the window moves the ring and title are wrong (a step was titled Export after clicking Save); a click on a window covering the guided one becomes a step. | Observed on macOS | The followed window's rectangle is read again at every click. If it moved or resized since the last click, the guide pauses with a notice instead of recording a wrong step. A click that lands on a different window than the followed one is ignored. | M |
+| BUG-6 | **Long Shot on Windows ends after 2 frames** on YouTube and carchargeos.com (Edge, 1280x900). Wikipedia, docs.rs and the essay page work. | Known limit of 0.3.4; cause unknown | Time-boxed to 1 day: reproduce on the ThinkPad, find why the scroll settle or frame compare stops, fix it, and add a `cm-regress` case on a local tall page with a sticky header and lazy images (no internet needed). If it is not fixed within the day, it stays a named known limit in the release text and moves to 0.3.6. | M to L |
+| BUG-7 | **The board sheet says "drag order = list order"** (Vietnamese "kéo để đổi thứ tự") but the order changes only with the arrow buttons; the pill says "Layout editable until Finish". | Observed on macOS (library-boards pass) | Copy only: the hint reads "Use the arrows to change the order" (EN and VI) and the pill reads "Preview". No drag handle is added. | S |
+| BUG-8 | **The 0.3.4 Preview feedback link may lose its pre-filled text:** `.github/ISSUE_TEMPLATE/config.yml` has `blank_issues_enabled: false`, so `issues/new?title=...&body=...` can land on the template chooser. | Suspected; check first by opening the link as a user would | If the pre-filled text arrives, change nothing. If it is dropped, point the link at an issue template (`template=bug_report.yml` or `feature_request.yml`) or add a "Feedback" issue form. The same link is used by the About button (section 4). | S |
 
 ## 3. Part 2, FEATURE: line styles for shapes (ANN-12)
 
 **What exists today.** Arrow, Line, Rectangle and Ellipse are already built (ANN-1: tools A, L, R, E; ops `arrow`, `line`, `rect`, `ellipse` in `crates/cm-core/src/annotation.rs`). They have colour and width and only a solid stroke; the renderer (`crates/cm-render/src/annot.rs`, `stroke_round`) has no dash support. The feature is **a stroke style: solid, dashed or dotted**, on all four shapes.
 
-| Point | Proposal |
+| Point | Requirement |
 | --- | --- |
 | Op field | New optional `style` on the four ops: `"solid"` (default), `"dashed"`, `"dotted"`. Absent means solid and solid is not written, so existing manifests and goldens do not change. |
 | Older apps | An app without ANN-12 draws the op solid and keeps the unknown field (the op's `extra` is preserved), so a 0.3.4 app does not lose the style when it saves (as ANN-9 AC7). |
@@ -63,8 +54,6 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 **Acceptance criteria (written first, in `specs/features/02-annotation.md`, ANN-12):** AC1 a dashed rectangle exports with the dash pattern, the same at 1x and 2x; AC2 a dotted line is round dots spaced 2 x width; AC3 a dashed arrow has a solid head; AC4 `style` absent renders exactly as before; AC5 changing a selected shape's style is one undo step and changes only that op; AC6 an agent op with `style: "dashed"` renders like the GUI; AC7 a build without ANN-12 draws it solid and writes the field back unchanged.
 
 **Files:** `cm-core/src/annotation.rs`, `cm-render/src/annot.rs`, `apps/desktop/src/editor/**` (shape panel), `cm-mcp` schema, `locales/` (three labels, EN and VI), `tests/golden/annotation/`. Merge after BUG-1 to BUG-5 touch `cm-mcp/src/tools.rs`, to avoid a conflict.
-
-**Decided Nov 17, 2026:** all the defaults above (dash numbers, solid arrow head, last style remembered per tool).
 
 ## 4. Part 3, FEATURE: Send feedback button on the About page
 
@@ -126,4 +115,4 @@ An agent tests the 0.3.4 and 0.3.5 builds the way the `QA-0.3.4-*` passes did, a
 
 ## 9. For the maintainer outside the code
 
-winget pull requests 472327 and 477195; the APT repository update with the 0.3.0 to 0.3.5 `.deb` files; the plugin line (held by the directory until the organization is Verified); the Windows licence list; the ThinkPad booted and logged in before QA pass 2 and the Windows regression; and nothing else: no decision is open.
+winget pull requests 472327 and 477195; the APT repository update with the 0.3.0 to 0.3.5 `.deb` files; the plugin line (held by the directory until the organization is Verified); the Windows licence list; the ThinkPad booted and logged in before QA pass 2 and the Windows regression; for review of this plan.
