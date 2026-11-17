@@ -22,7 +22,8 @@
       "fields": [
         {
           "id": "product",
-          "label": "Product"
+          "label": "Product",
+          "prose": false
         },
         {
           "id": "audience",

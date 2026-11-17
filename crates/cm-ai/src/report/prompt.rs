@@ -50,18 +50,17 @@ pub fn system_prompt(template: &Template, language: Option<&str>, source_languag
          4. Notes are written from the words of the transcript. Do not describe tone, emotion, age, \
             accent or personality.\n",
     );
-    match language {
-        Some(code) if !same_language(code, source_language) => {
-            s.push_str(&format!(
-                "5. Write all the note text in {}. Quotes stay in the language they were spoken in.\n",
-                language_name(code)
-            ));
-        }
-        _ => {
-            s.push_str(
-                "5. Write the note text in the language of the transcript. Quotes stay as spoken.\n",
-            );
-        }
+    match output_language(language, source_language) {
+        Some(name) => s.push_str(&format!(
+            "5. Write all the note text in {name}: every summary, title, key point, decision, task and \
+             question, even though these rules are written in English. Names and terms the speakers \
+             said in another language may stay as spoken. Quotes stay in the language they were \
+             spoken in.\n"
+        )),
+        None => s.push_str(
+            "5. Write all the note text in the language of the transcript, even though these rules \
+             are written in English. Quotes stay as spoken.\n",
+        ),
     }
     s.push_str(&format!(
         "6. Keep each item short: one or two sentences.\n\nTemplate: {}.\n{}\n",
@@ -70,8 +69,31 @@ pub fn system_prompt(template: &Template, language: Option<&str>, source_languag
     s
 }
 
-fn same_language(a: &str, b: &str) -> bool {
-    a.split('-').next() == b.split('-').next()
+/// The name of the language the note text is written in: the one asked for, else the
+/// transcript's. `None` only when neither is known (the prompt then says "the language of the
+/// transcript").
+pub fn output_language(language: Option<&str>, source_language: &str) -> Option<String> {
+    let code = language
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+        .unwrap_or_else(|| source_language.trim());
+    (!code.is_empty()).then(|| language_name(code))
+}
+
+/// The last lines of a user prompt, after the transcript or the notes: the language rule again,
+/// because a small model follows what it read last.
+fn closing(language: Option<&str>) -> String {
+    match language {
+        Some(name) => format!(
+            "\nReminder: write all the note text in {name} (names, terms and quotes may stay as \
+             spoken). Answer with the JSON object only.\n"
+        ),
+        None => {
+            "\nReminder: write all the note text in the language of the transcript. Answer with \
+                 the JSON object only.\n"
+                .to_owned()
+        }
+    }
 }
 
 /// The part of the user prompt before the transcript: context, speakers and markers.
@@ -124,7 +146,12 @@ pub fn preamble(
 }
 
 /// The prompt for a whole recording or for one chunk of it (`part` is `(index, of)`, 1-based).
-pub fn notes_prompt(preamble: &str, transcript: &str, part: Option<(usize, usize)>) -> String {
+pub fn notes_prompt(
+    preamble: &str,
+    transcript: &str,
+    part: Option<(usize, usize)>,
+    language: Option<&str>,
+) -> String {
     let mut s = String::from(preamble);
     match part {
         Some((i, n)) => s.push_str(&format!(
@@ -135,11 +162,12 @@ pub fn notes_prompt(preamble: &str, transcript: &str, part: Option<(usize, usize
     }
     s.push_str("Transcript (each line starts with its time in seconds):\n");
     s.push_str(transcript);
+    s.push_str(&closing(language));
     s
 }
 
 /// The prompt that merges the notes of consecutive parts into one set of notes.
-pub fn merge_prompt(preamble: &str, notes: &[Value]) -> String {
+pub fn merge_prompt(preamble: &str, notes: &[Value], language: Option<&str>) -> String {
     let mut s = String::from(preamble);
     s.push_str(
         "\nBelow are the notes made from consecutive parts of one recording, as JSON. Merge them \
@@ -151,5 +179,6 @@ pub fn merge_prompt(preamble: &str, notes: &[Value]) -> String {
     for (i, n) in notes.iter().enumerate() {
         s.push_str(&format!("\nNotes of part {}:\n{}\n", i + 1, n));
     }
+    s.push_str(&closing(language));
     s
 }

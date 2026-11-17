@@ -12030,3 +12030,48 @@ msgstr "Các bảng ảnh của bạn và những ảnh chụp trong đó là �
 msgctxt "feature name"
 msgid "Boards"
 msgstr "Bảng ảnh"
+
+#, fuzzy
+msgid "{n} section may not be in the report language"
+msgid_plural "{n} sections may not be in the report language"
+msgstr[0] "{n} mục có thể không viết bằng ngôn ngữ của báo cáo"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Label"
+msgstr "Nhãn"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Name"
+msgstr "Tên"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Owner"
+msgstr "Người phụ trách"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Step"
+msgstr "Bước"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Task"
+msgstr "Công việc"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Term"
+msgstr "Thuật ngữ"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Text"
+msgstr "Nội dung"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Follow-ups for next time"
+msgstr "Việc theo dõi cho lần sau"

@@ -457,8 +457,17 @@ async fn generate_report(cx: &mut Ctx<'_>, a: ReportArgs) -> Result<(), CliError
     .await?;
     cx.emit(&job, |j| {
         let r = &j["result"];
+        let unsure = r["language_unsure"].as_u64().unwrap_or(0);
+        let language_note = if unsure > 0 {
+            format!(
+                "\n  {unsure} section{} may not be in the report language: check the text or generate again",
+                if unsure == 1 { "" } else { "s" }
+            )
+        } else {
+            String::new()
+        };
         format!(
-            "Wrote report {} of {} ({} items dropped without a matching citation)\n  read it with `capturemann ai report get {} {}`",
+            "Wrote report {} of {} ({} items dropped without a matching citation){language_note}\n  read it with `capturemann ai report get {} {}`",
             plain(&r["report_id"]),
             plain(&r["capture_id"]),
             plain(&r["dropped_uncited"]),

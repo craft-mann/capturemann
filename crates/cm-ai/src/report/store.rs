@@ -53,6 +53,10 @@ pub struct Report {
     pub dropped_uncited: usize,
     #[serde(default)]
     pub reassigned_names: usize,
+    /// Sections the language check could not get into `language` (AI-9.AC10); 0 for a report
+    /// made before the check.
+    #[serde(default)]
+    pub language_unsure: usize,
     /// Pieces the transcript was cut into (1 for a short recording).
     #[serde(default)]
     pub chunks: usize,
@@ -127,6 +131,7 @@ impl Report {
             "model": self.model,
             "edited": self.edited,
             "dropped_uncited": self.dropped_uncited,
+            "language_unsure": self.language_unsure,
             "version": self.v,
         })
     }
@@ -347,6 +352,7 @@ pub fn new_report(
         content: generated.content.clone(),
         dropped_uncited: generated.dropped_uncited,
         reassigned_names: generated.reassigned_names,
+        language_unsure: generated.language_unsure,
         chunks: generated.chunks,
         edited: false,
         checked: Vec::new(),

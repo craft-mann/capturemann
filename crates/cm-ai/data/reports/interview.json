@@ -57,11 +57,13 @@
       "fields": [
         {
           "id": "competency",
-          "label": "Competency"
+          "label": "Competency",
+          "prose": false
         },
         {
           "id": "quote",
-          "label": "Quote"
+          "label": "Quote",
+          "prose": false
         },
         {
           "id": "note",

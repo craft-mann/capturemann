@@ -23,6 +23,8 @@ sherpa = ["dep:sherpa-onnx"]
 
 [dependencies]
 cm-core.workspace = true
+# Report headings and labels in the report's own language (AI-9.AC11); no dependencies.
+cm-i18n.workspace = true
 cm-platform.workspace = true
 cm-cursor.workspace = true
 cm-library.workspace = true

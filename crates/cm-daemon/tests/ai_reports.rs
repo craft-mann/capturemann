@@ -323,6 +323,9 @@ async fn generate_get_export_and_drop_the_uncited() {
     let rid = res["report_id"].as_str().unwrap().to_owned();
     assert_eq!(res["dropped_uncited"], 1, "AC3");
     assert_eq!(res["language"], "vi", "AC7");
+    // AC10: the job result carries the language check's count (this scripted model gives the
+    // check no usable answer, so nothing is counted).
+    assert_eq!(res["language_unsure"], 0);
 
     // AC7: the language reached the model.
     let req = r.model.seen.lock().unwrap()[0].clone();
@@ -376,7 +379,13 @@ async fn generate_get_export_and_drop_the_uncited() {
     // Citation times are left out unless asked for (the marked moments keep theirs: the time is
     // the content there), and the stored report keeps them either way.
     let plain_md = std::fs::read_to_string(md["path"].as_str().unwrap()).unwrap();
-    let notes = |t: &str| t.split("## Marked moments").next().unwrap().to_owned();
+    // The report is in Vietnamese: its headings are too (AI-9.AC11), whatever the app speaks.
+    let marked = cm_ai::report::labels::section_title_in(
+        cm_ai::report::labels::lang_of("vi"),
+        "Marked moments",
+    );
+    assert_ne!(marked, "Marked moments");
+    let notes = |t: &str| t.split(&format!("## {marked}")).next().unwrap().to_owned();
     assert!(!notes(&plain_md).contains("[00:"), "{plain_md}");
     assert!(plain_md.contains("pricing [00:20]"), "{plain_md}");
     let timed = user(

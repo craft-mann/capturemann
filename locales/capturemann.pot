@@ -7982,6 +7982,11 @@ msgid_plural "{n} seconds"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} section may not be in the report language"
+msgid_plural "{n} sections may not be in the report language"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} selected"
 msgid_plural "{n} selected"
 msgstr[0] ""
@@ -10573,6 +10578,18 @@ msgid "Key points"
 msgstr ""
 
 msgctxt "report field"
+msgid "Label"
+msgstr ""
+
+msgctxt "report field"
+msgid "Name"
+msgstr ""
+
+msgctxt "report field"
+msgid "Owner"
+msgstr ""
+
+msgctxt "report field"
 msgid "People"
 msgstr ""
 
@@ -10590,6 +10607,22 @@ msgstr ""
 
 msgctxt "report field"
 msgid "Role"
+msgstr ""
+
+msgctxt "report field"
+msgid "Step"
+msgstr ""
+
+msgctxt "report field"
+msgid "Task"
+msgstr ""
+
+msgctxt "report field"
+msgid "Term"
+msgstr ""
+
+msgctxt "report field"
+msgid "Text"
 msgstr ""
 
 msgctxt "report field"
@@ -10658,6 +10691,10 @@ msgstr ""
 
 msgctxt "report section"
 msgid "Follow-ups"
+msgstr ""
+
+msgctxt "report section"
+msgid "Follow-ups for next time"
 msgstr ""
 
 msgctxt "report section"

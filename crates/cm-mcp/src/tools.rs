@@ -2066,7 +2066,7 @@ fn ai_tools() -> Vec<ToolSpec> {
             Tier::Free,
             true,
             "AI-9",
-            "Write a structured report (meeting minutes, notes, recap, summary) from a recording's transcript with the built-in text model (any other provider gives `no_text_model`). Runs in the background and returns a `job_id`; the job result is `{ report_id, dropped_uncited }` and `report.ready` is published. Every item cites the recording with `at` times; items whose citations do not match the transcript are dropped and counted in `dropped_uncited`. The transcript must exist (run `transcribe`) and have at least 30 words. Pass `report_id` to regenerate a report: the old one is replaced only when the new one succeeds. One undo step.",
+            "Write a structured report (meeting minutes, notes, recap, summary) from a recording's transcript with the built-in text model (any other provider gives `no_text_model`). Runs in the background and returns a `job_id`; the job result is `{ report_id, dropped_uncited, language_unsure }` and `report.ready` is published. Every item cites the recording with `at` times; items whose citations do not match the transcript are dropped and counted in `dropped_uncited`. The note text is written in the output language (`language`, else the transcript language) and checked for it by the same model: a section it could not get into that language stays as written and is counted in `language_unsure`. The Markdown headings and labels follow the report language. The transcript must exist (run `transcribe`) and have at least 30 words. Pass `report_id` to regenerate a report: the old one is replaced only when the new one succeeds. One undo step.",
             json!({ "template": { "type": "string", "enum": ["summary", "minutes", "one_on_one", "interview", "product_recap", "lecture"],
                         "description": "A template id from list_report_templates." },
                     "language": { "type": "string", "description": "Language of the note text (`vi`, `es`, `pt-br`); default the transcript's. Quotes stay as spoken." },
@@ -2096,7 +2096,7 @@ fn ai_tools() -> Vec<ToolSpec> {
             &["capture_id"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" }, "report_id": { "type": "string" },
-                "report": { "type": "object", "description": "The stored report: template, model, provider, created, language, context, content, dropped_uncited, edited." },
+                "report": { "type": "object", "description": "The stored report: template, model, provider, created, language, context, content, dropped_uncited, language_unsure, edited." },
                 "markdown": { "type": "string" },
                 "reports": { "type": "array", "items": { "type": "object" } },
                 "latest": { "type": ["object", "null"] } },

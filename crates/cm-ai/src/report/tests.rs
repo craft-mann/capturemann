@@ -12,6 +12,28 @@ struct Scripted {
     answer: Box<dyn Fn(&JsonRequest) -> Value + Send + Sync>,
     /// The streamed token counts reported before each answer (none: does not stream).
     ticks: Vec<usize>,
+    /// The language-check questions, kept apart from `seen` (the notes and their rewrites).
+    checks: Mutex<Vec<JsonRequest>>,
+    /// Answers a language-check question (default: every part is in the language).
+    check_answer: FallibleAnswer,
+}
+
+/// The part ids a language-check question lists (`### id` lines).
+fn check_ids(req: &JsonRequest) -> Vec<String> {
+    req.messages[0]
+        .content
+        .lines()
+        .filter_map(|l| l.strip_prefix("### "))
+        .map(str::to_owned)
+        .collect()
+}
+
+fn all_in_language(req: &JsonRequest) -> Result<Value, TextModelError> {
+    let parts: Vec<Value> = check_ids(req)
+        .into_iter()
+        .map(|id| json!({"id": id, "in_language": true}))
+        .collect();
+    Ok(json!({ "parts": parts }))
 }
 
 impl Scripted {
@@ -20,7 +42,21 @@ impl Scripted {
             seen: Mutex::new(vec![]),
             answer: Box::new(f),
             ticks: vec![],
+            checks: Mutex::new(vec![]),
+            check_answer: Box::new(all_in_language),
         }
+    }
+
+    fn with_check(
+        mut self,
+        f: impl Fn(&JsonRequest) -> Result<Value, TextModelError> + Send + Sync + 'static,
+    ) -> Scripted {
+        self.check_answer = Box::new(f);
+        self
+    }
+
+    fn check_count(&self) -> usize {
+        self.checks.lock().unwrap().len()
     }
 
     fn streaming(mut self, ticks: &[usize]) -> Scripted {
@@ -47,6 +83,13 @@ impl TextModel for Scripted {
     }
 
     fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
+        if req.schema_name == "report_language_check" {
+            self.checks.lock().unwrap().push(req.clone());
+            return Ok(JsonReply {
+                value: (self.check_answer)(req)?,
+                attempts: 1,
+            });
+        }
         self.seen.lock().unwrap().push(req.clone());
         Ok(JsonReply {
             value: (self.answer)(req),
@@ -334,6 +377,9 @@ struct Fallible {
 
 impl TextModel for Fallible {
     fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
+        if req.schema_name == "report_language_check" {
+            return all_in_language(req).map(|value| JsonReply { value, attempts: 1 });
+        }
         self.calls.lock().unwrap().push(req.clone());
         (self.answer)(req).map(|value| JsonReply { value, attempts: 1 })
     }
@@ -595,8 +641,10 @@ fn sample_report(t: &Template) -> store::Report {
         dropped_uncited: 0,
         reassigned_names: 0,
         dropped_names: 0,
+        language_unsure: 0,
         chunks: 1,
         model_calls: 1,
+        language_calls: 0,
     };
     store::new_report(
         "rpt_00000001".into(),
@@ -750,3 +798,5 @@ fn store_versions_make_undo_possible() {
     assert!(store::version_path(dir.path(), "rpt_00000001", 1).exists());
     assert!(store::valid_id("rpt_0a1b2c3d") && !store::valid_id("../x"));
 }
+
+mod lang_tests;

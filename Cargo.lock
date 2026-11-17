@@ -1265,6 +1265,7 @@ version = "0.3.5"
 dependencies = [
  "cm-core",
  "cm-cursor",
+ "cm-i18n",
  "cm-library",
  "cm-media",
  "cm-platform",
