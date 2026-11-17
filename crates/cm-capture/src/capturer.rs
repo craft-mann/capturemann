@@ -310,15 +310,38 @@ impl Capturer {
             .collect()
     }
 
-    /// First window (front to back) whose title contains `needle`, case-insensitively
-    /// (CLI `--window "<title substring>"`). `not_found` if none.
+    /// The window whose title equals `needle` (case-insensitively), else the only window whose
+    /// title contains it (CLI-style `--window "<title substring>"`, used by examples).
+    /// `not_found` if none; `invalid_input` (message lists id, app and title of each match,
+    /// BUG-9) when several partial matches and no exact one.
     pub fn find_window(&self, needle: &str) -> Result<WindowInfo, CmError> {
         let needle_lc = needle.to_lowercase();
-        self.list_targets()?
-            .windows
-            .into_iter()
-            .find(|w| w.title.to_lowercase().contains(&needle_lc))
-            .ok_or_else(|| CmError::not_found(format!("No window title contains \"{needle}\"")))
+        let all = self.list_targets()?.windows;
+        let exact: Vec<&WindowInfo> = all
+            .iter()
+            .filter(|w| w.title.to_lowercase() == needle_lc)
+            .collect();
+        let hits: Vec<&WindowInfo> = if exact.is_empty() {
+            all.iter()
+                .filter(|w| w.title.to_lowercase().contains(&needle_lc))
+                .collect()
+        } else {
+            exact
+        };
+        match hits.as_slice() {
+            [] => Err(CmError::not_found(format!(
+                "No window title contains \"{needle}\""
+            ))),
+            [one] => Ok((*one).clone()),
+            many => Err(CmError::invalid_input(format!(
+                "\"{needle}\" matches {} windows: {}. Pass the window id to choose one.",
+                many.len(),
+                many.iter()
+                    .map(|w| format!("{} ({}) \"{}\"", w.id, w.app, w.title))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ))),
+        }
     }
 
     /// One capture of a window, downscaled so the longer edge is at most `max_px` (aspect
@@ -980,6 +1003,23 @@ mod tests {
             c.find_window("nope").unwrap_err().code(),
             ErrorCode::NotFound
         );
+    }
+
+    /// CAP-1.AC8 (BUG-9): several partial matches are `invalid_input` listing each one; an
+    /// exact title wins.
+    #[test]
+    fn cap1_ac8_find_window_ambiguous_partial_titles() {
+        let b = FakeBackend::new()
+            .with_display(1, 0, 0, 300, 300, 1.0)
+            .with_window(1, "Mail - work", "Mail", 100, 1, (0, 0, 10, 10), false)
+            .with_window(2, "Mail - private", "Mail", 100, 1, (0, 0, 10, 10), false)
+            .with_window(3, "Mail", "Mail", 100, 1, (0, 0, 10, 10), false);
+        let c = Capturer::new(b);
+        let e = c.find_window("mail -").unwrap_err();
+        assert_eq!(e.code(), ErrorCode::InvalidInput);
+        let m = e.to_string();
+        assert!(m.contains("1 (Mail)") && m.contains("2 (Mail)"), "{m}");
+        assert_eq!(c.find_window("MAIL").unwrap().id, 3);
     }
 
     #[test]
