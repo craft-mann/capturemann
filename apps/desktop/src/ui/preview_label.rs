@@ -265,20 +265,23 @@ pub fn url_encode(s: &str) -> String {
 /// name and the app version filled in (its `feature` and `version` fields); no logs, screenshots
 /// or paths are attached. Pointing at a template keeps the values when blank issues are off.
 pub fn feedback_url(feature_name: &str, version: &str) -> String {
-    format!(
-        "{}&feature={}",
-        general_feedback_url(version),
-        url_encode(feature_name)
-    )
+    format!("{}&feature={}", form_url(version), url_encode(feature_name))
 }
 
-/// The same form without a feature (the About page's Send feedback button): only the app version
-/// is filled in. Nothing is sent before the click.
-pub fn general_feedback_url(version: &str) -> String {
+/// The form with only the app version filled in.
+fn form_url(version: &str) -> String {
     format!(
         "{ISSUES_NEW}?template=feedback.yml&version={}",
         url_encode(version)
     )
+}
+
+/// The same form without a feature (the About page's Send feedback button): the app version and a
+/// title, "CaptureMann {version} general feedback", are filled in. Nothing is sent before the click.
+pub fn general_feedback_url(version: &str) -> String {
+    // The title is for the maintainers and stays English, whatever the UI language is.
+    let title = format!("CaptureMann {version} general feedback"); // i18n-ignore: issue title for the maintainers, English
+    format!("{}&title={}", form_url(version), url_encode(&title))
 }
 
 /// Opens the feedback form in the system browser.
@@ -580,13 +583,15 @@ mod tests {
     }
 
     #[test]
-    fn the_general_feedback_url_carries_the_version_only() {
+    fn the_general_feedback_url_carries_the_version_and_a_title_only() {
         let u = general_feedback_url("0.3.5");
         assert_eq!(
             u,
-            "https://github.com/craft-mann/capturemann/issues/new?template=feedback.yml&version=0.3.5"
+            "https://github.com/craft-mann/capturemann/issues/new?template=feedback.yml&version=0.3.5&title=CaptureMann%200.3.5%20general%20feedback"
         );
         assert!(!u.contains("feature") && !u.contains("body=") && !u.contains(' '));
+        // The Preview link has no title.
+        assert!(!feedback_url("Boards", "0.3.5").contains("title="));
     }
 
     #[test]

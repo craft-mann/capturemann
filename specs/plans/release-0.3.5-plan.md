@@ -72,6 +72,7 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 - One unit test modelled on `the_feedback_url_carries_the_feature_and_the_version_only`.
 - Optional icon: `message-square.svg` exists in `apps/desktop/assets/icons/` but is not registered in `ui/paint.rs`; skip the icon if registering it takes more than a few lines.
 - The link target depends on BUG-8 (the template chooser).
+- The About button's form also gets the title `CaptureMann {version} general feedback` (for example `CaptureMann 0.3.5 general feedback`), always English; the Preview links carry no title (maintainer's change, Nov 17, 2026).
 
 ## 4b. Part 5, FEATURE: Boards marked Preview
 
