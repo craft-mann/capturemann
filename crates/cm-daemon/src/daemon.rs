@@ -276,6 +276,7 @@ pub struct DaemonBuilder {
     kept_windows: Option<Arc<dyn Fn() -> Vec<u32> + Send + Sync>>,
     camera_watcher: Option<Box<dyn cm_camera::CameraWatcher>>,
     guide_clicks: Arc<dyn crate::guide::GuideClicks>,
+    guide_names: Arc<dyn crate::guide::AccessibleNames>,
     /// `recording_system` was used: audio recordings hold the OS power assertion (VOC-1).
     system_idle_sleep: bool,
     long_shot: Arc<dyn crate::long_shot_ops::LongShotSystem>,
@@ -308,6 +309,7 @@ impl DaemonBuilder {
             kept_windows: None,
             camera_watcher: None,
             guide_clicks: Arc::new(crate::guide::NoClicks),
+            guide_names: Arc::new(crate::guide::NoNames),
             system_idle_sleep: false,
             long_shot: Arc::new(crate::long_shot_ops::RealLongShot),
         }
@@ -331,8 +333,16 @@ impl DaemonBuilder {
 
     /// Click Guide on this system's real mouse-down listener (REC-7's source, clicks only).
     /// Only turn this on in a process that shows the recording HUD.
-    pub fn guide_system(self) -> Self {
+    pub fn guide_system(mut self) -> Self {
+        self.guide_names = Arc::new(crate::guide::access::sys::SystemNames);
         self.guide_clicks(crate::guide::clicks::sys::SystemClicks::default())
+    }
+
+    /// The accessibility service Click Guide names steps from (BUG-4). Without one steps are
+    /// named from the screen text. Tests pass [`crate::guide::ScriptedNames`].
+    pub fn guide_names(mut self, names: impl crate::guide::AccessibleNames + 'static) -> Self {
+        self.guide_names = Arc::new(names);
+        self
     }
 
     /// Turns on the recording engine with these track sources. Without it the recording actions
@@ -576,7 +586,10 @@ impl DaemonBuilder {
                 frames: Arc::new(FrameCache::new(self.frame_ttl)),
                 jobs: self.jobs.map(JobsRuntime::new),
                 recording,
-                guide: crate::guide::GuideRuntime::new(self.guide_clicks.clone()),
+                guide: crate::guide::GuideRuntime::new(
+                    self.guide_clicks.clone(),
+                    self.guide_names.clone(),
+                ),
                 next_session: AtomicU64::new(1),
                 confirm_timeout: self.confirm_timeout,
                 watcher: Mutex::new(None),

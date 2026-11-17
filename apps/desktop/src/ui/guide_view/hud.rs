@@ -293,6 +293,10 @@ enum GuideEvent {
     Stopped {
         guide_id: String,
     },
+    /// The followed window was moved or resized: the guide paused itself (BUG-5).
+    WindowMoved {
+        step_count: u64,
+    },
     Other,
 }
 
@@ -319,6 +323,9 @@ fn classify_event(name: &str, data: &Value) -> GuideEvent {
         },
         "guide.stopped" => GuideEvent::Stopped {
             guide_id: text("guide_id"),
+        },
+        "guide.window_moved" => GuideEvent::WindowMoved {
+            step_count: data["step_count"].as_u64().unwrap_or(0),
         },
         _ => GuideEvent::Other,
     }
@@ -383,6 +390,19 @@ pub fn on_event(app: &Entity<AppModel>, name: &str, data: &Value, cx: &mut App) 
                 );
             }
         }
+        GuideEvent::WindowMoved { step_count } => toast(
+            app,
+            ToastSpec::new(
+                ToastKind::Warning,
+                tr!("The window moved. The Click Guide is paused."),
+            )
+            .body(trn!(
+                "Your {n} step is kept. Put the window where you want it, then resume.",
+                "Your {n} steps are kept. Put the window where you want it, then resume.",
+                step_count
+            )),
+            cx,
+        ),
         GuideEvent::Stopped { guide_id } => {
             let Some(hud) = cx.try_global::<Holder>().and_then(|h| h.0) else {
                 return;
@@ -1553,6 +1573,13 @@ mod cap_tests {
             GuideEvent::Stopped {
                 guide_id: "guide_3".into()
             }
+        );
+        assert_eq!(
+            classify_event(
+                "guide.window_moved",
+                &json!({ "guide_id": "guide_3", "step_count": 4 })
+            ),
+            GuideEvent::WindowMoved { step_count: 4 }
         );
         assert_eq!(
             classify_event("guide.step_added", &json!({})),

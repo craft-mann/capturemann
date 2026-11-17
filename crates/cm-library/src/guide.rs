@@ -148,6 +148,9 @@ pub struct GuideStep {
 pub const TITLE_FROM_SCREEN: &str = "screen_text";
 /// [`GuideStep::title_source`] of the wording used when no usable text was near the click.
 pub const TITLE_GENERIC: &str = "generic";
+/// [`GuideStep::title_source`] of a title named from the accessibility name of the clicked
+/// control (BUG-4: the system says what the control is called; nothing is read from the screen).
+pub const TITLE_ACCESSIBLE: &str = "accessibility";
 
 impl GuideStep {
     pub fn is_note(&self) -> bool {

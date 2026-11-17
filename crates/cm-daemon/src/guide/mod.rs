@@ -16,6 +16,7 @@ use serde_json::{json, Map, Value};
 
 use crate::action::{Action, Fields, ScreenshotTarget};
 
+pub mod access;
 pub mod clicks;
 pub mod export;
 pub mod pdf;
@@ -23,6 +24,7 @@ pub mod ring;
 pub mod session;
 pub mod titles;
 
+pub use access::{AccessibleNames, NoNames, ScriptedNames};
 pub use clicks::{ClickSink, GuideClicks, LocalClick, NoClicks, ScriptedClicks};
 pub(crate) use session::GuideRuntime;
 
@@ -487,7 +489,7 @@ pub(crate) fn guide_json(id: &str, g: &cm_library::guide::GuideBundle, state: &s
             );
             o.insert("type".into(), json!(s.kind));
             o.insert("title".into(), json!(s.title));
-            // `screen_text` or `generic` for a title CaptureMann made; absent for one a person
+            // `accessibility`, `screen_text` or `generic` for a title CaptureMann made; absent for one a person
             // or an agent wrote.
             if let Some(src) = &s.title_source {
                 o.insert("title_source".into(), json!(src));

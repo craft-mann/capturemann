@@ -1477,6 +1477,7 @@ dependencies = [
  "time",
  "tokio",
  "ttf-parser",
+ "windows 0.61.3",
 ]
 
 [[package]]
