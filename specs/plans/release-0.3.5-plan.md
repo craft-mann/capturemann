@@ -41,6 +41,8 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 
 ## 3. Part 2, FEATURE: line styles for shapes (ANN-12)
 
+**Seen by the maintainer on the 0.3.5 dev bundle (Nov 17, 2026): the line styles in the editor are OK (reported by the maintainer, no stored report).**
+
 **What exists today.** Arrow, Line, Rectangle and Ellipse are already built (ANN-1: tools A, L, R, E; ops `arrow`, `line`, `rect`, `ellipse` in `crates/cm-core/src/annotation.rs`). They have colour and width and only a solid stroke; the renderer (`crates/cm-render/src/annot.rs`, `stroke_round`) has no dash support. The feature is **a stroke style: solid, dashed or dotted**, on all four shapes.
 
 | Point | Requirement |
@@ -81,6 +83,8 @@ Added by the maintainer on Nov 17, 2026. Long Shot and Click Guide already carry
 - All strings through `cm_i18n` with Vietnamese entries; the existing registry tests (`every_registered_preview_has_a_preview_feature` and the tool/CLI marker tests) cover it.
 - `specs/features/20-boards-and-bulk.md` and the Preview design note (`docs/development/design-s24-preview-label.md`) say Boards is Preview in 0.3.5; `docs/reference/` is regenerated (the tool description gets the preview marker). Bulk export is not marked.
 - Moving Boards to stable later is a one-line change in the registry.
+
+**Seen by the maintainer on the 0.3.5 dev bundle (Nov 17, 2026): the Boards Preview label and the intro card are OK (reported by the maintainer, no stored report).**
 
 ## 5. Part 4, PROCESS: QA agent pass
 
