@@ -320,6 +320,36 @@ These three ops change pixels before anything is drawn on them. Rules, decided N
 
 **Out of scope:** replacing icons and images (it needs detection); turning a whole UI into a wireframe.
 
+### ANN-12 Line styles: solid, dashed, dotted
+**Priority** P1 · **Status** Ready · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-1, ANN-3
+
+**User story** — As someone marking up a screenshot, I want dashed and dotted lines, so that I can show an optional step, a boundary or a path without a solid line.
+
+**Description**
+- **Field.** The ops `arrow`, `line`, `rect` and `ellipse` take an optional `style`: `"solid"` (default), `"dashed"` or `"dotted"`. Absent means solid; solid is not written, so existing manifests and golden images do not change. Any other value is `invalid_input` naming the op index (`ops[3]: ...`).
+- **Look.** Dashed: dash 4 × width, gap 2.5 × width, butt caps. Dotted: round dots (dash 0, gap 2 × width, round caps), with a minimum width of 2 px so a dot stays visible. The pattern is measured along the path from the first point; on a rectangle it keeps running round the corners.
+- **Arrow.** The shaft takes the style; **the head is always solid.**
+- **Ellipse.** The style applies to the ring; the click-marker halo (`glow`) is unchanged.
+- **Older apps.** An app without ANN-12 draws the op solid and keeps the unknown field (the op's `extra` is preserved), so a 0.3.4 app does not lose the style when it saves (as ANN-9 AC7).
+- **Editor.** A three-button control (solid, dashed, dotted) in the shape panel for the four tools and for a selected shape. The last style is remembered per tool like colour and width. Changing it is one undo step and changes only that op (ANN-1 AC5).
+- **Preview and export** use the same renderer, so they match. Goldens at 1× and 2× for each shape and style.
+
+**Acceptance criteria**
+- **AC1** Given a dashed rectangle, when exported at 1× and at 2×, then the dash pattern matches the golden image within 1 %.
+- **AC2** Given a dotted line, then it is round dots spaced 2 × width.
+- **AC3** Given a dashed arrow, then its head is solid.
+- **AC4** Given an op with no `style`, then it renders exactly as in 0.3.4 and the existing goldens are unchanged.
+- **AC5** Given a selected shape, when the user changes its style, then only that op changes and it is one undo step.
+- **AC6** Given an agent sends `style: "dashed"` through `annotate`, then the result renders the same as the same shape drawn in the editor.
+- **AC7** Given a build without ANN-12 opens a manifest with `style`, then it draws the op solid and writes the field back unchanged.
+- **AC8** Given `style: "wavy"`, then `invalid_input` names the op index.
+
+**Agent interface** — `annotate` ops take `style`; the MCP schema, the CLI docs and `docs/reference/` are regenerated; no new tool.
+
+**Out of scope** — custom dash lengths, double lines, arrow-head styles, the freehand pen, styles on Highlighter, Callout or Spotlight.
+
+---
+
 ### ANN-5 Copy text from a screenshot
 **Priority** P1 · **Status** In progress (the headless part is built and tested with a scripted recognizer: `ocr::layout_text` and the region crop in `cm-render`, the action `recognize_text` through daemon, MCP and CLI; the editor part is built too: a Copy text button, the Select text tool (key G), a library menu entry and a capture-toast button, with the pure parts (region mapping, outcomes, enabled state) tested and the window not seen by eye; `tests/manual/ANN-5.md` has not been run; the real recognizer ran only on synthetic PNGs, recorded in `verification/benchmarks/ocr-copy-text-synthetic-macos-2026-11-11.md`) · **Crates** cm-render, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3, ANN-2 (the recognizer)
 

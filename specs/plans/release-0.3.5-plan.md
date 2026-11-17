@@ -48,7 +48,7 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 | Arrow | The shaft takes the style; **the head is always solid.** |
 | Ellipse glow | The click-marker halo (`glow`) is unchanged; the style applies to the ring. |
 | Editor | A three-button control (solid, dashed, dotted) in the shape panel for the four tools and for a selected shape; the last style is remembered per tool like colour and width; one undo step (ANN-1 AC5). |
-| Agents | `annotate` ops take `style`; MCP schema, CLI docs and `docs/reference/` regenerated (`docs/reference/gen_agent_reference.py`); the tool count stays 89. An unknown value gives `invalid_input` naming the op index. |
+| Agents | `annotate` ops take `style`; MCP schema, CLI docs and `docs/reference/` regenerated (`docs/reference/gen_agent_reference.py`); ANN-12 adds no tool. An unknown value gives `invalid_input` naming the op index. |
 | Export | The same renderer drives preview and export; add goldens at 1x and 2x per shape and style. |
 | Not in scope | Custom dash lengths, double lines, arrow-head styles, freehand pen, styles for Highlighter, Callout or Spotlight. |
 
