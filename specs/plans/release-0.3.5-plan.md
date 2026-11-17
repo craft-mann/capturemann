@@ -1,6 +1,6 @@
 # Release 0.3.5: a light release (plan, draft, Nov 17, 2026)
 
-Status: **draft, nothing built, waiting for the maintainer's review.** Scope set by the maintainer on Nov 17, 2026: a **light** release with four parts, each labelled **BUG** or **FEATURE** below:
+Status: **final draft for review (Nov 17, 2026); all decisions made (D3, D4, D12, D30, ANN-12); nothing built.** Scope set by the maintainer on Nov 17, 2026: a **light** release with four parts, each labelled **BUG** or **FEATURE** below:
 
 | Part | Label | What | Size |
 | --- | --- | --- | --- |
@@ -40,7 +40,7 @@ All are defects or safety gaps in features that already shipped. Order: safety a
 | D | Question | Default |
 | --- | --- | --- |
 | D3 | BUG-4: accessibility name, else the current nearest-text logic | **Decided Nov 17** (revised) |
-| D4 | BUG-1: passive bar with Stop, no Pause, for agent- and CLI-started guides | Default; **waiting for the maintainer to confirm** after the clarification above |
+| D4 | BUG-1: passive bar with Stop, no Pause, for agent- and CLI-started guides | **Decided Nov 17**: in 0.3.5 |
 | D12 | BUG-3: refuse an existing file; Confirm with the exact path outside known folders | **Decided Nov 17**: default |
 | D30 | BUG-2: write into the chosen folder with date and time in the names | **Decided Nov 17** (revised) |
 
@@ -126,4 +126,4 @@ An agent tests the 0.3.4 and 0.3.5 builds the way the `QA-0.3.4-*` passes did, a
 
 ## 9. For the maintainer outside the code
 
-winget pull requests 472327 and 477195; the APT repository update with the 0.3.0 to 0.3.5 `.deb` files; the plugin line (held by the directory until the organization is Verified); the Windows licence list; the ThinkPad booted and logged in before QA pass 2 and the Windows regression; and your confirmation of D4.
+winget pull requests 472327 and 477195; the APT repository update with the 0.3.0 to 0.3.5 `.deb` files; the plugin line (held by the directory until the organization is Verified); the Windows licence list; the ThinkPad booted and logged in before QA pass 2 and the Windows regression; and nothing else: no decision is open.
