@@ -23,6 +23,33 @@ fn take_image(result: &mut Value, out: Option<&Path>) -> Result<(), CliError> {
         }
         return Ok(());
     };
+    if image.get("omitted").and_then(Value::as_bool) == Some(true) {
+        // The daemon left a big image out of its reply (the line limit); the stored file has it.
+        let size = image["bytes"].as_u64().unwrap_or(0);
+        if let Some(p) = out {
+            let stored = result["path"].as_str().map(std::path::PathBuf::from);
+            let Some(src) = stored.filter(|s| s.is_file()) else {
+                return Err(CliError::new(
+                    ErrorCode::Internal,
+                    format!(
+                        "the image is too large to send back; it is stored in the library, not written to {}",
+                        p.display()
+                    ),
+                ));
+            };
+            std::fs::copy(&src, p).map_err(|e| {
+                CliError::new(
+                    ErrorCode::Internal,
+                    format!("cannot write `{}`: {e}", p.display()),
+                )
+            })?;
+            result["out"] = json!(p);
+        }
+        if let Some(o) = result["image"].as_object_mut() {
+            o.insert("bytes".into(), json!(size));
+        }
+        return Ok(());
+    }
     let data = image["data"].as_str().unwrap_or_default();
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data)
@@ -499,7 +526,7 @@ pub(super) async fn undo_redo(
 
 #[cfg(test)]
 mod resolve_window_tests {
-    use super::resolve_window;
+    use super::{resolve_window, take_image};
     use serde_json::json;
 
     fn targets() -> serde_json::Value {
@@ -525,6 +552,25 @@ mod resolve_window_tests {
             "{}",
             e.message
         );
+    }
+
+    /// An image the daemon left out (too large for one reply line) is copied from the stored file.
+    #[test]
+    fn an_omitted_image_is_copied_from_the_stored_file() {
+        let d = tempfile::tempdir().unwrap();
+        let src = d.path().join("original.png");
+        std::fs::write(&src, b"png").unwrap();
+        let out = d.path().join("o.png");
+        let mut r = json!({ "path": src, "image": { "omitted": true, "bytes": 18_200_000 } });
+        take_image(&mut r, Some(&out)).unwrap();
+        assert_eq!(std::fs::read(&out).unwrap(), b"png");
+        assert_eq!(r["image"]["bytes"], 18_200_000);
+        // No stored file to copy from: an error, not an empty file.
+        let mut r = json!({ "image": { "omitted": true, "bytes": 1 } });
+        assert!(take_image(&mut r, Some(&d.path().join("x.png"))).is_err());
+        // Without --out it just reports the size.
+        let mut r = json!({ "image": { "omitted": true, "bytes": 5 } });
+        take_image(&mut r, None).unwrap();
     }
 
     /// CAP-1.AC8: an exact title (any case) wins among several partial matches.

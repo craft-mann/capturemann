@@ -34,7 +34,21 @@ const MAX_CURSOR: usize = i32::MAX as usize;
 /// Largest `freeze_display` frame an agent may take with `transport: "inline"` (R2-6).
 pub const MAX_INLINE_FRAME_BYTES: usize = 8_000_000;
 
+/// Largest PNG a result carries inline. Base64 adds a third, and a JSON-RPC line may not pass
+/// `rpc::MAX_LINE_BYTES` (16 MiB): a big Long Shot (18 MB) answered with a line the client
+/// refused although the capture was saved. A larger image is left out (`omitted`), and the
+/// caller reads it from `path` (or `get_capture`).
+pub const MAX_INLINE_IMAGE_BYTES: usize = 10_000_000;
+
 fn image_json(png: &[u8]) -> Value {
+    if png.len() > MAX_INLINE_IMAGE_BYTES {
+        return json!({
+            "mime_type": "image/png",
+            "omitted": true,
+            "reason": "too_large",
+            "bytes": png.len(),
+        });
+    }
     json!({
         "mime_type": "image/png",
         "data": base64::engine::general_purpose::STANDARD.encode(png),
@@ -819,5 +833,23 @@ impl Inner {
                 .filter(|(k, _)| validate_setting_key(k).is_ok())
                 .collect(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod image_json_tests {
+    use super::*;
+
+    /// A result must fit one JSON-RPC line (16 MiB): an 18 MB Long Shot PNG is left out.
+    #[test]
+    fn a_big_image_is_omitted_and_a_small_one_is_inline() {
+        let small = image_json(&[1, 2, 3]);
+        assert!(small["data"].is_string() && small.get("omitted").is_none());
+        let big = image_json(&vec![0u8; 18_200_000]);
+        assert_eq!(big["omitted"], true);
+        assert_eq!(big["bytes"], 18_200_000);
+        assert!(big.get("data").is_none());
+        let line = json!({ "image": image_json(&vec![0u8; MAX_INLINE_IMAGE_BYTES]) }).to_string();
+        assert!(line.len() < crate::rpc::MAX_LINE_BYTES);
     }
 }
