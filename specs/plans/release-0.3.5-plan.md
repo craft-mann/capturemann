@@ -1,6 +1,6 @@
 # Release 0.3.5: a light release (plan, draft, Nov 17, 2026)
 
-Status: **final draft for review (Nov 17, 2026); nothing built, no open decision.** Scope set by the maintainer on Nov 17, 2026: a **light** release with five parts, each labelled **BUG**, **FEATURE** or **PROCESS** below:
+Status: **ready to ship (Nov 17, 2026); built and merged on `main`, release planned for Nov 18, 2026; no open decision except the Linux files (`docs/development/release-day-0.3.5.md`).** Scope set by the maintainer on Nov 17, 2026: a **light** release with five parts, each labelled **BUG**, **FEATURE** or **PROCESS** below:
 
 | Part | Label | What |
 | --- | --- | --- |
@@ -120,12 +120,14 @@ An agent tests the 0.3.4 and 0.3.5 builds the way the `QA-0.3.4-*` passes did, a
 
 ## 7. Exit criteria
 
-- BUG-1 to BUG-5, BUG-7 and BUG-12 to BUG-18 fixed with a test or stored check; BUG-6 fixed or named again as a known limit with what was tried; BUG-8 checked and fixed if the link is dropped.
-- ANN-12: its acceptance criteria cited by tests, goldens for each shape and style, existing goldens unchanged, one look at the control on macOS and Windows with a stored report.
-- The About button opens the pre-filled form and sends nothing before the click.
-- QA pass 1 and pass 2 reports stored; every P1 finding fixed or named.
-- No regression failure on any system; skipped cases listed by name; version 0.3.5; MCP tool count 89.
-- The release text says only what a stored report supports.
+State on Nov 17, 2026 (night); items marked **open** are still to do on the release day (`docs/development/release-day-0.3.5.md`).
+
+- BUG-1 to BUG-5, BUG-7 and BUG-12 to BUG-18 fixed with a test or stored check; BUG-6 fixed or named again as a known limit with what was tried; BUG-8 checked and fixed if the link is dropped. **Done:** all merged and tested with fakes; stored checks exist for BUG-1 to BUG-7 and BUG-9 on Windows and, for BUG-1 to BUG-3, BUG-9 and BUG-10, on macOS (pass 2 reports); BUG-6 fixed (frame counts and end reasons, `QA-0.3.5-bug6-long-shot-windows-*`). **Open:** a stored check of BUG-12, BUG-15 and BUG-18 on Windows and a look at BUG-13, BUG-14 and BUG-17; BUG-8's link works only once `feedback.yml` is on the public remote (push).
+- ANN-12: its acceptance criteria cited by tests, goldens for each shape and style, existing goldens unchanged, one look at the control on macOS and Windows with a stored report. **Done:** ACs cited by tests, 16 goldens; the Windows editor control is in `QA-0.3.5-pass2-windows-*`; the macOS control was seen by the maintainer (reported, no stored report).
+- The About button opens the pre-filled form and sends nothing before the click. **Done in code and by the pass 2 reports (URL carries the version and the title only); the form itself works only after the push.**
+- QA pass 1 and pass 2 reports stored; every P1 finding fixed or named. **Done:** no P1 found.
+- No regression failure on any system; skipped cases listed by name; version 0.3.5; MCP tool count 89. **Open:** the regression on the final files (the reports so far are on `7cd4e31d`: macOS one test-case failure fixed afterwards, Windows hardware `rec.camera` dark room); version and tool count done.
+- The release text says only what a stored report supports. **Open:** fill `release-0.3.5-github-text.md` on the day.
 
 ## 8. Moved out of 0.3.5 (to 0.3.6 or later)
 

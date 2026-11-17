@@ -6,6 +6,30 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 ## [Unreleased]
 
 ### Added
+- **Line styles (ANN-12).** Arrow, Line, Rectangle and Ellipse can be solid, dashed or dotted: a three-button control in the editor's shape panel (remembered per tool, one undo step) and an optional `style` on the four `annotate` ops (`solid`, `dashed`, `dotted`; solid is not written; an unknown value is `invalid_input` naming the op; an older app keeps the field and draws it solid). The arrow head stays solid.
+- **Send feedback in Settings > About**, next to Source on GitHub: opens the GitHub feedback issue form with the app version and the title `CaptureMann {version} general feedback`; nothing is sent before the click and no logs, paths or library data are included. `.github/ISSUE_TEMPLATE/feedback.yml` is the form.
+- **Boards are marked Preview** (the feature registry, a label, a popover with Send feedback and a first-use intro card; `create_board` and `board` carry the preview marker). MCP stays at 89 tools.
+
+### Changed
+- Click Guide Markdown export names carry the local date and time: `guide-YYYY-MM-DD-HHMMSS.md` and `images-YYYY-MM-DD-HHMMSS/`; nothing existing is overwritten; a guide with no steps is refused; the success toast has an Open folder button.
+- `export_guide` refuses to write over an existing file; a destination outside the library and the user's export folders needs a Confirm dialog that shows the exact path.
+- A window chosen by title text (`capture screenshot --window <text>` in the CLI) fails with `invalid_input` and the reason `ambiguous_target` when several titles match, and lists the matches (window id, app, title); an exact title still wins.
+- The New board sheet hint reads "Use the arrows to change the order" and its pill "Preview".
+
+### Fixed
+- **Click Guide:** a guide started by an agent or the CLI shows a passive bar (recording dot, step count, "Started by agent {client}", Stop; the toast has Stop too) and, after a window-move pause, a Paused state with Resume; a clicked object's accessibility name is used for the step title when it has one, and Markdown special characters in titles are escaped; the followed window is read again at every click, a moved or resized window pauses the guide and a click on another window is ignored.
+- **Long Shot on Windows** no longer ends after 2 frames on YouTube and carchargeos.com (fine wheel steps for non-console targets, a larger static-panel share, no re-push of an unchanged first pair); a large result no longer fails with `daemon_unavailable: line too long` after the picture was stored (an image over 10 MB is left out of the reply, which names the stored capture; the CLI copies the stored file to `--out`).
+- **Window capture on Windows:** a DPI-unaware window fills the picture instead of the top-left corner.
+- **Transcripts:** runs of digital silence of 1 s or longer are not given to Whisper and the guard's room level ignores silent frames, so text is no longer invented after a muted stretch.
+- **Meeting minutes** in a chosen language are no longer mixed with English: the prompt names the output language, a section in the wrong language is regenerated once (`language_unsure` is counted), and the section titles and labels follow the report's language (Vietnamese entries added).
+- The New board sheet and the sidebar Preview pills no longer overlap; the disabled Make a board button names Click Guides; the left rail scrolls in a short window so Settings stays reachable; the export confirmation dialog exposes its text and destination to screen readers.
+
+### Removed
+- The PhoWhisper catalogue rows (they were never offered), their strings and the converter folder `packaging/phowhisper/`.
+
+## [0.3.4] - 2026-11-17
+
+### Added
 - **Previews (design S24).** Long Shot and Click Guide are marked Preview: one table of feature stages (`cm_core::features`; moving a feature to stable is a one-line change), a Preview popover with a Send feedback button that opens a GitHub issue form with the feature name and the app version only. A preview is only a label: it is always available (a Settings switch and a `feature_disabled` error were built and dropped on Nov 16, 2026). MCP tools of a preview have `_meta.stage: "preview"` and "(preview)" in the description; `capturemann --help` marks them `[preview]`.
 - **Long Shot (CAP-6, scrolling capture).** Capture a whole page or window as one picture: Auto scroll (macOS needs Accessibility) or Hand scroll, vertical or horizontal, from the overlay's mode bar, the sidebar tile, the launcher, the menu or a shortcut you set (none by default). A small HUD, a live side preview, a size limit and Esc keep what was captured; fixed headers, footers and toolbars are kept once; a run started by an agent or the CLI shows a passive HUD with Stop. `capturemann long-shot` and the Long Shot tools.
 - **Click Guide (GDE-1 to GDE-4).** Click through a task and CaptureMann writes the steps (a picture with a ring and a numbered badge, an OCR title, notes). It records clicks only, never keystrokes, and in 0.3.4 it does not mark or blur text, so check a guide before sharing it. Start on a display or on a chosen window; a bar with Stop, Pause, Note step and Undo step; edit, reorder, retake; export Markdown, HTML or PDF, or copy as rich text; a new `guide` capture kind in the Library; five tools for agents.

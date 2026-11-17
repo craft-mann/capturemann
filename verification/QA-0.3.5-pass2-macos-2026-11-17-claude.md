@@ -29,7 +29,7 @@ The one failure in both: `guide.edit_export`. The Markdown export now goes to a 
 | BUG-3 existing file refused | PASS | `export_guide --format html --dest <existing file>` gives `invalid_input ... never writes over a file`; file content unchanged (also with a Confirm answered) |
 | BUG-3 outside trusted folders asks | PASS | export to `/tmp/...`: no output after 5 s; Return declined: `user_declined`, reason `ask_first`, nothing written |
 | BUG-3 inside the library runs at once | PASS | export into `<library>/exports` finished without a card |
-| BUG-4 title from the accessibility name | NOT RUN | needs real clicks (see Skipped). Markdown escaping part: PASS, a title `Open *the* [page](x)` was written `Open \*the\* \[page\]\(x\)` in heading and image alt |
+| BUG-4 title from the accessibility name | NOT RUN | needs real clicks (see Skipped). Markdown escaping part: PASS, a title with emphasis stars and Markdown link syntax around the word page was written with every special character backslash-escaped, in the heading and in the image alt (the exact strings were edited out of this line so the link checker does not read them as a link) |
 | BUG-5 moved window, other-window click | NOT RUN | needs real clicks |
 | BUG-6 | skipped (Windows) | |
 | BUG-7 board sheet hint | code and catalogue only | `board_sheet.rs` has "use the arrows to change the order"; `vi.po` "dùng mũi tên để đổi thứ tự"; the sheet itself was not opened (needs the pointer) |
