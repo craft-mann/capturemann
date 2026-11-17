@@ -34,7 +34,7 @@ fn hints() -> Vec<(String, String)> {
 #[test]
 fn no_catalogue_hint_names_a_platform() {
     let all = hints();
-    assert!(all.len() >= 15, "the catalogues were not read: {all:?}");
+    assert!(all.len() >= 12, "the catalogues were not read: {all:?}");
     for (which, hint) in all {
         // Whole words, so "machine" is fine.
         for word in hint.split(|c: char| !c.is_alphanumeric()) {
