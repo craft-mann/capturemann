@@ -4046,6 +4046,9 @@ msgstr ""
 msgid "Phrase to leave out"
 msgstr ""
 
+msgid "Pick 2 to 12 screenshots and put them into one picture: a pair, a grid, a strip or a free layout."
+msgstr ""
+
 msgid "Pick a speed for the selected range."
 msgstr ""
 
@@ -7096,6 +7099,9 @@ msgstr ""
 msgid "Your agent permissions were kept."
 msgstr ""
 
+msgid "Your boards and the screenshots in them are normal screenshots and stay readable."
+msgstr ""
+
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr ""
 
@@ -9420,6 +9426,10 @@ msgstr ""
 
 msgctxt "fallback title"
 msgid "recording"
+msgstr ""
+
+msgctxt "feature name"
+msgid "Boards"
 msgstr ""
 
 msgctxt "field"

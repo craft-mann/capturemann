@@ -81,6 +81,16 @@ pub const FEATURES: &[Feature] = &[
         cli_args: &[],
         tool_params: &[],
     },
+    Feature {
+        id: "boards",
+        name: "Boards",
+        stage: Stage::Preview,
+        // Bulk export is a separate feature and is not marked.
+        tools: &["create_board"],
+        cli_commands: &["board"],
+        cli_args: &[],
+        tool_params: &[],
+    },
 ];
 
 /// The feature with this id.
@@ -120,7 +130,7 @@ mod tests {
             assert!(f.id.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'));
         }
         let ids: Vec<_> = previews().map(|f| f.id).collect();
-        assert_eq!(ids, ["long_shot", "click_guide"]);
+        assert_eq!(ids, ["long_shot", "click_guide", "boards"]);
     }
 
     #[test]
@@ -131,6 +141,9 @@ mod tests {
             }
         }
         assert!(is_preview_tool("start_guide"));
+        assert!(is_preview_tool("create_board"));
+        assert!(!is_preview_tool("export_images"));
+        assert_eq!(feature_of_tool("create_board").unwrap().id, "boards");
         assert!(!is_preview_tool("capture_screenshot"));
         assert_eq!(
             preview_param("capture_screenshot", "mode").unwrap().id,

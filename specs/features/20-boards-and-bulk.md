@@ -8,7 +8,7 @@
 - **WebP** is offered only as lossless and only if it adds no dependency (the `image` crate in the tree writes lossless WebP only); otherwise it waits.
 
 ### BRD-1 Boards (several screenshots in one image)
-**Priority** P1 · **Status** In progress (0.3.4; Track E, Nov 14, 2026: Pair, Grid and Strip, `create_board`, `capturemann board` and the Make a board sheet are built and tested with fakes, the sheet is not seen by eye; Track E2, Nov 14, 2026: the Free drag canvas (move, corner resize, pink snap guides and gap measure; model tested, not seen on a screen), board sizes use a source's cropped size, bulk Delete asks once; `tests/manual/BRD.md`, `cm-regress` case `board.create` passed on macOS) · **Crates** cm-render, cm-library, cm-mcp, apps/desktop
+**Priority** P1 · **Status** In progress (**Preview in 0.3.5** (Nov 17, 2026: the Preview label, popover with Send feedback and first-use intro, `create_board` and `capturemann board` marked in the MCP listing and the CLI help; see AC5); 0.3.4; Track E, Nov 14, 2026: Pair, Grid and Strip, `create_board`, `capturemann board` and the Make a board sheet are built and tested with fakes, the sheet is not seen by eye; Track E2, Nov 14, 2026: the Free drag canvas (move, corner resize, pink snap guides and gap measure; model tested, not seen on a screen), board sizes use a source's cropped size, bulk Delete asks once; `tests/manual/BRD.md`, `cm-regress` case `board.create` passed on macOS) · **Crates** cm-render, cm-library, cm-mcp, apps/desktop
 
 **User story.** As someone presenting a change, I want two or more screenshots side by side with labels, so that I can show before and after, or a short sequence, in one picture.
 
@@ -25,6 +25,7 @@
 - **AC2** A source with a blur. The board shows the blur, and its copy holds no unblurred pixels.
 - **AC3** Deleting a source after Finish leaves the board unchanged.
 - **AC4** (agent) `create_board { capture_ids, layout, options }` → `{ capture_id, image }` (Free; it creates a new capture and changes nothing else).
+- **AC5** (Preview, 0.3.5) Boards is listed in the feature-stage registry (`cm_core::features`, id `boards`, stage Preview) with `create_board` and `board`: the MCP listing marks the tool `(preview)` (`_meta.stage`), the CLI help shows `[preview]`, and the Make a board sheet shows the Preview label, whose popover has a **Send feedback** button (the issue form with feature `Boards`) and whose intro card shows once. Existing boards and screenshots are unchanged; Bulk export is not marked. Moving Boards to stable is one line in the registry.
 
 ### BLK-1 Bulk export
 **Priority** P1 · **Status** In progress (0.3.4; Track E, Nov 14, 2026: `export_images`, `capturemann export-images` and the Export selected sheet are built and tested with fakes, the sheet is not seen by eye; WebP is lossless and adds no crate to `Cargo.lock`; Track E2: the Blueprint step is built (boxes found once per picture, applied as a base edit on the rendered image, the capture unchanged; tested with a scripted recognizer and, as an ignored test, with the real one on a synthetic picture; `cm-regress` case `bulk.export_images` passed on macOS), the switch is enabled and not seen by eye) · **Crates** cm-render, cm-daemon, cm-library, apps/desktop

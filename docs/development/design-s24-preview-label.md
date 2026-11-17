@@ -178,3 +178,6 @@ Text
 English “Preview”; Vietnamese draft “Xem trước”. The label is never truncated; in tight spots the XS tag is used instead of S.
 0.3.4
 Long Shot and Click Guide are Preview. Touch-up, Blueprint, Boards and Bulk export keep “New in 0.3.4”.
+
+0.3.5
+Boards (BRD-1) is Preview too (`PreviewFeature::Boards`, registry id `boards`, `create_board` and `capturemann board`): the M label in the Make a board sheet title (it replaces the old plain “Preview” pill), the popover with Send feedback (feature name “Boards”), and the first-use intro (`ui.preview_intro.boards`). It has no sidebar tile, menu item or launcher command, so no XS tag or menu suffix. Bulk export is not marked.
