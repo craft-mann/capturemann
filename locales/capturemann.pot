@@ -6270,6 +6270,9 @@ msgstr ""
 msgid "The window follows the cursor and only moves when the cursor leaves its middle 80%."
 msgstr ""
 
+msgid "The window moved. The Click Guide is paused."
+msgstr ""
+
 msgid "The window was closed. Everything up to there is kept: 1 frame, {size}."
 msgstr ""
 
@@ -7139,6 +7142,11 @@ msgstr ""
 
 msgid "Your {n} capture ({size}) is copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
 msgid_plural "Your {n} captures ({size}) are copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Your {n} step is kept. Put the window where you want it, then resume."
+msgid_plural "Your {n} steps are kept. Put the window where you want it, then resume."
 msgstr[0] ""
 msgstr[1] ""
 

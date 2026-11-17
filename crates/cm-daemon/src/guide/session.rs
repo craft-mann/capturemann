@@ -20,12 +20,15 @@ use std::time::Duration;
 
 use cm_capture::{CaptureRequest, CaptureTarget, Capturer, Frame};
 use cm_core::{Actor, CmError, PhysicalPoint, PhysicalRect, PhysicalSize};
-use cm_library::guide::{ClickPoint, GuideBundle, MAX_STEPS, TITLE_FROM_SCREEN, TITLE_GENERIC};
+use cm_library::guide::{
+    ClickPoint, GuideBundle, MAX_STEPS, TITLE_ACCESSIBLE, TITLE_FROM_SCREEN, TITLE_GENERIC,
+};
 use cm_render::ocr::{TextLine, TextRecognizer};
 use image::RgbaImage;
 use serde_json::{json, Value};
 use tokio::sync::Notify;
 
+use super::access::{clean_name, AccessibleNames};
 use super::clicks::{GuideClicks, LocalClick};
 use super::titles::{self, compose, nearest_label};
 use super::{guide_json, NoteArgs, SetArgs};
@@ -108,6 +111,8 @@ enum Job {
         png: Encoded,
         click: ClickPoint,
         title_input: Option<TitleInput>,
+        /// The accessibility name of the clicked control (BUG-4), already cleaned.
+        ax_name: Option<String>,
     },
     /// The same spot was clicked again: the newest step becomes a double click.
     Double,
@@ -137,6 +142,8 @@ struct Active {
 /// The one running Click Guide, the click source and the HUD exclusion rectangles.
 pub(crate) struct GuideRuntime {
     pub(crate) clicks: Arc<dyn GuideClicks>,
+    /// The accessibility service steps are named from (BUG-4).
+    pub(crate) names: Arc<dyn AccessibleNames>,
     active: Mutex<Option<Active>>,
     /// Rectangles of CaptureMann's own HUD windows in the OS's global space `[x, y, w, h]`: a
     /// click inside one is never a step (GDE-1.AC2).
@@ -144,9 +151,10 @@ pub(crate) struct GuideRuntime {
 }
 
 impl GuideRuntime {
-    pub(crate) fn new(clicks: Arc<dyn GuideClicks>) -> Self {
+    pub(crate) fn new(clicks: Arc<dyn GuideClicks>, names: Arc<dyn AccessibleNames>) -> Self {
         GuideRuntime {
             clicks,
+            names,
             active: Mutex::new(None),
             exclusions: Arc::default(),
         }
@@ -191,26 +199,77 @@ struct SinkState {
     /// Names steps from the text next to the click (`guide.titles_from_screen`, and a reader).
     titles: bool,
     encoders: Encoders,
-    /// The followed window as it was when the guide started (see [`WindowFollow`]).
+    /// The followed window (see [`WindowFollow`]).
     follow: Option<WindowFollow>,
+    /// Names steps from the clicked control's accessibility name (BUG-4); `None` when the person
+    /// turned screen titles off (`guide.titles_from_screen`).
+    names: Option<Arc<dyn AccessibleNames>>,
+    /// Steps taken so far (for the notice of a pause).
+    steps: Arc<AtomicUsize>,
 }
 
-/// A guide of one window maps every click with the rectangle the window had when the guide
-/// started. The window can be moved or resized since (the window is the thing being shown, so
-/// people do), and the ring would land where the window used to be: so each click reads the
-/// window's rectangle again and moves the click by how far the window's corner went (QA macOS
-/// pass 7).
-struct WindowFollow {
+/// The rectangle of the followed window `[x, y, w, h]` in physical px, as the desktop lists it.
+pub(crate) type WindowRect = [i32; 4];
+
+fn rect_of(w: &cm_capture::WindowInfo) -> WindowRect {
+    [
+        w.bounds.origin.x,
+        w.bounds.origin.y,
+        i32::try_from(w.bounds.size.width).unwrap_or(i32::MAX),
+        i32::try_from(w.bounds.size.height).unwrap_or(i32::MAX),
+    ]
+}
+
+/// A guide of one window reads the window's rectangle again at every click (BUG-5). A click is
+/// mapped with the rectangle the window had when the guide started, so when the window was
+/// moved or resized since the last click the ring and the title would be wrong: the guide
+/// pauses with a notice instead, and the person resumes it when ready. A click that lands on
+/// another window (one that covers the followed window, or lies elsewhere) is not a step.
+pub(crate) struct WindowFollow {
     window_id: u32,
+    /// The window's corner when the guide started: the click listener maps with it, so the
+    /// click's global physical position is this plus the click's own pixels.
     origin: (i32, i32),
+    /// The rectangle at the last click (or, while the guide is paused, at the last look of the
+    /// window watch, so a window moved on purpose while paused does not pause the guide again).
+    rect: Arc<Mutex<WindowRect>>,
+}
+
+/// What a click on a followed window is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Follow {
+    /// A step at this point, in the window's own pixels.
+    At(f64, f64),
+    /// Not a step: outside the window, or on another window.
+    Ignore,
+    /// The window moved or was resized since the last click: pause, record nothing.
+    Moved { from: WindowRect, to: WindowRect },
+}
+
+/// The window at a global physical point: the first, front to back, that is not minimized and
+/// holds the point.
+fn window_at(
+    windows: &[cm_capture::WindowInfo],
+    x: f64,
+    y: f64,
+) -> Option<&cm_capture::WindowInfo> {
+    windows.iter().find(|w| {
+        let [rx, ry, rw, rh] = rect_of(w).map(f64::from);
+        !w.minimized && x >= rx && y >= ry && x < rx + rw && y < ry + rh
+    })
 }
 
 impl SinkState {
-    /// The click as the window is now: `Some((x, y))` in the window's own pixels, `None` when
-    /// the click is outside it. A listing that fails or no longer shows the window leaves the
-    /// click as it was mapped.
-    fn follow_window(&self, c: &LocalClick) -> Option<(f64, f64)> {
-        let as_mapped = || (!c.outside).then_some((c.x, c.y));
+    /// What the click is, with the window as it is now. A listing that fails or no longer shows
+    /// the window leaves the click as the listener mapped it (the watch pauses a closed window).
+    fn follow_window(&self, c: &LocalClick) -> Follow {
+        let as_mapped = || {
+            if c.outside {
+                Follow::Ignore
+            } else {
+                Follow::At(c.x, c.y)
+            }
+        };
         let Some(f) = &self.follow else {
             return as_mapped();
         };
@@ -220,13 +279,37 @@ impl SinkState {
         let Some(w) = t.windows.iter().find(|w| w.id == f.window_id) else {
             return as_mapped();
         };
-        let x = c.x - f64::from(w.bounds.origin.x - f.origin.0);
-        let y = c.y - f64::from(w.bounds.origin.y - f.origin.1);
-        let inside = x >= 0.0
-            && y >= 0.0
-            && x < f64::from(w.bounds.size.width)
-            && y < f64::from(w.bounds.size.height);
-        inside.then_some((x, y))
+        let (px, py) = (f64::from(f.origin.0) + c.x, f64::from(f.origin.1) + c.y);
+        if window_at(&t.windows, px, py).is_none_or(|top| top.id != f.window_id) {
+            return Follow::Ignore;
+        }
+        let now = rect_of(w);
+        let mut last = f.rect.lock().unwrap_or_else(PoisonError::into_inner);
+        if *last != now {
+            let from = std::mem::replace(&mut *last, now);
+            return Follow::Moved { from, to: now };
+        }
+        // The window holds the point (checked above), whatever the listener's `outside` says
+        // after a window moved. The listener maps with the rectangle of the start; after a pause that took the window
+        // somewhere else the baseline is the new place, so the click moves by the difference.
+        Follow::At(
+            c.x - f64::from(now[0] - f.origin.0),
+            c.y - f64::from(now[1] - f.origin.1),
+        )
+    }
+
+    /// The followed window moved: pause and say so (the guide keeps its steps; resuming works).
+    fn window_moved(&self, from: WindowRect, to: WindowRect) {
+        self.paused.store(true, Ordering::SeqCst);
+        self.events.publish(
+            "guide.window_moved",
+            json!({ "guide_id": self.guide_id,
+                    "window_id": self.follow.as_ref().map(|f| f.window_id),
+                    "step_count": self.steps.load(Ordering::SeqCst),
+                    "from": from, "to": to }),
+        );
+        self.events
+            .publish("guide.paused", json!({ "guide_id": self.guide_id }));
     }
 
     /// The part of `frame` around the click that the text reader gets.
@@ -270,10 +353,14 @@ impl SinkState {
         if self.paused.load(Ordering::Relaxed) || self.excluded(c.gx, c.gy) {
             return;
         }
-        let Some((x, y)) = self.follow_window(&c) else {
-            return;
-        };
-        (c.x, c.y) = (x, y);
+        match self.follow_window(&c) {
+            Follow::Ignore => return,
+            Follow::Moved { from, to } => {
+                self.window_moved(from, to);
+                return;
+            }
+            Follow::At(x, y) => (c.x, c.y) = (x, y),
+        }
         if let Some((t, x, y, button, double)) = &mut self.last {
             let near = (c.x - *x).hypot(c.y - *y) <= DOUBLE_CLICK_PX;
             if !*double
@@ -313,6 +400,14 @@ impl SinkState {
         };
         self.last = Some((c.host_ns, c.x, c.y, c.button.clone(), false));
         let title_input = self.title_input(&frame, (c.x, c.y));
+        // What the clicked control is called, from the system and not from the screen (BUG-4).
+        let ax_name = self
+            .names
+            .as_ref()
+            .and_then(|n| n.name_at(c.gx, c.gy))
+            .and_then(|n| clean_name(&n));
+        // Named by the control: the text around it is not read at all.
+        let title_input = if ax_name.is_some() { None } else { title_input };
         let Some(png) = self.encoders.encode(frame) else {
             return;
         };
@@ -320,6 +415,7 @@ impl SinkState {
         let _ = self.tx.send(Job::Step {
             png,
             title_input,
+            ax_name,
             click: ClickPoint {
                 x: c.x,
                 y: c.y,
@@ -414,6 +510,8 @@ struct Worker {
     titler: Option<Titler>,
     /// The newest image step and the label read for it (a double click rewrites its title).
     last: Option<(String, Option<String>)>,
+    /// The newest step was named by the control's accessibility name.
+    last_ax: bool,
     /// Frames waiting in the channel (see [`MAX_PENDING_FRAMES`]).
     pending: Arc<AtomicUsize>,
     /// Shared with the click filter: set when the guide is full, so no click is a step any more.
@@ -431,20 +529,25 @@ impl Worker {
         png: Encoded,
         click: ClickPoint,
         title_input: Option<TitleInput>,
+        ax_name: Option<String>,
     ) -> Result<(), CmError> {
         let png = png
             .recv()
             .map_err(|_| CmError::internal("the picture of a step was lost"))??;
-        let title = compose(&click.button, 1, None);
+        let (title, source) = match &ax_name {
+            Some(n) => (compose(&click.button, 1, Some(n)), TITLE_ACCESSIBLE),
+            None => (compose(&click.button, 1, None), TITLE_GENERIC),
+        };
         let step = self.guide.add_click_step_titled(
             &png,
             click.clone(),
             &title,
-            Some(TITLE_GENERIC),
+            Some(source),
             &self.by,
             self.clock.now(),
         )?;
-        self.last = Some((step.id.clone(), None));
+        self.last_ax = ax_name.is_some();
+        self.last = Some((step.id.clone(), ax_name));
         if let (Some(t), Some(input)) = (&self.titler, title_input) {
             t.submit(TitleWork {
                 step_id: step.id.clone(),
@@ -522,7 +625,9 @@ impl Worker {
             return Ok(());
         };
         let title = compose(&click.button, 2, label.as_deref());
-        let source = if label.is_some() {
+        let source = if self.last_ax {
+            TITLE_ACCESSIBLE
+        } else if label.is_some() {
             TITLE_FROM_SCREEN
         } else {
             TITLE_GENERIC
@@ -559,13 +664,14 @@ impl Worker {
                     png,
                     click,
                     title_input,
+                    ax_name,
                 } => {
                     self.pending.fetch_sub(1, Ordering::SeqCst);
                     // The guide is full: what is still queued is dropped (and freed) unread.
                     if self.full {
                         continue;
                     }
-                    if let Err(e) = self.step(png, click, title_input) {
+                    if let Err(e) = self.step(png, click, title_input, ax_name) {
                         self.events.publish(
                             "guide.error",
                             json!({ "guide_id": self.guide_id, "message": e.to_string() }),
@@ -684,6 +790,9 @@ struct WindowWatch {
     /// Set by `stop_guide`: the watch ends.
     cancelled: Arc<AtomicBool>,
     steps: Arc<AtomicUsize>,
+    /// The sink's baseline rectangle: kept current while the guide is paused (BUG-5), so a
+    /// window moved on purpose during a pause does not pause the guide again at the next click.
+    rect: Arc<Mutex<WindowRect>>,
 }
 
 impl WindowWatch {
@@ -699,8 +808,11 @@ impl WindowWatch {
             let Ok(targets) = blocking(move || c.list_targets_with(true)).await else {
                 continue;
             };
-            if targets.windows.iter().any(|w| w.id == self.window_id) {
+            if let Some(w) = targets.windows.iter().find(|w| w.id == self.window_id) {
                 misses = 0;
+                if self.paused.load(Ordering::SeqCst) {
+                    *self.rect.lock().unwrap_or_else(PoisonError::into_inner) = rect_of(w);
+                }
                 continue;
             }
             misses += 1;
@@ -791,6 +903,13 @@ impl Inner {
                 .all()
                 .map(|m| titles::titles_from_screen(&m))
                 .unwrap_or(true);
+        // The accessibility name of the clicked control is no screen text, but the same switch
+        // stands for "name my steps from what is around the click": off means `Click here`.
+        let names_on = self
+            .settings
+            .all()
+            .map(|m| titles::titles_from_screen(&m))
+            .unwrap_or(true);
         let (library, t) = (self.library.clone(), title.clone());
         let target_json = serde_json::to_value(target).unwrap_or(Value::Null);
         let (guide_id, dir) = {
@@ -825,6 +944,7 @@ impl Inner {
                 steps: steps.clone(),
                 guide_id: id.clone(),
                 last: None,
+                last_ax: false,
                 pending: pending.clone(),
                 paused: paused.clone(),
                 limit: limit.clone(),
@@ -891,8 +1011,30 @@ impl Inner {
         let Some((paused, tx, listening, window_closed, steps, pending)) = started else {
             return Ok(json!({ "guide_id": guide_id, "state": "cancelled", "step_count": 0 }));
         };
-        let watch = match capture_target {
-            CaptureTarget::Window { window_id } => Some(WindowWatch {
+        // The window may have been moved during the countdown: the rectangle the listener maps
+        // with, and the baseline of BUG-5, are the ones of this moment.
+        let targets = if matches!(capture_target, CaptureTarget::Window { .. }) {
+            let c = capturer.clone();
+            blocking(move || c.list_targets_with(true))
+                .await
+                .unwrap_or(targets)
+        } else {
+            targets
+        };
+        let follow = match capture_target {
+            CaptureTarget::Window { window_id } => targets
+                .windows
+                .iter()
+                .find(|w| w.id == window_id)
+                .map(|w| WindowFollow {
+                    window_id,
+                    origin: (w.bounds.origin.x, w.bounds.origin.y),
+                    rect: Arc::new(Mutex::new(rect_of(w))),
+                }),
+            _ => None,
+        };
+        let watch = match (capture_target, &follow) {
+            (CaptureTarget::Window { window_id }, Some(f)) => Some(WindowWatch {
                 window_id,
                 capturer: capturer.clone(),
                 events: self.events.clone(),
@@ -900,7 +1042,19 @@ impl Inner {
                 paused: paused.clone(),
                 closed: window_closed,
                 cancelled: cancelled.clone(),
-                steps,
+                steps: steps.clone(),
+                rect: f.rect.clone(),
+            }),
+            (CaptureTarget::Window { window_id }, None) => Some(WindowWatch {
+                window_id,
+                capturer: capturer.clone(),
+                events: self.events.clone(),
+                guide_id: guide_id.clone(),
+                paused: paused.clone(),
+                closed: window_closed,
+                cancelled: cancelled.clone(),
+                steps: steps.clone(),
+                rect: Arc::default(),
             }),
             _ => None,
         };
@@ -917,17 +1071,9 @@ impl Inner {
             last: None,
             titles: titles_on,
             encoders: Encoders::start(),
-            follow: match capture_target {
-                CaptureTarget::Window { window_id } => targets
-                    .windows
-                    .iter()
-                    .find(|w| w.id == window_id)
-                    .map(|w| WindowFollow {
-                        window_id,
-                        origin: (w.bounds.origin.x, w.bounds.origin.y),
-                    }),
-                _ => None,
-            },
+            follow,
+            names: names_on.then(|| self.guide.names.clone()),
+            steps,
         };
         let res = self.guide.clicks.start(
             &capture_target,

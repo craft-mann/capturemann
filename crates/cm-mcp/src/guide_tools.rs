@@ -38,7 +38,7 @@ fn guide_output() -> Value {
             "label": { "type": "string", "description": "The badge text in the guide's numbering style (1, A, a)." },
             "type": { "type": "string", "enum": ["image", "note"] },
             "title": { "type": "string" },
-            "title_source": { "type": "string", "enum": ["screen_text", "generic"], "description": "Only on a title CaptureMann drafted: `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`." },
+            "title_source": { "type": "string", "enum": ["accessibility", "screen_text", "generic"], "description": "Only on a title CaptureMann drafted: `accessibility` (the accessibility name of the clicked control, when the system gives one), `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`." },
             "note": { "type": "string" },
             "image_id": { "type": "string", "description": "The step's screenshot as a capture id (`<guide_id>/<step_id>`): `annotate`, `get_capture`, `suggest_redactions`, `recognize_text` and `undo` take it. Absent for a note step." },
             "click": click_schema(),

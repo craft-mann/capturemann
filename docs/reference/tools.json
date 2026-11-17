@@ -9772,10 +9772,11 @@
                 "title_source": {
                   "type": "string",
                   "enum": [
+                    "accessibility",
                     "screen_text",
                     "generic"
                   ],
-                  "description": "Only on a title CaptureMann drafted: `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
+                  "description": "Only on a title CaptureMann drafted: `accessibility` (the accessibility name of the clicked control, when the system gives one), `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
                 },
                 "note": {
                   "type": "string"
@@ -9944,10 +9945,11 @@
                 "title_source": {
                   "type": "string",
                   "enum": [
+                    "accessibility",
                     "screen_text",
                     "generic"
                   ],
-                  "description": "Only on a title CaptureMann drafted: `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
+                  "description": "Only on a title CaptureMann drafted: `accessibility` (the accessibility name of the clicked control, when the system gives one), `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
                 },
                 "note": {
                   "type": "string"
@@ -10110,10 +10112,11 @@
                 "title_source": {
                   "type": "string",
                   "enum": [
+                    "accessibility",
                     "screen_text",
                     "generic"
                   ],
-                  "description": "Only on a title CaptureMann drafted: `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
+                  "description": "Only on a title CaptureMann drafted: `accessibility` (the accessibility name of the clicked control, when the system gives one), `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
                 },
                 "note": {
                   "type": "string"
@@ -10353,10 +10356,11 @@
                 "title_source": {
                   "type": "string",
                   "enum": [
+                    "accessibility",
                     "screen_text",
                     "generic"
                   ],
-                  "description": "Only on a title CaptureMann drafted: `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
+                  "description": "Only on a title CaptureMann drafted: `accessibility` (the accessibility name of the clicked control, when the system gives one), `screen_text` (named from the text recognized next to the click, used only when it looks like a control's label) or `generic` (`Click here`). Absent once a person or an agent wrote the title: rewrite drafts from the step's picture with `set_guide`. The user can turn screen text out of titles with the setting `guide.titles_from_screen`."
                 },
                 "note": {
                   "type": "string"

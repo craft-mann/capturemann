@@ -12005,3 +12005,12 @@ msgstr "{title}, bản xem trước"
 msgctxt "preview label"
 msgid "Preview"
 msgstr "Xem trước"
+
+#, fuzzy
+msgid "The window moved. The Click Guide is paused."
+msgstr "Cửa sổ đã bị di chuyển. Hướng dẫn thao tác đã tạm dừng."
+
+#, fuzzy
+msgid "Your {n} step is kept. Put the window where you want it, then resume."
+msgid_plural "Your {n} steps are kept. Put the window where you want it, then resume."
+msgstr[0] "{n} bước của bạn vẫn được giữ. Đặt cửa sổ về vị trí mong muốn rồi tiếp tục."

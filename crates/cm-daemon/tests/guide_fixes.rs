@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use cm_capture::fake::FakeBackend;
 use cm_capture::{CaptureBackend, Capturer, DisplayInfo, Frame, WindowInfo};
 use cm_core::CmError;
-use cm_daemon::guide::ScriptedClicks;
+use cm_daemon::guide::{ScriptedClicks, ScriptedNames};
 use cm_daemon::testing::FixedConfirmer;
 use cm_daemon::{Daemon, DaemonBuilder, Decision};
 use cm_render::ocr::{TextLine, TextRecognizer};
@@ -32,6 +32,16 @@ struct Wrap {
     inner: FakeBackend,
     noise: Option<Frame>,
     window_shift: Arc<Mutex<(i32, i32)>>,
+    desk: Arc<Mutex<Desk>>,
+}
+
+/// What a test does to the desktop besides moving windows (BUG-5).
+#[derive(Default)]
+struct Desk {
+    /// Added to every window's width and height.
+    grow: (i32, i32),
+    /// A window of another application in front of all others: `(x, y, w, h)`.
+    cover: Option<(i32, i32, u32, u32)>,
 }
 
 impl CaptureBackend for Wrap {
@@ -44,9 +54,24 @@ impl CaptureBackend for Wrap {
     fn windows(&self) -> Result<Vec<WindowInfo>, CmError> {
         let (dx, dy) = *self.window_shift.lock().unwrap();
         let mut w = self.inner.windows()?;
+        let desk = self.desk.lock().unwrap();
         for x in &mut w {
             x.bounds.origin.x += dx;
             x.bounds.origin.y += dy;
+            x.bounds.size.width = x.bounds.size.width.saturating_add_signed(desk.grow.0);
+            x.bounds.size.height = x.bounds.size.height.saturating_add_signed(desk.grow.1);
+        }
+        if let (Some((cx, cy, cw, ch)), Some(first)) = (desk.cover, w.first().cloned()) {
+            let mut c = first;
+            c.id = 11;
+            c.title = "Cover".into();
+            c.app = "Other".into();
+            c.pid = 101;
+            c.bounds.origin.x = cx;
+            c.bounds.origin.y = cy;
+            c.bounds.size.width = cw;
+            c.bounds.size.height = ch;
+            w.insert(0, c);
         }
         Ok(w)
     }
@@ -125,6 +150,7 @@ struct Rig {
     daemon: Daemon,
     clicks: ScriptedClicks,
     shift: Arc<Mutex<(i32, i32)>>,
+    desk: Arc<Mutex<Desk>>,
     confirmer: Arc<FixedConfirmer>,
     dir: tempfile::TempDir,
 }
@@ -135,6 +161,17 @@ fn rig_with(
     settings: Option<serde_json::Map<String, Value>>,
     decision: Decision,
 ) -> Rig {
+    rig_named(noise, reader, settings, decision, ScriptedNames::new())
+}
+
+fn rig_named(
+    noise: Option<(u32, u32)>,
+    reader: Reader,
+    settings: Option<serde_json::Map<String, Value>>,
+    decision: Decision,
+    names: ScriptedNames,
+) -> Rig {
+    let desk = Arc::new(Mutex::new(Desk::default()));
     let shift = Arc::new(Mutex::new((0, 0)));
     let (w, h) = noise.unwrap_or((400, 300));
     let inner = FakeBackend::new()
@@ -144,6 +181,7 @@ fn rig_with(
         inner,
         noise: noise.map(|(w, h)| noise_frame(w, h)),
         window_shift: shift.clone(),
+        desk: desk.clone(),
     };
     let dir = tempfile::tempdir().unwrap();
     let lib = cm_library::Library::open_or_create(dir.path()).unwrap();
@@ -151,6 +189,7 @@ fn rig_with(
     let confirmer = Arc::new(FixedConfirmer::new(decision));
     let mut b: DaemonBuilder = Daemon::builder(Capturer::new(backend).with_own_pid(None), lib)
         .guide_clicks(clicks.clone())
+        .guide_names(names)
         .text_recognizer(reader)
         .confirmer(confirmer.clone());
     if let Some(s) = settings {
@@ -160,6 +199,7 @@ fn rig_with(
         daemon: b.build(),
         clicks,
         shift,
+        desk,
         confirmer,
         dir,
     }
@@ -231,21 +271,138 @@ async fn cg_a_burst_of_ten_clicks_a_second_keeps_most() {
     assert!(kept >= 24, "only {kept} of 60 clicks were kept");
 }
 
-/// A followed window that was moved after the guide started: the click is mapped to where the
-/// window is now, not where it was (QA macOS pass 7).
+/// The followed window of a guide on window 10: it lies at (20, 10) and is 100 x 80. A click
+/// at window pixel (x, y) is the global point (20 + x, 10 + y).
+async fn window_guide(c: &mut Client) -> String {
+    start_target(c, json!({"window_id": 10})).await
+}
+
+async fn state_of(c: &mut Client, id: &str) -> Value {
+    ok(&c.call("get_guide", json!({"guide_id": id})).await).clone()
+}
+
+/// BUG-5: the window's rectangle is read again at every click. A window that was moved since the
+/// last click pauses the guide with a notice, and the click is no step (before: the click was
+/// shifted and recorded, which titled a step Export after a click on Save).
 #[tokio::test]
-async fn cg_a_moved_window_still_gets_the_ring_on_the_clicked_place() {
+async fn bug_5_a_moved_window_pauses_the_guide_and_the_click_is_no_step() {
     let r = rig_with(None, plain_reader(), None, Decision::Approve);
     let mut c = Client::connect(&r.daemon, "agent");
-    let id = start_target(&mut c, json!({"window_id": 10})).await;
-    // The window moves 50 right and 40 down; the click was on its button at (30, 28), which the
-    // OS mapped with the rectangle of the start.
+    ok(&c
+        .call("events.subscribe", json!({"topics": ["guide.*"]}))
+        .await);
+    let id = window_guide(&mut c).await;
+    // One click on the window as it is: a step.
+    r.clicks.click(30.0, 28.0);
+    for _ in 0..100 {
+        if state_of(&mut c, &id).await["recorded_steps"] == 1 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    // The window moves 50 right and 40 down; the person clicks inside it, which the listener
+    // maps with the rectangle of the start: (60, 50) is the global point (80, 60).
     *r.shift.lock().unwrap() = (50, 40);
-    r.clicks.click(30.0 + 50.0, 28.0 + 40.0);
+    r.clicks.click(60.0, 50.0);
+    let g = state_of(&mut c, &id).await;
+    assert_eq!(g["state"], "paused", "{g}");
+    let moved = c
+        .events
+        .iter()
+        .find(|e| e["event"] == "guide.window_moved")
+        .map(|e| e["data"].clone())
+        .expect("a notice that the window moved");
+    assert_eq!(moved["guide_id"], id.as_str());
+    assert_eq!(moved["window_id"], 10);
+    assert_eq!(moved["step_count"], 1);
+    assert_eq!(moved["from"], json!([20, 10, 100, 80]));
+    assert_eq!(moved["to"], json!([70, 50, 100, 80]));
     let done = c.call("stop_guide", json!({"guide_id": id})).await;
-    let s = &ok(&done)["steps"][0];
-    assert_eq!(s["click"]["x"].as_f64(), Some(30.0), "{s}");
-    assert_eq!(s["click"]["y"].as_f64(), Some(28.0), "{s}");
+    assert_eq!(
+        ok(&done)["step_count"],
+        1,
+        "the click after the move is no step"
+    );
+}
+
+/// BUG-5: a window that was resized is as wrong as one that was moved.
+#[tokio::test]
+async fn bug_5_a_resized_window_pauses_the_guide() {
+    let r = rig_with(None, plain_reader(), None, Decision::Approve);
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = window_guide(&mut c).await;
+    r.desk.lock().unwrap().grow = (30, 0);
+    r.clicks.click(30.0, 28.0);
+    assert_eq!(state_of(&mut c, &id).await["state"], "paused");
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    assert_eq!(ok(&done)["step_count"], 0);
+}
+
+/// BUG-5: after the notice the guide resumes on the window where it is now: the click is a step
+/// and its ring is on the clicked place of the moved window; a window that is not moved again
+/// does not pause the guide again.
+#[tokio::test]
+async fn bug_5_after_resuming_the_next_click_is_mapped_to_the_window_where_it_is() {
+    let r = rig_with(None, plain_reader(), None, Decision::Approve);
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = window_guide(&mut c).await;
+    *r.shift.lock().unwrap() = (50, 40);
+    r.clicks.click(60.0, 50.0);
+    assert_eq!(state_of(&mut c, &id).await["state"], "paused");
+    ok(&c
+        .call("set_guide", json!({"guide_id": id, "paused": false}))
+        .await);
+    // The window now lies at (70, 50): the global point (80, 60) is its pixel (10, 10).
+    r.clicks.click(60.0, 50.0);
+    r.clicks.click(61.0, 51.0);
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    let steps = ok(&done)["steps"].as_array().unwrap().clone();
+    assert_eq!(steps.len(), 2, "{steps:?}");
+    assert_eq!(steps[0]["click"]["x"].as_f64(), Some(10.0));
+    assert_eq!(steps[0]["click"]["y"].as_f64(), Some(10.0));
+}
+
+/// BUG-5: a window moved on purpose while the guide is paused does not pause it again at the
+/// next click (the window watch keeps the baseline current while paused).
+#[tokio::test]
+async fn bug_5_a_window_moved_while_paused_is_not_a_second_pause() {
+    let r = rig_with(None, plain_reader(), None, Decision::Approve);
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = window_guide(&mut c).await;
+    ok(&c
+        .call("set_guide", json!({"guide_id": id, "paused": true}))
+        .await);
+    *r.shift.lock().unwrap() = (50, 40);
+    // The watch looks every 500 ms.
+    tokio::time::sleep(Duration::from_millis(1300)).await;
+    ok(&c
+        .call("set_guide", json!({"guide_id": id, "paused": false}))
+        .await);
+    r.clicks.click(60.0, 50.0);
+    let g = state_of(&mut c, &id).await;
+    assert_eq!(g["state"], "recording", "{g}");
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    assert_eq!(ok(&done)["step_count"], 1);
+}
+
+/// BUG-5: a click that lands on a window covering the followed one is ignored; the guide goes on
+/// (before: it became a step of the guided window).
+#[tokio::test]
+async fn bug_5_a_click_on_another_window_is_ignored() {
+    let r = rig_with(None, plain_reader(), None, Decision::Approve);
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = window_guide(&mut c).await;
+    // Another application's window in front, over the right part of the followed window.
+    r.desk.lock().unwrap().cover = Some((60, 30, 100, 80));
+    // Window pixel (50, 40) is the global point (70, 50), under the cover: ignored.
+    r.clicks.click(50.0, 40.0);
+    assert_eq!(state_of(&mut c, &id).await["state"], "recording");
+    // Window pixel (10, 10) is (30, 20), the part nothing covers: a step.
+    r.clicks.click(10.0, 10.0);
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    let d = ok(&done);
+    assert_eq!(d["step_count"], 1, "{d}");
+    assert_eq!(d["steps"][0]["click"]["x"].as_f64(), Some(10.0));
 }
 
 fn line_near_click(t: &str) -> Vec<TextLine> {
@@ -339,6 +496,7 @@ async fn cg_a_stalled_text_reader_does_not_stop_the_steps() {
         inner: FakeBackend::new().with_display(1, 0, 0, 400, 300, 2.0),
         noise: None,
         window_shift: shift,
+        desk: Arc::default(),
     };
     let dir = tempfile::tempdir().unwrap();
     let lib = cm_library::Library::open_or_create(dir.path()).unwrap();
@@ -503,4 +661,104 @@ async fn cg_the_ask_first_dialog_names_the_target_in_words() {
             shown[0]
         );
     }
+}
+
+// ---- BUG-4: the accessibility name of the clicked control ----------------------------------------
+
+fn named_rig(names: ScriptedNames, text: &str, calls: Arc<AtomicU64>) -> Rig {
+    let reader = Reader {
+        ms: 0,
+        lines: line_near_click(text),
+        calls,
+    };
+    rig_named(None, reader, None, Decision::Approve, names)
+}
+
+/// BUG-4 (GDE-1): a control with an accessibility name is named by it, whatever text is near it
+/// (before: the nearest text, here a person's name, became the title); the screen is not read
+/// for that step, and the step says where its title came from.
+#[tokio::test]
+async fn bug_4_an_accessibility_name_names_the_step_not_the_nearest_text() {
+    let calls = Arc::new(AtomicU64::new(0));
+    // The button (global x 20..60, y 20..40) is called Save; the text next to it is a name.
+    let names = ScriptedNames::new().with(20.0, 20.0, 40.0, 20.0, "Save");
+    let r = named_rig(names.clone(), "Jane Doe", calls.clone());
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = start_target(&mut c, json!({"display_id": 1})).await;
+    let done = click_and_stop(&r, &mut c, &id, 1).await;
+    let s = &done["steps"][0];
+    assert_eq!(s["title"], "Click \"Save\"", "{s}");
+    assert_eq!(s["title_source"], "accessibility", "{s}");
+    assert_eq!(calls.load(Ordering::SeqCst), 0, "the screen was read");
+    assert_eq!(names.asked(), 1);
+}
+
+/// BUG-4: with no accessibility name the title is built exactly as before, from the nearest text.
+#[tokio::test]
+async fn bug_4_a_control_with_no_name_is_titled_from_the_screen_text_as_before() {
+    let names = ScriptedNames::new().with(300.0, 200.0, 10.0, 10.0, "Elsewhere");
+    let r = named_rig(names.clone(), "Cancel", Arc::default());
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = start_target(&mut c, json!({"display_id": 1})).await;
+    let done = click_and_stop(&r, &mut c, &id, 1).await;
+    let s = &done["steps"][0];
+    assert_eq!(s["title"], "Click \"Cancel\"", "{s}");
+    assert_eq!(s["title_source"], "screen_text", "{s}");
+    assert_eq!(names.asked(), 1);
+}
+
+/// BUG-4: the verb and the 40-character limit of titles hold for a name; a quote in it cannot
+/// end the label; a double click keeps the name.
+#[tokio::test]
+async fn bug_4_names_keep_the_title_pattern_the_limit_and_double_clicks() {
+    let long = "Save the whole document and close it for good, \"now\"";
+    let names = ScriptedNames::new().with(0.0, 0.0, 400.0, 300.0, long);
+    let r = named_rig(names, "Cancel", Arc::default());
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = start_target(&mut c, json!({"display_id": 1})).await;
+    // A right click, then a double click somewhere else.
+    r.clicks
+        .click_at(20.0, 28.0, 20.0, 28.0, false, "right", 1_000_000_000);
+    r.clicks
+        .click_at(200.0, 100.0, 200.0, 100.0, false, "left", 1_000_000_000);
+    r.clicks
+        .click_at(200.0, 100.0, 200.0, 100.0, false, "left", 100_000_000);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let done = ok(&c.call("stop_guide", json!({"guide_id": id})).await).clone();
+    let steps = done["steps"].as_array().unwrap();
+    assert_eq!(steps.len(), 2, "{done}");
+    let label = |t: &str| {
+        let q = t.find('"').unwrap();
+        t[q + 1..t.len() - 1].to_owned()
+    };
+    let right = steps[0]["title"].as_str().unwrap();
+    assert!(right.starts_with("Right-click \""), "{right}");
+    assert!(label(right).chars().count() <= 40, "{right}");
+    assert!(!label(right).contains('"'), "{right}");
+    let double = steps[1]["title"].as_str().unwrap();
+    assert!(double.starts_with("Double-click \""), "{double}");
+    assert_eq!(steps[1]["title_source"], "accessibility");
+}
+
+/// BUG-4: `guide.titles_from_screen` off means `Click here` and no question to the system either.
+#[tokio::test]
+async fn bug_4_with_screen_titles_off_the_accessibility_service_is_not_asked() {
+    let names = ScriptedNames::new().with(0.0, 0.0, 400.0, 300.0, "Save");
+    let mut settings = serde_json::Map::new();
+    settings.insert("guide.titles_from_screen".into(), json!(false));
+    let r = rig_named(
+        None,
+        plain_reader(),
+        Some(settings),
+        Decision::Approve,
+        names.clone(),
+    );
+    let mut c = Client::connect(&r.daemon, "agent");
+    let id = start_target(&mut c, json!({"display_id": 1})).await;
+    let done = click_and_stop(&r, &mut c, &id, 2).await;
+    for s in done["steps"].as_array().unwrap() {
+        assert_eq!(s["title"], "Click here");
+        assert_eq!(s["title_source"], "generic");
+    }
+    assert_eq!(names.asked(), 0);
 }
