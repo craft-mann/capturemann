@@ -419,7 +419,7 @@ pub fn on_event(app: &Entity<AppModel>, name: &str, data: &Value, cx: &mut App) 
             // CG-2: a guide this app did not start (an agent, the CLI) gets a passive bar too,
             // so a person can always see it and stop it. The app's own start opened its bar
             // before the daemon answered, so a bar that is already open is left alone.
-            if !is_running(cx) && !guide_id.is_empty() {
+            if passive_for(is_running(cx), &guide_id, &by).is_some() {
                 open_passive(app, guide_id, &by, cx);
             }
         }
@@ -442,6 +442,13 @@ fn passive_client(by: &str) -> Option<String> {
         .map(str::trim)
         .filter(|c| !c.is_empty())
         .map(str::to_owned)
+}
+
+/// Whether a `guide.started` event asks for the passive bar (BUG-1): when no bar is open (the
+/// app's own start opened its bar before the daemon answered) and the event names a guide. The
+/// value is the client to name (`None` inside: say "an agent or the command line").
+fn passive_for(bar_open: bool, guide_id: &str, by: &str) -> Option<Option<String>> {
+    (!bar_open && !guide_id.is_empty()).then(|| passive_client(by))
 }
 
 /// The agent line of the passive bar and the chip's accessible name.
@@ -807,6 +814,14 @@ pub fn pick_another(app: &Entity<AppModel>, cx: &mut App) {
         stop_flow(app, After::Pick, cx);
     } else {
         pick_window(app, cx);
+    }
+}
+
+/// The agent toast's "Stop" (BUG-1): ends the guide an agent or the CLI started and opens it;
+/// nothing when no guide is recording any more.
+pub fn stop_running(app: &Entity<AppModel>, cx: &mut App) {
+    if is_running(cx) {
+        stop_flow(app, After::Open, cx);
     }
 }
 
@@ -1198,7 +1213,7 @@ impl GuideHud {
         cx: &mut Context<Self>,
     ) -> gpui::Stateful<gpui::Div> {
         let mode = self.mode();
-        let p = parts(mode, self.shown.steps + 1, 0, None);
+        let p = parts(mode, self.shown.steps + 1, self.remaining(), None);
         let line = passive_line(client.as_deref());
         let mark = match mode {
             Mode::Paused | Mode::Closed => dot(t.mist, 8.).into_any_element(),
@@ -1512,6 +1527,31 @@ mod ended_tests {
         assert_eq!(passive_client("user"), None);
         assert_eq!(passive_client("agent:  "), None);
         assert!(passive_line(Some("x")).contains('x'));
+    }
+
+    /// BUG-1: an agent's or the CLI's guide gets the passive bar with the real client's name
+    /// ("Started by agent {client}", never a fixed "MCP"); the app's own guide (its bar is open)
+    /// and an event with no guide get none.
+    #[test]
+    fn bug_1_the_passive_bar_opens_for_agent_and_cli_guides_with_the_real_client() {
+        assert_eq!(
+            passive_for(false, "g1", "agent:claude-desktop"),
+            Some(Some("claude-desktop".to_owned()))
+        );
+        assert_eq!(
+            passive_for(false, "g1", "agent:capturemann-cli"),
+            Some(Some("capturemann-cli".to_owned()))
+        );
+        assert_eq!(passive_for(true, "g1", "agent:claude-desktop"), None);
+        assert_eq!(passive_for(false, "", "agent:claude-desktop"), None);
+        assert_eq!(
+            passive_line(Some("claude-desktop")),
+            "Started by agent claude-desktop"
+        );
+        assert_eq!(
+            passive_line(Some("capturemann-cli")),
+            "Started by agent capturemann-cli"
+        );
     }
 
     /// The passive bar is never wider than the display's limit or the full bar's maximum.

@@ -1088,8 +1088,20 @@ impl Daemon {
         // before any dialog: a confirmation opened over the page that is being captured ended
         // the first run (Windows QA pass 6).
         self.inner.refuse_when_capture_is_busy(&action)?;
+        // BUG-3: an export onto a file that is there is refused before any dialog opens, and an
+        // agent's export outside the library and the user's export folders always asks.
+        let export_outside = match &action {
+            Action::Guide(p) => match &p.op {
+                crate::guide::GuideOp::Export(a) => {
+                    crate::guide::export::check_dest(a.format, a.dest.as_deref())?;
+                    agent.is_some() && self.inner.export_needs_confirmation(a)
+                }
+                _ => false,
+            },
+            _ => false,
+        };
         let tier = if agent.is_some() {
-            if matches!(&action, Action::CaptureLong(p) if p.moves_the_screen()) {
+            if export_outside || matches!(&action, Action::CaptureLong(p) if p.moves_the_screen()) {
                 Tier::Confirm
             } else {
                 self.inner.effective_tier(&spec)

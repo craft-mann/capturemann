@@ -26,7 +26,7 @@ pub fn start_agent_watch(app: &Entity<AppModel>, cx: &mut App) {
                 .filter(|e| crate::agent_status::started_by_agent(e.decision))
                 // The recording controller shows its own agent toast from the start event.
                 .filter(|e| e.tool != "start_recording")
-                .map(|e| ToastSpec::agent(e.tool.clone(), e.client.clone()))
+                .map(|e| ToastSpec::for_agent_call(e.tool.clone(), e.client.clone()))
                 .collect();
             app2.update(cx, |m, cx| {
                 m.agent_seen = total;

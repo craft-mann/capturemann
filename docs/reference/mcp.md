@@ -2263,9 +2263,9 @@ Errors: `user_declined`, `not_found` (plus the common errors above).
 
 #### `export_guide`
 
-Export a stopped guide.
+Export a stopped guide. Markdown goes straight into `dest` as `guide-YYYY-MM-DD-HHMMSS.md` and `images-YYYY-MM-DD-HHMMSS/step-NN.png` (local time); nothing is overwritten, a `dest` that is a file that already exists is refused, and so is a guide with no step.
 
-- **Tier:** Free, changes something: runs at once; the user can set it to Ask first.
+- **Tier:** Free, changes something: runs at once inside the library and the user's export folders; the user can set it to Ask first. A `dest` anywhere else is Confirm for that call (0.3.5), and the dialog shows the exact path.
 - **Read-only:** no
 - **CLI:** `capturemann guide export`
 - **Preview:** yes. `_meta.stage` is `preview`; the tool may still change.
@@ -2284,9 +2284,9 @@ Export a stopped guide.
 | `note_steps` | boolean | no | true |  |
 | `request_id` | string | no |  | Idempotency key; a repeat within 24 h returns the first result. (min length 1, max length 256) |
 
-Returns: `guide_id`, `format`, `steps`, `path`, `renamed`, `requested`, `files`, `copied_to_clipboard`, `html`, `warnings`.
+Returns: `guide_id`, `format`, `steps`, `path`, `file`, `renamed`, `files`, `copied_to_clipboard`, `html`, `warnings`.
 
-Errors: `user_declined`, `not_found` (plus the common errors above).
+Errors: `user_declined`, `not_found`, `invalid_input` (a `dest` that is a file that already exists; a guide with no step) (plus the common errors above).
 
 ```json
 {"name": "export_guide", "arguments": {"guide_id": "guide_REGRESSFIXTURE01", "format": "markdown", "dest": "/Users/me/Documents/guides"}}

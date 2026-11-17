@@ -430,6 +430,18 @@ pub fn summary(p: &GuideParams) -> String {
 /// The rows of the start dialog (`start_guide`): flat English text a client words itself from
 /// [`confirm_params`] (the raw serialized parameters are nested JSON, not rows).
 pub fn confirm_details(p: &GuideParams) -> Option<Value> {
+    // BUG-3: the export dialog names the exact place, made absolute and free of `..` and links,
+    // so what is shown is what is written to.
+    if let GuideOp::Export(a) = &p.op {
+        let mut rows = serde_json::Map::new();
+        rows.insert("guide".into(), json!(a.guide_id));
+        rows.insert("format".into(), json!(a.format.as_str()));
+        if let Some(d) = a.dest.as_deref().filter(|d| !d.is_empty()) {
+            let shown = export::resolve_path(std::path::Path::new(d));
+            rows.insert("path".into(), json!(shown.display().to_string()));
+        }
+        return Some(Value::Object(rows));
+    }
     let GuideOp::Start {
         target,
         title,

@@ -377,70 +377,161 @@ fn numbered(stem: &str, ext: Option<&str>, n: u32) -> String {
     }
 }
 
-/// Creates the folder `parent/<stem>` that did not exist before (`<stem> (2)`, `(3)` ... when it
-/// did): the name is claimed by `create_dir`, which fails when the folder is there, so two
-/// exports at once cannot share one.
-fn claim_dir(parent: &Path, stem: &str) -> Result<PathBuf, CmError> {
-    std::fs::create_dir_all(parent).map_err(|e| io_err(parent, &e))?;
-    for n in 1..10_000 {
-        let p = parent.join(numbered(stem, None, n));
-        match std::fs::create_dir(&p) {
-            Ok(()) => return Ok(p),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(e) => return Err(io_err(&p, &e)),
-        }
-    }
-    Err(CmError::internal(format!(
-        "no free folder name next to `{stem}`"
-    )))
+/// The local date and time in a file name: `2026-11-17-153045` (BUG-2).
+pub fn stamp_of(local: time::OffsetDateTime) -> String {
+    let fmt = time::macros::format_description!("[year]-[month]-[day]-[hour][minute][second]");
+    local
+        .format(&fmt)
+        .unwrap_or_else(|_| "0000-00-00-000000".to_owned())
 }
 
-/// The folder a Markdown export writes into; never a folder or file that was already there with
-/// something in it (QA macOS pass 7: the export replaced `guide.md` and `images/` of an earlier
-/// one without asking):
-/// * `dest` is not there: it is created and used;
-/// * `dest` is an empty folder: used as it is;
-/// * `dest` is a folder with files in it (the person chose `Documents`, or an earlier export):
-///   a new folder named after the guide is made inside it, `Title (2)` when that is taken;
-/// * `dest` is a file: a new folder next to it, `name (2)`.
-fn markdown_root(dest: &Path, title: &str) -> Result<PathBuf, CmError> {
-    if dest.as_os_str().is_empty() {
+/// The Markdown file name of an export made at `stamp`.
+pub fn markdown_name(stamp: &str) -> String {
+    format!("guide-{stamp}.md")
+}
+
+/// The pictures folder of an export made at `stamp`.
+pub fn images_dir_name(stamp: &str) -> String {
+    format!("images-{stamp}")
+}
+
+/// The first stamp, from `local` on, whose file and folder are both free in `dest` (two exports in
+/// the same second move on by a second), so nothing that is there is ever written over.
+pub fn free_stamp(dest: &Path, local: time::OffsetDateTime) -> Result<String, CmError> {
+    for n in 0..3600 {
+        let stamp = stamp_of(local + time::Duration::seconds(n));
+        if !dest.join(markdown_name(&stamp)).exists()
+            && !dest.join(images_dir_name(&stamp)).exists()
+        {
+            return Ok(stamp);
+        }
+    }
+    Err(CmError::internal("no free export name in the folder"))
+}
+
+/// Points every picture of `doc` at the folder `images-<stamp>` (the links of the Markdown).
+pub fn use_images_dir(doc: &mut ExportDoc, stamp: &str) {
+    let dir = images_dir_name(stamp);
+    for s in &mut doc.steps {
+        if let Some(img) = &mut s.image {
+            let name = img.file.rsplit('/').next().unwrap_or(&img.file).to_owned();
+            img.file = format!("{dir}/{name}");
+        }
+    }
+}
+
+/// What `export_guide` refuses before anything is written (BUG-2, BUG-3): a `dest` that is a
+/// file that already exists (an export never replaces one) or is missing. The agent's dialog is
+/// not opened for such a call.
+pub fn check_dest(format: Format, dest: Option<&str>) -> Result<(), CmError> {
+    if matches!(format, Format::RichText) {
+        return Ok(());
+    }
+    let dest = dest.unwrap_or_default();
+    if dest.is_empty() {
         return Err(CmError::invalid_field(
             "dest",
-            "is required: the folder to write the Markdown into",
+            "is required: the folder to write to",
         ));
     }
-    match std::fs::metadata(dest) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            if let (Some(parent), Some(name)) = (dest.parent(), dest.file_name()) {
-                return claim_dir(parent, &name.to_string_lossy());
+    if Path::new(dest).is_file() {
+        return Err(CmError::invalid_field(
+            "dest",
+            format!(
+                "`{dest}` is a file that already exists; an export never writes over a file, name a folder"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// The folders an agent may export into without a question: the library, the user's export
+/// folders (`export.folders`, an app-only setting) and the Documents, Desktop and Downloads
+/// folders of the home folder (BUG-3).
+pub fn trusted_folders(
+    library: &Path,
+    settings: &serde_json::Map<String, Value>,
+    home: Option<&Path>,
+) -> Vec<PathBuf> {
+    let mut v = vec![library.to_owned()];
+    if let Some(list) = settings.get("export.folders").and_then(Value::as_array) {
+        v.extend(
+            list.iter()
+                .filter_map(Value::as_str)
+                .filter(|s| !s.trim().is_empty())
+                .map(PathBuf::from),
+        );
+    }
+    if let Some(h) = home {
+        v.extend(["Documents", "Desktop", "Downloads"].map(|n| h.join(n)));
+    }
+    v
+}
+
+/// `p` made absolute and free of `.` and `..`, by its words alone.
+fn lexical(p: &Path) -> PathBuf {
+    let mut abs = if p.is_absolute() {
+        PathBuf::new()
+    } else {
+        std::env::current_dir().unwrap_or_default()
+    };
+    for c in p.components() {
+        match c {
+            std::path::Component::ParentDir => {
+                abs.pop();
             }
-            std::fs::create_dir_all(dest).map_err(|e| io_err(dest, &e))?;
-            Ok(dest.to_owned())
-        }
-        Err(e) => Err(io_err(dest, &e)),
-        Ok(m) if m.is_dir() => {
-            let empty = std::fs::read_dir(dest)
-                .map_err(|e| io_err(dest, &e))?
-                .next()
-                .is_none();
-            if empty {
-                Ok(dest.to_owned())
-            } else {
-                claim_dir(dest, &file_stem(title))
-            }
-        }
-        Ok(_) => {
-            let parent = dest
-                .parent()
-                .filter(|p| !p.as_os_str().is_empty())
-                .unwrap_or_else(|| Path::new("."));
-            let name = dest
-                .file_name()
-                .map_or_else(|| "guide".to_owned(), |n| n.to_string_lossy().into_owned());
-            claim_dir(parent, &name)
+            std::path::Component::CurDir => {}
+            c => abs.push(c.as_os_str()),
         }
     }
+    abs
+}
+
+/// `p` made absolute and free of `.` and `..`, with the links of its deepest existing part
+/// resolved, so `inside/../../etc` and a link out of a trusted folder do not pass.
+pub fn resolve_path(p: &Path) -> PathBuf {
+    let abs = lexical(p);
+    let mut tail = Vec::new();
+    let mut base = abs.clone();
+    let mut links = 0;
+    loop {
+        if let Ok(real) = base.canonicalize() {
+            let mut out = real;
+            out.extend(tail.iter().rev());
+            return out;
+        }
+        // A link whose target is not there yet: follow it by hand, so it cannot lead out of a
+        // trusted folder unseen.
+        if let (Ok(target), true) = (std::fs::read_link(&base), links < 16) {
+            links += 1;
+            let parent = base.parent().map(Path::to_owned).unwrap_or_default();
+            base = lexical(&if target.is_absolute() {
+                target
+            } else {
+                parent.join(target)
+            });
+            continue;
+        }
+        match (
+            base.file_name().map(std::ffi::OsStr::to_owned),
+            base.parent(),
+        ) {
+            (Some(n), Some(parent)) => {
+                tail.push(n);
+                base = parent.to_owned();
+            }
+            _ => return abs,
+        }
+    }
+}
+
+/// Whether an agent writing to `dest` needs the user's yes: it is not inside one of `trusted`.
+pub fn dest_needs_confirmation(dest: &str, trusted: &[PathBuf]) -> bool {
+    if dest.is_empty() {
+        return false;
+    }
+    let target = resolve_path(Path::new(dest));
+    !trusted.iter().any(|t| target.starts_with(resolve_path(t)))
 }
 
 /// Writes `bytes` to a file that did not exist: `path`, or `stem (2).ext`, `(3)` ... when it
@@ -494,11 +585,27 @@ fn single_file_target(dest: &str, title: &str, ext: &str) -> Result<PathBuf, CmE
 }
 
 impl Inner {
+    /// BUG-3: an agent's `export_guide` to a place outside the library and the user's export
+    /// folders is gated as Confirm (the dialog shows the exact path); inside them it is Free.
+    pub(crate) fn export_needs_confirmation(&self, a: &ExportArgs) -> bool {
+        if matches!(a.format, Format::RichText) {
+            return false;
+        }
+        let library = lock_library(&self.library).root().to_owned();
+        let settings = self.settings.all().unwrap_or_default();
+        let home = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from);
+        let trusted = trusted_folders(&library, &settings, home.as_deref());
+        dest_needs_confirmation(a.dest.as_deref().unwrap_or_default(), &trusted)
+    }
+
     pub(crate) async fn export_guide(
         &self,
         _actor: &Actor,
         a: ExportArgs,
     ) -> Result<Value, DaemonError> {
+        check_dest(a.format, a.dest.as_deref())?;
         if self.guide.active_id().as_deref() == Some(a.guide_id.as_str()) {
             return Err(CmError::busy("stop the guide before exporting it").into());
         }
@@ -512,9 +619,16 @@ impl Inner {
             lib.bundle_path(&rec)
         };
         let clipboard = self.clipboard.clone();
+        let local_now = cm_library::index::to_local(self.clock.now());
         blocking(move || {
             let g = GuideBundle::open(&dir)?;
-            let doc = build_doc(&g, &a)?;
+            let mut doc = build_doc(&g, &a)?;
+            if doc.steps.is_empty() {
+                return Err(CmError::invalid_field(
+                    "guide_id",
+                    "the guide has no step to export",
+                ));
+            }
             let mut warnings: Vec<String> = Vec::new();
             let mut out = json!({
                 "guide_id": a.guide_id,
@@ -523,8 +637,12 @@ impl Inner {
             });
             match a.format {
                 Format::Markdown => {
-                    let requested = PathBuf::from(a.dest.as_deref().unwrap_or_default());
-                    let root = markdown_root(&requested, &doc.title)?;
+                    // BUG-2: straight into the folder, every name carries the local date and
+                    // time, so an earlier export is never written over.
+                    let root = PathBuf::from(a.dest.as_deref().unwrap_or_default());
+                    std::fs::create_dir_all(&root).map_err(|e| io_err(&root, &e))?;
+                    let stamp = free_stamp(&root, local_now)?;
+                    use_images_dir(&mut doc, &stamp);
                     let mut files = Vec::new();
                     for s in &doc.steps {
                         if let Some(img) = &s.image {
@@ -532,12 +650,12 @@ impl Inner {
                             files.push(img.file.clone());
                         }
                     }
+                    let name = markdown_name(&stamp);
                     let md = markdown(&doc, a.headings, a.intro, a.notes);
-                    write_file(&root.join("guide.md"), md.as_bytes())?;
-                    files.insert(0, "guide.md".to_owned());
-                    out["renamed"] = json!(root != requested);
-                    out["requested"] = json!(requested);
+                    write_file(&root.join(&name), md.as_bytes())?;
+                    files.insert(0, name.clone());
                     out["path"] = json!(root);
+                    out["file"] = json!(name);
                     out["files"] = json!(files);
                 }
                 Format::Html => {
@@ -690,41 +808,90 @@ mod tests {
         assert_eq!(md_text("Đăng nhập", false, false), "Đăng nhập");
     }
 
+    /// BUG-2: the names carry the local date and time, and the links point at that folder.
     #[test]
-    fn a_markdown_export_never_writes_over_what_is_there() {
+    fn bug_2_names_carry_the_date_and_time_and_the_links_follow() {
+        let t = time::macros::datetime!(2026-11-17 15:30:45 +7);
+        let stamp = stamp_of(t);
+        assert_eq!(stamp, "2026-11-17-153045");
+        assert_eq!(markdown_name(&stamp), "guide-2026-11-17-153045.md");
+        assert_eq!(images_dir_name(&stamp), "images-2026-11-17-153045");
+        let mut d = doc();
+        use_images_dir(&mut d, &stamp);
+        let md = markdown(&d, Headings::Numbered, true, true);
+        assert!(
+            md.contains("(images-2026-11-17-153045/step-01.png)"),
+            "{md}"
+        );
+        assert!(!md.contains("(images/"), "{md}");
+    }
+
+    /// BUG-2: a second export, even in the same second, never reuses a name that is there.
+    #[test]
+    fn bug_2_a_taken_name_moves_on_and_nothing_is_replaced() {
         let dir = tempfile::tempdir().unwrap();
-        let p = |n: &str| dir.path().join(n);
-        // A folder that is not there: made and used.
-        let a = markdown_root(&p("guide"), "Set up").unwrap();
-        assert_eq!(a, p("guide"));
-        // The same name again (empty): used as it is.
-        assert_eq!(markdown_root(&p("guide"), "Set up").unwrap(), p("guide"));
-        // With a file in it: a folder of the guide's name inside, then (2).
-        std::fs::write(p("guide").join("guide.md"), "mine").unwrap();
-        let b = markdown_root(&p("guide"), "Set up").unwrap();
-        assert_eq!(b, p("guide").join("Set up"));
-        std::fs::write(b.join("guide.md"), "x").unwrap();
-        let c = markdown_root(&p("guide"), "Set up").unwrap();
-        assert_eq!(c, p("guide").join("Set up (2)"));
-        assert_eq!(
-            std::fs::read_to_string(p("guide").join("guide.md")).unwrap(),
-            "mine"
-        );
-        // A file of that name: a folder next to it.
-        std::fs::write(p("note.txt"), "keep").unwrap();
-        assert_eq!(
-            markdown_root(&p("note.txt"), "Set up").unwrap(),
-            p("note.txt (2)")
-        );
-        assert_eq!(std::fs::read_to_string(p("note.txt")).unwrap(), "keep");
-        // A title that is a path is one folder name.
-        std::fs::write(p("guide").join("other"), "x").unwrap();
-        let d = markdown_root(&p("guide"), "../../etc/passwd").unwrap();
-        assert!(d.starts_with(p("guide")), "{d:?}");
-        // Single files: the second export is `(2)`.
-        let f1 = write_unique(&p("g.html"), b"one").unwrap();
-        let f2 = write_unique(&p("g.html"), b"two").unwrap();
-        assert_eq!((f1, f2), (p("g.html"), p("g (2).html")));
-        assert_eq!(std::fs::read_to_string(p("g.html")).unwrap(), "one");
+        let t = time::macros::datetime!(2026-11-17 15:30:45 +0);
+        let first = free_stamp(dir.path(), t).unwrap();
+        assert_eq!(first, "2026-11-17-153045");
+        std::fs::write(dir.path().join(markdown_name(&first)), "mine").unwrap();
+        assert_eq!(free_stamp(dir.path(), t).unwrap(), "2026-11-17-153046");
+        // A leftover pictures folder alone also takes the name.
+        std::fs::create_dir(dir.path().join(images_dir_name("2026-11-17-153046"))).unwrap();
+        assert_eq!(free_stamp(dir.path(), t).unwrap(), "2026-11-17-153047");
+    }
+
+    /// BUG-3: a `dest` that is a file already is refused; a folder, or a path that is not there,
+    /// is not; `rich_text` has no `dest`.
+    #[test]
+    fn bug_3_a_destination_file_that_exists_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("report.docx");
+        std::fs::write(&file, "mine").unwrap();
+        let f = file.to_str().unwrap();
+        for fmt in [Format::Markdown, Format::Html, Format::Pdf] {
+            assert!(check_dest(fmt, Some(f)).is_err(), "{fmt:?}");
+            assert!(check_dest(fmt, None).is_err());
+            assert!(check_dest(fmt, Some(dir.path().to_str().unwrap())).is_ok());
+            assert!(check_dest(fmt, Some(dir.path().join("new.x").to_str().unwrap())).is_ok());
+        }
+        assert!(check_dest(Format::RichText, Some(f)).is_ok());
+        assert!(check_dest(Format::RichText, None).is_ok());
+    }
+
+    /// BUG-3: inside the library or an export folder runs at once; anywhere else, including a
+    /// `..` escape and a link out, asks.
+    #[test]
+    fn bug_3_only_the_library_and_the_export_folders_are_trusted() {
+        let lib = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let mut settings = serde_json::Map::new();
+        settings.insert("export.folders".into(), json!([other.path()]));
+        let trusted = trusted_folders(lib.path(), &settings, Some(home.path()));
+        let asks = |p: &Path| dest_needs_confirmation(p.to_str().unwrap(), &trusted);
+        assert!(!asks(&lib.path().join("exports/new")));
+        assert!(!asks(lib.path()));
+        assert!(!asks(&other.path().join("a")));
+        assert!(!asks(&home.path().join("Documents/guides")));
+        assert!(asks(&home.path().join(".ssh")));
+        assert!(asks(Path::new("/etc")));
+        assert!(asks(&lib.path().join("../escape")));
+        assert!(asks(&home.path().join("Documents/../.ssh")));
+        #[cfg(unix)]
+        {
+            let link = lib.path().join("out");
+            std::os::unix::fs::symlink(home.path().join(".ssh"), &link).unwrap();
+            assert!(asks(&link.join("x")), "a link out of the library asks");
+        }
+        // Without an export setting only the library and the home folders count.
+        let bare = trusted_folders(lib.path(), &serde_json::Map::new(), None);
+        assert!(dest_needs_confirmation(
+            other.path().to_str().unwrap(),
+            &bare
+        ));
+        assert!(!dest_needs_confirmation(
+            lib.path().to_str().unwrap(),
+            &bare
+        ));
     }
 }

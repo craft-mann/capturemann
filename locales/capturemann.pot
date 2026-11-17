@@ -3858,6 +3858,9 @@ msgstr ""
 msgid "Open captions"
 msgstr ""
 
+msgid "Open folder"
+msgstr ""
+
 msgid "Open in transcript"
 msgstr ""
 
