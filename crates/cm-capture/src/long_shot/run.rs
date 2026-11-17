@@ -257,7 +257,18 @@ pub fn run_auto_ex(
         {
             retry += 1;
             sleeper.sleep(LATE_SCROLL_WAIT * (2 * retry));
+            let before = next.frame.clone();
             next = settled!('run, settle_frame(src, sleeper, cfg.settle));
+            // The same frame as the pair already refused gives the same answer, and a refused
+            // pair of large frames takes the stitcher many seconds (BUG-6: 8 s on a Mac, three
+            // times that on the lab laptop, for each of two looks at an unchanged frame).
+            if next.frame == before {
+                super::debug::trace(
+                    &next.frame,
+                    &format!("first pair looked at again ({retry}): the frame did not change"),
+                );
+                continue;
+            }
             outcome = stitcher.push(&next.frame, Some(expected(step, gain)));
             super::debug::trace(
                 &next.frame,

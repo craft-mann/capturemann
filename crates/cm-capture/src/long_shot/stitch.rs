@@ -1421,7 +1421,10 @@ const SHADOW_STEPS: [usize; 4] = [0, 4, 12, 32];
 
 /// The share of the lines in which a row (column) of a static strip may differ between two
 /// frames (a blinking caret, a loading spinner in the toolbar).
-const STATIC_SHARE: f64 = 0.02;
+/// Raised from 0.02 to 0.08 on Nov 17, 2026 (BUG-6 reruns, Wikipedia on Windows): a panel whose
+/// current item changes with the scroll (a contents list) differs in a few percent of the lines
+/// in its text columns, which cut the unchanging run at the first of them.
+const STATIC_SHARE: f64 = 0.08;
 
 /// The columns at each end of a vertical capture that are left out of the comparison when a pair
 /// does not join and an overlay scrollbar may be drawn over them (macOS: a thumb that fades in

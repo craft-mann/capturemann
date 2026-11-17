@@ -2817,6 +2817,87 @@ fn lsreal_a_first_step_that_overshoots_is_scrolled_back_and_joined() {
     }
 }
 
+/// BUG-6 (Windows, Edge at 150 %, YouTube): the wheel moves the page three times as far as asked,
+/// and a sticky masthead with a tab bar covers a quarter of the window, so a step of 30 % of the
+/// window already passes the last row of the first frame. The first pair is scrolled back and
+/// joined, the next steps are sized for the wheel, and the page is taken to its end.
+#[test]
+fn bug_6_a_tall_sticky_header_and_a_wheel_of_three_times_the_request_joins_to_the_end() {
+    for header in [160u32, 275] {
+        let page = SyntheticPage::new(300, 6000, 1100).with_bands(header, 0);
+        let view = page.clone().view();
+        let pos = PosCell::default();
+        let mut src = Overlaid {
+            view: view.clone(),
+            pos: pos.clone(),
+            over: |_: u32, _: u32, _: u32, _: &mut [u8]| {},
+        };
+        let mut sc = FirstBig {
+            view,
+            pos,
+            first: 3.0,
+            later: 3.0,
+            scrolls: 0,
+            notch: 15,
+            backs: 0,
+        };
+        let r = auto_with(&mut src, &mut sc);
+        assert_eq!(r.end, EndReason::ReachedEnd, "header {header}");
+        assert_eq!(r.image.frame, page.expected(), "header {header}");
+        assert!(sc.backs <= 3, "header {header}: {} scroll backs", sc.backs);
+    }
+}
+
+/// The same panels with the contents list's current item highlighted: the item changes with the
+/// scroll position (Wikipedia on Windows, Edge, Nov 17, 2026: after the wheel took larger steps
+/// the pair had "History" bold and "(Top)" blue, a few percent of the lines differed in the
+/// panel's columns beyond the first one, the run of unchanging columns from the edge was cut
+/// there and the panel's other columns spoiled every shift, `no_overlap` after 12 frames while
+/// the page's columns matched at the true shift in 2 rows per mille).
+#[test]
+fn bug_6_a_panel_whose_current_item_changes_is_left_out_of_the_comparison() {
+    let page = SyntheticPage::new(420, 4000, 300).with_scrollbar(14);
+    let framed = |pos: u32| {
+        let f = page.frame_at(pos);
+        let (w, h) = (f.width(), f.height());
+        let mut data = f.rgba().to_vec();
+        for y in 0..h {
+            for x in (0..90).chain(w - 100..w - 14) {
+                let v = ((y / 20 * 37 + y * 29 + x * 11) % 200) as u8;
+                let i = ((y * w + x) * 4) as usize;
+                let mut px = if y % 20 < 10 {
+                    [40 + v / 2, 40, 90 + v / 2, 255]
+                } else {
+                    [250, 250, 250, 255]
+                };
+                // The current item: 14 lines (4.7 % of 300) that change with the position.
+                if (100..114).contains(&y) && (20..90).contains(&x) {
+                    px = [
+                        200 - (pos / 200 % 5) as u8 * 30,
+                        40 + (pos / 200 % 5) as u8 * 20,
+                        30,
+                        255,
+                    ];
+                }
+                data[i..i + 4].copy_from_slice(&px);
+            }
+        }
+        Frame::new(w, h, data).unwrap()
+    };
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&framed(1000), None);
+    s.assume_trim(0, 14);
+    for (pos, new_len) in [(1200u32, 200u32), (1410, 210), (1600, 190)] {
+        let got = s.push(&framed(pos), Some(new_len));
+        assert_eq!(
+            got,
+            PushOutcome::Added { new_len },
+            "pos {pos}: {:?}",
+            s.last_refusal()
+        );
+    }
+}
+
 /// A pair with little left in common: a translucent sticky header over the top of the next frame,
 /// and, at the bottom of the first, content that had not been drawn yet (a card that reveals
 /// itself as it scrolls into view), so that only a short stretch of the overlap matches. A real
