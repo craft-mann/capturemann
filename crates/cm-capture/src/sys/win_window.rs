@@ -13,7 +13,8 @@ use windows::Win32::Graphics::Dwm::DWMWA_CLOAKED;
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetWindowDC,
-    ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
+    MonitorFromWindow, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+    DIB_RGB_COLORS, HBITMAP, HDC, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::Storage::FileSystem::{
     GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW,
@@ -24,7 +25,9 @@ use windows::Win32::System::Threading::{
     PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::HiDpi::{
+    GetAwarenessFromDpiAwarenessContext, GetDpiForMonitor, GetWindowDpiAwarenessContext,
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+    DPI_AWARENESS_UNAWARE, MDT_EFFECTIVE_DPI,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, EnumChildWindows, GetClassNameW, GetForegroundWindow, GetWindowLongW,
@@ -32,7 +35,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GWL_EXSTYLE, SW_RESTORE,
 };
 
-use super::win_names::{choose_app_name, crop_box, is_frame_host, visible_xywh};
+use super::win_names::{
+    choose_app_name, crop_box, is_frame_host, unaware_painted_size, upscale_top_left, visible_xywh,
+};
 
 /// `PW_RENDERFULLCONTENT`: also paints DirectX and XAML content.
 const PW_RENDERFULLCONTENT: u32 = 2;
@@ -290,6 +295,24 @@ pub fn app_name(id: u32, title: &str) -> String {
     choose_app_name(&refs, &exe, title)
 }
 
+/// The effective DPI of the window's monitor when the window is DPI-unaware (Windows draws it at 96 DPI and
+/// stretches it), else 96, which means "painted at its physical size".
+fn unaware_dpi(hwnd: HWND) -> u32 {
+    // SAFETY: plain queries on a window handle and a monitor; a failure leaves the default.
+    unsafe {
+        let context = GetWindowDpiAwarenessContext(hwnd);
+        if GetAwarenessFromDpiAwarenessContext(context) != DPI_AWARENESS_UNAWARE {
+            return 96;
+        }
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let (mut x, mut y) = (0u32, 0u32);
+        match GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut x, &mut y) {
+            Ok(()) if x > 0 => x,
+            _ => 96,
+        }
+    }
+}
+
 /// An RGBA8 picture of the visible frame of the window: `(width, height, pixels)`.
 pub fn capture(id: u32) -> Result<(u32, u32, Vec<u8>), String> {
     ensure_dpi_aware();
@@ -310,7 +333,22 @@ pub fn capture(id: u32) -> Result<(u32, u32, Vec<u8>), String> {
     if ow <= 0 || oh <= 0 {
         return Err("the window has no size".into());
     }
-    let full = print_window(hwnd, ow, oh)?;
+    let mut full = print_window(hwnd, ow, oh)?;
+    // A DPI-unaware window paints at its virtualised size into the top-left of the bitmap and leaves the rest
+    // black; scale that corner up to the physical size so the picture fills the frame.
+    let (pw, ph) = unaware_painted_size(ow as u32, oh as u32, unaware_dpi(hwnd));
+    if (pw, ph) != (ow as u32, oh as u32) {
+        if let Some(scaled) = upscale_top_left(
+            &full,
+            ow as usize,
+            pw as usize,
+            ph as usize,
+            ow as usize,
+            oh as usize,
+        ) {
+            full = scaled;
+        }
+    }
     let (x0, y0, w, h) = crop_box(
         (outer.left, outer.top, outer.right, outer.bottom),
         (frame.left, frame.top, frame.right, frame.bottom),

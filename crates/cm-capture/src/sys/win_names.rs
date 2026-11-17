@@ -125,6 +125,58 @@ pub fn crop_box(outer: (i32, i32, i32, i32), frame: (i32, i32, i32, i32)) -> (i3
     }
 }
 
+/// The size a DPI-unaware window paints itself at when `PrintWindow` is given a bitmap of its physical size
+/// `(ow, oh)`: Windows virtualises such a window, so it draws at `96 / dpi` of that size into the top-left
+/// corner and leaves the rest of the bitmap black. `dpi` is the monitor's effective DPI (96 = 100 %); 96 or
+/// less gives the whole bitmap.
+pub fn unaware_painted_size(ow: u32, oh: u32, dpi: u32) -> (u32, u32) {
+    if dpi <= 96 {
+        return (ow, oh);
+    }
+    let scale =
+        |v: u32| ((v as u64 * 96 + dpi as u64 / 2) / dpi as u64).clamp(1, v.max(1) as u64) as u32;
+    (scale(ow), scale(oh))
+}
+
+/// Scales the top-left `sw` x `sh` part of a 4-bytes-per-pixel picture (`stride_w` pixels per row) up to
+/// `dw` x `dh` with bilinear sampling. `None` when a size is zero or the buffer is too short.
+pub fn upscale_top_left(
+    src: &[u8],
+    stride_w: usize,
+    sw: usize,
+    sh: usize,
+    dw: usize,
+    dh: usize,
+) -> Option<Vec<u8>> {
+    if sw == 0 || sh == 0 || dw == 0 || dh == 0 || sw > stride_w || src.len() < stride_w * sh * 4 {
+        return None;
+    }
+    let mut out = vec![0u8; dw * dh * 4];
+    // Pixel centres: destination centre (i + 0.5) maps to source (i + 0.5) * s / d - 0.5, in 1/256ths.
+    let axis = |d: usize, s: usize| -> Vec<(usize, usize, u32)> {
+        (0..d)
+            .map(|i| {
+                let pos = (((2 * i + 1) * s * 256) as i64 / (2 * d) as i64 - 128).max(0);
+                let i0 = ((pos >> 8) as usize).min(s - 1);
+                let i1 = (i0 + 1).min(s - 1);
+                (i0, i1, (pos & 255) as u32)
+            })
+            .collect()
+    };
+    let (xs, ys) = (axis(dw, sw), axis(dh, sh));
+    for (y, &(y0, y1, fy)) in ys.iter().enumerate() {
+        for (x, &(x0, x1, fx)) in xs.iter().enumerate() {
+            let at = |xx: usize, yy: usize, c: usize| src[(yy * stride_w + xx) * 4 + c] as u32;
+            for c in 0..4 {
+                let top = at(x0, y0, c) * (256 - fx) + at(x1, y0, c) * fx;
+                let bot = at(x0, y1, c) * (256 - fx) + at(x1, y1, c) * fx;
+                out[(y * dw + x) * 4 + c] = ((top * (256 - fy) + bot * fy + 32768) >> 16) as u8;
+            }
+        }
+    }
+    Some(out)
+}
+
 /// The rectangle a window screenshot covers, `(x, y, width, height)` in virtual-screen px: the visible frame
 /// inside the window rectangle, or the whole rectangle (see [`crop_box`]). The picker lists this and `capture`
 /// saves this, so the two cannot differ. `None` for an empty rectangle.
@@ -139,6 +191,31 @@ pub fn visible_xywh(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_unaware_window_paints_at_the_unscaled_size() {
+        // 150 % display: a 1426x721 physical window paints 951x481 in its corner.
+        assert_eq!(unaware_painted_size(1426, 721, 144), (951, 481));
+        assert_eq!(unaware_painted_size(1000, 500, 96), (1000, 500));
+        assert_eq!(unaware_painted_size(1000, 500, 0), (1000, 500));
+        assert_eq!(unaware_painted_size(1, 1, 288), (1, 1));
+    }
+
+    #[test]
+    fn the_painted_corner_fills_the_whole_picture() {
+        // A 2x2 corner of a 4x4 buffer (the rest black) scaled to 4x4 has no black left.
+        let mut src = vec![0u8; 4 * 4 * 4];
+        for y in 0..2 {
+            for x in 0..2 {
+                src[(y * 4 + x) * 4..][..4].copy_from_slice(&[200, 100, 50, 255]);
+            }
+        }
+        let out = upscale_top_left(&src, 4, 2, 2, 4, 4).unwrap();
+        assert_eq!(out.len(), 64);
+        assert!(out.chunks(4).all(|p| p == [200, 100, 50, 255]));
+        assert!(upscale_top_left(&src, 4, 0, 2, 4, 4).is_none());
+        assert!(upscale_top_left(&src[..8], 4, 2, 2, 4, 4).is_none());
+    }
 
     #[test]
     fn paths_and_executable_names_are_not_app_names() {
