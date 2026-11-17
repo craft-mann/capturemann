@@ -1,12 +1,12 @@
 # Release 0.3.5: bug fixes and stabilisation (plan, draft, Nov 17, 2026)
 
-Status: **draft, nothing built, waiting for the maintainer's review.** Scope decided by the maintainer on Nov 17, 2026, right after 0.3.4 was published: **bug fixes, stabilisation and feedback from 0.3.4; no new features, with one enhancement added the same day: line styles for the drawing shapes (track E, ANN-12).** Every other item below is a defect, a safety gap or a missing check in something that already shipped. Where a fix needs a product decision (D1 to D31 in `docs/development/ux-proposals-0.3.4-for-design.md`), the plan proposes a default and lists it in section 6; a default is not a decision until the maintainer says so.
+Status: **draft, nothing built, waiting for the maintainer's review.** Scope decided by the maintainer on Nov 17, 2026, right after 0.3.4 was published: **bug fixes, stabilisation and feedback from 0.3.4; no new features, with two enhancements added the same day: line styles for the drawing shapes (track E, ANN-12) and a Send feedback button on the About page (track F).** Every other item below is a defect, a safety gap or a missing check in something that already shipped. Where a fix needs a product decision (D1 to D31 in `docs/development/ux-proposals-0.3.4-for-design.md`), the plan proposes a default and lists it in section 6; a default is not a decision until the maintainer says so.
 
 Sources: the Known limits of `docs/development/release-0.3.4-github-text.md`, `docs/development/release-0.3.4-morning-report.md`, the two UX audits (`ux-audit-long-shot-click-guide-0.3.4.md`, `ux-audit-boards-bulk-0.3.4.md`), the UX proposal list (131 items: 14 P1, 54 P2, 63 P3), `docs/project/status.md`, and the `QA-0.3.4-*` and `L1-*-0.3.4-*` reports in `verification/`. No user report of 0.3.4 had arrived when this was written; section 5 is the intake for those.
 
 ## 1. Rules for this release
 
-1. **No new features except track E (ANN-12), no new tools, no new ops.** MCP stays at 89 tools (ANN-12 adds a field to existing ops, not a tool); the only new spec ID is ANN-12. A fix may add an error code or a toast, not a surface. If a fix cannot be done without a feature, it moves to section 7. Further enhancements need the maintainer's word.
+1. **No new features except tracks E (ANN-12) and F (About feedback button), no new tools, no new ops.** MCP stays at 89 tools (ANN-12 adds a field to existing ops, not a tool); the only new spec ID is ANN-12. A fix may add an error code or a toast, not a surface. If a fix cannot be done without a feature, it moves to section 7. Further enhancements need the maintainer's word.
 2. **Safety first.** Items where the user cannot see or stop a capture, or where data is overwritten or leaked, come before polish.
 3. **Every fix has a test or a stored check** that fails before and passes after (a unit test, a `cm-regress` case, or a `tests/manual/` script with a report). "Verified" only with a report in `verification/`.
 4. **Scoped tests while developing, the full gate once on the final tree** ([[feedback-full-gate-once-before-release]]); run clippy with the CI toolchain; run the Trivy gate and `cargo deny` before each merge to `main`.
@@ -78,6 +78,25 @@ The audit rated 6 board items P1. Boards stay as built (flat band label, no drop
 
 **Size:** M (core field and validation S, renderer M with the dash phase around corners and ellipse, editor control S, schema, docs and goldens S). Files: `cm-core/src/annotation.rs`, `cm-render/src/annot.rs`, `apps/desktop/src/editor/**` (shape panel), `cm-mcp` schema, `locales/` (three labels, EN and VI), `tests/golden/annotation/`. A separate track from A to D; it does not touch the guide or capture code.
 
+## 4c. Track F: Send feedback button on the About page (enhancement)
+
+**Today.** Settings > About (`apps/desktop/src/ui/settings/general.rs`, `about()`) has two secondary buttons in one row: `craftmann.app` and `Source on GitHub`. The only Send feedback button is on the Long Shot and Click Guide Preview card (`ui/preview_label.rs`), which opens a GitHub issue form with the feature name and app version.
+
+**Proposal:**
+
+| Point | Proposal |
+| --- | --- |
+| Button | A third secondary button **Send feedback** in the same row, right after `Source on GitHub` (same style, `button_with_icon`, same wrapping on narrow widths). Icon `message-square` (the file is in `apps/desktop/assets/icons/`; it has to be registered in `ui/paint.rs` like `external-link`). |
+| Action | Opens the system browser on the GitHub issue form with the app version filled in; **no logs, paths, screenshots or library data are attached** (same rule as the Preview feedback). A new `general_feedback_url(version)` next to `feedback_url` in `preview_label.rs`, reusing `url_encode`. |
+| Open point to check first | `.github/ISSUE_TEMPLATE/config.yml` has `blank_issues_enabled: false`, so `issues/new?title=...&body=...` shows the template chooser and may drop the pre-filled text. Check on GitHub with the existing Preview link; if it is dropped, point both links at a template (`template=feature_request.yml` or `bug_report.yml`, with the version in a field the template defines) or add a "Feedback" issue form. This also affects the 0.3.4 Preview button, so it may be a bug fix there. |
+| Strings | `tr_ctx!("button", "Send feedback")` for the About page (the Preview card uses `tr!("Send feedback")`; reuse one msgid if the context allows, else add one); Vietnamese entry; `cargo run -p cm-i18n -- extract` and `check`. The issue title and body text stay English (`i18n-ignore`, as today). |
+| Privacy | A click opens the browser; nothing is sent by the app. No network traffic before the click. |
+| Not in scope | An in-app feedback form, attaching logs or screenshots, telemetry, a feedback shortcut elsewhere. |
+
+**Checks:** a unit test that the URL carries the version only and no raw space or newline (as `the_feedback_url_carries_the_feature_and_the_version_only`); the about page's button count and order; Vietnamese and the pseudo-locale (`CAPTUREMANN_PSEUDO_LOCALE=1`) for the row wrapping at the narrowest Settings width; one look on macOS and Windows with a stored report. Spec: add the line to the About page text in the settings spec (find it with `grep -n -i about specs/features/*.md`); no new AC ID needed unless the spec has an About criteria list.
+
+**Size:** S (about half a day, plus the issue-form check). Files: `ui/settings/general.rs`, `ui/preview_label.rs`, `ui/paint.rs`, `locales/`, optionally `.github/ISSUE_TEMPLATE/`. Independent of the other tracks.
+
 ## 5. Track D: intake, carry-over and checks that were never run
 
 1. **0.3.4 user feedback.** Triage every new GitHub issue and message into this plan or section 7. Reserve about a third of the time for it. Nothing has arrived yet.
@@ -123,6 +142,7 @@ Board drop tile and drag handle, Edit board after creation, the S10 stamp label 
 - Section 2 (A1 to A8) fixed, each with a test or stored check, or moved to section 7 with the maintainer's agreement.
 - B1: fixed with a check, or named in the release text as a known limit with what was tried.
 - No regression failure on any system; skipped cases listed by name.
+- Track F: the button is in the About row next to Source on GitHub, opens a pre-filled issue form (checked on GitHub, not dropped by the template chooser), sends nothing before the click.
 - Track E: ANN-12 acceptance criteria cited by tests, goldens for each shape and style, one look at the editor control on macOS and Windows with a stored report; existing goldens unchanged.
 - Version 0.3.5 in `Cargo.toml`, the bundle and the installers; MCP tool count unchanged at 89.
 - Release text says only what a stored report supports.
