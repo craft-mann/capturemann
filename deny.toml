@@ -23,6 +23,7 @@ ignore = [
   { id = "RUSTSEC-2026-0192", reason = "ttf-parser: unmaintained, transitive via gpui-pre/usvg/zbus, no fix available; revisit on upgrade" },
   { id = "RUSTSEC-2026-0371", reason = "zbus_names: unmaintained, transitive via gpui-pre/usvg/zbus, no fix available; revisit on upgrade" },
   { id = "RUSTSEC-2026-0370", reason = "zvariant: unmaintained, transitive via gpui-pre/usvg/zbus, no fix available; revisit on upgrade" },
+  { id = "RUSTSEC-2026-0543", reason = "chrono: unmaintained (advisory of Nov 2026), transitive via gpui-pre only, no fix available; revisit on upgrade" },
   { id = "RUSTSEC-2026-0372", reason = "zvariant_derive: unmaintained, transitive via gpui-pre/usvg/zbus, no fix available; revisit on upgrade" },
 ]
 
