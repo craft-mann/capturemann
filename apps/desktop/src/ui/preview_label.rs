@@ -254,15 +254,23 @@ pub fn url_encode(s: &str) -> String {
     out
 }
 
-/// The GitHub issue form for feedback on a preview: the feature's name and the app version are
-/// filled in; no logs, screenshots or paths are attached.
+/// The GitHub issue form for feedback on a preview: the `feedback.yml` form with the feature's
+/// name and the app version filled in (its `feature` and `version` fields); no logs, screenshots
+/// or paths are attached. Pointing at a template keeps the values when blank issues are off.
 pub fn feedback_url(feature_name: &str, version: &str) -> String {
-    let title = format!("Preview feedback: {feature_name}"); // i18n-ignore: issue text for the maintainers, English
-    let body = format!("Feature: {feature_name} (preview)\nApp version: {version}\n\nWhat works, and what does not:\n"); // i18n-ignore: issue text for the maintainers, English
     format!(
-        "{ISSUES_NEW}?title={}&body={}&labels=preview",
-        url_encode(&title),
-        url_encode(&body)
+        "{}&feature={}",
+        general_feedback_url(version),
+        url_encode(feature_name)
+    )
+}
+
+/// The same form without a feature (the About page's Send feedback button): only the app version
+/// is filled in. Nothing is sent before the click.
+pub fn general_feedback_url(version: &str) -> String {
+    format!(
+        "{ISSUES_NEW}?template=feedback.yml&version={}",
+        url_encode(version)
     )
 }
 
@@ -532,9 +540,20 @@ mod tests {
     fn the_feedback_url_carries_the_feature_and_the_version_only() {
         let u = feedback_url("Long Shot", "0.3.4");
         assert!(u.starts_with("https://github.com/craft-mann/capturemann/issues/new?"));
-        assert!(u.contains("Long%20Shot") && u.contains("0.3.4"));
+        assert!(u.contains("template=feedback.yml"));
+        assert!(u.contains("feature=Long%20Shot") && u.contains("version=0.3.4"));
         assert!(!u.contains(' ') && !u.contains('\n'));
         assert_eq!(url_encode("a b&c"), "a%20b%26c");
+    }
+
+    #[test]
+    fn the_general_feedback_url_carries_the_version_only() {
+        let u = general_feedback_url("0.3.5");
+        assert_eq!(
+            u,
+            "https://github.com/craft-mann/capturemann/issues/new?template=feedback.yml&version=0.3.5"
+        );
+        assert!(!u.contains("feature") && !u.contains("body=") && !u.contains(' '));
     }
 
     #[test]

@@ -965,7 +965,7 @@ impl Render for BoardSheetView {
                             .border_color(rgba_of(t.border))
                             .text_size(px(12.))
                             .text_color(rgba_of(t.text_2))
-                            .child(tr!("Layout editable until Finish")),
+                            .child(tr!("Preview")),
                     )
                     .child(div().flex_1())
                     .child(

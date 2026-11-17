@@ -10751,9 +10751,6 @@ msgstr "Các dòng được giữ lại"
 msgid "Larger corners"
 msgstr "Tăng độ bo góc"
 
-msgid "Layout editable until Finish"
-msgstr "Có thể chỉnh bố cục trước khi chọn “Hoàn tất”"
-
 #. FACT: owner review required (what the permission is for)
 msgid "Lets Long Shot scroll for you. Without it, scroll by hand and Long Shot still works."
 msgstr "Cấp quyền này để Chụp dài có thể tự cuộn. Bạn vẫn có thể cuộn thủ công khi chưa cấp quyền."

@@ -332,7 +332,21 @@ impl SettingsView {
                 "external-link",
                 GITHUB_URL,
                 cx,
-            ));
+            ))
+            .child(
+                button_with_icon(
+                    t,
+                    "about-feedback",
+                    tr!("Send feedback"),
+                    ButtonKind::Secondary,
+                    Some("message-square"),
+                )
+                .on_click(cx.listener(|_, _, _, cx| {
+                    cx.open_url(&crate::ui::preview_label::general_feedback_url(env!(
+                        "CARGO_PKG_VERSION"
+                    )))
+                })),
+            );
         div()
             .flex()
             .flex_col()
