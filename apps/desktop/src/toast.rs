@@ -74,6 +74,10 @@ pub enum ToastAction {
     UploadFile(String, String),
     /// Ends the running Long Shot and keeps the frames taken (S18: "Stop and keep").
     StopLongShot,
+    /// The agent toast's Stop for a Click Guide an agent or the CLI started (BUG-1): ends the
+    /// guide that is recording and opens it, like the passive bar's Stop. Does nothing when no
+    /// guide is recording any more.
+    StopGuide,
     /// Starts Long Shot again to pick Hand scroll (S18: after Auto scroll stopped on a jump).
     TryHandScroll,
 }
@@ -145,7 +149,7 @@ impl ToastAction {
             ToastAction::GuidePickWindow => "app-window",
             ToastAction::GuideStopOpen(_) => "mouse-pointer-click",
             ToastAction::SuggestReport(_) => "file-text",
-            ToastAction::StopLongShot => "cm-stop",
+            ToastAction::StopLongShot | ToastAction::StopGuide => "cm-stop",
             ToastAction::TryHandScroll => "hand",
         }
     }
@@ -287,6 +291,20 @@ impl ToastSpec {
                 cm_i18n::tr_ctx!("button", "Stop"),
                 ToastAction::StopRecording(id.clone()),
             )
+        })
+    }
+
+    /// The agent toast for a call the activity log reported (BUG-1): `start_guide` gets a
+    /// "Stop" button, because a guide an agent or the CLI started listens to every click until
+    /// somebody stops it; any other tool gets the plain toast.
+    pub fn for_agent_call(tool: impl Into<String>, client: impl Into<String>) -> Self {
+        let (tool, client) = (tool.into(), client.into());
+        if tool != "start_guide" {
+            return ToastSpec::agent(tool, client);
+        }
+        ToastSpec::live(move || {
+            ToastSpec::agent(tool.clone(), client.clone())
+                .button(cm_i18n::tr_ctx!("button", "Stop"), ToastAction::StopGuide)
         })
     }
 
@@ -713,6 +731,24 @@ mod tests {
         assert_eq!(cli.title, "Started by agent via the command line");
         let mcp = ToastSpec::agent("start_guide", "claude-desktop");
         assert_eq!(mcp.title, "Started by agent via MCP");
+    }
+
+    /// BUG-1: the toast of an agent's or the CLI's `start_guide` has a Stop button; the toast of
+    /// any other tool does not, and the Stop survives a language change (a live toast).
+    #[test]
+    fn bug_1_the_start_guide_toast_has_a_stop_button() {
+        for client in [CLI_CLIENT_NAME, "claude-desktop"] {
+            let g = ToastSpec::for_agent_call("start_guide", client);
+            assert_eq!(g.kind, ToastKind::Agent);
+            assert_eq!(g.buttons.len(), 1, "{client}");
+            assert_eq!(g.buttons[0].action, ToastAction::StopGuide);
+            assert_eq!(g.buttons[0].label, "Stop");
+            assert!(g.rebuild.is_some());
+            assert_eq!(g.agent.as_ref().unwrap().client, client);
+        }
+        let other = ToastSpec::for_agent_call("capture_screenshot", "claude-desktop");
+        assert!(other.buttons.is_empty());
+        assert_eq!(other.title, "Started by agent via MCP");
     }
 
     #[test]

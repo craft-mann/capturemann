@@ -403,31 +403,38 @@ async fn cg_markdown_export_never_overwrites_and_writes_titles_as_plain_text() {
         )
         .await;
     let ex = ok(&ex);
+    // BUG-2: straight into the folder, the name carries the date and time.
     let path = std::path::PathBuf::from(ex["path"].as_str().unwrap());
-    assert_ne!(path, out, "{ex}");
-    assert_eq!(ex["renamed"], true);
-    assert!(path.starts_with(&out) && path.join("guide.md").is_file());
+    assert_eq!(path, out, "{ex}");
+    let name = ex["file"].as_str().unwrap().to_owned();
+    assert!(
+        name.starts_with("guide-")
+            && name.ends_with(".md")
+            && name.len() == "guide-YYYY-MM-DD-HHMMSS.md".len(),
+        "{name}"
+    );
     assert_eq!(
         std::fs::read_to_string(out.join("guide.md")).unwrap(),
         "my own notes"
     );
-    let md = std::fs::read_to_string(path.join("guide.md")).unwrap();
+    let md = std::fs::read_to_string(out.join(&name)).unwrap();
     assert!(!md.contains("](https"), "{md}");
     assert!(!md.replace("\\<", "").contains('<'), "{md}");
     assert!(!md.contains("https://"), "{md}");
     assert!(!md.contains("www.evil"), "{md}");
     assert!(md.contains("\\[Open\\]"), "{md}");
-    // Again: a second folder, the first untouched.
+    // Again: new names, the first export untouched.
     let ex2 = c
         .call(
             "export_guide",
             json!({"guide_id": id, "format": "markdown", "dest": out}),
         )
         .await;
-    let path2 = std::path::PathBuf::from(ok(&ex2)["path"].as_str().unwrap());
-    assert_ne!(path2, path);
-    assert!(path.join("guide.md").is_file() && path2.join("guide.md").is_file());
-    // HTML to a file that is there: `name (2).html`.
+    let name2 = ok(&ex2)["file"].as_str().unwrap().to_owned();
+    assert_ne!(name2, name);
+    assert!(out.join(&name).is_file() && out.join(&name2).is_file());
+    assert_eq!(std::fs::read_to_string(out.join(&name)).unwrap(), md);
+    // HTML to a file that is there is refused (BUG-3) and the file is untouched.
     let file = r.dir.path().join("g.html");
     std::fs::write(&file, "old").unwrap();
     let h = c
@@ -436,9 +443,8 @@ async fn cg_markdown_export_never_overwrites_and_writes_titles_as_plain_text() {
             json!({"guide_id": id, "format": "html", "dest": file}),
         )
         .await;
-    let h = ok(&h);
+    assert!(h.get("error").is_some(), "{h}");
     assert_eq!(std::fs::read_to_string(&file).unwrap(), "old");
-    assert!(h["path"].as_str().unwrap().ends_with("g (2).html"), "{h}");
 }
 
 /// QA macOS pass 7: the confirmation of a Click Guide (and of a Long Shot) showed its target as

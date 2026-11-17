@@ -1157,6 +1157,11 @@ pub fn remember_local_offset() {
     }
 }
 
+/// `now` in the computer's local offset (UTC when [`remember_local_offset`] was not called).
+pub fn to_local(now: OffsetDateTime) -> OffsetDateTime {
+    LOCAL_OFFSET.get().map_or(now, |o| now.to_offset(*o))
+}
+
 /// `"<prefix> yyyy-MM-dd HH.mm"` in local time (LIB-1 default title).
 pub fn default_title(prefix: &str, now: OffsetDateTime) -> Result<String, CmError> {
     let now = LOCAL_OFFSET.get().map_or(now, |o| now.to_offset(*o));

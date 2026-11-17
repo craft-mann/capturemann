@@ -203,7 +203,14 @@ async fn gde_3_ac2_ocr_finds_no_text_inside_a_blur_in_markdown_html_and_pdf() {
             "markdown",
             (1..=2)
                 .map(|n| {
-                    image::open(md.join(format!("images/step-{n:02}.png")))
+                    // BUG-2: the pictures are in `images-<date and time>`.
+                    let pictures = std::fs::read_dir(&md)
+                        .unwrap()
+                        .flatten()
+                        .map(|e| e.path())
+                        .find(|p| p.is_dir())
+                        .unwrap();
+                    image::open(pictures.join(format!("step-{n:02}.png")))
                         .unwrap()
                         .to_rgba8()
                 })

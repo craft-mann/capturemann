@@ -2097,6 +2097,9 @@ msgstr "Mở Cài đặt Hệ thống"
 msgid "Open captions"
 msgstr "Mở phụ đề"
 
+msgid "Open folder"
+msgstr "Mở thư mục"
+
 msgid "Open launcher"
 msgstr "Mở trình khởi chạy"
 

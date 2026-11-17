@@ -188,8 +188,9 @@ fn edit_export(ctx: &mut Ctx) -> R {
     for i in &images {
         crate::cases::common::check_png(i)?;
     }
+    // 0.3.5 names the folder `images-<date and time>`; 0.3.4 packages used `images/`.
     check!(
-        text.matches("](images/").count() == 2,
+        text.matches("](images/").count() + text.matches("](images-").count() == 2,
         "guide.md does not link its two images with relative `images/` paths"
     );
     check!(
@@ -238,9 +239,16 @@ fn edit_export(ctx: &mut Ctx) -> R {
 }
 
 fn find_file(dir: &Path, name: &str) -> Option<PathBuf> {
-    Ctx::files_under(dir)
-        .into_iter()
-        .find(|p| p.file_name().is_some_and(|n| n == name))
+    Ctx::files_under(dir).into_iter().find(|p| {
+        p.file_name().is_some_and(|n| {
+            let n = n.to_string_lossy();
+            // `guide.md`, or `guide-YYYY-MM-DD-HHMMSS.md` (0.3.5).
+            n == name
+                || name
+                    .strip_suffix(".md")
+                    .is_some_and(|stem| n.starts_with(&format!("{stem}-")) && n.ends_with(".md"))
+        })
+    })
 }
 
 fn images_under(dir: &Path) -> Vec<PathBuf> {

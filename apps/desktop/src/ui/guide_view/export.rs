@@ -10,7 +10,7 @@ use cm_i18n::tr;
 
 use super::GuideView;
 use crate::theme::{scale, type_scale, Theme};
-use crate::toast::{ToastKind, ToastSpec};
+use crate::toast::{ToastAction, ToastKind, ToastSpec};
 use crate::ui::app;
 use crate::ui::components::{button, ButtonKind};
 use crate::ui::paint::{rgba_of, TextExt};
@@ -134,8 +134,8 @@ fn run(view: &mut GuideView, cx: &mut Context<GuideView>) {
     if let Some(e) = &mut view.export {
         e.busy = true;
     }
-    // Markdown goes into the chosen folder when it is empty, else into a folder of the guide's
-    // name inside it; HTML and PDF are one file in the chosen folder. Nothing is overwritten.
+    // Markdown goes straight into the chosen folder as `guide-<date and time>.md` and
+    // `images-<date and time>/`; HTML and PDF are one file in it. Nothing is overwritten.
     let params = json!({
         "guide_id": id,
         "format": ex.format.key(),
@@ -151,26 +151,35 @@ fn run(view: &mut GuideView, cx: &mut Context<GuideView>) {
         this.export = None;
         match r {
             Ok(v) => {
-                let n = v["steps"].as_u64().unwrap_or(0);
-                // Where it really went: the daemon never writes over what is there, so a folder
-                // that held files gets a folder of the guide's name inside it (or `(2)`).
-                let path = v["path"]
-                    .as_str()
-                    .map_or_else(|| dest.display().to_string(), str::to_owned);
-                let mut body = tr!("{n} steps written to {path}", n = n, path = path);
-                if let Some(w) = v["warnings"][0].as_str() {
-                    body = format!("{body}\n{w}");
-                }
-                toast(
-                    this,
-                    ToastSpec::new(ToastKind::Success, tr!("Guide exported")).body(body),
-                    cx,
-                );
+                let spec = exported_toast(&v, &dest);
+                toast(this, spec, cx);
             }
             Err(e) => this.error = Some(e),
         }
         cx.notify();
     });
+}
+
+/// The success toast of an export (BUG-2): how many steps went where, with an **Open folder**
+/// button that shows the written file (the Markdown, the HTML or the PDF) in the file manager.
+/// `v` is the `export_guide` reply, `dest` the folder the person chose.
+pub(crate) fn exported_toast(v: &Value, dest: &std::path::Path) -> ToastSpec {
+    let n = v["steps"].as_u64().unwrap_or(0);
+    let path = v["path"]
+        .as_str()
+        .map_or_else(|| dest.display().to_string(), str::to_owned);
+    let mut body = tr!("{n} steps written to {path}", n = n, path = path);
+    if let Some(w) = v["warnings"][0].as_str() {
+        body = format!("{body}\n{w}");
+    }
+    // Markdown: the file inside the folder; HTML and PDF: `path` is the file itself.
+    let reveal = match v["file"].as_str() {
+        Some(f) => std::path::Path::new(&path).join(f).display().to_string(),
+        None => path,
+    };
+    ToastSpec::new(ToastKind::Success, tr!("Guide exported"))
+        .body(body)
+        .button(tr!("Open folder"), ToastAction::RevealPath(reveal))
 }
 
 fn tile(
@@ -386,4 +395,41 @@ pub fn sheet(t: &Theme, ex: &ExportState, cx: &mut Context<GuideView>) -> gpui::
         .occlude()
         .child(card)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// BUG-2: the success toast has an Open folder button that shows what was written (the
+    /// Markdown file inside its folder; the HTML or PDF file itself).
+    #[test]
+    fn bug_2_the_success_toast_has_an_open_folder_button() {
+        let md = exported_toast(
+            &json!({"steps": 3, "path": "/out", "file": "guide-2026-11-17-153045.md",
+                    "warnings": []}),
+            std::path::Path::new("/out"),
+        );
+        assert_eq!(md.kind, ToastKind::Success);
+        assert_eq!(md.buttons.len(), 1);
+        assert_eq!(md.buttons[0].label, "Open folder");
+        assert_eq!(
+            md.buttons[0].action,
+            ToastAction::RevealPath(
+                std::path::Path::new("/out")
+                    .join("guide-2026-11-17-153045.md")
+                    .display()
+                    .to_string()
+            )
+        );
+        assert!(md.body.as_deref().is_some_and(|b| b.contains("/out")));
+        let html = exported_toast(
+            &json!({"steps": 2, "path": "/out/g.html", "warnings": []}),
+            std::path::Path::new("/out"),
+        );
+        assert_eq!(
+            html.buttons[0].action,
+            ToastAction::RevealPath("/out/g.html".into())
+        );
+    }
 }

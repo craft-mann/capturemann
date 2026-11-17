@@ -431,26 +431,32 @@ async fn gde_3_markdown_export_has_relative_images_and_the_blur_is_in_them() {
             json!({"guide_id": id, "format": "markdown", "dest": out}),
         )
         .await;
-    ok(&ex);
-    let md = std::fs::read_to_string(out.join("guide.md")).unwrap();
+    let name = ok(&ex)["file"].as_str().unwrap().to_owned();
+    let stamp = name
+        .strip_prefix("guide-")
+        .and_then(|n| n.strip_suffix(".md"))
+        .unwrap()
+        .to_owned();
+    let images = format!("images-{stamp}");
+    let md = std::fs::read_to_string(out.join(&name)).unwrap();
     assert_eq!(md.matches("![").count(), 5);
     assert!(md.contains("# Set up"));
     assert!(md.contains("## 1. Click \"Alpha\""));
-    assert!(md.contains("(images/step-03.png)"));
+    assert!(md.contains(&format!("({images}/step-03.png)")));
     assert!(
         !md.contains(r.dir.path().to_str().unwrap()),
         "no absolute paths"
     );
     for n in 1..=5 {
-        assert!(out.join(format!("images/step-{n:02}.png")).is_file());
+        assert!(out.join(format!("{images}/step-{n:02}.png")).is_file());
     }
     // The pixelated block holds one colour in the exported image, the original does not.
-    let img = image::open(out.join("images/step-03.png"))
+    let img = image::open(out.join(format!("{images}/step-03.png")))
         .unwrap()
         .to_rgba8();
     let px = |x, y| *img.get_pixel(x, y);
     assert_eq!(px(205, 105), px(215, 115));
-    let other = image::open(out.join("images/step-02.png"))
+    let other = image::open(out.join(format!("{images}/step-02.png")))
         .unwrap()
         .to_rgba8();
     assert_ne!(*other.get_pixel(205, 105), *other.get_pixel(215, 115));

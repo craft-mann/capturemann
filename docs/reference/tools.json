@@ -10404,7 +10404,7 @@
       "previewParams": [],
       "spec": "GDE-3, GDE-4",
       "cli": "guide export",
-      "description": "Export a stopped guide. `markdown`: `guide.md` and `images/step-NN.png` (relative links, no absolute paths; pastes into a GitHub wiki) in the folder `dest` when it is new or empty, else in a new folder inside it named after the guide (`Title (2)` when taken); titles and notes are written as plain text, never as links or markup. Nothing is ever overwritten: an HTML or PDF file that exists gets `name (2).html`; `path` is what was written and `renamed` says whether the name differs from `dest`. `html`: one self-contained file (images embedded, light and dark styles, table of contents, print styles; `dest` is a file or a folder). `rich_text`: puts formatted text with the pictures on the clipboard (no `dest`). `pdf`: one file (`dest` is a file or a folder), A4 or `paper` `letter`, one or two steps per page, the fonts embedded (Vietnamese text works). The pictures are rendered, so annotations and blurs are in every export; Click Guide does not mark or blur text: a step can show private text, so look at the pictures first (`suggest_redactions` and `annotate` work on a step's `image_id`). Options: `headings` (`numbered` `1. Title`, `step` `Step 1 · Title`, `title_only`), `image_scale` 1 or 2 (images are at most 800 px wide, or 1600 at 2, never larger than the frame), and `intro`, `notes`, `note_steps` switches (default true). Tier: Free (runs immediately; undoable where it edits a capture). The user can set this tool to Ask first in CaptureMann’s settings: the call then waits up to 5 minutes for an on-screen confirmation and fails with `user_declined` (`data.reason` is `ask_first`) or `confirmation_timeout`; the daemon’s `actions.list` reports the `effective_tier`. Accepts an optional `request_id`: repeating it returns the first result instead of acting twice. Spec: GDE-3, GDE-4. (preview) Part of Click Guide, a Preview feature: it may still change, but it is always available.",
+      "description": "Export a stopped guide. `markdown`: `guide-YYYY-MM-DD-HHMMSS.md` and `images-YYYY-MM-DD-HHMMSS/step-NN.png` (the local date and time; relative links, no absolute paths; pastes into a GitHub wiki) written straight into the folder `dest`; titles and notes are written as plain text, never as links or markup. Nothing is ever overwritten: a second export gets new names, and a `dest` that is a file that already exists is refused (`invalid_input`), as is a guide with no step. Where the files go: inside the library or the user's export folders the call runs at once; anywhere else the user is asked first and the dialog shows the exact path (Confirm for that call). An HTML or PDF file named by a folder `dest` gets `name (2).html` when `<title>.html` is taken.`html`: one self-contained file (images embedded, light and dark styles, table of contents, print styles; `dest` is a file or a folder). `rich_text`: puts formatted text with the pictures on the clipboard (no `dest`). `pdf`: one file (`dest` is a file or a folder), A4 or `paper` `letter`, one or two steps per page, the fonts embedded (Vietnamese text works). The pictures are rendered, so annotations and blurs are in every export; Click Guide does not mark or blur text: a step can show private text, so look at the pictures first (`suggest_redactions` and `annotate` work on a step's `image_id`). Options: `headings` (`numbered` `1. Title`, `step` `Step 1 · Title`, `title_only`), `image_scale` 1 or 2 (images are at most 800 px wide, or 1600 at 2, never larger than the frame), and `intro`, `notes`, `note_steps` switches (default true). Tier: Free (runs immediately; undoable where it edits a capture). The user can set this tool to Ask first in CaptureMann’s settings: the call then waits up to 5 minutes for an on-screen confirmation and fails with `user_declined` (`data.reason` is `ask_first`) or `confirmation_timeout`; the daemon’s `actions.list` reports the `effective_tier`. Accepts an optional `request_id`: repeating it returns the first result instead of acting twice. Spec: GDE-3, GDE-4. (preview) Part of Click Guide, a Preview feature: it may still change, but it is always available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10492,15 +10492,15 @@
           },
           "path": {
             "type": "string",
-            "description": "The folder or file written; differs from `dest` when `renamed`."
+            "description": "The folder (markdown) or file (html, pdf) written."
+          },
+          "file": {
+            "type": "string",
+            "description": "markdown: the name of the `.md` file inside `path`."
           },
           "renamed": {
             "type": "boolean",
-            "description": "A free name was chosen because `dest` was taken (never overwritten)."
-          },
-          "requested": {
-            "type": "string",
-            "description": "markdown: `dest` as asked."
+            "description": "html, pdf: a free name was chosen because `<title>.<ext>` was taken in the folder `dest` (never overwritten)."
           },
           "files": {
             "type": "array",
