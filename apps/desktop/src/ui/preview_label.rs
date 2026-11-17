@@ -1,5 +1,5 @@
 //! The Preview label (design S24): one small neutral component that marks a feature as a
-//! preview (Long Shot and Click Guide in 0.3.4) wherever people start it, plus the popover it
+//! preview (Long Shot and Click Guide in 0.3.4, Boards in 0.3.5) wherever people start it, plus the popover it
 //! opens on a click and the one-time intro card.
 //!
 //! The label is a 1 px dashed pill with no fill, in three sizes: XS (14 px, 9/600, a corner tag on
@@ -32,16 +32,22 @@ use crate::ui::tooltip::{rich_tip, TipLine};
 pub enum PreviewFeature {
     LongShot,
     ClickGuide,
+    Boards,
 }
 
 impl PreviewFeature {
-    pub const ALL: [PreviewFeature; 2] = [PreviewFeature::LongShot, PreviewFeature::ClickGuide];
+    pub const ALL: [PreviewFeature; 3] = [
+        PreviewFeature::LongShot,
+        PreviewFeature::ClickGuide,
+        PreviewFeature::Boards,
+    ];
 
     /// The stable key: `ui.preview_intro.<key>` is its flag.
     pub fn key(self) -> &'static str {
         match self {
             PreviewFeature::LongShot => "long_shot",
             PreviewFeature::ClickGuide => "click_guide",
+            PreviewFeature::Boards => "boards",
         }
     }
 
@@ -50,6 +56,7 @@ impl PreviewFeature {
         match self {
             PreviewFeature::LongShot => crate::nav::ExtraTile::LongShot.label(),
             PreviewFeature::ClickGuide => crate::nav::ExtraTile::ClickGuide.label(),
+            PreviewFeature::Boards => tr_ctx!("feature name", "Boards"),
         }
     }
 
@@ -280,6 +287,7 @@ pub fn send_feedback(feature: PreviewFeature, cx: &mut App) {
     let name = match feature {
         PreviewFeature::LongShot => "Long Shot",
         PreviewFeature::ClickGuide => "Click Guide",
+        PreviewFeature::Boards => "Boards",
     };
     cx.open_url(&feedback_url(name, env!("CARGO_PKG_VERSION")));
 }
@@ -347,6 +355,9 @@ fn popover_lines(feature: PreviewFeature) -> [String; 3] {
             PreviewFeature::ClickGuide => {
                 tr!("Your Click Guides are normal guides and stay readable.")
             }
+            PreviewFeature::Boards => {
+                tr!("Your boards and the screenshots in them are normal screenshots and stay readable.")
+            }
         },
         tr!("Tell us what works and what doesn\u{2019}t."),
     ]
@@ -359,6 +370,9 @@ fn intro_line(feature: PreviewFeature) -> String {
         ),
         PreviewFeature::ClickGuide => tr!(
             "Click through a task once; each click becomes a numbered step. Clicks only, never keystrokes."
+        ),
+        PreviewFeature::Boards => tr!(
+            "Pick 2 to 12 screenshots and put them into one picture: a pair, a grid, a strip or a free layout."
         ),
     }
 }
@@ -534,6 +548,25 @@ mod tests {
         s.insert("ui.preview_intro.click_guide".into(), Value::Bool(true));
         assert!(!intro_due(&s, PreviewFeature::ClickGuide));
         assert!(intro_due(&s, PreviewFeature::LongShot), "per feature");
+    }
+
+    #[test]
+    fn boards_is_a_preview_feature_with_its_own_flag_and_english_feedback_name() {
+        let b = PreviewFeature::Boards;
+        assert_eq!(b.key(), "boards");
+        assert_eq!(b.intro_key(), "ui.preview_intro.boards");
+        assert!(PreviewFeature::ALL.contains(&b));
+        assert!(cm_core::features::feature("boards").unwrap().is_preview());
+        let mut s = Map::new();
+        assert!(intro_due(&s, b));
+        s.insert("ui.preview_intro.boards".into(), Value::Bool(true));
+        assert!(!intro_due(&s, b));
+        assert!(intro_due(&s, PreviewFeature::ClickGuide), "per feature");
+        let u = feedback_url("Boards", "0.3.5");
+        assert!(u.contains("feature=Boards") && u.contains("version=0.3.5"));
+        assert!(!b.name().is_empty());
+        assert_eq!(popover_lines(b).len(), 3);
+        assert!(!intro_line(b).is_empty());
     }
 
     #[test]

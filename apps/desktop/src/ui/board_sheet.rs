@@ -956,17 +956,13 @@ impl Render for BoardSheetView {
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(tr!("New board")),
                     )
-                    .child(
-                        div()
-                            .px(px(10.))
-                            .py(px(3.))
-                            .rounded(px(scale::RADIUS_PILL))
-                            .border_1()
-                            .border_color(rgba_of(t.border))
-                            .text_size(px(12.))
-                            .text_color(rgba_of(t.text_2))
-                            .child(tr!("Preview")),
-                    )
+                    .child(crate::ui::preview_label::label(
+                        &t,
+                        crate::ui::preview_label::Size::M,
+                        crate::ui::preview_label::PreviewFeature::Boards,
+                        None,
+                        Some(app.clone()),
+                    ))
                     .child(div().flex_1())
                     .child(
                         div()
@@ -1115,6 +1111,12 @@ pub fn open(app: &Entity<AppModel>, shots: Vec<(String, String, u32, u32)>, cx: 
         m.bulk.epoch += 1;
         cx.notify();
     });
+    // Design S24: the first time the sheet opens, a one-line intro (once).
+    crate::ui::preview_label::show_intro_if_due(
+        app,
+        crate::ui::preview_label::PreviewFeature::Boards,
+        cx,
+    );
     refine_sizes(app, cx);
 }
 
