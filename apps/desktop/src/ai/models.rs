@@ -229,15 +229,6 @@ fn model_hint(id: &str, catalogue: &str) -> String {
             tr!("Compares voices so the same person gets the same label. Second of the two files that tell speakers apart.")
         }
         "silero-vad" => tr!("Finds where people speak so the transcription can skip noise. 0.9 MB."),
-        "phowhisper-small" => tr!(
-            "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages."
-        ),
-        "phowhisper-medium" => tr!(
-            "Vietnamese speech, more accurate and slower. Fine-tuned from Whisper medium for Vietnamese; not for other languages."
-        ),
-        "phowhisper-large" => tr!(
-            "Vietnamese speech, the largest. Fine-tuned from Whisper large for Vietnamese; not for other languages."
-        ),
         "gemma-4-e2b" => tr!(
             "Recommended for reports and notes on every computer. Best score in our test, English and Vietnamese."
         ),

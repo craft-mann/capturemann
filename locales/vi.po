@@ -6228,15 +6228,6 @@ msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt
 msgid "Finds where people speak so the transcription can skip noise. 0.9 MB."
 msgstr "Tìm chỗ có người nói để bản chép lời bỏ qua tạp âm. 0,9 MB."
 
-msgid "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages."
-msgstr "Giọng nói tiếng Việt, cân bằng. Tinh chỉnh từ Whisper small cho tiếng Việt; không dùng cho ngôn ngữ khác."
-
-msgid "Vietnamese speech, more accurate and slower. Fine-tuned from Whisper medium for Vietnamese; not for other languages."
-msgstr "Giọng nói tiếng Việt, chính xác hơn và chậm hơn. Tinh chỉnh từ Whisper medium cho tiếng Việt; không dùng cho ngôn ngữ khác."
-
-msgid "Vietnamese speech, the largest. Fine-tuned from Whisper large for Vietnamese; not for other languages."
-msgstr "Giọng nói tiếng Việt, bản lớn nhất. Tinh chỉnh từ Whisper large cho tiếng Việt; không dùng cho ngôn ngữ khác."
-
 msgid "Recommended for reports and notes on every computer. Best score in our test, English and Vietnamese."
 msgstr "Khuyên dùng cho báo cáo và ghi chú trên mọi máy tính. Điểm cao nhất trong bài thử của chúng tôi, tiếng Anh và tiếng Việt."
 

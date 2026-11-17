@@ -6805,15 +6805,6 @@ msgstr ""
 msgid "Video: {video} · Audio: {audio} · Pictures: {image}"
 msgstr ""
 
-msgid "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages."
-msgstr ""
-
-msgid "Vietnamese speech, more accurate and slower. Fine-tuned from Whisper medium for Vietnamese; not for other languages."
-msgstr ""
-
-msgid "Vietnamese speech, the largest. Fine-tuned from Whisper large for Vietnamese; not for other languages."
-msgstr ""
-
 msgid "Voice note"
 msgstr ""
 
