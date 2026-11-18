@@ -17,12 +17,14 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 ## 1. Opening the panel (QC-1 "Opening")
 
 1. **Shortcut.** Press Option+Shift+C (macOS) or Ctrl+Alt+Shift+C (Windows, Linux). Expected: the panel
-   opens near the pointer, on the display that has it, and the keyboard goes to it. Press the shortcut
+   opens near the pointer, on the display that has it (move the pointer to a corner and press it again:
+   the panel follows the pointer; on Wayland, which gives no position, it opens centred on the display), and
+   the keyboard goes to it (on X11, focus another window first: keys 1, 2, 3 must not reach it). Press the shortcut
    again: it closes. The Launcher shortcut (Option+Shift+Space) still opens the Launcher.
 2. **Tray.** Open the tray or menu-bar menu. Expected: **Quick Capture…** is the first item, then
    Capture region, Capture window, Capture display. Choose it: the panel is centred on the tray icon (under the
    macOS status item, above the Windows taskbar icon) and fully on the display; on Linux, where the
-   icon has no position, it opens near the pointer (QC-1.AC11). While a recording runs, Stop is the first item and
+   icon has no position, it opens near the pointer (QC-1.AC11, AC12). While a recording runs, Stop is the first item and
    Quick Capture… follows the Record group.
 3. **Dock.** In the sidebar, under **Record…**, a neutral **Capture…** button with its keycap.
    Click it: the panel opens near the pointer. The five dock tiles and the Long Shot and Click Guide
@@ -31,7 +33,9 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
    and its keycap, in the Capture group. Press Enter: the panel opens.
 5. **Rebind.** Settings > Shortcuts > "Open Quick Capture" > Change. Press the Launcher's chord:
    refused with "Already used by Open launcher". Press a free chord: it works. Reset to defaults.
-6. **Hotkey taken.** With another app holding Option+Shift+C: Settings > Shortcuts shows "Couldn't
+6. **Rebind needs the keys.** On X11 the chord you press while Change waits must reach the page even when
+   the app itself holds it as a global shortcut (QC-1.AC15; the recorder must show the refusal, not open the Launcher).
+6b. **Hotkey taken.** With another app holding Option+Shift+C: Settings > Shortcuts shows "Couldn't
    register: used by another app" on that row, and the tray item still opens the panel.
 
 ## 2. The panel (QC-1, QC-4)
@@ -61,6 +65,9 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 11. **Not in the picture.** Take a Region screenshot from the panel with Copy on. Expected: the panel is
     gone before the picker opens and is not in the picture. Do it with Delay 3 s too: the pill counts
     down with no panel on screen.
+11b. **Wayland.** A portal screenshot or a recording started by another program while the panel is
+    open can show the panel: there is no way to exclude a window there (spec, Window behaviour). Check
+    that the panel closes before a capture started from it.
 12. **Preview.** The Preview label is in the header; hover it for its tooltip. **Send feedback** opens the
     browser on the feedback form with the feature "Quick Capture" and the app version only.
 
@@ -96,8 +103,8 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
     microphone, webcam and countdown choices are as before. Stop and delete the take.
 21. **Video Region and Window.** The region or window picker opens (no screenshot is taken), then the
     countdown, then the HUD.
-22. **Audio.** Audio > Mic on, Transcribe on, Markers on. "Record" starts an audio recording (no screen
-    picker); a toast shows the marker shortcut. Stop after a few seconds: the transcript starts by itself.
+22. **Audio.** Audio > Mic on, Transcribe on, Markers on. "Record" starts an audio recording at once, with
+    no countdown even when Settings has one (QC-1.AC14; no screen picker); a toast shows the marker shortcut. Stop after a few seconds: the transcript starts by itself.
 23. **No permission.** With the microphone not allowed: the recording starts without it and says so, or
     the start error points at Permissions.
 
@@ -106,14 +113,15 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 24. **Starters.** Open the picker (the pill, or P). Expected: No preset, Bug report, Docs shot, Demo video,
     Meeting, each with a one-line summary, then **Save current as preset…** and **Edit presets…**. Pick
     "Bug report": the kind, target and tiles fill, and the bar reads "Capture · Bug report". Pick "Demo
-    video": the bar is red and reads "Record · Demo video". Switching the tab drops the preset.
+    video": the bar is red and reads "Record · Demo video". Switching the tab drops the preset. Pick "Docs shot", close the panel, open `quick_capture.json`: it still
+    holds the tiles you had before (QC-1.AC13); choose No preset: the tiles are back as they were.
 25. **Save current.** Set up something, pick **Save current as preset…**, name it, Save. It is the picked
     preset, appears in the picker, and `presets.json` in the settings folder holds the same setup.
     A field you add by hand to that file (for example `"team": "docs"`) is still there after the next save.
 26. **Settings > Capture & recording > Presets** (the top of the page; the panel's settings button and
     **Edit presets…** open it). Move a preset up and down; Edit opens the sheet; Delete asks for a second
     click ("Delete for good"). Delete all four starters, quit and start again: they do not come back.
-27. **Edit sheet.** Name; Kind and Target; the toggles (Copy to clipboard, Auto-redact, Open in editor for
+27. **Edit sheet.** Name (it shows the preset's name when you edit an existing one; on X11 click it and type); Kind and Target; the toggles (Copy to clipboard, Auto-redact, Open in editor for
     a screenshot); "Then open the tool" (after Open in editor); Save to; Shortcut with **Change**;
     Save preset, Cancel, Delete. Make a preset with Save to `~/Bugs/{date}` and the tool "step".
     On a 1080p display at 150 % scale (1280 by 720 logical): the title and the footer stay in place,
@@ -134,7 +142,8 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 
 ## 5b. The panel's height with the picker (QC-4.AC8)
 
-34. Open the picker with the four starters: the panel grows to show every row, no row is cut off.
+34. Open the picker with the four starters: the panel grows to show every row (a preset row is about 55 px),
+    "Meeting" and its summary are fully visible, no row is cut off.
     Add presets until the list is taller than the display: the panel stops at the height of the display
     (less the edge gaps), the list scrolls, and moving the highlight with Down scrolls it into view.
     Close the picker (Esc): the panel returns to its normal size. Check it on the 720 px display too.

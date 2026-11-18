@@ -13,6 +13,10 @@ use std::time::{Duration, Instant};
 
 pub const MAX_TOASTS: usize = 3;
 pub const AUTO_DISMISS: Duration = Duration::from_secs(5);
+/// The longest a hover holds a toast: the pointer may be over a toast whose window went away
+/// (hidden for a capture, closed, moved), and no "left" event then comes. After this the toast
+/// ends even if the pointer is still counted as over it.
+pub const HOVER_PAUSE_MAX: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastKind {
@@ -212,10 +216,16 @@ impl Toast {
                     .any(|b| matches!(b.action, ToastAction::StopRecording(_))))
     }
 
-    /// When the toast goes away by itself; `None` for a sticky toast and while it is hovered.
+    /// When the toast goes away by itself; `None` for a sticky toast. While it is hovered the
+    /// clock is paused, but never for longer than [`HOVER_PAUSE_MAX`].
     pub fn expires_at(&self) -> Option<Instant> {
-        (!self.sticky() && self.hovered_since.is_none())
-            .then(|| self.created + self.dismiss_after.unwrap_or(AUTO_DISMISS))
+        if self.sticky() {
+            return None;
+        }
+        match self.hovered_since {
+            Some(since) => Some(since + HOVER_PAUSE_MAX),
+            None => Some(self.created + self.dismiss_after.unwrap_or(AUTO_DISMISS)),
+        }
     }
 }
 
@@ -564,6 +574,19 @@ impl ToastQueue {
         true
     }
 
+    /// The toast window went away (hidden for a capture, closed or moved): no toast is under the
+    /// pointer any more, and no "left" event will come. Every clock runs again.
+    pub fn clear_hovers(&mut self, now: Instant) -> bool {
+        let mut changed = false;
+        for t in &mut self.toasts {
+            if let Some(since) = t.hovered_since.take() {
+                t.created += now.saturating_duration_since(since);
+                changed = true;
+            }
+        }
+        changed
+    }
+
     pub fn is_empty(&self) -> bool {
         self.toasts.is_empty()
     }
@@ -870,10 +893,13 @@ mod tests {
             !q.set_hover(id, true, t + Duration::from_secs(5)),
             "no change"
         );
-        assert_eq!(q.next_expiry(t + Duration::from_secs(10)), None);
+        assert_eq!(
+            q.next_expiry(t + Duration::from_secs(10)),
+            Some(Duration::from_secs(24))
+        );
         assert!(
-            !q.expire(t + Duration::from_secs(3600)),
-            "paused: never expires"
+            !q.expire(t + Duration::from_secs(20)),
+            "paused while hovered"
         );
         // Leaving 10 s after entering: 1 s of the 5 s was left.
         assert!(q.set_hover(id, false, t + Duration::from_secs(14)));
@@ -884,6 +910,26 @@ mod tests {
         assert!(!q.expire(t + Duration::from_millis(14_999)));
         assert!(q.expire(t + Duration::from_secs(15)));
         assert!(!q.set_hover(id, true, t), "gone");
+    }
+
+    /// L-6: a hover that never ends (the window went away under the pointer) holds a toast only
+    /// for [`HOVER_PAUSE_MAX`], and a toast window that goes away releases it at once.
+    #[test]
+    fn a_stuck_hover_does_not_keep_a_toast_for_ever() {
+        let mut q = ToastQueue::default();
+        let t = Instant::now();
+        let id = q.push(spec(ToastKind::Success), t);
+        assert!(q.set_hover(id, true, t + Duration::from_secs(1)));
+        assert!(!q.expire(t + Duration::from_secs(30)));
+        assert!(q.expire(t + Duration::from_secs(31)), "capped at 30 s");
+        let id = q.push(spec(ToastKind::Success), t);
+        assert!(q.set_hover(id, true, t + Duration::from_secs(1)));
+        assert!(q.clear_hovers(t + Duration::from_secs(3)));
+        assert!(!q.clear_hovers(t + Duration::from_secs(3)), "nothing left");
+        assert!(
+            q.expire(t + Duration::from_secs(8)),
+            "5 s of life, 2 s spent hovering"
+        );
     }
 
     #[test]

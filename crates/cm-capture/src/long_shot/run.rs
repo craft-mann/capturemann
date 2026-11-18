@@ -109,8 +109,43 @@ pub struct PageOffset {
     /// any scroll back); 0 when the run began again from the top of a page that was at its end
     /// and reached its end.
     pub moved_px: u32,
-    /// The page was scrolled back by `moved_px` (about; a wheel is not exact), or needed none.
+    /// True only when the page was seen back where the run found it (the first frame and a new
+    /// look match), or when it never moved. A scroll back that was sent but not checked, or that
+    /// landed elsewhere, is false.
     pub restored: bool,
+    /// How far from its first place the page was left when `restored` is false, in physical px
+    /// along the scroll direction: positive is further on than it started, negative before it.
+    /// `None` when it could not be measured (nothing matches the first frame) or when it is
+    /// restored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remaining_px: Option<i64>,
+}
+
+/// Scroll-back corrections tried after the first scroll back when the page is seen elsewhere.
+const RESTORE_TRIES: u32 = 3;
+
+/// How far `now` is from `first` along the scroll direction, by joining the two frames: 0 when
+/// they are the same, positive when `now` shows content further on, negative when before.
+/// `None` when they do not join either way.
+fn offset_between(first: &Frame, now: &Frame, cfg: &LongShotConfig) -> Option<i64> {
+    let mut forward = Stitcher::new(cfg.direction, cfg.limits);
+    forward.push(first, None);
+    match forward.push(now, None) {
+        PushOutcome::NoChange => return Some(0),
+        PushOutcome::Added { new_len } | PushOutcome::LimitReached { new_len } => {
+            return Some(i64::from(new_len));
+        }
+        PushOutcome::NoOverlap => {}
+    }
+    let mut back = Stitcher::new(cfg.direction, cfg.limits);
+    back.push(now, None);
+    match back.push(first, None) {
+        PushOutcome::NoChange => Some(0),
+        PushOutcome::Added { new_len } | PushOutcome::LimitReached { new_len } => {
+            Some(-i64::from(new_len))
+        }
+        PushOutcome::NoOverlap => None,
+    }
 }
 
 fn progress(s: &Stitcher) -> LongShotProgress {
@@ -645,21 +680,50 @@ pub fn run_auto_ex(
         } else {
             stitcher.len_px().saturating_sub(first_len)
         };
-        let restored = if moved_px == 0 {
-            true
+        let (restored, remaining_px) = if moved_px == 0 {
+            (true, None)
         } else if restarted {
             // Its first place is unknown: say how far it moved, do not guess a way back.
-            false
+            (false, None)
+        } else if !matches!(scroller.scroll_back(cfg.direction, moved_px), Ok(true)) {
+            (false, Some(i64::from(moved_px)))
         } else {
-            let back = scroller.scroll_back(cfg.direction, moved_px);
-            if matches!(back, Ok(true)) {
+            // A wheel is not exact, and a scroll back can stop at once (a smooth-scrolling
+            // page, a page that cannot go further): the page is looked at again and compared
+            // with the first frame. It is "restored" only when it matches; otherwise the
+            // remaining distance is measured, corrected a few times, and reported as it is.
+            sleeper.sleep(LATE_SCROLL_WAIT);
+            let mut result = (false, None);
+            for attempt in 0..=RESTORE_TRIES {
+                let Ok(now) = settle_frame(src, sleeper, cfg.settle) else {
+                    break;
+                };
+                let off = offset_between(&first.frame, &now.frame, &cfg);
+                result = (off == Some(0), off.filter(|d| *d != 0));
+                if off == Some(0) || attempt == RESTORE_TRIES {
+                    break;
+                }
+                // The page is too far from its start to be compared with the first frame: the
+                // whole distance is asked again.
+                let d = off.unwrap_or(i64::from(moved_px));
+                let amount = u32::try_from(d.unsigned_abs()).unwrap_or(u32::MAX);
+                let moved = if d > 0 {
+                    scroller.scroll_back(cfg.direction, amount)
+                } else {
+                    scroller.scroll(cfg.direction, amount).map(|()| true)
+                };
+                if !matches!(moved, Ok(true)) {
+                    break;
+                }
                 sleeper.sleep(LATE_SCROLL_WAIT);
-                true
-            } else {
-                false
             }
+            result
         };
-        Some(PageOffset { moved_px, restored })
+        Some(PageOffset {
+            moved_px,
+            restored,
+            remaining_px,
+        })
     };
     Ok(LongShotResult {
         why: (end == EndReason::NoOverlap)

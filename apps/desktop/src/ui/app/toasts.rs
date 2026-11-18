@@ -356,6 +356,13 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
         };
         let existing = app.read(cx).toast_window;
         let now = Instant::now();
+        // The window is gone while a capture hides it, and no "pointer left" event arrives: a
+        // toast must not stay held by a hover that ended with its window (L-6).
+        if crate::capture_cloak::is_hidden() {
+            app.update(cx, |m, _| {
+                m.toasts.clear_hovers(now);
+            });
+        }
         let (idle_for, since_closed) = {
             let m = app.read(cx);
             (
@@ -385,6 +392,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                 WindowPlan::Close => {
                     if let Some(h) = existing {
                         app.update(cx, |m, _| {
+                            m.toasts.clear_hovers(now);
                             m.toast_window = None;
                             m.toast_display = None;
                             m.toast_idle_since = None;
@@ -465,6 +473,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                     }
                     (FitPlan::Recreate, _) => {
                         app.update(cx, |m, _| {
+                            m.toasts.clear_hovers(Instant::now());
                             m.toast_window = None;
                             // Another display is not the quick re-open the gap protects against.
                             m.toast_closed_at = (shown == display_id).then_some(Instant::now());

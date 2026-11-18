@@ -84,7 +84,7 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
     let visible = visible_part(&display.1);
     let pointer = crate::ui::launcher_window::pointer(cx)
         .map(|p| (f64::from(f32::from(p.x)), f64::from(f32::from(p.y))));
-    let (px_, py_) = pointer.unwrap_or((visible.x + visible.w / 2.0, visible.y + visible.h * 0.3));
+    let (px_, py_) = crate::quick::place::open_point(pointer, f64::from(HEIGHT), &visible);
     let max_h = visible.h - 2.0 * crate::quick::place::EDGE;
     // From the tray the panel is on the icon where the system gives its position (macOS status
     // item, Windows notification area); where it does not (Linux) it opens near the pointer.
@@ -113,6 +113,7 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
             crate::surfaces::opened(crate::surfaces::Surface::QuickCapture, h);
             cx.set_global(PanelSlot(Some(h)));
             crate::surfaces::activate_app(cx, "quick capture opened");
+            crate::surfaces::take_keyboard_x11(cx, h);
         }
         Err(e) => app::push_toast(
             app,
@@ -233,8 +234,8 @@ impl QuickPanel {
     fn fit_height(&self, window: &mut Window, cx: &mut Context<Self>) {
         let h = match self.body {
             Body::Picker => {
-                let rows = self.app.read(cx).quick.presets.len() + 1;
-                crate::quick::place::picker_height(rows, f64::from(HEIGHT), self.max_h)
+                let presets = self.app.read(cx).quick.presets.len();
+                crate::quick::place::picker_height(presets, f64::from(HEIGHT), self.max_h)
             }
             _ => f64::from(HEIGHT),
         };
@@ -664,7 +665,9 @@ impl QuickPanel {
                     ),
                 )
                 .h(px(32.))
-                .flex_1()
+                // Each tab is as wide as its label needs and shares what is left (L-10: at
+                // +30 % text "Long Shot" wrapped to two lines and was clipped in an equal cell).
+                .flex_auto()
                 .min_w(px(0.))
                 .px(px(6.))
                 .flex()
@@ -681,7 +684,7 @@ impl QuickPanel {
                     this.st.set_target(tg);
                     this.changed(cx);
                 }))
-                .child(crate::ui::components::shrink_text(target_label(tg)))
+                .child(crate::ui::components::ellipsis_text(target_label(tg)))
             }))
     }
 
@@ -892,9 +895,9 @@ impl QuickPanel {
                     None => title.clone(),
                 },
             )
-            .min_h(px(44.))
+            .min_h(px(crate::quick::place::ROW_MIN_H as f32))
             .px(px(10.))
-            .py(px(6.))
+            .py(px(crate::quick::place::ROW_PAD_Y as f32))
             .flex()
             .flex_none()
             .items_center()
@@ -916,14 +919,14 @@ impl QuickPanel {
                     .flex_col()
                     .child(
                         div()
-                            .text_size(px(type_scale::UI))
+                            .text_size(px(crate::quick::place::ROW_NAME_PX as f32))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(rgba_of(t.text))
                             .child(crate::ui::components::shrink_text(title)),
                     )
                     .children(sub.map(|s| {
                         div()
-                            .text_size(px(11.))
+                            .text_size(px(crate::quick::place::ROW_SUMMARY_PX as f32))
                             .text_color(rgba_of(t.text_3))
                             .child(crate::ui::components::shrink_text(s))
                     })),

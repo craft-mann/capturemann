@@ -201,6 +201,10 @@ pub struct PanelState {
     /// The picked preset with the panel's own tile changes applied on top; its hidden fields
     /// (tool, folder, format, scale, cursor, frame rate) travel with the run. `None`: no preset.
     pub preset: Option<Preset>,
+    /// The panel's own remembered tiles, set aside while a preset is picked: the preset fills
+    /// `mem` for as long as it is picked, and only this is written to `quick_capture.json`.
+    /// "No preset" puts it back (L-9).
+    base: Option<Remembered>,
 }
 
 /// The screenshot targets, in tab order.
@@ -351,12 +355,18 @@ impl PanelState {
 
     pub fn set_kind(&mut self, k: PresetKind) {
         if self.mem.kind != k {
-            self.mem.kind = k;
-            // A preset belongs to one kind; switching the tab leaves it.
+            // A preset belongs to one kind; switching the tab leaves it, and the panel's own
+            // tiles come back.
             if self.preset.as_ref().is_some_and(|p| p.kind != k) {
-                self.preset = None;
+                self.clear_preset();
             }
+            self.mem.kind = k;
         }
+    }
+
+    /// What `quick_capture.json` holds: the panel's own choices, never a picked preset's.
+    pub fn persisted(&self) -> &Remembered {
+        self.base.as_ref().unwrap_or(&self.mem)
     }
 
     /// The targets of the current kind (audio has none).
@@ -487,6 +497,9 @@ impl PanelState {
 
     /// QC-4.AC1: picks `p`: kind, target and the tiles are filled from it.
     pub fn apply_preset(&mut self, p: &Preset) {
+        if self.preset.is_none() {
+            self.base = Some(self.mem.clone());
+        }
         self.mem.kind = p.kind;
         let (o, a) = (&p.options, &p.after);
         match p.kind {
@@ -532,9 +545,13 @@ impl PanelState {
         self.preset = Some(p.clone());
     }
 
-    /// Leaves the preset ("No preset"); the tiles stay as they are.
+    /// Leaves the preset ("No preset"): the panel's own tiles are back as they were before the
+    /// preset was picked (L-9).
     pub fn clear_preset(&mut self) {
         self.preset = None;
+        if let Some(base) = self.base.take() {
+            self.mem = base;
+        }
     }
 
     /// QC-4.AC2: the panel's current setup as a new preset (JSON without an `id`, as

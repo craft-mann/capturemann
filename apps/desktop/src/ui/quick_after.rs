@@ -201,6 +201,7 @@ fn open_at(
         crate::surfaces::opened(crate::surfaces::Surface::QuickAfter, h);
         cx.set_global(Slot(Some(h)));
         crate::surfaces::activate_app(cx, "after-capture bar opened");
+        crate::surfaces::take_keyboard_x11(cx, h);
     }
 }
 

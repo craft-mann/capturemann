@@ -82,6 +82,7 @@ pub fn open(app: &Entity<AppModel>, preset: Option<Preset>, cx: &mut App) {
         crate::surfaces::opened(crate::surfaces::Surface::QuickSheet, handle);
         cx.set_global(SheetSlot(Some(handle)));
         crate::surfaces::activate_app(cx, "preset sheet opened");
+        crate::surfaces::take_keyboard_x11(cx, handle);
     }
 }
 
@@ -604,7 +605,7 @@ impl Render for PresetSheet {
             .flex_col()
             .gap(px(14.))
             .child(section(&t, tr_ctx!("preset sheet", "Name")))
-            .child(self.name.clone())
+            .child(div().flex_none().child(self.name.clone()))
             .child(section(&t, tr_ctx!("preset sheet", "Kind and target")))
             .child(div().flex().flex_wrap().gap(px(6.)).children(kinds))
             .children((!targets.is_empty()).then(|| {
@@ -614,6 +615,7 @@ impl Render for PresetSheet {
             .child(self.toggles(&t, cx))
             .children(tool_chips.map(|chips| {
                 div()
+                    .flex_none()
                     .flex()
                     .flex_col()
                     .gap(px(8.))
@@ -622,11 +624,12 @@ impl Render for PresetSheet {
             }))
             .children((self.p.kind == PresetKind::Screenshot).then(|| {
                 div()
+                    .flex_none()
                     .flex()
                     .flex_col()
                     .gap(px(8.))
                     .child(section(&t, tr_ctx!("preset sheet", "Save to")))
-                    .child(self.save_to.clone())
+                    .child(div().flex_none().child(self.save_to.clone()))
                     .child(
                         div()
                             .text_size(px(11.))
