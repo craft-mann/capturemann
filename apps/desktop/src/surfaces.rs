@@ -271,6 +271,7 @@ pub fn live_report(cx: &App) -> String {
 pub fn close_self(window: &mut Window) {
     let id = window.window_handle().window_id().as_u64();
     registry().forget(id, "closed itself");
+    crate::platform_window::release_x11_focus(window);
     window.remove_window();
 }
 
@@ -395,6 +396,29 @@ fn request(cx: &mut App, a: Activation, why: &str) {
     }
 }
 
+/// X11: gives a just-opened interactive window (panel, bar, sheet, Launcher, picker) the keyboard.
+/// These are override-redirect windows, so the window manager never focuses them; the app sets
+/// the input focus itself, trying again until the window is on screen. Passive windows (toasts,
+/// HUD) must not call this. No-op on the other platforms.
+pub fn take_keyboard_x11<V: 'static>(cx: &mut App, handle: gpui::WindowHandle<V>) {
+    cx.spawn(async move |cx| {
+        for _ in 0..16 {
+            cx.background_executor()
+                .timer(Duration::from_millis(100))
+                .await;
+            let done = cx.update(|cx| {
+                handle
+                    .update(cx, |_, window, _| crate::platform_window::focus_x11(window))
+                    .unwrap_or(true)
+            });
+            if done {
+                break;
+            }
+        }
+    })
+    .detach();
+}
+
 /// Activates the app once the current update is over (see above).
 pub fn activate_app(cx: &mut App, why: &str) {
     request(cx, Activation::App, why);
@@ -431,7 +455,10 @@ impl SurfaceHost for GpuiHost<'_> {
         {
             return CloseResult::Gone;
         }
-        match handle.update(self.cx, |_, window, _| window.remove_window()) {
+        match handle.update(self.cx, |_, window, _| {
+            crate::platform_window::release_x11_focus(window);
+            window.remove_window()
+        }) {
             Ok(()) => CloseResult::Closed,
             Err(e) => CloseResult::Failed(format!("{e:#}")),
         }

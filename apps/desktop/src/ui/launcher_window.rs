@@ -150,9 +150,17 @@ pub(crate) fn pointer(cx: &App) -> Option<gpui::Point<gpui::Pixels>> {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn pointer(_cx: &App) -> Option<gpui::Point<gpui::Pixels>> {
-    // Windows: the pointer in GPUI points (`platform_win_monitors`); Linux cannot say.
-    crate::platform_window::mouse_location().map(|(x, y)| point(px(x as f32), px(y as f32)))
+pub(crate) fn pointer(cx: &App) -> Option<gpui::Point<gpui::Pixels>> {
+    // Windows: the pointer in GPUI points (`platform_win_monitors`). X11: the root window's
+    // pointer, in pixels, turned into points with the scale GPUI uses for that screen. Wayland
+    // lets no client read the pointer: `None`.
+    if let Some((x, y)) = crate::platform_window::mouse_location() {
+        return Some(point(px(x as f32), px(y as f32)));
+    }
+    let (x, y, root_w, _) = crate::platform_window::x11_pointer()?;
+    let display_w = f64::from(f32::from(cx.primary_display()?.bounds().size.width));
+    let (x, y) = crate::quick::place::x11_pixels_to_points((x, y), root_w, display_w);
+    Some(point(px(x as f32), px(y as f32)))
 }
 
 /// Height reserved for the window: the full list (all groups, all rows) plus chrome, capped to
@@ -259,6 +267,7 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
             crate::surfaces::opened(crate::surfaces::Surface::Launcher, handle);
             cx.set_global(LauncherSlot(Some(handle)));
             crate::surfaces::activate_app(cx, "launcher opened");
+            crate::surfaces::take_keyboard_x11(cx, handle);
         }
         Err(e) => app::push_toast(
             app,

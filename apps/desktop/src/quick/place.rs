@@ -34,10 +34,60 @@ pub fn bar_rect(area: &Rect, bar_w: f64, bar_h: f64, display: &Rect) -> Rect {
 /// (padding, header, the two links under the list) plus `rows` rows, never less than the normal
 /// panel and never more than `cap` (the display's visible height less the edge gaps); beyond
 /// that the list scrolls.
-pub fn picker_height(rows: usize, base: f64, cap: f64) -> f64 {
-    const FIXED: f64 = 171.0;
-    const ROW: f64 = 48.0;
-    (FIXED + rows as f64 * ROW).max(base).min(cap.max(base))
+///
+/// `rows` is the number of presets; the list also has the "No preset" row. Row heights come from
+/// the same constants the picker draws with ([`picker_list_height`]), not from a guess.
+pub fn picker_height(presets: usize, base: f64, cap: f64) -> f64 {
+    (PICKER_FIXED + picker_list_height(presets))
+        .max(base)
+        .min(cap.max(base))
+}
+
+/// Everything in the picker's panel that is not the list: padding, header, the rule and the two
+/// links under the list, measured on the real panel on X11 (a list area of 223 px in a
+/// 433 px panel).
+pub const PICKER_FIXED: f64 = 210.0;
+/// Vertical padding of a picker row (top and bottom each), its border (each side) and the least
+/// height of a row.
+pub const ROW_PAD_Y: f64 = 6.0;
+pub const ROW_BORDER: f64 = 1.0;
+pub const ROW_MIN_H: f64 = 44.0;
+/// Font sizes of a row's name and summary, and the line height GPUI gives text that sets none
+/// (the golden ratio times the size).
+pub const ROW_NAME_PX: f64 = 14.0;
+pub const ROW_SUMMARY_PX: f64 = 11.0;
+#[allow(clippy::approx_constant)]
+pub const LINE_RATIO: f64 = 1.618_034;
+
+/// The height of one picker row: its text lines plus padding and border, never under the least
+/// height. A preset row has a summary line under the name, "No preset" has none.
+pub fn picker_row_height(with_summary: bool) -> f64 {
+    let lines = (ROW_NAME_PX + if with_summary { ROW_SUMMARY_PX } else { 0.0 }) * LINE_RATIO;
+    (lines + 2.0 * ROW_PAD_Y + 2.0 * ROW_BORDER).max(ROW_MIN_H)
+}
+
+/// The list: "No preset" and `presets` rows with a summary.
+pub fn picker_list_height(presets: usize) -> f64 {
+    picker_row_height(false) + presets as f64 * picker_row_height(true)
+}
+
+/// X11: a pointer position in root-window pixels as GPUI points. GPUI sizes the X screen as
+/// `root pixels / scale`, so the scale is the root width over the display width in points.
+pub fn x11_pixels_to_points(p: (f64, f64), root_w: f64, display_w: f64) -> (f64, f64) {
+    if root_w <= 0.0 || display_w <= 0.0 {
+        return p;
+    }
+    let scale = root_w / display_w;
+    (p.0 / scale, p.1 / scale)
+}
+
+/// QC-1 "Opening": where the panel's top edge centre goes. The pointer where the system tells it;
+/// else (Wayland gives no position to a client) the panel is centred on the display.
+pub fn open_point(pointer: Option<(f64, f64)>, panel_h: f64, display: &Rect) -> (f64, f64) {
+    pointer.unwrap_or((
+        display.x + display.w / 2.0,
+        display.y + (display.h - panel_h) / 2.0,
+    ))
 }
 
 /// QC-1 "Opening": the panel opens under a point (the tray icon, or the pointer), kept on the
@@ -80,6 +130,46 @@ mod tests {
         Rect::new(0.0, 0.0, 1440.0, 900.0)
     }
 
+    /// QC-4.AC8: a row with its summary is about 55 px (measured on the real picker), not 48, so
+    /// four starters and a "No preset" row all fit.
+    #[test]
+    fn a_picker_row_is_as_tall_as_its_two_lines() {
+        let row = picker_row_height(true);
+        assert!((54.0..=56.0).contains(&row), "{row}");
+        assert_eq!(picker_row_height(false), ROW_MIN_H);
+        // The four starters: every row is inside the panel the picker asks for.
+        let h = picker_height(4, 400.0, 876.0);
+        assert!(h - PICKER_FIXED >= picker_list_height(4));
+        assert!(
+            h > 411.0,
+            "the old 48 px guess gave 411 and cut the last row"
+        );
+    }
+
+    #[test]
+    fn the_pointer_on_x11_becomes_points() {
+        assert_eq!(
+            x11_pixels_to_points((300.0, 200.0), 1920.0, 1920.0),
+            (300.0, 200.0)
+        );
+        assert_eq!(
+            x11_pixels_to_points((300.0, 200.0), 3840.0, 1920.0),
+            (150.0, 100.0)
+        );
+        assert_eq!(x11_pixels_to_points((5.0, 6.0), 0.0, 1920.0), (5.0, 6.0));
+    }
+
+    /// QC-1 "Opening": no pointer (Wayland) centres the panel; a pointer is used as it is.
+    #[test]
+    fn without_a_pointer_the_panel_is_centred() {
+        let d = display();
+        let (x, y) = open_point(None, 400.0, &d);
+        let r = panel_rect((x, y), 352.0, 400.0, &d);
+        assert_eq!(r.x + r.w / 2.0, 720.0);
+        assert_eq!(r.y + r.h / 2.0, 450.0);
+        assert_eq!(open_point(Some((300.0, 300.0)), 400.0, &d), (300.0, 300.0));
+    }
+
     #[test]
     fn the_picker_grows_to_its_rows_and_stops_at_the_display() {
         assert_eq!(
@@ -87,7 +177,8 @@ mod tests {
             400.0,
             "never below the panel"
         );
-        assert_eq!(picker_height(6, 400.0, 876.0), 459.0);
+        let six = PICKER_FIXED + picker_list_height(6);
+        assert_eq!(picker_height(6, 400.0, 876.0), six);
         assert_eq!(
             picker_height(40, 400.0, 876.0),
             876.0,

@@ -258,6 +258,13 @@ pub fn focus_x11(window: &Window) -> bool {
         let Ok((conn, _)) = x11rb::connect(None) else {
             return true;
         };
+        // Remember who had the keyboard, so closing the window hands it back (an
+        // override-redirect window that goes away leaves the focus on the root window).
+        let before = conn
+            .get_input_focus()
+            .ok()
+            .and_then(|c| c.reply().ok())
+            .map(|r| r.focus);
         let set = conn
             .set_input_focus(InputFocus::PARENT, id, x11rb::CURRENT_TIME)
             .ok()
@@ -269,6 +276,15 @@ pub fn focus_x11(window: &Window) -> bool {
                 .ok()
                 .and_then(|c| c.reply().ok())
                 .is_some_and(|r| r.focus == id);
+        if on_window {
+            if let Some(before) = before.filter(|b| *b != id && *b > 1) {
+                x11_focus_back()
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .entry(id)
+                    .or_insert(before);
+            }
+        }
         log::debug!("x11 focus on window {id}: {on_window}");
         on_window
     }
@@ -276,6 +292,85 @@ pub fn focus_x11(window: &Window) -> bool {
     {
         let _ = window;
         true
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn x11_focus_back() -> &'static std::sync::Mutex<std::collections::HashMap<u32, u32>> {
+    static BACK: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u32, u32>>> =
+        std::sync::OnceLock::new();
+    BACK.get_or_init(Default::default)
+}
+
+/// X11 only: call just before `window` closes. When it holds the keyboard (it took it with
+/// [`focus_x11`]), the keyboard goes back to the window that had it. Elsewhere: nothing.
+pub fn release_x11_focus(window: &Window) {
+    #[cfg(target_os = "linux")]
+    {
+        use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        use x11rb::connection::Connection;
+        use x11rb::protocol::xproto::{ConnectionExt, InputFocus};
+        let Ok(handle) = HasWindowHandle::window_handle(window) else {
+            return;
+        };
+        let id = match handle.as_raw() {
+            RawWindowHandle::Xcb(h) => h.window.get(),
+            RawWindowHandle::Xlib(h) => h.window as u32,
+            _ => return,
+        };
+        let Some(back) = x11_focus_back()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(&id)
+        else {
+            return;
+        };
+        let Ok((conn, _)) = x11rb::connect(None) else {
+            return;
+        };
+        let holds = conn
+            .get_input_focus()
+            .ok()
+            .and_then(|c| c.reply().ok())
+            .is_some_and(|r| r.focus == id);
+        if holds {
+            let _ = conn.set_input_focus(InputFocus::PARENT, back, x11rb::CURRENT_TIME);
+            let _ = conn.flush();
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = window;
+    }
+}
+
+/// The pointer on an X11 session, in root-window pixels, with the root's size, so the caller can
+/// turn it into GPUI points. `None` on Wayland (no client may ask), macOS and Windows.
+pub fn x11_pointer() -> Option<(f64, f64, f64, f64)> {
+    #[cfg(target_os = "linux")]
+    {
+        use x11rb::connection::Connection;
+        use x11rb::protocol::xproto::ConnectionExt;
+        if is_wayland_session(
+            std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
+            std::env::var("WAYLAND_DISPLAY").ok().as_deref(),
+            std::env::var("DISPLAY").ok().as_deref(),
+        ) {
+            return None;
+        }
+        let (conn, screen) = x11rb::connect(None).ok()?;
+        let root = conn.setup().roots.get(screen)?;
+        let p = conn.query_pointer(root.root).ok()?.reply().ok()?;
+        Some((
+            f64::from(p.root_x),
+            f64::from(p.root_y),
+            f64::from(root.width_in_pixels),
+            f64::from(root.height_in_pixels),
+        ))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
     }
 }
 
