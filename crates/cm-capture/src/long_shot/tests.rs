@@ -65,6 +65,113 @@ fn cap_6_ac17_the_page_is_scrolled_back_to_where_it_was() {
     let off = r.page_offset.unwrap();
     assert!(!off.restored && off.moved_px > 0);
     assert_eq!(off.moved_px, view.position());
+    assert_eq!(off.remaining_px, Some(i64::from(off.moved_px)));
+}
+
+/// A scroller that says it scrolled back and moves the page only `share` of the way (a page that
+/// stops, a wheel that is not exact).
+struct PartialBack {
+    view: fake::PageView,
+    share: f64,
+    /// Scroll backs that move the page exactly after the first (a correction lands).
+    exact_after_first: bool,
+    calls: u32,
+}
+impl Scroller for PartialBack {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.view.scroll(d, amount_px)
+    }
+    fn scroll_back(&mut self, _: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.calls += 1;
+        let share = if self.exact_after_first && self.calls > 1 {
+            1.0
+        } else {
+            self.share
+        };
+        self.view.back((f64::from(amount_px) * share) as u32);
+        Ok(true)
+    }
+}
+
+/// CAP-6.AC17 (L-5, Linux QA 0.3.6): `restored` is true only when the page is seen back where it
+/// started. A scroll back that was sent but fell short is reported as not restored, with the
+/// distance that is really left.
+#[test]
+fn cap_6_ac17_restored_is_true_only_when_the_page_is_seen_back() {
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    // A first scroll back that falls short is corrected until the page is where it started.
+    let view = page.clone().view();
+    let (mut src, mut sc) = (
+        view.clone(),
+        PartialBack {
+            view: view.clone(),
+            share: 0.8,
+            exact_after_first: true,
+            calls: 0,
+        },
+    );
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(page.direction),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    let off = r.page_offset.unwrap();
+    assert!(off.restored, "{off:?}");
+    assert_eq!(off.remaining_px, None);
+    assert_eq!(view.position(), 0);
+    // A scroll back that falls short every time, but leaves the page where it is still
+    // comparable with the first frame: not restored, and the distance left is the real one.
+    let view = page.clone().view();
+    let (mut src, mut sc) = (
+        view.clone(),
+        PartialBack {
+            view: view.clone(),
+            share: 0.8,
+            exact_after_first: false,
+            calls: 0,
+        },
+    );
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(page.direction),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    let off = r.page_offset.unwrap();
+    assert!(!off.restored, "{off:?}");
+    let left = view.position();
+    assert!(left > 0);
+    assert_eq!(off.remaining_px, Some(i64::from(left)), "{off:?}");
+    // A scroll back that does almost nothing: not restored (the page is too far to compare).
+    let view = page.clone().view();
+    let (mut src, mut sc) = (
+        view.clone(),
+        PartialBack {
+            view: view.clone(),
+            share: 0.02,
+            exact_after_first: false,
+            calls: 0,
+        },
+    );
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(page.direction),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    let off = r.page_offset.unwrap();
+    assert!(!off.restored, "{off:?}");
+    assert!(view.position() > 0);
 }
 
 /// CAP-6.AC1: a page five screens long, every row once and in order.
