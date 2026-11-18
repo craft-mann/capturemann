@@ -1,67 +1,46 @@
-# Release 0.3.6: Quick Capture (plan, draft, Nov 17, 2026)
+# Release 0.3.6: Quick Capture and stabilisation (plan)
 
-Status: **scope only; nothing built.** Quick Capture was first added to 0.3.5 and moved to 0.3.6 by the maintainer on Nov 17, 2026, so 0.3.5 stays light (`specs/plans/release-0.3.5-plan.md`).
+Status: **build started Nov 18, 2026.** Quick Capture was moved here from 0.3.5 by the maintainer on Nov 17, 2026. The plan states final requirements only; behaviour and acceptance criteria are in the feature spec.
 
-## 1. FEATURE: Quick Capture (QC-1, QC-3, QC-4, QC-5)
+## 1. Quick Capture (QC-1, QC-3, QC-4, QC-5)
 
-- **Spec:** `specs/features/21-quick-capture.md` (Phase 0 text is written, with acceptance criteria; Preview label). FR rows are in `specs/00-product-spec.md`.
-- **Design pack:** `specs/capturemann-0.3.6-quick-capture/` (local, git-ignored): boards Q036Brief, Q036Panel, Q036After, Q036Presets, Q036Scope. The spec file wins where they differ.
-- **Not in this release:** QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock).
-- **MCP:** one new read tool, `list_presets`, so the count goes from 89 to 90; the assertion in `crates/cm-mcp/tests/stdio.rs` and `docs/reference/` change with it.
+Spec: `specs/features/21-quick-capture.md` (the spec file wins over the design pack `specs/capturemann-0.3.6-quick-capture/`, local and git-ignored). FR rows are in `specs/00-product-spec.md`. QC-2 and QC-6 are not in this release.
 
-**Decisions already made (Nov 17, 2026), all written into the spec:**
+- The shortcut ⌥⇧C (Ctrl+Alt+Shift+C on Windows and Linux) opens the panel; the Launcher keeps ⌥⇧Space.
+- The native tray and menu-bar menu stays, with **Quick Capture…** as its first item; the panel opens under the icon.
+- Panel option tiles are remembered per kind and apply only to captures started from the panel or a preset. Dock tiles, hotkeys and the tray keep using Settings. Neither overwrites the other.
+- Quick Capture carries the Preview label and a Send feedback button, with no Settings switch.
+- Four starter presets ship: Bug report, Docs shot, Demo video and Meeting. They are editable and deletable.
+- `list_presets` is the one new MCP tool (90 tools); `capture_screenshot` and `start_recording` take `preset`; the CLI gets `--preset` and `capturemann presets list`. The assertion in `crates/cm-mcp/tests/stdio.rs` and `docs/reference/` change with it.
+- The after-capture actions "Long Shot extends this area" and "Record exactly this area" start a capture from a region that already exists; they reuse the existing capture actions with that region as the start.
 
-| Point | Decision |
-| --- | --- |
-| Shortcut | **⌥⇧C** (Ctrl+Alt+Shift+C on Windows and Linux) opens the panel; the Launcher keeps ⌥⇧Space. |
-| Tray and menu bar | The native menu stays; **Quick Capture…** is its first item. The panel opens under the icon after that. |
-| Panel options and Settings | The option tiles are remembered per kind and apply only to captures started from the panel or a preset; dock tiles, hotkeys and the tray keep using Settings; neither overwrites the other. |
-| Preview | Quick Capture carries the Preview label and a Send feedback button, no Settings switch. |
-| Starter presets | Ship Bug report, Docs shot, Demo video and Meeting, editable and deletable. |
-| Scope | QC-1, QC-3, QC-4 and QC-5 (including `list_presets` and the `preset` argument for agents and the CLI). |
+## 2. Transcripts: invented text on short recordings
 
-## 2. Also to plan for 0.3.6
+Report: the maintainer's recording `Audio recording 2026-11-17 17.02` (9 s, ThinkPad, 0.3.4, Vietnamese): the transcript holds invented text of the "thanks for watching" kind and no `[unclear]`, though the audio holds two short bursts (about 1.5 s and 2.3 s, around -33 dBFS) over a room level near -60 dBFS. The gap check (`pieces.rs` `fill_gaps`, minimum `GAP_MIN_SECS` 3 s) and the shape guard (AI-1.AC12, `guard.rs`, minimum `MIN_AUDIO_SECS` 30 s) both skip short audio.
 
-The bugs and checks moved out of 0.3.5 (section 8 of the 0.3.5 plan), and whatever the QA agent passes and users report for 0.3.4 and 0.3.5.
-
-## 2b. Findings from QA pass 1 on macOS (0.3.4 files, Nov 17, 2026; report `verification/QA-0.3.5-pass1-macos-2026-11-17-claude.md`, PARTIAL: no P1 found, 5 polish)
-
-| Id | Finding | Seen |
-| --- | --- | --- |
-| F4 | `capture screenshot --window -` matches the first window whose title contains "-" with no ambiguity error, and captured an unrelated private window. Fixed in 0.3.5 as BUG-9 (the maintainer included it on Nov 17, 2026). | once |
-| F1 | A text file named `.png` is rejected with "The video codec Png is not supported yet." (treated as video). | once |
-| F2 | `annotate` accepts a rect of width 5,000,000 with no warning and stores it as a revision. | once |
-| F5 | In Vietnamese the Click Guide tile label wraps to two lines and the "Xem trước" Preview pill touches the icon (related to D28, CG-11). | once |
-| F3 | Long Shot leaves the target page scrolled about 150 px (known, D13). | once |
-
-## 2c. BUG: invented transcript text and no [unclear] on short recordings (reported Nov 17, 2026)
-
-Report: the maintainer's recording `Audio recording 2026-11-17 17.02` (9 s, recorded on the ThinkPad with 0.3.4, Vietnamese, no mute): the transcript holds invented text (a stock "thanks for watching" kind of line; medium model: 17 words with most confidences 0.2 to 0.5, large model on the Mac: 7 words, a different text of the same kind) and no `[unclear]` part, although the audio holds only two short bursts of sound (about 1.5 s and 2.3 s, around -33 dBFS) over a room level of about -60 dBFS, and the invented words sit partly over room-level audio.
-
-Cause: the two checks that could catch it both skip short audio. `[unclear]` and `[noise]` come only from the gap check (`pieces.rs` `fill_gaps`), which needs a stretch of speech-like level of at least `GAP_MIN_SECS` (3 s) with no words; and the shape guard (AI-1.AC12, `guard.rs`) never judges audio under `MIN_AUDIO_SECS` (30 s). Both were tuned on long meetings; short clips were never measured.
-
-Required (to be built and measured in 0.3.6; general techniques only, no phrase lists):
-1. **Doubtful lines become `[unclear]`:** a line whose words are mostly low in confidence, over audio that is not speech-like (level near the room, or no speech evidence from the speaker engine or the level detector), is written as an `[unclear]` sound entry and its words are left out of `words`, so captions, reports and search never see them; the dropped line is counted and kept (like `dropped`, so nothing disappears silently); a Re-generate with the setting off brings it back. Thresholds are measured on the silence and quiet-speech sets (`silence_probe`, `quiet_silence`, `outro_guard` examples, the maintainer's library) and written into the spec with the numbers.
-2. **Short audio:** if the measurements support it, the guard (AI-1.AC12) judges audio under 30 s when speech and room are clearly apart (this clip: about 27 dB) and enough non-silent frames exist; the minimum is measured, not guessed.
-3. **Not changed:** the 3 s gap minimum stays (shortening it makes more `[noise]` entries).
+Requirements (general techniques only, no phrase lists):
+1. A line whose words are mostly low in confidence, over audio that is not speech-like (level near the room, or no speech evidence from the speaker engine or the level detector), is written as an `[unclear]` sound entry. Its words are left out of `words`, so captions, reports and search never see them. The dropped line is counted and kept, like `dropped`, and a Re-generate with the setting off brings it back. The thresholds are measured on the silence and quiet-speech sets (`silence_probe`, `quiet_silence`, `outro_guard` examples) and written into the spec with the numbers.
+2. The guard judges audio under 30 s when speech and room are clearly apart and enough non-silent frames exist; the minimum is measured.
+3. The 3 s gap minimum stays.
 4. Existing transcripts are unchanged; a Re-generate uses the fix.
+5. Every word has an end after its start; the last word of a piece gets the end of its piece (P-1).
 
-## 2d. Findings from QA pass 2 and 3 (macOS and Windows, 0.3.5 candidates, Nov 17 to 18, 2026): not fixed in 0.3.5
+## 3. Fixes carried over from 0.3.4 and 0.3.5 QA
 
-All are small. Reports: `verification/QA-0.3.5-pass2-macos-2026-11-17-claude.md`, `QA-0.3.5-pass2-windows-2026-11-17-claude.md`, `QA-0.3.5-windows-ci-package-9dcfb5c3-2026-11-17-claude.md`.
+Reports: `verification/QA-0.3.5-pass1-macos-2026-11-17-claude.md`, `QA-0.3.5-pass2-macos-2026-11-17-claude.md`, `QA-0.3.5-pass2-windows-2026-11-17-claude.md`, `QA-0.3.5-windows-ci-package-9dcfb5c3-2026-11-17-claude.md`.
 
-| # | Finding | Required behaviour |
-| --- | --- | --- |
-| P-1 | Transcript pieces: the last word of a piece has start equal to end (seen 3 times in one run, may predate 0.3.5). | Every word has an end after its start; a word at the end of a piece gets the end of its piece. |
-| P-2 | The ambiguous-window CLI error (BUG-9) lists the titles of other apps' windows. | The error lists only the matching windows' ids and a short title; nothing else. |
-| P-3 | Windows: one YouTube Long Shot stopped after 2 frames (`no_overlap`) in a maximized Edge window with a second tab; a fresh window gave 40 frames. | The cause is found; a run that cannot join frames says why and keeps what it has. |
-| P-4 | `annotate --out` on a 19 MB image fails with `error.code: internal`. | A reason under `invalid_input` or a stored-file answer, never `internal`. |
-| P-5 | Windows: the export dialog shows the destination as `\\?\C:\...`. | The extended-path prefix is never shown. |
-| P-6 | Windows: the rail shows no cue that it scrolls. | A visible scroll cue or enough room. |
-| P-7 | The Boards intro card stays on screen after Cancel. | It closes with the sheet. |
-| P-8 | The disabled Make a board button reports as enabled to UI Automation. | It reports as disabled. |
-| P-9 | Click Guide Vietnamese layout: the tile text wraps and the Preview pill overlaps (G2, F5, D28). | Both fit at the default width. |
+- F1: a text file named `.png` is rejected as an unreadable image, never as an unsupported video codec.
+- F2: `annotate` rejects a shape whose size is outside the image by a wide margin with `invalid_input`.
+- F3: Long Shot leaves the target page where it was before the capture, or says in the result how far it moved the page.
+- P-2: the ambiguous-window CLI error lists only the matching windows' ids and a short title.
+- P-3: when Long Shot cannot join frames it says why and keeps the frames it has; the Windows case (maximized Edge window with a second tab, `no_overlap` after 2 frames) has a found cause.
+- P-4: `annotate --out` on a large image never answers `internal`; it answers `invalid_input` with a reason, or stores the file.
+- P-5: the Windows export dialog never shows the `\\?\` extended-path prefix.
+- P-6: the Windows rail shows a visible cue that it scrolls, or has enough room.
+- P-7: the Boards intro card closes with the sheet.
+- P-8: the disabled Make a board button reports as disabled to UI Automation.
+- P-9 and F5: in Vietnamese the Click Guide tile text and the Preview pill fit at the default width without overlap.
 
-## 3. To write before the build
+## 4. Order of work and exit
 
-Tracks, order and exit criteria (as in the 0.3.5 plan: Phase 0 done, parallel tracks on disjoint files, one full gate, QA agent passes on the candidates, `cm-regress` on all three systems). Open points to check when the build starts: "Long Shot extends this area" and "Record exactly this area" from the after-capture bar start a capture from a region that already exists, which is more than adding a surface.
+Phase 0 text is written. The presets core (QC-4, QC-5) is built first because the panel (QC-1) and the after-capture bar (QC-3) use its types. The transcript work and the small fixes run in parallel on disjoint files. During development only fmt, clippy and the tests of the touched crates run (plus the i18n check, and the MCP tool count when tools change). The full gate runs once, on the final tree, before release. After it: QA agent passes on the candidates and `cm-regress` on all three systems, with reports in `verification/`.
