@@ -327,6 +327,9 @@ msgstr ""
 msgid "After an upload the file gets a link that only people in your organization can open."
 msgstr ""
 
+msgid "After capture"
+msgstr ""
+
 msgid "After export"
 msgstr ""
 
@@ -422,6 +425,9 @@ msgid "Allow without asking"
 msgstr ""
 
 msgid "Already split here"
+msgstr ""
+
+msgid "Already used by the preset {name}"
 msgstr ""
 
 msgid "Already used by {action}"
@@ -579,6 +585,12 @@ msgstr ""
 msgid "Auto-redact"
 msgstr ""
 
+msgid "Auto-redact didn’t run"
+msgstr ""
+
+msgid "Auto-redact found nothing to blur"
+msgstr ""
+
 msgid "Auto-redact needs a Windows text recognition language. Add one in Settings > Time & language > Language & region (it installs the text recognition part), then restart CaptureMann."
 msgstr ""
 
@@ -662,6 +674,11 @@ msgstr ""
 
 msgid "Blur here is only a look. To hide information, use Blur (B) or Pixelate (X)."
 msgstr ""
+
+msgid "Blurred {n} area"
+msgid_plural "Blurred {n} areas"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Board created"
 msgstr ""
@@ -840,6 +857,9 @@ msgid "Capture region"
 msgstr ""
 
 msgid "Capture region, shortcut {chord}"
+msgstr ""
+
+msgid "Capture removed"
 msgstr ""
 
 msgid "Capture unavailable"
@@ -1497,6 +1517,9 @@ msgstr ""
 msgid "Couldn’t move the old copies to {trash}"
 msgstr ""
 
+msgid "Couldn’t open Quick Capture"
+msgstr ""
+
 msgid "Couldn’t open the launcher"
 msgstr ""
 
@@ -1536,6 +1559,9 @@ msgstr ""
 msgid "Couldn’t register — used by another app"
 msgstr ""
 
+msgid "Couldn’t remove the capture"
+msgstr ""
+
 msgid "Couldn’t rename the capture"
 msgstr ""
 
@@ -1543,6 +1569,9 @@ msgid "Couldn’t restart the take"
 msgstr ""
 
 msgid "Couldn’t retry the upload"
+msgstr ""
+
+msgid "Couldn’t save"
 msgstr ""
 
 msgid "Couldn’t save the captions"
@@ -1566,6 +1595,12 @@ msgstr ""
 msgid "Couldn’t save the transcript file"
 msgstr ""
 
+msgid "Couldn’t save to the preset’s folder"
+msgstr ""
+
+msgid "Couldn’t save to {folder}"
+msgstr ""
+
 msgid "Couldn’t save to {folder}: {reason}"
 msgstr ""
 
@@ -1579,6 +1614,9 @@ msgid "Couldn’t show the file"
 msgstr ""
 
 msgid "Couldn’t start the capture overlay: {e}"
+msgstr ""
+
+msgid "Couldn’t start the transcript"
 msgstr ""
 
 msgid "Couldn’t start the transcription"
@@ -2052,6 +2090,9 @@ msgstr ""
 msgid "Enter the client’s name."
 msgstr ""
 
+msgid "Esc goes back"
+msgstr ""
+
 msgid "Esc to stop"
 msgstr ""
 
@@ -2339,6 +2380,9 @@ msgstr ""
 msgid "Folder pattern"
 msgstr ""
 
+msgid "Folder, e.g. ~/Bugs/{date}"
+msgstr ""
+
 msgid "Folder: the file {path}"
 msgstr ""
 
@@ -2418,6 +2462,9 @@ msgid "Give it a name such as “CaptureMann”. Under Supported account types c
 msgstr ""
 
 msgid "Give the destination a name."
+msgstr ""
+
+msgid "Give the preset a name."
 msgstr ""
 
 msgid "Global shortcuts are not available here"
@@ -2756,6 +2803,9 @@ msgstr ""
 msgid "Keep the name to {max} characters."
 msgstr ""
 
+msgid "Keeps the kind, the target and the four tiles. The area is never saved."
+msgstr ""
+
 msgid "Kept lines"
 msgstr ""
 
@@ -2766,6 +2816,9 @@ msgid "Keyboard shortcuts reset to their defaults"
 msgstr ""
 
 msgid "Kind"
+msgstr ""
+
+msgid "Kind, target and options in one panel"
 msgstr ""
 
 msgid "Kinds to look for"
@@ -2922,6 +2975,9 @@ msgid "List save destinations"
 msgstr ""
 
 msgid "List speech models"
+msgstr ""
+
+msgid "List the Quick Capture presets"
 msgstr ""
 
 msgid "List the library"
@@ -3084,6 +3140,9 @@ msgstr ""
 msgid "Marker {label} at {time}"
 msgstr ""
 
+msgid "Markers are on"
+msgstr ""
+
 msgid "Markers you added while recording appear as “Marked moments”."
 msgstr ""
 
@@ -3127,6 +3186,9 @@ msgid "Merge with next"
 msgstr ""
 
 msgid "Merge {name} into another speaker"
+msgstr ""
+
+msgid "Mic and system sound, no screen"
 msgstr ""
 
 msgid "Microphone"
@@ -3492,6 +3554,12 @@ msgstr ""
 msgid "No picture yet"
 msgstr ""
 
+msgid "No presets yet"
+msgstr ""
+
+msgid "No presets yet. New preset makes one."
+msgstr ""
+
 msgid "No preview"
 msgstr ""
 
@@ -3807,6 +3875,12 @@ msgstr ""
 msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
 msgstr ""
 
+msgid "One pick, or one shortcut, runs the setup"
+msgstr ""
+
+msgid "One small panel for the kind, the target and the options, with presets for the setups you repeat."
+msgstr ""
+
 msgid "One speaker, a room"
 msgstr ""
 
@@ -3847,6 +3921,9 @@ msgid "Open Destinations"
 msgstr ""
 
 msgid "Open Permissions…"
+msgstr ""
+
+msgid "Open Quick Capture"
 msgstr ""
 
 msgid "Open Settings"
@@ -4151,6 +4228,15 @@ msgstr ""
 msgid "Preparing the sound… {pct} %"
 msgstr ""
 
+msgid "Preset name, e.g. Bug report"
+msgstr ""
+
+msgid "Presets"
+msgstr ""
+
+msgid "Presets are kept in presets.json in the settings folder; copy the file to share them."
+msgstr ""
+
 msgid "Press Export… to choose a format and size for one file with the screen, camera bubble and audio."
 msgstr ""
 
@@ -4291,6 +4377,12 @@ msgid "Put the speakers’ names in the SRT file"
 msgstr ""
 
 msgid "Quality"
+msgstr ""
+
+msgid "Quick Capture"
+msgstr ""
+
+msgid "Quick Capture…"
 msgstr ""
 
 msgid "Quick Look made no thumbnail"
@@ -4946,6 +5038,9 @@ msgstr ""
 msgid "Saved to your library"
 msgstr ""
 
+msgid "Saved to {folder}"
+msgstr ""
+
 msgid "Saved without a single MP4"
 msgstr ""
 
@@ -5289,6 +5384,9 @@ msgid "Snap to the source row and column"
 msgstr ""
 
 msgid "Some online copies weren’t deleted"
+msgstr ""
+
+msgid "Some presets were skipped"
 msgstr ""
 
 msgid "Something went wrong while working with a file. Try again, and if it keeps happening, please report it."
@@ -5736,6 +5834,12 @@ msgid "That lens would be too large (16,384 px a side, 32 megapixels). Draw a sm
 msgstr ""
 
 msgid "That phrase is already in the list."
+msgstr ""
+
+msgid "That preset can’t run"
+msgstr ""
+
+msgid "That preset is gone"
 msgstr ""
 
 msgid "That term is already in the glossary."
@@ -7093,6 +7197,9 @@ msgstr ""
 msgid "Your boards and the screenshots in them are normal screenshots and stay readable."
 msgstr ""
 
+msgid "Your captures are normal captures, and your presets are a plain file you can read and share."
+msgstr ""
+
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr ""
 
@@ -7388,6 +7495,9 @@ msgstr ""
 msgid "not given: the account's default"
 msgstr ""
 
+msgid "not selected"
+msgstr ""
+
 msgid "not supported on this OS"
 msgstr ""
 
@@ -7404,6 +7514,9 @@ msgid "over a month ago"
 msgstr ""
 
 msgid "permission denied"
+msgstr ""
+
+msgid "selected"
 msgstr ""
 
 msgid "stereo"
@@ -7569,6 +7682,9 @@ msgstr ""
 msgid "{count} of {max} characters"
 msgstr ""
 
+msgid "{date} becomes today’s date. The capture is also in your library."
+msgstr ""
+
 msgid "{device_kind}: {device}"
 msgstr ""
 
@@ -7597,6 +7713,9 @@ msgid "{first}; {second}"
 msgstr ""
 
 msgid "{folder} as \"{title}\""
+msgstr ""
+
+msgid "{folder}: {reason}. The capture is in your library."
 msgstr ""
 
 msgid "{format} saved"
@@ -8105,6 +8224,9 @@ msgstr ""
 msgid "{row}. Changed from the default."
 msgstr ""
 
+msgid "{secs} s"
+msgstr ""
+
 msgid "{secs} s countdown · Space skips, Esc cancels"
 msgstr ""
 
@@ -8314,6 +8436,38 @@ msgstr ""
 
 msgctxt "accounts"
 msgid "Channel"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "Copy"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "Edit"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "Long Shot"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "Record"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "Save"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "Text"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "{action}, unavailable"
+msgstr ""
+
+msgctxt "after-capture bar"
+msgid "{action}, {key}"
 msgstr ""
 
 msgctxt "agent decision"
@@ -8757,7 +8911,15 @@ msgid "Cancelling…"
 msgstr ""
 
 msgctxt "button"
+msgid "Change"
+msgstr ""
+
+msgctxt "button"
 msgid "Change…"
+msgstr ""
+
+msgctxt "button"
+msgid "Clear"
 msgstr ""
 
 msgctxt "button"
@@ -8782,6 +8944,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Delete"
+msgstr ""
+
+msgctxt "button"
+msgid "Delete for good"
 msgstr ""
 
 msgctxt "button"
@@ -8822,6 +8988,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Manage"
+msgstr ""
+
+msgctxt "button"
+msgid "New preset"
 msgstr ""
 
 msgctxt "button"
@@ -8885,7 +9055,15 @@ msgid "Save"
 msgstr ""
 
 msgctxt "button"
+msgid "Save preset"
+msgstr ""
+
+msgctxt "button"
 msgid "Search again"
+msgstr ""
+
+msgctxt "button"
+msgid "Send feedback"
 msgstr ""
 
 msgctxt "button"
@@ -8918,6 +9096,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Transcribe"
+msgstr ""
+
+msgctxt "button"
+msgid "Undo"
 msgstr ""
 
 msgctxt "button"
@@ -9005,6 +9187,10 @@ msgid "Capture"
 msgstr ""
 
 msgctxt "capture dock"
+msgid "Capture…"
+msgstr ""
+
+msgctxt "capture dock"
 msgid "Click Guide"
 msgstr ""
 
@@ -9030,6 +9216,10 @@ msgstr ""
 
 msgctxt "capture dock"
 msgid "Window"
+msgstr ""
+
+msgctxt "capture dock"
+msgid "{label}, {keys}"
 msgstr ""
 
 msgctxt "capture kind"
@@ -9428,6 +9618,10 @@ msgctxt "feature name"
 msgid "Boards"
 msgstr ""
 
+msgctxt "feature name"
+msgid "Quick Capture"
+msgstr ""
+
 msgctxt "field"
 msgid "1600"
 msgstr ""
@@ -9458,6 +9652,14 @@ msgstr ""
 
 msgctxt "field"
 msgid "Name"
+msgstr ""
+
+msgctxt "field"
+msgid "Preset name"
+msgstr ""
+
+msgctxt "field"
+msgid "Save to folder"
 msgstr ""
 
 msgctxt "field"
@@ -9646,6 +9848,10 @@ msgstr ""
 
 msgctxt "job kind, starts a sentence"
 msgid "An upload"
+msgstr ""
+
+msgctxt "keyboard shortcut hint"
+msgid "Add a marker"
 msgstr ""
 
 msgctxt "keyboard shortcut hint"
@@ -9861,7 +10067,15 @@ msgid "page"
 msgstr ""
 
 msgctxt "launcher keyword"
+msgid "panel"
+msgstr ""
+
+msgctxt "launcher keyword"
 msgid "preferences"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "preset"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -9882,6 +10096,10 @@ msgstr ""
 
 msgctxt "launcher keyword"
 msgid "screencast"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "screenshot"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -9944,8 +10162,16 @@ msgctxt "launcher keyword"
 msgid "youtube"
 msgstr ""
 
+msgctxt "launcher preset"
+msgid "Preset: {name}"
+msgstr ""
+
 msgctxt "launcher verb"
 msgid "Publish"
+msgstr ""
+
+msgctxt "launcher verb"
+msgid "Run preset"
 msgstr ""
 
 msgctxt "lens setting"
@@ -10308,6 +10534,150 @@ msgctxt "platform word"
 msgid "your system settings"
 msgstr ""
 
+msgctxt "preset picker"
+msgid "Edit presets…"
+msgstr ""
+
+msgctxt "preset picker"
+msgid "No preset"
+msgstr ""
+
+msgctxt "preset picker"
+msgid "Preset: {name}"
+msgstr ""
+
+msgctxt "preset picker"
+msgid "Presets"
+msgstr ""
+
+msgctxt "preset picker"
+msgid "Save current as preset"
+msgstr ""
+
+msgctxt "preset picker"
+msgid "Save current as preset…"
+msgstr ""
+
+msgctxt "preset picker"
+msgid "{name}, {summary}"
+msgstr ""
+
+msgctxt "preset row"
+msgid "Delete {name}"
+msgstr ""
+
+msgctxt "preset row"
+msgid "Edit {name}"
+msgstr ""
+
+msgctxt "preset row"
+msgid "Move {name} down"
+msgstr ""
+
+msgctxt "preset row"
+msgid "Move {name} up"
+msgstr ""
+
+msgctxt "preset row"
+msgid "{name}, {summary}"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Auto-redact"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Copy to clipboard"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Edit preset"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Kind and target"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Microphone"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Name"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "New preset"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "No tool"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Not set"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Open in editor"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Options"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Save to"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Shortcut"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "System audio"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Then open the tool"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Transcribe after"
+msgstr ""
+
+msgctxt "preset sheet"
+msgid "Webcam"
+msgstr ""
+
+msgctxt "preset summary"
+msgid "copy"
+msgstr ""
+
+msgctxt "preset summary"
+msgid "editor"
+msgstr ""
+
+msgctxt "preset summary"
+msgid "mic"
+msgstr ""
+
+msgctxt "preset summary"
+msgid "redact"
+msgstr ""
+
+msgctxt "preset summary"
+msgid "system sound"
+msgstr ""
+
+msgctxt "preset summary"
+msgid "transcribe"
+msgstr ""
+
+msgctxt "preset summary"
+msgid "webcam"
+msgstr ""
+
 msgctxt "preview label"
 msgid "Preview"
 msgstr ""
@@ -10334,6 +10704,122 @@ msgstr ""
 
 msgctxt "privacy value"
 msgid "unlisted"
+msgstr ""
+
+msgctxt "quick capture"
+msgid "Enter"
+msgstr ""
+
+msgctxt "quick capture"
+msgid "Preset settings"
+msgstr ""
+
+msgctxt "quick capture action"
+msgid "Capture"
+msgstr ""
+
+msgctxt "quick capture action"
+msgid "Capture · {name}"
+msgstr ""
+
+msgctxt "quick capture action"
+msgid "Record"
+msgstr ""
+
+msgctxt "quick capture action"
+msgid "Record · {name}"
+msgstr ""
+
+msgctxt "quick capture kind"
+msgid "Audio"
+msgstr ""
+
+msgctxt "quick capture kind"
+msgid "Screenshot"
+msgstr ""
+
+msgctxt "quick capture kind"
+msgid "Video"
+msgstr ""
+
+msgctxt "quick capture kind"
+msgid "{kind}, key {n}"
+msgstr ""
+
+msgctxt "quick capture target"
+msgid "Display"
+msgstr ""
+
+msgctxt "quick capture target"
+msgid "Long Shot"
+msgstr ""
+
+msgctxt "quick capture target"
+msgid "Region"
+msgstr ""
+
+msgctxt "quick capture target"
+msgid "Window"
+msgstr ""
+
+msgctxt "quick capture target"
+msgid "{target}, {state}"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Auto-redact"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Copy"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Countdown"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Delay"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Editor"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Markers"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Mic"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "System audio"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Transcribe"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "Webcam"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "{tile}, off"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "{tile}, on"
+msgstr ""
+
+msgctxt "quick capture tile"
+msgid "{tile}, {value}"
+msgstr ""
+
+msgctxt "quick capture value"
+msgid "Off"
 msgstr ""
 
 msgctxt "record sheet"
@@ -10785,6 +11271,10 @@ msgid "Microphone"
 msgstr ""
 
 msgctxt "settings group"
+msgid "Presets"
+msgstr ""
+
+msgctxt "settings group"
 msgid "Recording"
 msgstr ""
 
@@ -10886,6 +11376,10 @@ msgstr ""
 
 msgctxt "shortcut"
 msgid "Long Shot"
+msgstr ""
+
+msgctxt "shortcut"
+msgid "Open Quick Capture"
 msgstr ""
 
 msgctxt "shortcut"

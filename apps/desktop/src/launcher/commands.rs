@@ -26,6 +26,10 @@ pub enum CommandId {
     ImportMedia,
     /// "New Click Guide" (GDE-1): the bar, a countdown, then clicks become steps.
     NewClickGuide,
+    /// "Quick Capture" (QC-1): the panel.
+    QuickCapture,
+    /// "Preset: {name}" (QC-4): the preset at this place in `presets.json`.
+    Preset(u16),
     OpenSettings,
     OpenPermissions,
     PublishLast,
@@ -267,6 +271,7 @@ impl Command {
         match self.id {
             CommandId::LongShot => Some(PreviewFeature::LongShot),
             CommandId::NewClickGuide => Some(PreviewFeature::ClickGuide),
+            CommandId::QuickCapture => Some(PreviewFeature::QuickCapture),
             _ => None,
         }
     }
@@ -341,6 +346,8 @@ pub struct Env<'a> {
     /// A 60 fps self-test passed on this machine and is still current, so "Record at 60 fps"
     /// can be offered (REC-3). The engine makes the final decision when the recording starts.
     pub fps60_ready: bool,
+    /// The presets of `presets.json` (QC-4): each is a row, "Preset: {name}".
+    pub presets: &'a [cm_core::preset::Preset],
 }
 
 /// Whether a 60 fps self-test passed on this machine, is not older than the daemon's staleness
@@ -400,7 +407,7 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
     let recording_off = || env.recording_off.clone();
     // (Row text is made here, when the launcher opens: the window lives for seconds and the
     // language cannot change meanwhile, so every open shows the current language.)
-    vec![
+    let mut rows = vec![
         Command {
             id: CommandId::RecordScreen,
             group: Group::Capture,
@@ -562,7 +569,7 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             glyph: Glyph::Frame,
             hint: Hint::Text(tr!("Scrolling capture")),
             shortcut: key(ShortcutAction::LongShot),
-            disabled: capture_off,
+            disabled: capture_off.clone(),
             verb: tr!("Start Long Shot"),
             options: Vec::new(),
         },
@@ -607,6 +614,28 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             shortcut: Vec::new(),
             disabled: env.guide_off.clone(),
             verb: tr!("Start a guide"),
+            options: Vec::new(),
+        },
+        Command {
+            id: CommandId::QuickCapture,
+            group: Group::Capture,
+            title: tr!("Quick Capture"),
+            keywords: keywords(
+                vec![
+                    tr_ctx!("launcher keyword", "capture"),
+                    tr_ctx!("launcher keyword", "panel"),
+                    tr_ctx!("launcher keyword", "preset"),
+                    tr_ctx!("launcher keyword", "screenshot"),
+                    tr_ctx!("launcher keyword", "record"),
+                ],
+                "Quick Capture", // i18n-ignore: the English title is searched too
+                &["capture", "panel", "preset", "screenshot", "record"],
+            ),
+            glyph: Glyph::Frame,
+            hint: Hint::Text(tr!("Kind, target and options in one panel")),
+            shortcut: key(ShortcutAction::OpenQuickCapture),
+            disabled: capture_off.clone(),
+            verb: tr!("Open Quick Capture"),
             options: Vec::new(),
         },
         Command {
@@ -750,7 +779,43 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             verb: tr!("Copy config"),
             options: Vec::new(),
         },
-    ]
+    ];
+    // QC-4: one row per preset, "Preset: {name}", in the Capture group after Quick Capture.
+    let at = rows
+        .iter()
+        .position(|c| c.id == CommandId::QuickCapture)
+        .map_or(rows.len(), |i| i + 1);
+    let preset_rows = env.presets.iter().enumerate().map(|(i, p)| {
+        let screenshot = p.kind == cm_core::preset::PresetKind::Screenshot;
+        Command {
+            id: CommandId::Preset(u16::try_from(i).unwrap_or(u16::MAX)),
+            group: Group::Capture,
+            title: tr_ctx!("launcher preset", "Preset: {name}", name = p.name),
+            keywords: keywords(
+                vec![tr_ctx!("launcher keyword", "preset"), p.name.clone()],
+                "Preset", // i18n-ignore: the English word is searched too
+                &["preset"],
+            ),
+            glyph: if screenshot {
+                Glyph::Frame
+            } else {
+                Glyph::Record
+            },
+            hint: Hint::Text(crate::quick::presets::summary_text(p)),
+            shortcut: crate::quick::presets::chord_of(p)
+                .map(|c| c.keycaps(env.platform))
+                .unwrap_or_default(),
+            disabled: if screenshot {
+                capture_off.clone()
+            } else {
+                recording_off()
+            },
+            verb: tr_ctx!("launcher verb", "Run preset"),
+            options: Vec::new(),
+        }
+    });
+    rows.splice(at..at, preset_rows);
+    rows
 }
 
 #[cfg(test)]
@@ -773,7 +838,55 @@ mod tests {
             recording_off: (!available).then(|| "Library unavailable".to_owned()),
             guide_off: (!available).then(|| "Library unavailable".to_owned()),
             fps60_ready: false,
+            presets: &[],
         }
+    }
+
+    /// QC-1 and QC-4: Quick Capture is a row of the Capture group with its chord, and every
+    /// preset is a row "Preset: {name}" that runs it; a recording preset follows the recording
+    /// switch, a screenshot preset the library.
+    #[test]
+    fn qc1_the_launcher_has_a_quick_capture_row_and_a_row_per_preset() {
+        let map = ShortcutMap::defaults(Platform::Mac);
+        let mcp = derive(true, true, None, &[]);
+        let presets = cm_core::preset::starter_presets();
+        let mut env = env_for(Platform::Mac, &map, &mcp, true);
+        env.presets = &presets;
+        env.recording_off = Some("A recording is running".into());
+        let cmds = build(&env);
+        let at = cmds
+            .iter()
+            .position(|c| c.id == CommandId::QuickCapture)
+            .unwrap();
+        let qc = &cmds[at];
+        assert_eq!(qc.group, Group::Capture);
+        assert_eq!(qc.title, "Quick Capture");
+        assert_eq!(qc.shortcut, ["\u{2325}", "\u{21E7}", "C"]);
+        assert!(qc.preview_feature().is_some());
+        // The preset rows follow it, in file order.
+        let titles: Vec<_> = cmds[at + 1..at + 5]
+            .iter()
+            .map(|c| c.title.clone())
+            .collect();
+        assert_eq!(
+            titles,
+            [
+                "Preset: Bug report",
+                "Preset: Docs shot",
+                "Preset: Demo video",
+                "Preset: Meeting"
+            ]
+        );
+        assert_eq!(cmds[at + 1].id, CommandId::Preset(0));
+        assert!(cmds[at + 1].is_enabled(), "a screenshot preset");
+        assert!(
+            !cmds[at + 3].is_enabled(),
+            "a recording preset while recording"
+        );
+        assert!(cmds[at + 1].keywords.iter().any(|k| k == "preset"));
+        // Without presets there are no preset rows.
+        let plain = build(&env_for(Platform::Mac, &map, &mcp, true));
+        assert!(!plain.iter().any(|c| matches!(c.id, CommandId::Preset(_))));
     }
 
     /// GDE-1.AC6: where the session has no click events the command is listed but off, and the
@@ -1013,10 +1126,12 @@ mod tests {
         let mcp = derive(true, true, None, &[]);
         let map = ShortcutMap::defaults(Platform::Mac);
         let cmds = build(&env_for(Platform::Mac, &map, &mcp, true));
-        let mut ids: Vec<_> = cmds.iter().map(|c| c.id as u8).collect();
-        ids.sort_unstable();
+        let mut ids: Vec<_> = cmds.iter().map(|c| c.id).collect();
+        let n = ids.len();
         ids.dedup();
-        assert_eq!(ids.len(), cmds.len());
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), cmds.len());
+        assert_eq!(n, cmds.len());
         assert!(cmds.iter().all(|c| Group::ORDER.contains(&c.group)));
     }
 

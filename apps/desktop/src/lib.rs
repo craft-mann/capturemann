@@ -52,6 +52,7 @@ pub mod preview;
 pub mod publish;
 pub mod publish_connect;
 pub mod published;
+pub mod quick;
 pub mod recedit;
 pub mod recording;
 pub mod remote_text;

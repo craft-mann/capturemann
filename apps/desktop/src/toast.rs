@@ -80,6 +80,8 @@ pub enum ToastAction {
     StopGuide,
     /// Starts Long Shot again to pick Hand scroll (S18: after Auto scroll stopped on a jump).
     TryHandScroll,
+    /// Undo of a Quick Capture screenshot (QC-3.AC5): removes that capture from the library.
+    UndoQuick(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,6 +153,7 @@ impl ToastAction {
             ToastAction::SuggestReport(_) => "file-text",
             ToastAction::StopLongShot | ToastAction::StopGuide => "cm-stop",
             ToastAction::TryHandScroll => "hand",
+            ToastAction::UndoQuick(_) => "undo-2",
         }
     }
 }

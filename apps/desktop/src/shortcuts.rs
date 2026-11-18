@@ -270,10 +270,12 @@ pub enum ShortcutAction {
     AddMarker,
     /// Long Shot (CAP-6): a scrolling capture. **No default chord** (design S13: "Not set").
     LongShot,
+    /// The Quick Capture panel (QC-1, Option+Shift+C).
+    OpenQuickCapture,
 }
 
 impl ShortcutAction {
-    pub const ALL: [ShortcutAction; 13] = [
+    pub const ALL: [ShortcutAction; 14] = [
         ShortcutAction::CaptureRegion,
         ShortcutAction::CaptureWindow,
         ShortcutAction::CaptureDisplay,
@@ -287,6 +289,7 @@ impl ShortcutAction {
         ShortcutAction::ToggleAudioRecording,
         ShortcutAction::AddMarker,
         ShortcutAction::LongShot,
+        ShortcutAction::OpenQuickCapture,
     ];
 
     /// Settings key (`get_settings` / `set_settings` can read and change `shortcuts.*`).
@@ -305,6 +308,7 @@ impl ShortcutAction {
             Self::ToggleAudioRecording => "shortcuts.toggle_audio_recording",
             Self::AddMarker => "shortcuts.add_marker",
             Self::LongShot => "shortcuts.long_shot",
+            Self::OpenQuickCapture => "shortcuts.open_quick_capture",
         }
     }
 
@@ -323,6 +327,7 @@ impl ShortcutAction {
             Self::ToggleAudioRecording => tr!("Start or stop audio recording"),
             Self::AddMarker => tr!("Add a marker"),
             Self::LongShot => tr!("Long Shot"),
+            Self::OpenQuickCapture => tr!("Open Quick Capture"),
         }
     }
 
@@ -347,6 +352,7 @@ impl ShortcutAction {
             Self::AddMarker => "m",
             // No default: the chord is unset (see `default_chord`).
             Self::LongShot => "",
+            Self::OpenQuickCapture => "c",
         }
     }
 
@@ -651,6 +657,89 @@ mod tests {
             .unwrap_err();
         assert_eq!(err.to_string(), "Already used by Open launcher");
         assert!(ShortcutAction::OpenLauncher.is_available());
+    }
+
+    /// QC-1.AC4: the Launcher keeps its chord, Quick Capture takes Option+Shift+C (Ctrl+Alt+Shift+C
+    /// on Windows and Linux), either can be rebound, and binding one to the other's chord is
+    /// refused as a conflict.
+    #[test]
+    fn qc1_ac4_quick_capture_shortcut_default_rebind_and_conflict() {
+        let mac = ShortcutMap::defaults(Platform::Mac);
+        assert_eq!(
+            mac.get(ShortcutAction::OpenQuickCapture).to_setting(),
+            "alt+shift+c"
+        );
+        assert_eq!(
+            mac.get(ShortcutAction::OpenLauncher).to_setting(),
+            "alt+shift+space"
+        );
+        for p in [Platform::Windows, Platform::Linux] {
+            let m = ShortcutMap::defaults(p);
+            assert_eq!(
+                m.get(ShortcutAction::OpenQuickCapture).to_setting(),
+                "ctrl+alt+shift+c"
+            );
+            assert_eq!(
+                m.get(ShortcutAction::OpenLauncher).to_setting(),
+                "ctrl+alt+shift+space"
+            );
+            assert!(m.conflicts().is_empty());
+        }
+        assert_eq!(
+            ShortcutAction::OpenQuickCapture.key(),
+            "shortcuts.open_quick_capture"
+        );
+        let launcher = mac.get(ShortcutAction::OpenLauncher);
+        let err = mac
+            .check_rebind(ShortcutAction::OpenQuickCapture, &launcher)
+            .unwrap_err();
+        assert_eq!(err.to_string(), "Already used by Open launcher");
+        let qc = mac.get(ShortcutAction::OpenQuickCapture);
+        let err = mac
+            .check_rebind(ShortcutAction::OpenLauncher, &qc)
+            .unwrap_err();
+        assert_eq!(err.to_string(), "Already used by Open Quick Capture");
+        let free = Chord::parse("alt+shift+q").unwrap();
+        assert!(mac
+            .check_rebind(ShortcutAction::OpenQuickCapture, &free)
+            .is_ok());
+        assert_eq!(
+            mac.with(ShortcutAction::OpenQuickCapture, free.clone())
+                .get(ShortcutAction::OpenQuickCapture),
+            free
+        );
+    }
+
+    /// QC-1.AC5: every shortcut that existed in 0.3.4 keeps its default chord.
+    #[test]
+    fn qc1_ac5_the_older_shortcuts_keep_their_chords() {
+        let table = [
+            (ShortcutAction::CaptureRegion, "1"),
+            (ShortcutAction::CaptureWindow, "2"),
+            (ShortcutAction::CaptureDisplay, "3"),
+            (ShortcutAction::ToggleRecording, "r"),
+            (ShortcutAction::PauseRecording, "p"),
+            (ShortcutAction::OpenLibrary, "l"),
+            (ShortcutAction::OpenLauncher, "space"),
+            (ShortcutAction::DiscardRecording, "d"),
+            (ShortcutAction::RestartRecording, "t"),
+            (ShortcutAction::AnnotateLast, "a"),
+            (ShortcutAction::ToggleAudioRecording, "v"),
+            (ShortcutAction::AddMarker, "m"),
+        ];
+        for (a, key) in table {
+            assert_eq!(
+                ShortcutMap::defaults(Platform::Mac).get(a).to_setting(),
+                format!("alt+shift+{key}")
+            );
+            assert_eq!(
+                ShortcutMap::defaults(Platform::Windows).get(a).to_setting(),
+                format!("ctrl+alt+shift+{key}")
+            );
+        }
+        assert!(ShortcutMap::defaults(Platform::Mac)
+            .get(ShortcutAction::LongShot)
+            .is_unset());
     }
 
     /// CAP-2.AC2 / R4-12: a pressed combination becomes a chord; bare keys and odd keys are

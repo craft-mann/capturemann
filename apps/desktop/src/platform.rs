@@ -148,6 +148,10 @@ pub fn suspend_shortcuts(manager: &impl HotkeyOs, map: &ShortcutMap) {
 
 /// Menu item ids of the tray menu (CAP-2).
 pub mod ids {
+    /// "Quick Capture…" (QC-1): the first item of the menu.
+    pub const QUICK_CAPTURE: &str = "quick_capture";
+    /// A tray item that runs a preset: `preset:<id>` (QC-4).
+    pub const PRESET_PREFIX: &str = "preset:";
     pub const CAPTURE_REGION: &str = "capture_region";
     pub const CAPTURE_WINDOW: &str = "capture_window";
     pub const CAPTURE_DISPLAY: &str = "capture_display";
@@ -345,13 +349,13 @@ pub fn recording_group(recording: bool) -> [&'static str; 4] {
     }
 }
 
-/// Where the Record / Pause / Stop group starts: after the three capture items and the delay
-/// submenu when idle, at the top while recording.
+/// Where the Record / Pause / Stop group starts: after Quick Capture, the three capture items
+/// and the delay submenu when idle, at the top while recording.
 pub fn recording_group_start(recording: bool) -> usize {
     if recording {
         0
     } else {
-        4
+        5
     }
 }
 
@@ -359,6 +363,7 @@ pub fn recording_group_start(recording: bool) -> usize {
 /// (IMP-5): macOS has the menu bar item, Linux builds its own menu.
 pub fn plain_menu_ids(with_import: bool) -> Vec<&'static str> {
     let mut v = vec![
+        ids::QUICK_CAPTURE,
         ids::CAPTURE_REGION,
         ids::CAPTURE_WINDOW,
         ids::CAPTURE_DISPLAY,
@@ -378,6 +383,7 @@ pub fn plain_menu_ids(with_import: bool) -> Vec<&'static str> {
 /// `Pause recording` is set by [`NativeTray::apply_plan`] (it becomes `Resume recording`).
 pub fn menu_text(id: &str) -> String {
     match id {
+        ids::QUICK_CAPTURE => tr!("Quick Capture\u{2026}"),
         ids::CAPTURE_REGION => tr!("Capture region"),
         ids::CAPTURE_WINDOW => tr!("Capture window"),
         ids::CAPTURE_DISPLAY => tr!("Capture display"),
@@ -393,6 +399,7 @@ pub fn menu_text(id: &str) -> String {
         ids::PERMISSIONS => tr!("Permissions\u{2026}"),
         ids::QUIT => tr!("Quit CaptureMann"),
         "recent" => tr!("Recent captures"),
+        "presets" => tr!("Presets"),
         "delay" => tr!("Capture delay"),
         _ => id.to_owned(),
     }
@@ -403,6 +410,8 @@ pub struct NativeTray {
     menu: Menu,
     tray: TrayIcon,
     recent: Submenu,
+    /// "Presets" (QC-4): one item per preset, `preset:<id>`.
+    presets: Submenu,
     /// "Capture delay" choices (CAP-5), one check mark among them.
     delays: Vec<(u32, CheckMenuItem)>,
     delay_menu: Submenu,
@@ -500,11 +509,33 @@ impl NativeTray {
         self.stop.set_text(menu_text(ids::REC_STOP));
         self.pause.set_text(menu_text(ids::REC_PAUSE));
         self.recent.set_text(menu_text("recent"));
+        self.presets.set_text(menu_text("presets"));
         self.delay_menu.set_text(menu_text("delay"));
         for (secs, item) in &self.delays {
             item.set_text(crate::delay::choice_label(*secs));
         }
         self.set_recents(recents);
+    }
+
+    /// Replaces the "Presets" entries: `(preset id, name)` in file order (QC-4).
+    pub fn set_presets(&self, presets: &[(String, String)]) {
+        while !self.presets.items().is_empty() {
+            self.presets.remove_at(0);
+        }
+        if presets.is_empty() {
+            let none = MenuItem::new(tr!("No presets yet"), false, None);
+            let _ = self.presets.append(&none);
+            return;
+        }
+        for (id, name) in presets {
+            let item = MenuItem::with_id(
+                MenuId::new(format!("{}{id}", ids::PRESET_PREFIX)),
+                name,
+                true,
+                None,
+            );
+            let _ = self.presets.append(&item);
+        }
     }
 
     /// Replaces the "Recent captures" entries (last 5, CAP-2).
@@ -565,6 +596,9 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
     let recent = Submenu::with_id(MenuId::new("recent"), menu_text("recent"), true);
     let none = MenuItem::new(tr!("No captures yet"), false, None);
     recent.append(&none).map_err(|e| e.to_string())?;
+    let presets = Submenu::with_id(MenuId::new("presets"), menu_text("presets"), true);
+    let no_presets = MenuItem::new(tr!("No presets yet"), false, None);
+    presets.append(&no_presets).map_err(|e| e.to_string())?;
     let delay_menu = Submenu::with_id(MenuId::new("delay"), menu_text("delay"), true);
     let plain: Vec<(&'static str, MenuItem)> = plain_menu_ids(cfg!(windows))
         .into_iter()
@@ -595,6 +629,7 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
         PredefinedMenuItem::separator(),
     );
     let mut entries: Vec<&dyn tray_icon::menu::IsMenuItem> = vec![
+        plain_item(ids::QUICK_CAPTURE),
         plain_item(ids::CAPTURE_REGION),
         plain_item(ids::CAPTURE_WINDOW),
         plain_item(ids::CAPTURE_DISPLAY),
@@ -613,6 +648,7 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
     }
     entries.extend([
         &recent as &dyn tray_icon::menu::IsMenuItem,
+        &presets,
         &sep_b,
         plain_item(ids::SETTINGS),
         plain_item(ids::PERMISSIONS),
@@ -640,6 +676,7 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
         menu,
         tray,
         recent,
+        presets,
         delays,
         delay_menu,
         plain,
@@ -831,7 +868,7 @@ mod tests {
             ]
         );
         // Capture region, window, display and the delay submenu come first (CAP-5).
-        assert_eq!(recording_group_start(false), 4);
+        assert_eq!(recording_group_start(false), 5);
         let mut a = recording_group(true);
         let mut b = recording_group(false);
         a.sort_unstable();

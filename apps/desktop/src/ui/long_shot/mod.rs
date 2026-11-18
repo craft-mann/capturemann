@@ -258,6 +258,8 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     if is_running(cx) {
         return;
     }
+    // A Quick Capture screenshot that never finished must not give this run its copy choice.
+    app.update(cx, |m, _| m.quick.ctx = None);
     // Design S24: the first Long Shot shows the one-time Preview intro in the main window.
     crate::ui::preview_label::show_intro_if_due(
         app,
@@ -337,6 +339,32 @@ fn after_pick(
             toast(app, crate::flows::overlay_error_toast(&e), cx);
         }
     }
+}
+
+/// QC-3: Long Shot from the area of a screenshot that was just taken (the after-capture bar).
+pub(crate) fn begin_from_area(
+    app: &Entity<AppModel>,
+    placed: &crate::quick::area::Placed,
+    cx: &mut App,
+) {
+    if is_running(cx) || app.read(cx).capture_busy {
+        return; // CAP-2: one capture at a time.
+    }
+    app.update(cx, |m, _| m.capture_busy = true);
+    let auto = model::overlay_flag(cm_capture::long_shot::auto_scroll_support()) == "available";
+    begin(
+        app,
+        LongPick {
+            display_id: placed.display_id,
+            window_id: placed.window_id,
+            rect: placed.picked,
+            area: Some(placed.rect),
+            scale: placed.scale,
+            scroll: if auto { "auto" } else { "hand" }.to_owned(),
+            direction: "vertical".to_owned(),
+        },
+        cx,
+    );
 }
 
 /// The overlay picked: open the HUD, then run the capture.
@@ -565,6 +593,12 @@ fn finish(
 ) {
     close_windows(cx);
     free(app, cx);
+    // A run that came from the panel or a preset: its steps, or nothing if no capture was made.
+    let finished = match &result {
+        Ok(Ok((_, Ok(done)))) => Some(done.clone()),
+        _ => None,
+    };
+    crate::ui::quick_flow::long_finished(app, finished.as_ref(), cx);
     match result {
         Ok(Ok((v, done))) => {
             let Some(spec) = model::done_toast(&v, how) else {

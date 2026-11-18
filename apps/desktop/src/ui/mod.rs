@@ -33,6 +33,12 @@ pub mod paint;
 pub mod permissions_view;
 pub mod preview_label;
 pub mod publish_sheet;
+pub mod quick_after;
+pub mod quick_flow;
+#[cfg(test)]
+mod quick_flow_tests;
+pub mod quick_sheet;
+pub mod quick_window;
 pub mod recording;
 pub mod recording_editor;
 pub mod report_offer;

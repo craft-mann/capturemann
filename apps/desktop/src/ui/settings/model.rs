@@ -348,6 +348,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "annotate" => tr!("Annotate captures"),
         "get_capture" => tr!("Read a capture"),
         "suggest_redactions" => tr!("Suggest redactions"),
+        "list_presets" => tr!("List the Quick Capture presets"),
         "recognize_text" => tr!("Read the text in a screenshot"),
         "suggest_blueprint" => tr!("Suggest placeholder bars for text"),
         "start_guide" => tr!("Start a Click Guide"),
@@ -648,6 +649,7 @@ pub fn shortcut_label(a: ShortcutAction) -> String {
         }
         ShortcutAction::AddMarker => tr_ctx!("shortcut", "Add a marker"),
         ShortcutAction::LongShot => tr_ctx!("shortcut", "Long Shot"),
+        ShortcutAction::OpenQuickCapture => tr_ctx!("shortcut", "Open Quick Capture"),
     }
 }
 
@@ -676,6 +678,7 @@ pub fn shortcut_groups() -> [(String, String, Vec<ShortcutAction>); 2] {
                 ShortcutAction::CaptureWindow,
                 ShortcutAction::CaptureDisplay,
                 ShortcutAction::LongShot,
+                ShortcutAction::OpenQuickCapture,
                 ShortcutAction::OpenLauncher,
                 ShortcutAction::OpenLibrary,
                 ShortcutAction::AnnotateLast,

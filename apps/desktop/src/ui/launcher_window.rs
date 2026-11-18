@@ -182,6 +182,8 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
         )
     };
     let mcp = crate::ui::studio::agent_status_of(&backend);
+    crate::ui::quick_flow::refresh_presets(app, cx);
+    let presets = app.read(cx).quick.presets.clone();
     let commands = commands::build(&Env {
         platform,
         shortcuts: &shortcuts,
@@ -195,6 +197,7 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
             &backend.settings.snapshot(),
             time::OffsetDateTime::now_utc(),
         ),
+        presets: &presets,
     });
     let recent = cx
         .try_global::<RecentUse>()
@@ -488,6 +491,22 @@ fn execute(id: CommandId, option: LaunchOption, cx: &mut App) {
             }
         }
         CommandId::LongShot => app::handle_command(&app, app::Command::LongShot, cx),
+        // QC-1: the panel opens near the pointer, once the launcher is gone.
+        CommandId::QuickCapture => {
+            crate::ui::quick_window::toggle(&app, crate::ui::quick_window::Anchor::Pointer, cx)
+        }
+        // QC-4: "Preset: {name}" runs it directly (it waits for the launcher to go itself).
+        CommandId::Preset(i) => {
+            let id = app
+                .read(cx)
+                .quick
+                .presets
+                .get(usize::from(i))
+                .map(|p| p.id.clone());
+            if let Some(id) = id {
+                crate::ui::quick_flow::run_preset(&app, &id, cx);
+            }
+        }
         CommandId::OpenLibrary => app::navigate(&app, Route::Library, cx),
         CommandId::OpenSettings => app::navigate(&app, Route::Settings, cx),
         CommandId::OpenPermissions => app::open_permissions_page(&app, cx),

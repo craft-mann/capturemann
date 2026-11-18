@@ -36,6 +36,12 @@ pub enum Surface {
     LongShotPreview,
     Confirm,
     Dialog,
+    /// The Quick Capture panel (QC-1).
+    QuickCapture,
+    /// The after-capture bar (QC-3).
+    QuickAfter,
+    /// The preset edit sheet (QC-4).
+    QuickSheet,
 }
 
 impl Surface {
@@ -57,6 +63,9 @@ impl Surface {
             Surface::LongShotPreview => "long_shot_preview",
             Surface::Confirm => "confirm",
             Surface::Dialog => "dialog",
+            Surface::QuickCapture => "quick_capture",
+            Surface::QuickAfter => "quick_after",
+            Surface::QuickSheet => "quick_sheet",
         }
     }
 }

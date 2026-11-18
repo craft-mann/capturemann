@@ -12,6 +12,8 @@ Spec: `specs/features/21-quick-capture.md` (the spec file wins over the design p
 - Quick Capture carries the Preview label and a Send feedback button, with no Settings switch.
 - Four starter presets ship: Bug report, Docs shot, Demo video and Meeting. They are editable and deletable.
 - `list_presets` is the one new MCP tool (90 tools); `capture_screenshot` and `start_recording` take `preset`; the CLI gets `--preset` and `capturemann presets list`. The assertion in `crates/cm-mcp/tests/stdio.rs` and `docs/reference/` change with it.
+- The panel, the after-capture bar and the preset edit sheet are built in `apps/desktop` (`quick/`, `ui/quick_window.rs`, `ui/quick_after.rs`, `ui/quick_sheet.rs`, `ui/quick_flow.rs`, `ui/settings/presets.rs`); their manual script is `tests/manual/QC-1.md`; `cm-desktop --demo-quick-capture` opens the panel.
+- What a preset's call cannot carry (Auto-redact, the editor and its tool, the folder, the format and scale, transcribing after) is done by the app after the capture through `suggest_redactions`, `annotate`, `transcribe` and the library's own copy paths; the capture is always in the library first.
 - The after-capture actions "Long Shot extends this area" and "Record exactly this area" start a capture from a region that already exists; they reuse the existing capture actions with that region as the start.
 
 ## 2. Transcripts: invented text on short recordings

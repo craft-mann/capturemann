@@ -43,6 +43,8 @@ pub struct MenuInputs {
     pub delay_s: u32,
     /// `(capture id, title)`, newest first.
     pub recents: Vec<(String, String)>,
+    /// `(preset id, name)` in file order (QC-4).
+    pub presets: Vec<(String, String)>,
 }
 
 impl Default for MenuInputs {
@@ -57,6 +59,7 @@ impl Default for MenuInputs {
             pause_label: menu_text(ids::REC_PAUSE),
             delay_s: 0,
             recents: Vec::new(),
+            presets: Vec::new(),
         }
     }
 }
@@ -81,6 +84,8 @@ pub fn item_id(key: &str) -> i32 {
         ids::PERMISSIONS => 13,
         ids::QUIT => 14,
         ids::NEW_CLICK_GUIDE => 15,
+        ids::QUICK_CAPTURE => 16,
+        "presets" => 17,
         _ => -1,
     }
 }
@@ -88,6 +93,7 @@ pub fn item_id(key: &str) -> i32 {
 const SEPARATOR_BASE: i32 = 50;
 const DELAY_BASE: i32 = 100;
 const RECENT_BASE: i32 = 200;
+const PRESET_BASE: i32 = 300;
 /// "Recent captures" shows at most this many entries.
 pub const MAX_RECENTS: usize = 5;
 
@@ -162,6 +168,35 @@ pub fn build_menu(inp: &MenuInputs) -> Vec<MenuNode> {
         ..node("recent", true)
     };
 
+    let preset_children = if inp.presets.is_empty() {
+        vec![MenuNode {
+            id: PRESET_BASE - 1,
+            key: String::new(),
+            label: cm_i18n::tr!("No presets yet"),
+            kind: Kind::Normal,
+            enabled: false,
+            children: Vec::new(),
+        }]
+    } else {
+        inp.presets
+            .iter()
+            .enumerate()
+            .map(|(i, (id, name))| MenuNode {
+                id: PRESET_BASE + i as i32,
+                key: format!("{}{id}", ids::PRESET_PREFIX),
+                label: name.clone(),
+                kind: Kind::Normal,
+                enabled: true,
+                children: Vec::new(),
+            })
+            .collect()
+    };
+    let presets = MenuNode {
+        kind: Kind::Submenu,
+        children: preset_children,
+        ..node("presets", true)
+    };
+
     let group = |key: &str| {
         let mut n = node(key, true);
         match key {
@@ -177,6 +212,7 @@ pub fn build_menu(inp: &MenuInputs) -> Vec<MenuNode> {
     };
 
     let mut items = vec![
+        node(ids::QUICK_CAPTURE, true),
         node(ids::CAPTURE_REGION, true),
         node(ids::CAPTURE_WINDOW, true),
         node(ids::CAPTURE_DISPLAY, true),
@@ -194,6 +230,7 @@ pub fn build_menu(inp: &MenuInputs) -> Vec<MenuNode> {
     items.push(node(ids::NEW_CLICK_GUIDE, true));
     items.extend([
         recent,
+        presets,
         separator(1),
         node(ids::SETTINGS, true),
         node(ids::PERMISSIONS, true),
@@ -367,6 +404,7 @@ mod tests {
         assert_eq!(
             keys(&m),
             [
+                "quick_capture",
                 "capture_region",
                 "capture_window",
                 "capture_display",
@@ -380,6 +418,7 @@ mod tests {
                 "open_launcher",
                 "new_click_guide",
                 "recent",
+                "presets",
                 "",
                 "settings",
                 "permissions",
@@ -387,7 +426,7 @@ mod tests {
                 "quit"
             ]
         );
-        assert_eq!(m[8].kind, Kind::Separator);
+        assert_eq!(m[9].kind, Kind::Separator);
     }
 
     /// CAP-2.AC4: while recording, Stop is the first item.
@@ -407,10 +446,10 @@ mod tests {
                 "rec_pause",
                 "record",
                 "record_audio",
+                "quick_capture",
                 "capture_region",
                 "capture_window",
-                "capture_display",
-                "delay"
+                "capture_display"
             ]
         );
         assert!(m[0].enabled && m[1].enabled && !m[2].enabled && !m[3].enabled);
@@ -525,6 +564,7 @@ mod tests {
     fn every_native_tray_action_is_present() {
         let m = build_menu(&MenuInputs::default());
         for key in [
+            ids::QUICK_CAPTURE,
             ids::CAPTURE_REGION,
             ids::CAPTURE_WINDOW,
             ids::CAPTURE_DISPLAY,
@@ -555,7 +595,7 @@ mod tests {
         assert!(p.contains(&("enabled", Prop::Bool(false))));
         assert!(p.iter().any(|(k, _)| *k == "label"));
         assert_eq!(props(stop, &["label".to_owned()]).len(), 1);
-        let sep = &m[8];
+        let sep = &m[9];
         assert_eq!(props(sep, &[]), [("type", Prop::Str("separator".into()))]);
         let three = find(&m, DELAY_BASE + 1).unwrap();
         let p = props(three, &[]);

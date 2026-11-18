@@ -112,6 +112,7 @@ impl SettingsView {
                 .flex()
                 .flex_col()
                 .gap(px(24.))
+                .child(self.presets_group(t, cx))
                 .child(group_with_card(
                     t,
                     &tr_ctx!("settings group", "Screenshots"),
@@ -127,6 +128,7 @@ impl SettingsView {
             .flex()
             .flex_col()
             .gap(px(24.))
+            .child(self.presets_group(t, cx))
             .child(
                 group_with_card(
                     t,

@@ -4,6 +4,13 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
     match cmd {
         Command::Hotkey(id) => {
             let action = app.read(cx).hotkey_ids.get(&id).copied();
+            // A preset's own shortcut runs it directly (QC-4.AC5).
+            if action.is_none() {
+                if let Some(preset) = crate::ui::quick_flow::hotkey_preset(app, id, cx) {
+                    crate::ui::quick_flow::run_preset(app, &preset, cx);
+                    return;
+                }
+            }
             match action {
                 Some(ShortcutAction::CaptureRegion) => start_capture(app, CaptureMode::Region, cx),
                 Some(ShortcutAction::CaptureWindow) => start_capture(app, CaptureMode::Window, cx),
@@ -22,6 +29,11 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 }
                 Some(ShortcutAction::AddMarker) => recording::add_marker_hotkey(app, cx),
                 Some(ShortcutAction::LongShot) => crate::ui::long_shot::start(app, cx),
+                Some(ShortcutAction::OpenQuickCapture) => crate::ui::quick_window::toggle(
+                    app,
+                    crate::ui::quick_window::Anchor::Pointer,
+                    cx,
+                ),
                 // A running Long Shot first (CAP-6), a Click Guide countdown, then a delay
                 // (CAP-5.AC2).
                 None if id == crate::ui::delay_pill::escape_hotkey_id()
@@ -42,7 +54,14 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 set_capture_delay(app, secs, cx);
                 return;
             }
+            if let Some(preset) = id.strip_prefix(crate::platform::ids::PRESET_PREFIX) {
+                crate::ui::quick_flow::run_preset(app, preset, cx);
+                return;
+            }
             match id.as_str() {
+                crate::platform::ids::QUICK_CAPTURE => {
+                    crate::ui::quick_window::toggle(app, crate::ui::quick_window::Anchor::Tray, cx)
+                }
                 "capture_region" => start_capture(app, CaptureMode::Region, cx),
                 "capture_window" => start_capture(app, CaptureMode::Window, cx),
                 "capture_display" => start_capture(app, CaptureMode::Display, cx),
@@ -111,6 +130,8 @@ pub enum RebindError {
     BadKey,
     /// Another action already uses the combination.
     Conflict(crate::shortcuts::Conflict),
+    /// A preset already uses the combination.
+    Preset(crate::quick::presets::Owner),
     /// The OS refused to register it (another app uses it).
     Register,
 }
@@ -125,6 +146,7 @@ impl RebindError {
                 "That key can\u{2019}t be used in a shortcut. Try a letter, a digit, Space or F1 to F24."
             ),
             RebindError::Conflict(c) => c.to_string(),
+            RebindError::Preset(o) => o.to_string(),
             RebindError::Register => {
                 tr!("Couldn\u{2019}t register \u{2014} used by another app")
             }
@@ -148,6 +170,7 @@ pub fn suspend_shortcuts(app: &Entity<AppModel>, cx: &mut App) {
         return;
     };
     crate::platform::suspend_shortcuts(&h.0, &app.read(cx).shortcuts);
+    crate::ui::quick_flow::unregister_hotkeys(app, cx);
     cx.set_global(ShortcutsSuspended);
 }
 
@@ -167,6 +190,7 @@ pub fn resume_shortcuts(app: &Entity<AppModel>, cx: &mut App) {
         m.registration = status;
         cx.notify();
     });
+    crate::ui::quick_flow::sync_hotkeys(app, cx);
 }
 
 pub fn rebind_shortcut(
@@ -181,6 +205,9 @@ pub fn rebind_shortcut(
     };
     map.check_rebind(action, &chord)
         .map_err(RebindError::Conflict)?;
+    // A preset's shortcut is one of "every other shortcut" (QC-4.AC5).
+    crate::quick::presets::check_action_chord(&app.read(cx).quick.presets, &chord)
+        .map_err(RebindError::Preset)?;
     if old == chord {
         return Ok(());
     }

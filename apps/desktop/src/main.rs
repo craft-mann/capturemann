@@ -4,7 +4,8 @@
 //! Flags: `--background` starts in the tray with no window (CAP-2.AC5, login item);
 //! `--open <capture_id>` opens that capture in the editor at startup;
 //! `--demo-toast`, `--demo-agent-toast` and `--demo-confirm` exercise the toast and the
-//! confirmation dialog by hand; `--demo-launcher` opens the command launcher (LNC-1). Debug flags: `--theme dark|light` forces the Studio theme and
+//! confirmation dialog by hand; `--demo-launcher` opens the command launcher (LNC-1);
+//! `--demo-quick-capture` opens the Quick Capture panel (QC-1). Debug flags: `--theme dark|light` forces the Studio theme and
 //! `--page recordings|screenshots|published|destinations|agents|settings` opens that section.
 //! `--demo-recording`, `--demo-region`, `--demo-paused`, `--demo-agent`, `--demo-sheet` run the
 //! recording UI on the real engine with fake tracks (no screen, microphone or camera is used; see
@@ -185,6 +186,9 @@ fn main() {
         });
     let demo_plan = cm_desktop::recording::demo::DemoPlan::parse(&args);
     let demo_query = value_of("--demo-launcher-query").unwrap_or_default();
+    // `--demo-quick-capture` opens the Quick Capture panel at start (QC-1; it captures nothing
+    // until a button is pressed).
+    let demo_quick = flag("--demo-quick-capture");
     let theme_override = value_of("--theme").and_then(|v| ThemePreference::parse(&v));
     // `--demo-permissions missing|partial|granted|restart|windows`: a fake permission provider so the
     // setup screen and Settings -> Permissions can be looked at without touching the real grants.
@@ -495,6 +499,9 @@ fn main() {
             ),
             }
         }
+        // Quick Capture: the panel's remembered choices, the presets and their own global
+        // shortcuts (after the global ones, so a clash loses to the action).
+        cm_desktop::ui::quick_flow::init(&model, cx);
         // A second launch (a desktop shortcut running `cm-desktop --launcher`, Open With on a
         // media file) reaches this app.
         #[cfg(any(unix, windows))]
@@ -525,6 +532,8 @@ fn main() {
                 // A notice about a missing extra, not a failed action: it must not cover the editor for good.
                 .dismiss_after(std::time::Duration::from_secs(10))),
         }
+        // The tray's Presets submenu (QC-4) follows presets.json.
+        cm_desktop::ui::quick_flow::sync_tray_presets(&model, cx);
 
         let app2 = model.clone();
         cx.spawn(async move |cx| {
@@ -718,6 +727,13 @@ fn main() {
         }
         if demo_launcher {
             cm_desktop::ui::launcher_window::open_launcher_with(&model, cx, &demo_query);
+        }
+        if demo_quick {
+            cm_desktop::ui::quick_window::open_panel(
+                &model,
+                cm_desktop::ui::quick_window::Anchor::Pointer,
+                cx,
+            );
         }
         if demo_agent {
             app::push_toast(

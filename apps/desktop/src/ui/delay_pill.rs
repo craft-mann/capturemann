@@ -417,6 +417,7 @@ pub fn cancel(app: &Entity<AppModel>, cx: &mut App) {
         }
         // Nothing will be captured, so a launcher action's one-off copy choice is spent.
         m.copy_override = None;
+        m.quick.ctx = None;
     });
     let waiting_in_daemon = daemon
         .as_ref()

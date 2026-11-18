@@ -284,6 +284,10 @@ impl Backend {
                 // Publish accounts (PUB-1, PUB-2): written by the connect flow, read here.
                 .publish_accounts(cm_publish::PublishAccountStore::new(
                     cm_daemon::config::config_dir(),
+                ))
+                // Quick Capture presets (QC-4, QC-5): `presets.json` in the settings folder.
+                .presets(cm_daemon::preset_ops::PresetStore::in_dir(
+                    &cm_daemon::config::config_dir(),
                 ));
             match jobs {
                 Ok(queue) => builder = builder.jobs(queue),

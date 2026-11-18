@@ -572,6 +572,16 @@ fn end_all(app: &Entity<AppModel>, e: &Ended, cx: &mut App) {
         },
         cx,
     );
+    // A panel audio start that ended without a capture forgets its Transcribe choice.
+    if !matches!(
+        e,
+        Ended::Stopped {
+            capture_id: Some(_),
+            ..
+        }
+    ) {
+        app.update(cx, |m, _| m.quick.transcribe_audio = false);
+    }
     if let Some(spec) = toasts::ended_toast(e) {
         if let Ended::Stopped {
             capture_id: Some(id),
@@ -579,6 +589,8 @@ fn end_all(app: &Entity<AppModel>, e: &Ended, cx: &mut App) {
         } = e
         {
             app::capture_changed(app, Some(id), cx);
+            // QC-1: an audio recording started from the panel with Transcribe on.
+            crate::ui::quick_flow::audio_ended(app, id, cx);
         }
         app::push_toast(app, spec, cx);
     }
@@ -1290,7 +1302,7 @@ pub fn blocker_text(blocker: RecordingBlocker) -> (String, String) {
 
 /// Shows why and returns true when recording cannot start now. Every Record entry point (the
 /// sheet, the hotkeys, the tray, the launcher) asks this one function.
-fn refuse_recording(app: &Entity<AppModel>, backend: &Backend, cx: &mut App) -> bool {
+pub(crate) fn refuse_recording(app: &Entity<AppModel>, backend: &Backend, cx: &mut App) -> bool {
     let Some(blocker) = backend.recording_blocker() else {
         return false;
     };
@@ -1315,6 +1327,29 @@ pub fn start_with(
     app: &Entity<AppModel>,
     opts: StartOptions,
     extra: Map<String, Value>,
+    cx: &mut App,
+) {
+    start_remembering(app, opts, extra, true, cx);
+}
+
+/// [`start_with`] for a start from the Quick Capture panel or a preset: the sheet's remembered
+/// choices (target, camera, microphone, system audio) are left as they are, so Settings and the
+/// Record sheet never follow the panel (QC-1.AC6). Only the bubble position is written, which
+/// the layout check at stop needs.
+pub fn start_quick(
+    app: &Entity<AppModel>,
+    opts: StartOptions,
+    extra: Map<String, Value>,
+    cx: &mut App,
+) {
+    start_remembering(app, opts, extra, false, cx);
+}
+
+fn start_remembering(
+    app: &Entity<AppModel>,
+    opts: StartOptions,
+    extra: Map<String, Value>,
+    remember: bool,
     cx: &mut App,
 ) {
     let rec = rec_of(app, cx);
@@ -1346,7 +1381,11 @@ pub fn start_with(
     if let Some(p) = params.as_object_mut() {
         p.extend(extra);
     }
-    let values = Value::Object(opts.remembered());
+    let values = Value::Object(if remember {
+        opts.remembered()
+    } else {
+        opts.remembered_position()
+    });
     call_after(
         app,
         Some(values),
@@ -1741,6 +1780,33 @@ pub fn pause_hotkey(app: &Entity<AppModel>, cx: &mut App) {
     }
 }
 
+/// The notice for a recording that starts without the microphone or the camera because the OS has
+/// not allowed it yet (R4-5), or `None` when nothing was left out.
+pub fn dropped_sources_toast(dropped: &[&str]) -> Option<ToastSpec> {
+    if dropped.is_empty() {
+        return None;
+    }
+    // Whole sentences for each case (microphone, camera, both), never joined pieces.
+    let (title, body) = match (
+        dropped.contains(&"microphone"),
+        dropped.contains(&"camera"),
+    ) {
+        (true, true) => (
+            tr!("Recording without the microphone and camera"),
+            tr!("Access to the microphone and camera isn\u{2019}t allowed yet. Turn it on in Settings \u{2192} Permissions."),
+        ),
+        (true, false) => (
+            tr!("Recording without the microphone"),
+            tr!("Access to the microphone isn\u{2019}t allowed yet. Turn it on in Settings \u{2192} Permissions."),
+        ),
+        _ => (
+            tr!("Recording without the camera"),
+            tr!("Access to the camera isn\u{2019}t allowed yet. Turn it on in Settings \u{2192} Permissions."),
+        ),
+    };
+    Some(ToastSpec::new(ToastKind::Info, title).body(body))
+}
+
 /// Starts straight away with the remembered options on the primary display (the hotkey path).
 pub fn quick_start(app: &Entity<AppModel>, cx: &mut App) {
     let backend = app.read(cx).backend.clone();
@@ -1801,26 +1867,8 @@ pub fn quick_start(app: &Entity<AppModel>, cx: &mut App) {
             };
             let opts = defaults.options(Target::Display { display_id: d.id });
             start(&app2, opts, cx);
-            if !dropped.is_empty() {
-                // Whole sentences for each case (microphone, camera, both), never joined pieces.
-                let (title, body) = match (
-                    dropped.contains(&"microphone"),
-                    dropped.contains(&"camera"),
-                ) {
-                    (true, true) => (
-                        tr!("Recording without the microphone and camera"),
-                        tr!("Access to the microphone and camera isn\u{2019}t allowed yet. Turn it on in Settings \u{2192} Permissions."),
-                    ),
-                    (true, false) => (
-                        tr!("Recording without the microphone"),
-                        tr!("Access to the microphone isn\u{2019}t allowed yet. Turn it on in Settings \u{2192} Permissions."),
-                    ),
-                    _ => (
-                        tr!("Recording without the camera"),
-                        tr!("Access to the camera isn\u{2019}t allowed yet. Turn it on in Settings \u{2192} Permissions."),
-                    ),
-                };
-                app::push_toast(&app2, ToastSpec::new(ToastKind::Info, title).body(body), cx);
+            if let Some(spec) = dropped_sources_toast(&dropped) {
+                app::push_toast(&app2, spec, cx);
             }
         });
     })
