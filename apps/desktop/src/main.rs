@@ -4,7 +4,8 @@
 //! Flags: `--background` starts in the tray with no window (CAP-2.AC5, login item);
 //! `--open <capture_id>` opens that capture in the editor at startup;
 //! `--demo-toast`, `--demo-agent-toast` and `--demo-confirm` exercise the toast and the
-//! confirmation dialog by hand; `--demo-launcher` opens the command launcher (LNC-1). Debug flags: `--theme dark|light` forces the Studio theme and
+//! confirmation dialog by hand; `--demo-launcher` opens the command launcher (LNC-1);
+//! `--demo-quick-capture` opens the Quick Capture panel (QC-1). Debug flags: `--theme dark|light` forces the Studio theme and
 //! `--page recordings|screenshots|published|destinations|agents|settings` opens that section.
 //! `--demo-recording`, `--demo-region`, `--demo-paused`, `--demo-agent`, `--demo-sheet` run the
 //! recording UI on the real engine with fake tracks (no screen, microphone or camera is used; see
@@ -185,6 +186,9 @@ fn main() {
         });
     let demo_plan = cm_desktop::recording::demo::DemoPlan::parse(&args);
     let demo_query = value_of("--demo-launcher-query").unwrap_or_default();
+    // `--demo-quick-capture` opens the Quick Capture panel at start (QC-1; it captures nothing
+    // until a button is pressed).
+    let demo_quick = flag("--demo-quick-capture");
     let theme_override = value_of("--theme").and_then(|v| ThemePreference::parse(&v));
     // `--demo-permissions missing|partial|granted|restart|windows`: a fake permission provider so the
     // setup screen and Settings -> Permissions can be looked at without touching the real grants.
@@ -723,6 +727,13 @@ fn main() {
         }
         if demo_launcher {
             cm_desktop::ui::launcher_window::open_launcher_with(&model, cx, &demo_query);
+        }
+        if demo_quick {
+            cm_desktop::ui::quick_window::open_panel(
+                &model,
+                cm_desktop::ui::quick_window::Anchor::Pointer,
+                cx,
+            );
         }
         if demo_agent {
             app::push_toast(

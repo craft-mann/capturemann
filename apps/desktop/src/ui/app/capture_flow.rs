@@ -79,7 +79,8 @@ pub(crate) fn start_hover_capture(app: &Entity<AppModel>, mode: CaptureMode, cx:
 /// else the "copy after capture" setting (CAP-4).
 pub(crate) fn take_copy(app: &Entity<AppModel>, cx: &mut App) -> bool {
     app.update(cx, |m, _| {
-        let quick = m.quick.ctx.as_ref().map(|c| c.run.copy);
+        // Auto-redact copies after the blur, so the clipboard never holds the unredacted picture.
+        let quick = m.quick.ctx.as_ref().map(|c| c.run.copy && !c.run.redact);
         m.copy_override
             .take()
             .or(quick)

@@ -224,13 +224,16 @@ impl QuickPanel {
         self.changed(cx);
         dismiss(window, cx, true);
         let app = self.app.clone();
-        cx.spawn(async move |_, cx| {
-            cx.background_executor()
-                .timer(Duration::from_millis(CAPTURE_DELAY_MS))
-                .await;
-            cx.update(|cx| crate::ui::quick_flow::execute(&app, run, preset, cx));
-        })
-        .detach();
+        // The panel is gone by then: the wait runs on the app, not on the closed window.
+        cx.defer(move |cx| {
+            cx.spawn(async move |cx| {
+                cx.background_executor()
+                    .timer(Duration::from_millis(CAPTURE_DELAY_MS))
+                    .await;
+                cx.update(|cx| crate::ui::quick_flow::execute(&app, run, preset, cx));
+            })
+            .detach();
+        });
     }
 
     fn click_tile(&mut self, t: Tile, cx: &mut Context<Self>) {

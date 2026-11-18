@@ -560,6 +560,8 @@ impl PanelState {
         }
         if let Some(c) = carried {
             extra.extend(c.extra.clone());
+            // The tools add a one-line `summary` to what they return; it is not part of a preset.
+            extra.remove("summary");
         }
         let p = Preset {
             id: String::new(),

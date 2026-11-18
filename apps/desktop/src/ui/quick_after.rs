@@ -431,6 +431,20 @@ mod tests {
         assert_eq!(Act::from_key("x"), None);
     }
 
+    /// QC-3: in Vietnamese and in the pseudo-locale the six labels still fit a 1280 px display with
+    /// room to spare; the widest bar is the pseudo-locale's.
+    #[test]
+    fn the_bar_fits_in_every_language() {
+        use cm_i18n::{with_language, Lang};
+        for lang in [Lang::En, Lang::Vi, Lang::EnXa] {
+            with_language(lang, || {
+                let labels: Vec<String> = Act::ALL.iter().map(|a| a.label()).collect();
+                let (w, shown) = bar_width(&labels, 1280.0 - 2.0 * 12.0);
+                assert!(shown && w < 900.0, "{lang:?}: {w}");
+            });
+        }
+    }
+
     /// QC-3: the labels fit at a normal display width; on a narrow one they give way to icons and
     /// keys and the bar never passes the limit.
     #[test]

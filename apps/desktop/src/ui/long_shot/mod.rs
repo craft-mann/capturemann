@@ -258,6 +258,8 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     if is_running(cx) {
         return;
     }
+    // A Quick Capture screenshot that never finished must not give this run its copy choice.
+    app.update(cx, |m, _| m.quick.ctx = None);
     // Design S24: the first Long Shot shows the one-time Preview intro in the main window.
     crate::ui::preview_label::show_intro_if_due(
         app,
