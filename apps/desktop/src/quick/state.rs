@@ -264,6 +264,21 @@ pub enum PanelKey {
     TargetNext,
     /// P opens the preset picker.
     Picker,
+    /// Up and Down in the picker move the highlighted row.
+    PickerUp,
+    PickerDown,
+    /// Enter in the picker chooses the highlighted row.
+    PickerGo,
+}
+
+/// The picker row a step lands on: one up or down, stopping at the first and the last row.
+pub fn picker_step(cur: usize, down: bool, rows: usize) -> usize {
+    let last = rows.saturating_sub(1);
+    if down {
+        (cur + 1).min(last)
+    } else {
+        cur.saturating_sub(1).min(last)
+    }
 }
 
 /// The screen the panel shows.
@@ -287,7 +302,12 @@ pub fn panel_key(key: &str, shift: bool, screen: Screen, menu_open: bool) -> Opt
         });
     }
     if screen == Screen::Picker {
-        return None;
+        return match key {
+            "up" => Some(PanelKey::PickerUp),
+            "down" => Some(PanelKey::PickerDown),
+            "enter" | "space" => Some(PanelKey::PickerGo),
+            _ => None,
+        };
     }
     Some(match key {
         "enter" | "space" => PanelKey::Go,
@@ -789,7 +809,13 @@ mod tests {
             panel_key("escape", false, Screen::Picker, false),
             Some(Back)
         );
-        assert_eq!(panel_key("enter", false, Screen::Picker, false), None);
+        // QC-1.AC9: the picker takes Up, Down and Enter; Esc leaves the picker only.
+        let pick = |k| panel_key(k, false, Screen::Picker, false);
+        assert_eq!(pick("up"), Some(PickerUp));
+        assert_eq!(pick("down"), Some(PickerDown));
+        assert_eq!(pick("enter"), Some(PickerGo));
+        assert_eq!(pick("1"), None, "no number keys in the picker");
+        assert_eq!(pick("p"), None);
         assert_eq!(
             panel_key("1", false, Screen::Name, false),
             None,
@@ -806,6 +832,20 @@ mod tests {
                 assert!(s.tile_aria(t).starts_with(&t.label()), "{t:?}");
             }
         }
+    }
+
+    #[test]
+    fn the_picker_cursor_stops_at_both_ends() {
+        assert_eq!(picker_step(0, true, 6), 1);
+        assert_eq!(picker_step(5, true, 6), 5);
+        assert_eq!(picker_step(0, false, 6), 0);
+        assert_eq!(picker_step(3, false, 6), 2);
+        assert_eq!(picker_step(0, true, 0), 0);
+        assert_eq!(
+            picker_step(9, false, 3),
+            1,
+            "a stale cursor is pulled back in"
+        );
     }
 
     #[test]

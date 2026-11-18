@@ -19,7 +19,7 @@ use crate::launcher::commands::CAPTURE_DELAY_MS;
 use crate::quick::place::panel_rect;
 use crate::quick::presets::summary_text;
 use crate::quick::state::{
-    kind_icon, kind_label, panel_key, target_label, PanelKey, PanelState, Screen, Tile,
+    kind_icon, kind_label, panel_key, picker_step, target_label, PanelKey, PanelState, Screen, Tile,
 };
 use crate::theme::{scale, type_scale, Color, Theme};
 use crate::ui::app::{self, AppModel};
@@ -90,6 +90,7 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
         Anchor::Tray if py_ < visible.y + visible.h / 2.0 => visible.y,
         _ => py_,
     };
+    let max_h = visible.h - 2.0 * crate::quick::place::EDGE;
     let global = panel_rect((px_, top), f64::from(WIDTH), f64::from(HEIGHT), &visible);
     cx.set_global(PreviousApp(crate::launcher::focus::frontmost_other_app()));
     let app2 = app.clone();
@@ -98,7 +99,7 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
         move |window, cx| {
             // The panel is never in a screenshot or a recording (QC-1.AC2).
             crate::platform_window::exclude_from_capture(window);
-            cx.new(|cx| QuickPanel::new(app2, state, window, cx))
+            cx.new(|cx| QuickPanel::new(app2, state, max_h, window, cx))
         },
     );
     match opened {
@@ -134,6 +135,10 @@ pub struct QuickPanel {
     focus: FocusHandle,
     scroll: ScrollHandle,
     body: Body,
+    /// The highlighted picker row: 0 is "No preset", then the presets, then the two links.
+    pick_at: usize,
+    /// The tallest the panel may grow while the picker shows every preset.
+    max_h: f64,
     /// The tile with the keyboard focus (Tab).
     tile: Option<usize>,
     /// The value tile whose menu is open.
@@ -147,6 +152,7 @@ impl QuickPanel {
     fn new(
         app: Entity<AppModel>,
         st: PanelState,
+        max_h: f64,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -187,6 +193,8 @@ impl QuickPanel {
             focus,
             scroll: ScrollHandle::new(),
             body: Body::Main,
+            pick_at: 0,
+            max_h,
             tile: None,
             menu: None,
             name,
@@ -206,8 +214,55 @@ impl QuickPanel {
     fn back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.body = Body::Main;
         self.menu = None;
+        self.fit_height(window, cx);
         window.focus(&self.focus, cx);
         cx.notify();
+    }
+
+    /// The panel is as tall as the picker's list needs while the picker shows, else normal.
+    fn fit_height(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let h = match self.body {
+            Body::Picker => {
+                let rows = self.app.read(cx).quick.presets.len() + 1;
+                crate::quick::place::picker_height(rows, f64::from(HEIGHT), self.max_h)
+            }
+            _ => f64::from(HEIGHT),
+        };
+        cx.defer_in(window, move |_, window, _| {
+            window.resize(gpui::size(px(WIDTH), px(h as f32)));
+        });
+    }
+
+    /// Rows the picker's keys move over: "No preset", every preset, "Save current...", "Edit...".
+    fn pick_rows(&self, cx: &Context<Self>) -> usize {
+        self.app.read(cx).quick.presets.len() + 3
+    }
+
+    fn open_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let presets = self.app.read(cx).quick.presets.clone();
+        self.pick_at = self.st.preset.as_ref().map_or(0, |p| {
+            presets
+                .iter()
+                .position(|q| q.id == p.id)
+                .map_or(0, |i| i + 1)
+        });
+        self.body = Body::Picker;
+        self.scroll
+            .scroll_to_item(self.pick_at.min(self.pick_rows(cx) - 3));
+        self.fit_height(window, cx);
+        cx.notify();
+    }
+
+    /// Enter in the picker: the highlighted row does what a click on it does.
+    fn pick_go(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let presets = self.app.read(cx).quick.presets.clone();
+        let n = presets.len();
+        match self.pick_at {
+            0 => self.pick_preset(None, window, cx),
+            i if i <= n => self.pick_preset(presets.get(i - 1).cloned(), window, cx),
+            i if i == n + 1 => self.open_name(window, cx),
+            _ => self.open_settings(window, cx),
+        }
     }
 
     fn set_kind(&mut self, k: PresetKind, cx: &mut Context<Self>) {
@@ -334,6 +389,7 @@ impl QuickPanel {
         self.body = Body::Name;
         self.name_error = None;
         self.name.update(cx, |f, cx| f.set_text("", cx));
+        self.fit_height(window, cx);
         let handle = self.name.read(cx).focus.clone();
         window.focus(&handle, cx);
         cx.notify();
@@ -387,10 +443,15 @@ impl QuickPanel {
             }
             PanelKey::TargetPrev => self.cycle_target(false, cx),
             PanelKey::TargetNext => self.cycle_target(true, cx),
-            PanelKey::Picker => {
-                self.body = Body::Picker;
+            PanelKey::Picker => self.open_picker(window, cx),
+            PanelKey::PickerUp | PanelKey::PickerDown => {
+                let rows = self.pick_rows(cx);
+                self.pick_at = picker_step(self.pick_at, key == PanelKey::PickerDown, rows);
+                self.scroll
+                    .scroll_to_item(self.pick_at.min(self.pick_rows(cx) - 3));
                 cx.notify();
             }
+            PanelKey::PickerGo => self.pick_go(window, cx),
             PanelKey::Kind(kind) => self.set_kind(kind, cx),
         }
         cx.stop_propagation();
@@ -442,10 +503,7 @@ impl QuickPanel {
             } else {
                 t.text_3
             }))
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.body = Body::Picker;
-                cx.notify();
-            }))
+            .on_click(cx.listener(|this, _, window, cx| this.open_picker(window, cx)))
             .child(icon("bookmark", 14., t.text_3))
             .child(crate::ui::components::shrink_text(name).flex_1())
             .child(icon("chevron-down", 14., t.text_3));
@@ -634,10 +692,10 @@ impl QuickPanel {
                 .h(px(52.))
                 .flex_1()
                 .min_w(px(0.))
-                .px(px(10.))
+                .px(px(8.))
                 .flex()
                 .items_center()
-                .gap(px(10.))
+                .gap(px(8.))
                 .rounded(px(scale::RADIUS_MD))
                 .border_1()
                 .border_color(rgba_of(if focused { t.text } else { t.border }))
@@ -668,13 +726,13 @@ impl QuickPanel {
                                 .text_size(px(type_scale::UI - 1.))
                                 .font_weight(FontWeight::MEDIUM)
                                 .text_color(rgba_of(if on { t.text } else { t.text_2 }))
-                                .child(crate::ui::components::shrink_text(tile.label())),
+                                .child(crate::ui::components::ellipsis_text(tile.label())),
                         )
                         .children(self.st.value_text(tile).map(|v| {
                             div()
                                 .text_size(px(11.))
                                 .text_color(rgba_of(t.text_3))
-                                .child(SharedString::from(v))
+                                .child(crate::ui::components::ellipsis_text(v))
                         })),
                 )
         };
@@ -809,7 +867,8 @@ impl QuickPanel {
     fn picker(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
         let presets = self.app.read(cx).quick.presets.clone();
         let picked = self.st.preset.as_ref().map(|p| p.id.clone());
-        let row = |id: String, title: String, sub: Option<String>, on: bool| {
+        let at = self.pick_at;
+        let row = |id: String, title: String, sub: Option<String>, on: bool, cur: bool| {
             pill_button(
                 t,
                 SharedString::from(id),
@@ -832,6 +891,12 @@ impl QuickPanel {
             .gap(px(8.))
             .rounded(px(scale::RADIUS_MD))
             .when(on, |d| d.bg(rgba_of(t.raised)))
+            .border_1()
+            .border_color(if cur {
+                gpui::Hsla::from(rgba_of(t.text))
+            } else {
+                gpui::transparent_black()
+            })
             .aria_selected(on)
             .child(
                 div()
@@ -862,6 +927,7 @@ impl QuickPanel {
                 tr_ctx!("preset picker", "No preset"),
                 None,
                 picked.is_none(),
+                at == 0,
             )
             .on_click(cx.listener(|this, _, window, cx| this.pick_preset(None, window, cx)))
             .into_any_element(),
@@ -874,6 +940,7 @@ impl QuickPanel {
                     p.name.clone(),
                     Some(summary_text(&p)),
                     on,
+                    at == i + 1,
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.pick_preset(Some(p.clone()), window, cx)
@@ -881,7 +948,8 @@ impl QuickPanel {
                 .into_any_element(),
             );
         }
-        let link = |id: &'static str, label: String, glyph: &'static str| {
+        let n_presets = presets.len();
+        let link = |id: &'static str, label: String, glyph: &'static str, cur: bool| {
             pill_button(t, id, label.clone())
                 .h(px(40.))
                 .px(px(10.))
@@ -890,6 +958,12 @@ impl QuickPanel {
                 .items_center()
                 .gap(px(8.))
                 .rounded(px(scale::RADIUS_MD))
+                .border_1()
+                .border_color(if cur {
+                    gpui::Hsla::from(rgba_of(t.text))
+                } else {
+                    gpui::transparent_black()
+                })
                 .text_size(px(type_scale::UI - 1.))
                 .text_color(rgba_of(t.text_2))
                 .child(icon(glyph, 14., t.text_3))
@@ -920,6 +994,7 @@ impl QuickPanel {
                     "qc-save-current",
                     tr_ctx!("preset picker", "Save current as preset\u{2026}"),
                     "plus",
+                    at == n_presets + 1,
                 )
                 .on_click(cx.listener(|this, _, window, cx| this.open_name(window, cx))),
             )
@@ -928,6 +1003,7 @@ impl QuickPanel {
                     "qc-edit-presets",
                     tr_ctx!("preset picker", "Edit presets\u{2026}"),
                     "pencil",
+                    at == n_presets + 2,
                 )
                 .on_click(cx.listener(|this, _, window, cx| this.open_settings(window, cx))),
             )
