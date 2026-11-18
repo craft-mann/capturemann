@@ -26,7 +26,7 @@ Written on Nov 17, 2026 from `specs/plans/release-0.3.5-plan.md`, `specs/feature
 **Click Guide**
 - A guide started by an agent or the CLI now shows a bar with the recording dot, the step count, "Started by agent <client>" and a **Stop** button (the toast has Stop too, and the sidebar tile shows it running). If the followed window moves, the bar shows **Paused** and a **Resume** button.
 - Markdown export no longer overwrites: files are named `guide-YYYY-MM-DD-HHMMSS.md` with an `images-YYYY-MM-DD-HHMMSS/` folder, a guide with no steps is refused, and the success toast has an **Open folder** button.
-- `export_guide` (agents) refuses to write over a file that exists, and a path outside the library and your export folders (your Documents, Desktop and Downloads folders and the export folders you list in the app's settings) asks you first and shows the exact path.
+- `export_guide` (agents) refuses to write over a file that exists, and a path outside the library and your export folders (your Documents, Desktop and Downloads folders and any folders you list under `export.folders` in the `settings.json` file (there is no Settings page for it)) asks you first and shows the exact path.
 - When a clicked button has an accessibility name, the step title uses it (`Click "Save"`); otherwise it uses the nearest text as before. Special Markdown characters in titles are escaped on export.
 - When the guided window moves or resizes, the guide pauses with a notice instead of recording a wrong step, and a click on a different window is ignored.
 
