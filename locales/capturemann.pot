@@ -5956,6 +5956,9 @@ msgstr ""
 msgid "The capture overlay (cm-overlay) was not found. Reinstall CaptureMann or put cm-overlay next to the app."
 msgstr ""
 
+msgid "The capture overlay closed before it finished. Try the shortcut again."
+msgstr ""
+
 msgid "The capture overlay returned something unexpected: {m}"
 msgstr ""
 
@@ -9203,6 +9206,10 @@ msgid "Long Shot"
 msgstr ""
 
 msgctxt "capture dock"
+msgid "Quick Capture, shortcut {chord}"
+msgstr ""
+
+msgctxt "capture dock"
 msgid "Record audio"
 msgstr ""
 
@@ -9216,10 +9223,6 @@ msgstr ""
 
 msgctxt "capture dock"
 msgid "Window"
-msgstr ""
-
-msgctxt "capture dock"
-msgid "{label}, {keys}"
 msgstr ""
 
 msgctxt "capture kind"

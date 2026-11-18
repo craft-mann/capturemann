@@ -3251,6 +3251,9 @@ msgstr "Lớp phủ chụp trả về kết quả không mong đợi: {m}"
 msgid "The capture overlay stopped responding and was closed. Try the shortcut again."
 msgstr "Lớp phủ chụp ngừng phản hồi và đã bị đóng. Hãy thử lại phím tắt."
 
+msgid "The capture overlay closed before it finished. Try the shortcut again."
+msgstr "Lớp phủ chụp đã đóng trước khi xong. Hãy thử lại phím tắt."
+
 msgid "The client ID has no spaces in it; copy it again."
 msgstr "Client ID không có dấu cách; hãy sao chép lại."
 
@@ -12250,8 +12253,8 @@ msgid "Capture…"
 msgstr "Chụp…"
 
 msgctxt "capture dock"
-msgid "{label}, {keys}"
-msgstr "{label}, {keys}"
+msgid "Quick Capture, shortcut {chord}"
+msgstr "Chụp nhanh, phím tắt {chord}"
 
 msgctxt "feature name"
 msgid "Quick Capture"

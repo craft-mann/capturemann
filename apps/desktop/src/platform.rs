@@ -425,6 +425,18 @@ pub struct NativeTray {
 }
 
 impl NativeTray {
+    /// Where the tray icon is, in global points `(x, y, w, h)` (top-left origin), when the
+    /// system tells (macOS status item, Windows notification area).
+    pub fn icon_frame(&self) -> Option<(f64, f64, f64, f64)> {
+        let r = self.tray.rect()?;
+        crate::platform_window::px_rect_to_points(
+            r.position.x,
+            r.position.y,
+            f64::from(r.size.width),
+            f64::from(r.size.height),
+        )
+    }
+
     /// Switches the icon between idle (template on macOS) and recording (red, non-template).
     pub fn set_state(&self, state: TrayState) {
         match tray_icon_for(state) {

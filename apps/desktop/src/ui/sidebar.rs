@@ -355,11 +355,11 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
     )
     .w_full()
     .h(px(42.))
+    // The same form as the Record and region buttons: "<what>, shortcut <keys>".
     .aria_label(SharedString::from(tr_ctx!(
         "capture dock",
-        "{label}, {keys}",
-        label = qc_label,
-        keys = qc_keys.join(" ")
+        "Quick Capture, shortcut {chord}",
+        chord = nav::tile_keys(&qc_keys).join("")
     )))
     .child(div().flex_1())
     .child(

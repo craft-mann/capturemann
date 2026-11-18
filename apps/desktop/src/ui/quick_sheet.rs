@@ -23,6 +23,16 @@ use crate::ui::text_field::{TextField, TextFieldEvent};
 pub const WIDTH: f32 = 440.;
 pub const HEIGHT: f32 = 640.;
 
+/// The sheet's height on a display whose visible part is `visible_h` logical px tall: the usual
+/// height, never more than the display leaves (QC-4.AC8). The body scrolls and the footer stays.
+pub fn sheet_height(visible_h: f64) -> f64 {
+    f64::from(HEIGHT).min((visible_h - 48.0).max(MIN_HEIGHT.min(visible_h - 16.0)))
+}
+
+/// The least height the sheet is drawn at when the display is very short (the title, one row of
+/// the body and the footer); below it the sheet takes what the display has.
+pub const MIN_HEIGHT: f64 = 360.0;
+
 /// The editor tools a preset can open with (the first is "none").
 pub const TOOLS: [&str; 8] = [
     "",
@@ -51,7 +61,7 @@ pub fn open(app: &Entity<AppModel>, preset: Option<Preset>, cx: &mut App) {
         return;
     };
     let visible = visible_part(&display.1);
-    let h = f64::from(HEIGHT).min(visible.h - 48.0).max(360.0);
+    let h = sheet_height(visible.h);
     let global = crate::recording::geometry::Rect::new(
         visible.x + (visible.w - f64::from(WIDTH)) / 2.0,
         visible.y + (visible.h - h) / 2.0,
@@ -588,12 +598,8 @@ impl Render for PresetSheet {
                     })
                     .collect::<Vec<_>>()
             });
-        let body = div()
+        let list = div()
             .id("ps-body")
-            .flex_1()
-            .min_h(px(0.))
-            .overflow_y_scroll()
-            .track_scroll(&self.scroll)
             .flex()
             .flex_col()
             .gap(px(14.))
@@ -638,6 +644,9 @@ impl Render for PresetSheet {
                     .text_color(rgba_of(t.warning))
                     .child(SharedString::from(e))
             }));
+        // The body fills what the title and the footer leave and scrolls inside it, with a
+        // scrollbar as the cue; the footer never moves over a field (QC-4.AC8).
+        let body = crate::ui::scroll::fill_scroll(&t, &self.scroll, list, || {});
         let delete_label = if self.confirm_delete {
             tr_ctx!("button", "Delete for good")
         } else {
@@ -645,6 +654,7 @@ impl Render for PresetSheet {
         };
         let footer = div()
             .flex()
+            .flex_none()
             .items_center()
             .gap(px(8.))
             .children((!self.is_new).then(|| {
@@ -705,6 +715,7 @@ impl Render for PresetSheet {
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
                         div()
+                            .flex_none()
                             .text_size(px(type_scale::TITLE))
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(SharedString::from(if self.is_new {
@@ -716,5 +727,26 @@ impl Render for PresetSheet {
                     .child(body)
                     .child(footer),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// QC-4.AC8: a 1080p display at 150 % is 720 logical px tall (less the taskbar): the sheet
+    /// fits with a margin, and the body keeps room for several rows between title and footer.
+    #[test]
+    fn the_sheet_fits_a_1080p_display_at_150_percent() {
+        for visible in [720.0, 680.0, 672.0, 640.0] {
+            let h = sheet_height(visible);
+            assert!(h <= visible - 16.0, "{h} px on a {visible} px display");
+            // title 28 + footer 36 + padding 36 + two gaps 28 leave the rest to the body.
+            let body = h - 128.0;
+            assert!(body >= 220.0, "body {body} px on a {visible} px display");
+        }
+        assert_eq!(sheet_height(1400.0), f64::from(HEIGHT));
+        // A very short display: the sheet takes what is there, not more.
+        assert!(sheet_height(300.0) <= 300.0);
     }
 }

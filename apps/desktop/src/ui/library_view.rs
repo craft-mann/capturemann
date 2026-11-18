@@ -917,16 +917,6 @@ pub(crate) fn selection_texts(n: u64) -> (String, [String; 3]) {
     )
 }
 
-/// The accessible role of a button of the selection bar: a button while it works, a plain label
-/// while it does not (see the comment where it is used).
-pub(crate) fn selection_action_role(enabled: bool) -> Role {
-    if enabled {
-        Role::Button
-    } else {
-        Role::Label
-    }
-}
-
 /// Why Make a board is off: `shots` screenshots among `n` selected (a board takes 2 to 12
 /// screenshots and nothing else). `None` when it is on.
 pub(crate) fn board_disabled_reason(shots: usize, n: usize) -> Option<String> {
@@ -2566,11 +2556,16 @@ impl LibraryView {
             let fg = t.text;
             div()
                 .id(id)
-                // The UI toolkit has no "disabled" flag for assistive technology, so a button
-                // that cannot be used is not announced as a button at all: it is a label, not
-                // focusable, and its reason is the description (0.3.6 P-8).
-                .role(selection_action_role(enabled))
+                // The toolkit has no `aria_disabled`, but the element's own accessibility node
+                // can be changed after the element is laid out: a button that cannot be used
+                // stays a named button and is marked disabled there (UI Automation
+                // `IsEnabled` false), is not focusable, and its reason is the description
+                // (0.3.6 P-8, W-4).
+                .role(Role::Button)
                 .aria_label(SharedString::from(label.clone()))
+                .when(!enabled, |d| {
+                    d.a11y_synthetic_children(|b| b.parent_node().set_disabled())
+                })
                 .when(enabled, |d| d.focusable())
                 .tab_stop(enabled)
                 .h(px(bar_layout::SEL_BTN_H as f32))
@@ -2992,15 +2987,7 @@ fn empty_state(
 
 #[cfg(test)]
 mod board_reason_tests {
-    use super::{board_disabled_reason, selection_action_role};
-    use gpui::Role;
-
-    /// 0.3.6 P-8: a selection-bar button that is off is not announced as a button.
-    #[test]
-    fn a_disabled_bar_button_is_not_a_button_to_assistive_tools() {
-        assert_eq!(selection_action_role(true), Role::Button);
-        assert_ne!(selection_action_role(false), Role::Button);
-    }
+    use super::board_disabled_reason;
 
     #[test]
     fn the_board_button_says_why_it_is_off() {

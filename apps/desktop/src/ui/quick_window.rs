@@ -85,13 +85,19 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
     let pointer = crate::ui::launcher_window::pointer(cx)
         .map(|p| (f64::from(f32::from(p.x)), f64::from(f32::from(p.y))));
     let (px_, py_) = pointer.unwrap_or((visible.x + visible.w / 2.0, visible.y + visible.h * 0.3));
-    let top = match anchor {
-        // The menu hangs from the bar at the top of the display: the panel goes right under it.
-        Anchor::Tray if py_ < visible.y + visible.h / 2.0 => visible.y,
-        _ => py_,
-    };
     let max_h = visible.h - 2.0 * crate::quick::place::EDGE;
-    let global = panel_rect((px_, top), f64::from(WIDTH), f64::from(HEIGHT), &visible);
+    // From the tray the panel is on the icon where the system gives its position (macOS status
+    // item, Windows notification area); where it does not (Linux) it opens near the pointer.
+    let icon = (anchor == Anchor::Tray)
+        .then(|| app.read(cx).tray.as_ref().and_then(|t| t.icon_frame()))
+        .flatten()
+        .filter(|(ix, iy, _, _)| visible_contains(&display.1, *ix, *iy));
+    let global = match icon {
+        Some(icon) => {
+            crate::quick::place::tray_rect(icon, f64::from(WIDTH), f64::from(HEIGHT), &visible)
+        }
+        None => panel_rect((px_, py_), f64::from(WIDTH), f64::from(HEIGHT), &visible),
+    };
     cx.set_global(PreviousApp(crate::launcher::focus::frontmost_other_app()));
     let app2 = app.clone();
     let opened = cx.open_window(
@@ -117,6 +123,10 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
             cx,
         ),
     }
+}
+
+fn visible_contains(display: &crate::recording::geometry::Rect, x: f64, y: f64) -> bool {
+    display.contains(x, y)
 }
 
 /// What the body of the card shows.

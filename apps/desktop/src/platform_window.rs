@@ -384,6 +384,12 @@ pub fn pointer_display_id() -> Option<u32> {
     imp::pointer_display_id()
 }
 
+/// A rectangle in physical desktop px (the tray icon's rectangle, as `tray-icon` gives it) as
+/// global points `(x, y, w, h)`; `None` where the platform cannot convert it.
+pub fn px_rect_to_points(x: f64, y: f64, w: f64, h: f64) -> Option<(f64, f64, f64, f64)> {
+    imp::px_rect_to_points(x, y, w, h)
+}
+
 /// The display that holds a recorded area (`indicator.area.bounds`, physical px in the global
 /// desktop space), as GPUI's display handle (Windows: the engine's display id is another number
 /// and the point rectangles of displays with different scales overlap); `None` elsewhere.
@@ -594,6 +600,22 @@ mod imp {
         objc2_app_kit::NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
         w.orderFrontRegardless();
         w.makeKeyAndOrderFront(None);
+    }
+
+    pub fn px_rect_to_points(x: f64, y: f64, w: f64, h: f64) -> Option<(f64, f64, f64, f64)> {
+        let mtm = MainThreadMarker::new()?;
+        let screens = NSScreen::screens(mtm);
+        let ph = screens.firstObject()?.frame().size.height;
+        // The rectangle is in the physical px of the screen that has the status item: the screen
+        // whose scale puts it inside its own frame.
+        screens.iter().find_map(|s| {
+            let k = s.backingScaleFactor();
+            let f = s.frame();
+            let (fx, fy) = (f.origin.x, ph - (f.origin.y + f.size.height));
+            let (px, py) = (x / k, y / k);
+            let inside = px >= fx && px < fx + f.size.width && py >= fy && py < fy + f.size.height;
+            inside.then_some((px, py, w / k, h / k))
+        })
     }
 
     pub fn visible_frame_at(x: f64, y: f64) -> Option<(f64, f64, f64, f64)> {
@@ -905,6 +927,14 @@ mod imp {
     pub fn bring_to_front(_window: &Window) {}
 
     pub fn capture_window_id(_window: &Window) -> Option<u32> {
+        None
+    }
+
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::rect_px_to_points as px_rect_to_points;
+
+    #[cfg(not(windows))]
+    pub fn px_rect_to_points(_x: f64, _y: f64, _w: f64, _h: f64) -> Option<(f64, f64, f64, f64)> {
         None
     }
 
