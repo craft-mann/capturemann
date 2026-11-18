@@ -76,3 +76,35 @@ async fn ann_1_ac8_annotate_text_without_color_is_auto() {
     assert_eq!(ok(&again)["auto_text"][0]["color"], auto[0]["color"]);
     assert_eq!(ok(&again)["auto_text"][0]["outline"], auto[0]["outline"]);
 }
+
+/// 0.3.6 P-4: the `annotate` answer names the stored render, so `--out` can copy it when the
+/// image itself is too large to send back; a far-away shape is `invalid_input` (ANN-1.AC14).
+#[tokio::test]
+async fn annotate_names_the_stored_render_and_refuses_a_far_shape() {
+    let (b, _dir) = builder(desktop());
+    let d = b.build();
+    let mut c = Client::connect(&d, "agent");
+    let r = c
+        .call("capture_screenshot", json!({"target": {"display_id": 1}}))
+        .await;
+    let id = ok(&r)["capture_id"].as_str().unwrap().to_owned();
+    let bad = c
+        .call(
+            "annotate",
+            json!({"capture_id": id, "return_image": false, "ops": [
+                { "op": "rect", "rect": [10, 10, 5000000, 50] },
+            ]}),
+        )
+        .await;
+    assert_eq!(bad["error"]["data"]["code"], "invalid_input", "{bad}");
+    let a = c
+        .call(
+            "annotate",
+            json!({"capture_id": id, "return_image": false, "ops": [
+                { "op": "rect", "rect": [10, 10, 50, 50] },
+            ]}),
+        )
+        .await;
+    let path = ok(&a)["path"].as_str().unwrap();
+    assert!(std::path::Path::new(path).is_file(), "{path}");
+}

@@ -30,7 +30,7 @@ fn take_image(result: &mut Value, out: Option<&Path>) -> Result<(), CliError> {
             let stored = result["path"].as_str().map(std::path::PathBuf::from);
             let Some(src) = stored.filter(|s| s.is_file()) else {
                 return Err(CliError::new(
-                    ErrorCode::Internal,
+                    ErrorCode::InvalidInput,
                     format!(
                         "the image is too large to send back; it is stored in the library, not written to {}",
                         p.display()
@@ -98,6 +98,20 @@ pub(super) fn parse_region(s: &str) -> Result<[i64; 4], CliError> {
 /// several windows match and none is an exact title match the call fails with
 /// `invalid_input`, `data.reason: "ambiguous_target"` and `data.matches` (`id`, `app`,
 /// `title`), so the caller picks one by id (CAP-1.AC8, BUG-9). Never guesses.
+/// Longest window title, in characters, that an ambiguity error repeats.
+const SHORT_TITLE_CHARS: usize = 30;
+
+/// A window title cut to [`SHORT_TITLE_CHARS`] characters (an ellipsis marks the cut), so a long
+/// private title is not repeated in full.
+fn short_title(t: &str) -> String {
+    if t.chars().count() <= SHORT_TITLE_CHARS {
+        return t.to_owned();
+    }
+    let mut s: String = t.chars().take(SHORT_TITLE_CHARS).collect();
+    s.push('\u{2026}');
+    s
+}
+
 pub(super) fn resolve_window(targets: &Value, needle: &str) -> Result<u64, CliError> {
     let windows = targets["windows"].as_array().cloned().unwrap_or_default();
     if let Ok(id) = needle.parse::<u64>() {
@@ -130,19 +144,13 @@ pub(super) fn resolve_window(targets: &Value, needle: &str) -> Result<u64, CliEr
             let list: Vec<Value> = many
                 .iter()
                 .map(|w| {
-                    json!({ "id": w["id"], "app": w["app"].as_str().unwrap_or(""),
-                            "title": w["title"].as_str().unwrap_or("") })
+                    json!({ "id": w["id"], "title": short_title(w["title"].as_str().unwrap_or("")) })
                 })
                 .collect();
             let lines: Vec<String> = list
                 .iter()
                 .map(|m| {
-                    format!(
-                        "{} ({}) \"{}\"",
-                        m["id"],
-                        m["app"].as_str().unwrap_or(""),
-                        m["title"].as_str().unwrap_or("")
-                    )
+                    format!("{} \"{}\"", m["id"], m["title"].as_str().unwrap_or(""))
                 })
                 .collect();
             let mut e = CliError::invalid_input(format!(
@@ -547,11 +555,18 @@ mod resolve_window_tests {
         assert_eq!(e.data["reason"], "ambiguous_target");
         assert_eq!(e.data["matches"].as_array().unwrap().len(), 2);
         assert_eq!(e.data["matches"][1]["title"], "Mail - private");
-        assert!(
-            e.message.contains("1 (Mail) \"Mail - work\""),
-            "{}",
-            e.message
-        );
+        assert!(e.data["matches"][1].get("app").is_none());
+        assert!(e.message.contains("1 \"Mail - work\""), "{}", e.message);
+        // Only the matching windows appear, and a long title is cut short.
+        assert!(!e.message.contains("Calendar"), "{}", e.message);
+        let long = json!({ "windows": [
+            { "id": 7, "title": "Inbox - a very long private subject line that goes on", "app": "M" },
+            { "id": 8, "title": "Inbox - another", "app": "M" },
+        ]});
+        let e = resolve_window(&long, "inbox").unwrap_err();
+        let t = e.data["matches"][0]["title"].as_str().unwrap();
+        assert_eq!(t.chars().count(), 31);
+        assert!(!e.message.contains("subject line"), "{}", e.message);
     }
 
     /// An image the daemon left out (too large for one reply line) is copied from the stored file.
@@ -567,7 +582,8 @@ mod resolve_window_tests {
         assert_eq!(r["image"]["bytes"], 18_200_000);
         // No stored file to copy from: an error, not an empty file.
         let mut r = json!({ "image": { "omitted": true, "bytes": 1 } });
-        assert!(take_image(&mut r, Some(&d.path().join("x.png"))).is_err());
+        let e = take_image(&mut r, Some(&d.path().join("x.png"))).unwrap_err();
+        assert_eq!(e.code, "invalid_input", "never `internal` (0.3.6 P-4)");
         // Without --out it just reports the size.
         let mut r = json!({ "image": { "omitted": true, "bytes": 5 } });
         take_image(&mut r, None).unwrap();

@@ -473,7 +473,7 @@ impl Inner {
         let capture_id = p.capture_id.clone();
         let copy = p.copy_to_clipboard;
         let return_image = p.return_image;
-        let (rev, png, copied, warnings, auto_text) = blocking(move || {
+        let (rev, png, copied, warnings, auto_text, render_path) = blocking(move || {
             let mut bundle = lock_library(&library).open_screenshot(&id)?;
             let mut p = p;
             // ANN-1.AC8: a text op with no `color` gets Auto's colour (and outline) from the
@@ -507,7 +507,7 @@ impl Inner {
                         false
                     }
                 };
-            Ok((rev, png, copied, warnings, auto_text))
+            Ok((rev, png, copied, warnings, auto_text, bundle.render_path()))
         })
         .await?;
         self.events.publish(
@@ -521,6 +521,8 @@ impl Inner {
             "copied_to_clipboard": copied,
             "warnings": warnings,
             "auto_text": auto_text,
+            // The stored render: a caller whose reply left a big image out copies it from here.
+            "path": render_path,
             "image": return_image.then(|| image_json(&png)),
         }))
     }
