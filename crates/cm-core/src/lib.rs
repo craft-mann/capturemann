@@ -23,6 +23,7 @@ pub mod long_shot_hud;
 pub mod media_time;
 pub mod message;
 pub mod perf;
+pub mod preset;
 pub mod record;
 pub mod undo;
 pub mod video_codec;

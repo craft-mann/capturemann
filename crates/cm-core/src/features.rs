@@ -91,6 +91,19 @@ pub const FEATURES: &[Feature] = &[
         cli_args: &[],
         tool_params: &[],
     },
+    Feature {
+        id: "quick_capture",
+        name: "Quick Capture",
+        stage: Stage::Preview,
+        // Presets are the part agents see; the panel itself is app-only.
+        tools: &["list_presets"],
+        cli_commands: &["presets"],
+        cli_args: &[],
+        tool_params: &[
+            ("capture_screenshot", "preset"),
+            ("start_recording", "preset"),
+        ],
+    },
 ];
 
 /// The feature with this id.
@@ -130,7 +143,7 @@ mod tests {
             assert!(f.id.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'));
         }
         let ids: Vec<_> = previews().map(|f| f.id).collect();
-        assert_eq!(ids, ["long_shot", "click_guide", "boards"]);
+        assert_eq!(ids, ["long_shot", "click_guide", "boards", "quick_capture"]);
     }
 
     #[test]
