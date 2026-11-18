@@ -189,6 +189,12 @@ pub const ACTIONS: &[ActionSpec] = &[
     // (never a key); the rules are the public limits of a publishing platform.
     spec("get_cursor_track", Tier::Free, false),
     spec("get_platform_rules", Tier::Free, false),
+    // QC-4, QC-5: the presets. `list_presets` is read-only and an MCP tool and CLI command; the
+    // other three are the app's own preset screens (internal, refused for agents).
+    spec("list_presets", Tier::Free, false),
+    spec("save_preset", Tier::Free, true),
+    spec("delete_preset", Tier::Free, true),
+    spec("reorder_presets", Tier::Free, true),
     // EXP-5: the size an export would have (a formula, no file is read or written).
     spec("estimate_export", Tier::Free, false),
 ];
@@ -219,6 +225,10 @@ pub const ACTIONS: &[ActionSpec] = &[
 /// * `rescan_library` is the app's "Rescan library" (LIB-1.AC3): the desktop runs it in process on
 ///   the daemon's own library handle instead of opening a second one. Agents have `list_library`.
 ///
+/// * `save_preset`, `delete_preset` and `reorder_presets` are the app's preset screens (QC-4):
+///   an agent reads the presets with `list_presets` and runs one with `preset`, and is refused
+///   (`app_only_action`) when it tries to change them.
+///
 /// They remain callable over the socket by any client and obey the same policy as every other
 /// action (`freeze_display` hands out screen pixels, so it counts as mutating: read-only
 /// clients are refused).
@@ -231,6 +241,9 @@ pub const INTERNAL_ACTIONS: &[&str] = &[
     "restart_recording",
     "skip_countdown",
     "rescan_library",
+    "save_preset",
+    "delete_preset",
+    "reorder_presets",
 ];
 
 /// Whether `name` is in [`INTERNAL_ACTIONS`].

@@ -294,7 +294,11 @@ async fn frame_target_errors_and_policy() {
             "long_shot_state",
             "discard_recording",
             "restart_recording",
-            "skip_countdown"
+            "skip_countdown",
+            // QC-4: the app's preset screens.
+            "save_preset",
+            "delete_preset",
+            "reorder_presets"
         ]
     );
     let f = rows.iter().find(|a| a["name"] == "freeze_display").unwrap();

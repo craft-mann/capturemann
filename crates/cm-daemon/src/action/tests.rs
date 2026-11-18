@@ -203,6 +203,13 @@ fn samples() -> Vec<(&'static str, Value)> {
             json!({"capture_id": "rec_1", "from": 1, "to": 5, "limit": 10}),
         ),
         ("get_platform_rules", json!({"platform": "youtube"})),
+        ("list_presets", json!({})),
+        (
+            "save_preset",
+            json!({"preset": {"name": "A", "kind": "audio"}, "request_id": "r"}),
+        ),
+        ("delete_preset", json!({"preset": "A"})),
+        ("reorder_presets", json!({"ids": ["a", "b"]})),
         (
             "estimate_export",
             json!({"capture_id": "rec_1", "format": "webm", "size": "720p", "max_mb": 20}),
@@ -442,7 +449,7 @@ fn agt_1_ac4_internal_actions_are_explicit() {
     ] {
         assert!(!is_internal(public), "{public}");
     }
-    assert_eq!(INTERNAL_ACTIONS.len(), 8);
+    assert_eq!(INTERNAL_ACTIONS.len(), 11);
 }
 
 #[test]

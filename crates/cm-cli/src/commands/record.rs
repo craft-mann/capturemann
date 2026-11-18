@@ -133,10 +133,20 @@ fn warning_lines(v: &Value, s: &mut String) {
 
 pub(super) async fn record_start(cx: &mut Ctx<'_>, a: RecordStartArgs) -> Result<(), CliError> {
     // Validate local inputs before anything is asked of the user.
+    let mut a = a;
     let region = a.region.as_deref().map(parse_region).transpose()?;
     let camera = camera_json(&a)?;
     let mic = mic_json(&a)?;
     let mut c = cx.client().await?;
+    // QC-5: an audio preset given alone makes an audio recording (no target to add).
+    if let (Some(name), false, None, None, None) =
+        (&a.preset, a.audio, &a.display, &a.window, &region)
+    {
+        let audio = super::presets::find(&mut c, name)
+            .await?
+            .is_some_and(|p| p["kind"] == json!("audio"));
+        a.audio = audio;
+    }
     if a.audio {
         return record_start_audio(cx, &mut c, a, mic).await;
     }
@@ -155,6 +165,9 @@ pub(super) async fn record_start(cx: &mut Ctx<'_>, a: RecordStartArgs) -> Result
     };
     let mut p = Map::new();
     p.insert("target".into(), target);
+    if let Some(v) = &a.preset {
+        p.insert("preset".into(), json!(v));
+    }
     if let Some(v) = &a.size {
         p.insert("size".into(), json!(v));
     }

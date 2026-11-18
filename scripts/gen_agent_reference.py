@@ -50,6 +50,7 @@ AREAS = [
     ("reports", "Reports", ["list_report_templates", "generate_report", "get_report", "export_report", "delete_report",
                             "edit_report", "check_report_item"]),
     ("guide", "Click Guide (Preview)", ["start_guide", "stop_guide", "get_guide", "set_guide", "export_guide"]),
+    ("presets", "Quick Capture presets (Preview)", ["list_presets"]),
     ("publish", "Destinations and publishing", ["list_destinations", "upload", "list_publish_accounts", "get_platform_rules",
                                                 "publish_video"]),
 ]

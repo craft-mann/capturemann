@@ -61,7 +61,7 @@ QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock) are **not** in 
 - **AC7** Given a capture near the bottom edge, then the bar is above the area and fully on the display.
 
 ### QC-4 Presets
-**Priority** P1 · **Status** Ready · **Crates** cm-core, cm-daemon, apps/desktop · **Depends on** QC-1
+**Priority** P1 · **Status** In progress (the model, `presets.json`, the starters and the daemon actions are built and tested with fakes: AC3, AC4, AC6, and the file side of AC2 and AC7; the picker, the Launcher and tray entries, Settings > Capture > Presets, the edit sheet, the shortcut conflict check against other shortcuts and saving into the folder are not built) · **Crates** cm-core, cm-daemon, apps/desktop · **Depends on** QC-1
 
 **User story.** As someone who repeats the same setup, I want to save it with a name, so that one pick (or one shortcut) does it.
 
@@ -83,7 +83,7 @@ QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock) are **not** in 
 - **AC7** Given a preset with Save to `~/Bugs/{date}`, then the capture is saved there with the local date and also appears in the library.
 
 ### QC-5 Presets for agents and the CLI
-**Priority** P2 · **Status** Ready · **Crates** cm-daemon, cm-mcp, cm-cli · **Depends on** QC-4, AGT-2
+**Priority** P2 · **Status** In progress (built and tested with fakes, AC1 to AC6; no run on real hardware yet) · **Crates** cm-daemon, cm-mcp, cm-cli · **Depends on** QC-4, AGT-2
 
 **User story.** As someone who uses an AI agent, I want the agent to run my preset by name, so that it captures the way I do.
 
@@ -91,6 +91,10 @@ QC-2 (one smart crosshair) and QC-6 (pinned presets in the dock) are **not** in 
 - `capture_screenshot` and `start_recording` take an optional `preset` (the name or the id). A new read-only tool **`list_presets`** (Free) returns the presets. CLI: `capturemann capture screenshot --preset "Bug report"`, the matching argument on the record command, and `capturemann presets list`.
 - An explicit argument in the same call wins over the preset's value.
 - **Confirm rules are unchanged:** a preset that records still needs the on-screen confirmation, and the dialog shows the plan the preset resolves to. A preset cannot loosen a locked tool or change `agents.tool_policy`.
+- A preset holds no area, so a call that uses one still gives `target`. The CLI is the exception: `--preset` alone captures the primary display, and a Window preset asks for `--window`. A screenshot preset does not fit `start_recording` and a video or audio preset does not fit `capture_screenshot`; the call fails with `invalid_input`.
+- The preset is written into the call's parameters before the call is checked, so the tier, the user's per-tool setting and the confirmation see an ordinary call. A preset sets only what the call itself can carry (delay, copy, Long Shot mode; microphone, system sound, webcam, cursor, frame rate and countdown); Auto-redact, the editor, the folder and the tool are for the app.
+- `start_recording` already had `preset` for the five audio use cases (`room`, `online`, `lecture`, `product`, `note`). With `mode: "audio"` those five words keep that meaning; any other value is a Quick Capture preset.
+- Agents read presets (`list_presets`) and run them; saving, deleting and reordering presets are internal actions for the app and are refused for agents.
 - An unknown preset gives `invalid_input` naming it. `docs/reference/` is regenerated (`docs/reference/gen_agent_reference.py`) and the tool-count assertion in `crates/cm-mcp/tests/stdio.rs` becomes 90.
 
 **Acceptance criteria**

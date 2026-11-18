@@ -62,6 +62,7 @@ impl Action {
             Action::DeleteCapture(_) => "delete_capture",
             Action::MoveLibrary(_) => "move_library",
             Action::ImportMedia(_) => "import_media",
+            Action::Preset(p) => p.op.method(),
         }
     }
 
@@ -112,6 +113,7 @@ impl Action {
             Action::AddMarker(p) => p.request_id.as_deref(),
             Action::MoveLibrary(p) => p.request_id.as_deref(),
             Action::ImportMedia(p) => p.request_id.as_deref(),
+            Action::Preset(p) => p.request_id.as_deref(),
             Action::PauseRecording(p)
             | Action::ResumeRecording(p)
             | Action::StopRecording(p)
@@ -198,6 +200,7 @@ impl Action {
             Action::Edit(p) => crate::edit_ops::summary(p),
             Action::Ai(p) => crate::ai::summary(p),
             Action::Guide(p) => crate::guide::summary(p),
+            Action::Preset(p) => crate::preset_ops::summary(p),
             Action::ListDestinations => "List the destinations".to_owned(),
             Action::ListPublishAccounts => "List the publish accounts".to_owned(),
             Action::GetTextModel => "Show the text model settings".to_owned(),

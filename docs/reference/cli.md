@@ -1,6 +1,6 @@
 # CaptureMann command-line reference
 
-`capturemann` is the command-line client of CaptureMann (105 commands and subcommands in version 0.3.4, listed below in the order of `capturemann --help`). It was written from the built binary (`--help` of every command) and the source of the 0.3.4 build. The same actions are available to AI agents as MCP tools; see [mcp.md](mcp.md) and the machine-readable [tools.json](tools.json). How these files were made: [README.md](README.md).
+`capturemann` is the command-line client of CaptureMann (107 commands and subcommands: the 105 of version 0.3.4 and `presets`, `presets list`, added for 0.3.6, listed below in the order of `capturemann --help`). It was written from the built binary (`--help` of every command) and the source of the 0.3.4 build. The same actions are available to AI agents as MCP tools; see [mcp.md](mcp.md) and the machine-readable [tools.json](tools.json). How these files were made: [README.md](README.md).
 
 Wording: nothing here is "verified" in the sense of the repository's `verification/` reports. Outputs shown under a command were produced by running that command against a headless `cm-daemon` with an empty throw-away library (one small picture imported); commands that record, capture the screen, need a speech or text model, a recording, or an account were not run, and their examples are marked as such. **Long Shot** (`capture screenshot --long`) and **Click Guide** (`guide ...`) are Preview features: they may still change.
 
@@ -104,6 +104,7 @@ The exit code follows the shared error code of the daemon's answer (`error.data.
 | [`capturemann devices`](#capturemann-devices) | List cameras, microphones and system-audio support (`list_devices`) | `list_devices` |
 | [`capturemann diagnostics`](#capturemann-diagnostics) | Print the diagnostics report to paste into an issue (`get_diagnostics`): versions, system, permissions, models, a few settings, library counts and... | `get_diagnostics` |
 | [`capturemann cursor`](#capturemann-cursor) | Print the pointer path and clicks of a recording (`get_cursor_track`): moves, button down/up, scroll direction, in physical pixels of the screen... | `get_cursor_track` |
+| [`capturemann presets`](#capturemann-presets) | Quick Capture presets: list the user's named setups (`list_presets`). Run one with `--preset` on `capture screenshot` or `record start`. Presets are changed in the app [preview] | `list_presets` |
 | [`capturemann platform-rules`](#capturemann-platform-rules) | Print the limits, required fields, privacy options and export presets of a publishing platform (`get_platform_rules`). Today: `youtube` | `get_platform_rules` |
 | [`capturemann destinations`](#capturemann-destinations) | List the destinations set up in Settings (`list_destinations`) | `list_destinations` |
 | [`capturemann upload`](#capturemann-upload) | Copy a capture or a file to a destination in the background (`upload`). Prints the job id | `upload` |
@@ -202,8 +203,10 @@ Take a screenshot of a display, a window or a region
 Synopsis:
 
 ```text
-capturemann capture screenshot [OPTIONS] <--display <ID>|--window <ID|TITLE>|--region <X,Y,W,H>|--pick>
+capturemann capture screenshot [OPTIONS]
 ```
+
+One of `--display`, `--window`, `--region`, `--pick` or `--preset` is required.
 
 Options (plus the [global flags](#global-flags)):
 
@@ -218,6 +221,7 @@ Options (plus the [global flags](#global-flags)):
 | `--annotate` | `<OPS>` |  |  | Annotation ops to apply right away: a JSON file, inline JSON, or `-` for stdin |
 | `--out` | `<FILE>` |  |  | Write the resulting PNG to this file |
 | `--title` | `<TITLE>` |  |  | Library title (default: `Screenshot yyyy-MM-dd HH.mm`) |
+| `--preset` | `<NAME\|ID>` |  |  | Run a Quick Capture preset by name or id (see `presets list`): it fills the delay, the copy and the Long Shot mode that this command leaves out; a flag given here wins. A preset holds no area: without `--display`, `--window` or `--region` the primary display is captured (a Window preset needs `--window`) **(Preview)** |
 | `--long` | switch |  |  | Long Shot (CAP-6): scroll the window (or area) and stitch one tall image. CaptureMann scrolls for you (the user confirms it when an agent runs this) **(Preview)** |
 | `--horizontal` | switch |  |  | Long Shot: scroll sideways instead of down **(Preview)** |
 | `--max-px` | `<PX>` |  |  | Long Shot: stop at this length in px (at most 16384) **(Preview)** |
@@ -227,12 +231,7 @@ Examples:
 
 ```text
 $ capturemann capture screenshot
-error: the following required arguments were not provided:
-  <--display <ID>|--window <ID|TITLE>|--region <X,Y,W,H>|--pick>
-
-Usage: capturemann capture screenshot <--display <ID>|--window <ID|TITLE>|--region <X,Y,W,H>|--pick>
-
-For more information, try '--help'.   (stderr)
+error[invalid_input]: give one of --display, --window, --region, --pick or --preset   (stderr)
 (exit 2)
 ```
 
@@ -958,7 +957,7 @@ Options (plus the [global flags](#global-flags)):
 | Flag | Value | Allowed values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--audio` | switch |  |  | Record audio only (microphone and/or system audio; no screen, camera or cursor): the result is an audio recording in the library. Use `--mic <ID>` for a specific microphone, `--system-audio` for system audio and `--preset` for a use case |
-| `--preset` | `<PRESET>` | room, online, lecture, product, note |  | Use case of an audio recording: `room` (interview, 1:1, meeting around a laptop), `online` (call: adds system audio), `lecture`, `product` (demo call: adds system audio) or `note` (voice note) |
+| `--preset` | `<NAME\|ID>` |  |  | With `--audio`, the use case of the recording: `room` (interview, 1:1, meeting around a laptop), `online` (call: adds system audio), `lecture`, `product` (demo call: adds system audio) or `note` (voice note). Any other value is the name or id of a Quick Capture preset (see `presets list`): it fills the options this command leaves out (a flag given here wins), an audio preset makes an audio recording, and the confirmation shows the resulting plan |
 | `--people` | `<N>` |  |  | How many people speak (1 to 8), for an audio recording: stored with it and used by the automatic speaker step. Leave it out when you do not know |
 | `--display` | `<ID>` |  |  | Display id to record (see `targets`; default: the primary display) |
 | `--window` | `<ID\|TITLE>` |  |  | Record one window: its id, or a case-insensitive substring of its title or app name. An exact title wins; several partial matches fail with `ambiguous_target` and list their ids |
@@ -1563,6 +1562,47 @@ error[invalid_input]: `shot_06GYEY0TM4JZ7KGH` is a screenshot; this works on rec
 ```
 
 The output above was run against a headless daemon with an empty throw-away library.
+
+### `capturemann presets`
+
+Quick Capture presets: list the user's named setups (`list_presets`). Run one with `--preset` on `capture screenshot` or `record start`. Presets are changed in the app [preview]
+
+- **MCP tool:** `list_presets`, Free, read-only
+- **Asks on screen:** No (read-only).
+- **Preview:** yes, this is a Preview feature (it may still change).
+
+Synopsis:
+
+```text
+capturemann presets [OPTIONS] <COMMAND>
+```
+
+Subcommands:
+
+- `capturemann presets list`: List the presets: id, name, kind, target and a one-line summary
+
+#### `capturemann presets list`
+
+List the presets: id, name, kind, target and a one-line summary [preview]
+
+- **MCP tool:** `list_presets`, Free, read-only
+- **Asks on screen:** No (read-only).
+
+Synopsis:
+
+```text
+capturemann presets list [OPTIONS]
+```
+
+Example (the starter presets):
+
+```text
+$ capturemann presets list
+bug-report  "Bug report"  Screenshot · Region · copy, redact, editor
+docs-shot  "Docs shot"  Screenshot · Window · cursor, editor
+demo-video  "Demo video"  Video · Display · mic, webcam
+meeting  "Meeting"  Audio · mic, system sound, transcribe
+```
 
 ### `capturemann platform-rules`
 

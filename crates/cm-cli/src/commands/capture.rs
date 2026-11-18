@@ -254,7 +254,29 @@ pub(super) async fn screenshot(cx: &mut Ctx<'_>, a: ScreenshotArgs) -> Result<()
         Some(spec) => Some(load_ops(spec, "--annotate", &mut cx.env.stdin)?),
         None => None,
     };
+    if a.preset.is_none()
+        && a.display.is_none()
+        && a.window.is_none()
+        && region.is_none()
+        && !a.pick
+    {
+        return Err(CliError::invalid_input(
+            "give one of --display, --window, --region, --pick or --preset",
+        ));
+    }
     let mut c = cx.client().await?;
+    // QC-5: a preset holds no area. A Window preset needs `--window`; the others take the
+    // primary display (or the given region) like a plain `capture screenshot --region`.
+    if let (Some(name), None) = (&a.preset, &a.window) {
+        let wants_window = super::presets::find(&mut c, name)
+            .await?
+            .is_some_and(|p| p["target"] == json!("window"));
+        if wants_window {
+            return Err(CliError::invalid_input(format!(
+                "the preset \"{name}\" captures a window: add --window <ID|TITLE>"
+            )));
+        }
+    }
     let target = if a.pick {
         json!({ "pick": true })
     } else if let Some(w) = &a.window {
@@ -280,7 +302,15 @@ pub(super) async fn screenshot(cx: &mut Ctx<'_>, a: ScreenshotArgs) -> Result<()
     // R1-1: with `--annotate` the clipboard must get the annotated (and redacted) image, never
     // the original, so the copy is requested with the `annotate` call below.
     let copy_with_capture = a.copy && ops.is_none();
-    let mut params = json!({ "target": target, "copy_to_clipboard": copy_with_capture });
+    let mut params = json!({ "target": target });
+    // With a preset an unset copy is left out: `false` would beat the preset's own copy. With
+    // `--annotate` the original is never copied (R1-1), so it is always sent.
+    if a.preset.is_none() || copy_with_capture || ops.is_some() {
+        params["copy_to_clipboard"] = json!(copy_with_capture);
+    }
+    if let Some(p) = &a.preset {
+        params["preset"] = json!(p);
+    }
     if let Some(d) = a.delay {
         params["delay_s"] = json!(d);
     }

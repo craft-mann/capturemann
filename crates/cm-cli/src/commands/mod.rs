@@ -14,14 +14,15 @@ pub(crate) mod guide;
 mod import;
 mod jobs;
 mod library;
+mod presets;
 mod publish;
 mod record;
 mod settings;
 mod text;
 
 use crate::args::{
-    CaptureCmd, Cli, Command, DaemonCmd, JobsCmd, LibraryCmd, LibraryListArgs, RecordCmd,
-    SettingsCmd,
+    CaptureCmd, Cli, Command, DaemonCmd, JobsCmd, LibraryCmd, LibraryListArgs, PresetsCmd,
+    RecordCmd, SettingsCmd,
 };
 use crate::client::Client;
 use crate::error::CliError;
@@ -121,6 +122,9 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
             limit,
         } => cursor_track(&mut cx, id, from, to, limit).await,
         Command::PlatformRules { platform } => platform_rules(&mut cx, platform).await,
+        Command::Presets { cmd } => match cmd {
+            PresetsCmd::List => presets::list(&mut cx).await,
+        },
         Command::Destinations => destinations(&mut cx).await,
         Command::Upload(a) => upload(&mut cx, a).await,
         Command::Publish(a) => publish(&mut cx, a).await,

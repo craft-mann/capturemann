@@ -1,6 +1,6 @@
 # CaptureMann MCP reference
 
-CaptureMann ships a Model Context Protocol (MCP) server, `cm-mcp`, that gives an AI agent the same actions as the app and the CLI. This page lists all 89 tools of version 0.3.4, in the order the server lists them within each area. It was written from the running server (`tools/list`) and the source of the 0.3.4 build, not from memory; the machine-readable version is [tools.json](tools.json). How both were made and how to regenerate them: [README.md](README.md).
+CaptureMann ships a Model Context Protocol (MCP) server, `cm-mcp`, that gives an AI agent the same actions as the app and the CLI. This page lists all 90 tools (the 89 of version 0.3.4 and `list_presets`, added for 0.3.6), in the order the server lists them within each area. It was written from the running server (`tools/list`) and the source of the 0.3.4 build, not from memory; the machine-readable version is [tools.json](tools.json). How both were made and how to regenerate them: [README.md](README.md).
 
 Wording: nothing here is "verified" in the sense of the repository's `verification/` reports. The examples marked as run were run against a headless daemon with an empty library in a throw-away folder; the rest are calls shown for their shape only.
 
@@ -160,7 +160,7 @@ Prompts (`prompts/list`, `prompts/get`): text templates that name the real tools
 
 ## Tool index
 
-The server lists 89 tools. Tier: F = Free, C = Confirm. Policy as in the table above (`locked_allow`, `default_allow`, `default_ask`, `locked_ask`).
+The server lists 90 tools. Tier: F = Free, C = Confirm. Policy as in the table above (`locked_allow`, `default_allow`, `default_ask`, `locked_ask`).
 
 | Tool | Area | Tier | Policy | Read-only | CLI | Preview |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -248,6 +248,7 @@ The server lists 89 tools. Tier: F = Free, C = Confirm. Policy as in the table a
 | [`get_guide`](#get_guide) | Click Guide (Preview) | F | `locked_allow` | yes | `capturemann guide get` | yes |
 | [`set_guide`](#set_guide) | Click Guide (Preview) | F | `default_allow` | no | `capturemann guide set` | yes |
 | [`export_guide`](#export_guide) | Click Guide (Preview) | F | `default_allow` | no | `capturemann guide export` | yes |
+| [`list_presets`](#list_presets) | Quick Capture presets (Preview) | F | `locked_allow` | yes | `capturemann presets list` | yes |
 | [`list_destinations`](#list_destinations) | Destinations and publishing | F | `locked_allow` | yes | `capturemann destinations` |  |
 | [`upload`](#upload) | Destinations and publishing | F | `default_allow` | no | `capturemann upload` |  |
 | [`list_publish_accounts`](#list_publish_accounts) | Destinations and publishing | F | `locked_allow` | yes | `capturemann publish accounts` |  |
@@ -256,7 +257,7 @@ The server lists 89 tools. Tier: F = Free, C = Confirm. Policy as in the table a
 
 ## Tools by area
 
-Notes for the entries: ids in the examples are illustrative; the descriptions are shortened (the full text and the complete schemas, including output schemas, are in [tools.json](tools.json)). "Preview" marks Click Guide and Long Shot, which are Preview features: they may still change, but they are always available. A recording id looks like `rec_...`, a screenshot id like `shot_...`.
+Notes for the entries: ids in the examples are illustrative; the descriptions are shortened (the full text and the complete schemas, including output schemas, are in [tools.json](tools.json)). "Preview" marks Click Guide, Long Shot and Quick Capture, which are Preview features: they may still change, but they are always available. A recording id looks like `rec_...`, a screenshot id like `shot_...`.
 
 ### Discovery and diagnostics
 
@@ -386,6 +387,7 @@ Take a screenshot of a display, a window, or a region of a display and store it 
 | `scroll` | auto \| hand | no | "auto" | Long Shot only. |
 | `copy_to_clipboard` | boolean | no | false |  |
 | `title` | string | no |  | Library title; defaults to `Screenshot <date> <time>`. |
+| `preset` | string | no |  | (preview) Quick Capture preset: the name or id of a screenshot preset from `list_presets`. It fills `delay_s`, `copy_to_clipboard` and `mode: "long"` (for a Long Shot preset) when the call leaves them out; an argument in the same call wins. A preset holds no area, so `target` is still required. An unknown name fails with `invalid_input` naming it. |
 | `request_id` | string | no |  | Idempotency key; a repeat within 24 h returns the first result. (min length 1, max length 256) |
 
 Returns: `capture_id`, `path`, `kind`, `width`, `height`, `copied_to_clipboard`, `warnings`, `image`, `source`, `long_shot`.
@@ -750,7 +752,7 @@ Start a screen recording of a display, a window or a region (physical px relativ
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `mode` | screen \| audio | no | "screen" | `audio`: microphone and/or system audio only (see above). |
-| `preset` | room \| online \| lecture \| product \| note | no |  | Only with `mode: "audio"`: the use case. `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set. |
+| `preset` | string | no |  | Either a Quick Capture preset (a Preview feature): the name or id of a video or audio preset from `list_presets`. It fills `mic`, `system_audio`, `camera`, `cursor`, `fps`, `countdown_s` (and `mode: "audio"` for an audio preset) when the call leaves them out; an argument in the same call wins; `target` is still required for a screen recording; the confirmation shows the plan the preset resolves to; an unknown name fails with `invalid_input` naming it. Or, with `mode: "audio"`, the use case: `room`, `online`, `lecture`, `product` or `note`. For the use case: `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set. |
 | `people` | integer | no |  | Only with `mode: "audio"`: how many people speak, when known. Stored with the recording; the automatic speaker step (setting `ai.auto_speakers`, on by default) uses it as the speaker count. (min 1, max 8) |
 | `target` | object {display_id} or object {window_id} or object {display_id, rect} | no |  | Required for a screen recording; refused with `mode: "audio"`. |
 | `size` | source \| 2160p \| 1440p \| 1080p \| 720p | no |  | Output size; default `source` (native, no cap) or the `recording.size` setting. |
@@ -2290,6 +2292,26 @@ Errors: `user_declined`, `not_found`, `invalid_input` (a `dest` that is a file t
 
 ```json
 {"name": "export_guide", "arguments": {"guide_id": "guide_REGRESSFIXTURE01", "format": "markdown", "dest": "/Users/me/Documents/guides"}}
+```
+
+### Quick Capture presets (Preview)
+
+#### `list_presets`
+
+List the user's Quick Capture presets: named setups for a capture (a screenshot, a video or an audio recording). Run one by passing its name or id as `preset` to `capture_screenshot` or `start_recording`. Four starter presets exist at first: Bug report, Docs shot, Demo video and Meeting. Presets are changed only in the CaptureMann app; a call that tries to change one over MCP is refused.
+
+- **Tier:** Free, read-only: always allowed, never asks, no setting.
+- **Read-only:** yes
+- **CLI:** `capturemann presets list`
+- **Spec:** QC-5
+- **Preview:** yes
+
+No input.
+
+Returns: `presets` (each with `id`, `name`, `kind`, `target`, `options`, `save_to`, `after`, `shortcut`, `summary`) and `notice` (a sentence naming presets of a hand-edited file that were skipped because they are not valid, else null).
+
+```json
+{"name": "list_presets", "arguments": {}}
 ```
 
 ### Destinations and publishing
