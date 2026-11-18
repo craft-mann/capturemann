@@ -46,6 +46,22 @@ Required (to be built and measured in 0.3.6; general techniques only, no phrase 
 3. **Not changed:** the 3 s gap minimum stays (shortening it makes more `[noise]` entries).
 4. Existing transcripts are unchanged; a Re-generate uses the fix.
 
+## 2d. Findings from QA pass 2 and 3 (macOS and Windows, 0.3.5 candidates, Nov 17 to 18, 2026): not fixed in 0.3.5
+
+All are small. Reports: `verification/QA-0.3.5-pass2-macos-2026-11-17-claude.md`, `QA-0.3.5-pass2-windows-2026-11-17-claude.md`, `QA-0.3.5-windows-ci-package-9dcfb5c3-2026-11-17-claude.md`.
+
+| # | Finding | Required behaviour |
+| --- | --- | --- |
+| P-1 | Transcript pieces: the last word of a piece has start equal to end (seen 3 times in one run, may predate 0.3.5). | Every word has an end after its start; a word at the end of a piece gets the end of its piece. |
+| P-2 | The ambiguous-window CLI error (BUG-9) lists the titles of other apps' windows. | The error lists only the matching windows' ids and a short title; nothing else. |
+| P-3 | Windows: one YouTube Long Shot stopped after 2 frames (`no_overlap`) in a maximized Edge window with a second tab; a fresh window gave 40 frames. | The cause is found; a run that cannot join frames says why and keeps what it has. |
+| P-4 | `annotate --out` on a 19 MB image fails with `error.code: internal`. | A reason under `invalid_input` or a stored-file answer, never `internal`. |
+| P-5 | Windows: the export dialog shows the destination as `\\?\C:\...`. | The extended-path prefix is never shown. |
+| P-6 | Windows: the rail shows no cue that it scrolls. | A visible scroll cue or enough room. |
+| P-7 | The Boards intro card stays on screen after Cancel. | It closes with the sheet. |
+| P-8 | The disabled Make a board button reports as enabled to UI Automation. | It reports as disabled. |
+| P-9 | Click Guide Vietnamese layout: the tile text wraps and the Preview pill overlaps (G2, F5, D28). | Both fit at the default width. |
+
 ## 3. To write before the build
 
 Tracks, order and exit criteria (as in the 0.3.5 plan: Phase 0 done, parallel tracks on disjoint files, one full gate, QA agent passes on the candidates, `cm-regress` on all three systems). Open points to check when the build starts: "Long Shot extends this area" and "Record exactly this area" from the after-capture bar start a capture from a region that already exists, which is more than adding a surface.
