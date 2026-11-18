@@ -249,6 +249,9 @@ pub enum OverlayError {
     BadOutput(String),
     /// The overlay did not finish within the watchdog time and was killed (R4-20).
     TimedOut,
+    /// The overlay ended without a result (killed, crashed, or an exit code with no error
+    /// report). Its own log goes to the app's log file, never into the toast (QA 0.3.6 W-5).
+    Stopped,
 }
 
 impl OverlayError {
@@ -269,6 +272,9 @@ impl OverlayError {
             OverlayError::TimedOut => tr!(
                 "The capture overlay stopped responding and was closed. Try the shortcut again."
             ),
+            OverlayError::Stopped => {
+                tr!("The capture overlay closed before it finished. Try the shortcut again.")
+            }
         }
     }
 }
@@ -359,16 +365,32 @@ pub fn parse_result(
         Some(0) if last.is_none() => Ok(OverlayOutcome::Cancelled),
         Some(3) => Ok(OverlayOutcome::Cancelled),
         Some(0) => Err(OverlayError::BadOutput(last.unwrap_or_default().to_owned())),
-        Some(4) => Err(OverlayError::PermissionMissing(stderr.trim().to_owned())),
+        Some(4) => Err(OverlayError::PermissionMissing(report_text(stderr))),
+        // No error report: whatever the overlay wrote is its log, which belongs in the app's log
+        // file and not in a toast (QA 0.3.6 W-5).
         Some(code) => {
-            let msg = stderr.trim();
-            Err(OverlayError::Failed(if msg.is_empty() {
-                format!("overlay exited with status {code}") // i18n-ignore: technical detail
-            } else {
-                msg.to_owned()
-            }))
+            log::warn!(
+                "cm-overlay exited with status {code} without an error report; its output: {}",
+                stderr.trim()
+            );
+            Err(OverlayError::Stopped)
         }
-        None => Err(OverlayError::Failed("overlay was terminated".to_owned())), // i18n-ignore: technical detail,
+        None => {
+            log::warn!("cm-overlay was terminated; its output: {}", stderr.trim());
+            Err(OverlayError::Stopped)
+        }
+    }
+}
+
+/// The overlay's stderr as a message for the user: only a single short line is one (a hand-made
+/// message); the overlay's log lines are written to the app log and left out.
+fn report_text(stderr: &str) -> String {
+    let t = stderr.trim();
+    if t.contains('\n') || t.starts_with('[') || t.chars().count() > 200 {
+        log::warn!("cm-overlay output: {t}");
+        String::new()
+    } else {
+        t.to_owned()
     }
 }
 
@@ -715,17 +737,15 @@ mod tests {
     #[test]
     fn failures_keep_the_message() {
         assert_eq!(
-            parse_result(Some(2), "", "bad window\n"),
+            parse_result(
+                Some(2),
+                "",
+                "{\"error\":{\"code\":\"x\",\"message\":\"bad window\"}}\n"
+            ),
             Err(OverlayError::Failed("bad window".into()))
         );
-        assert_eq!(
-            parse_result(Some(2), "", ""),
-            Err(OverlayError::Failed("overlay exited with status 2".into()))
-        );
-        assert!(matches!(
-            parse_result(None, "", ""),
-            Err(OverlayError::Failed(_))
-        ));
+        assert_eq!(parse_result(Some(2), "", ""), Err(OverlayError::Stopped));
+        assert_eq!(parse_result(None, "", ""), Err(OverlayError::Stopped));
         assert!(matches!(
             parse_result(Some(0), "hello", ""),
             Err(OverlayError::BadOutput(_))
@@ -752,6 +772,21 @@ mod tests {
             "Capture failed: boom"
         );
         assert!(with_language(Lang::Vi, || e.user_message()).contains("boom"));
+    }
+
+    /// QA 0.3.6 W-5: the overlay's log never reaches the toast, whatever the exit.
+    #[test]
+    fn the_overlay_log_stays_out_of_the_toast() {
+        let log = "[INFO cm_core::logging] overlay 0.3.6 started\n[INFO cm_overlay] picker open\n";
+        for code in [Some(1), Some(2), None, Some(4)] {
+            let text = match parse_result(code, "", log) {
+                Err(e) => e.user_message(),
+                Ok(_) => panic!("{code:?} is not a result"),
+            };
+            assert!(!text.contains("[INFO"), "{code:?}: {text}");
+            assert!(!text.contains('\n'), "{code:?}: {text}");
+        }
+        assert!(!OverlayError::Stopped.user_message().is_empty());
     }
 
     #[test]

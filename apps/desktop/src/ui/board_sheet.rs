@@ -1111,12 +1111,8 @@ pub fn open(app: &Entity<AppModel>, shots: Vec<(String, String, u32, u32)>, cx: 
         m.bulk.epoch += 1;
         cx.notify();
     });
-    // Design S24: the first time the sheet opens, a one-line intro (once).
-    crate::ui::preview_label::show_intro_if_due(
-        app,
-        crate::ui::preview_label::PreviewFeature::Boards,
-        cx,
-    );
+    // The one-time intro card is not shown over the sheet (QA 0.3.6 W-6): it comes when the
+    // sheet closes (see `close`).
     refine_sizes(app, cx);
 }
 
@@ -1166,12 +1162,15 @@ fn refine_sizes(app: &Entity<AppModel>, cx: &mut App) {
 pub fn close(app: &Entity<AppModel>, cx: &mut App) {
     app.update(cx, |m, cx| {
         m.bulk.board = None;
-        crate::ui::preview_label::drop_intro_of(
-            &mut m.preview_card,
-            crate::ui::preview_label::PreviewFeature::Boards,
-        );
         cx.notify();
     });
+    // Design S24, once: the intro to Boards (and Send feedback) shows after the sheet, never over
+    // it.
+    crate::ui::preview_label::show_intro_if_due(
+        app,
+        crate::ui::preview_label::PreviewFeature::Boards,
+        cx,
+    );
 }
 
 /// Finish board: `create_board` as the user, then the new board opens in the editor.

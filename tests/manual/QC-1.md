@@ -20,8 +20,9 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
    opens near the pointer, on the display that has it, and the keyboard goes to it. Press the shortcut
    again: it closes. The Launcher shortcut (Option+Shift+Space) still opens the Launcher.
 2. **Tray.** Open the tray or menu-bar menu. Expected: **Quick Capture…** is the first item, then
-   Capture region, Capture window, Capture display. Choose it: the panel opens under the icon (macOS,
-   Linux top bar) or above the taskbar (Windows). While a recording runs, Stop is the first item and
+   Capture region, Capture window, Capture display. Choose it: the panel is centred on the tray icon (under the
+   macOS status item, above the Windows taskbar icon) and fully on the display; on Linux, where the
+   icon has no position, it opens near the pointer (QC-1.AC11). While a recording runs, Stop is the first item and
    Quick Capture… follows the Record group.
 3. **Dock.** In the sidebar, under **Record…**, a neutral **Capture…** button with its keycap.
    Click it: the panel opens near the pointer. The five dock tiles and the Long Shot and Click Guide
@@ -52,7 +53,10 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 10. **Keyboard.** Without the mouse: 1, 2, 3 switch the kind; Tab moves through the four tiles (a ring on
     the focused one); Up or Down toggles the focused tile or steps its value; Left and Right change the
     target; P opens the preset picker; Enter or Space captures; Esc closes (Esc in a menu or the picker
-    goes back first). With VoiceOver or Narrator, every control has a name that includes its state
+    goes back first). In the picker (QC-1.AC9): Up and Down move the ring and stop at the first and the
+    last row (No preset at the top, Edit presets… at the bottom), Enter or Space chooses the
+    highlighted row, Esc closes the picker only and the panel stays; the highlighted row scrolls into
+    view when the list is long. With VoiceOver or Narrator, every control has a name that includes its state
     ("Copy, on", "Delay, 5 s", "Region, selected").
 11. **Not in the picture.** Take a Region screenshot from the panel with Copy on. Expected: the panel is
     gone before the picker opens and is not in the picture. Do it with Delay 3 s too: the pill counts
@@ -112,6 +116,9 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 27. **Edit sheet.** Name; Kind and Target; the toggles (Copy to clipboard, Auto-redact, Open in editor for
     a screenshot); "Then open the tool" (after Open in editor); Save to; Shortcut with **Change**;
     Save preset, Cancel, Delete. Make a preset with Save to `~/Bugs/{date}` and the tool "step".
+    On a 1080p display at 150 % scale (1280 by 720 logical): the title and the footer stay in place,
+    the footer never covers a field, the body scrolls with a scrollbar on its right edge, and the
+    Save to and Shortcut rows are reached by scrolling and clicked (QC-4.AC9).
 28. **Save to.** Run that preset: the capture is in the library and as a PNG in `~/Bugs/<today's local date>`
     (the folder is made). With "Open in editor" the editor opens with the step tool selected.
 29. **Shortcut.** Give a preset Ctrl+Alt+Shift+B (Option+Shift+B). Change, then press a chord another action
@@ -125,6 +132,15 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 31. **Hand-edited file.** Break one preset in `presets.json` (for example a video preset with
     `"target": "long_shot"`). Restart. Expected: one notice names that preset, the others load.
 
+## 5b. The panel's height with the picker (QC-4.AC8)
+
+34. Open the picker with the four starters: the panel grows to show every row, no row is cut off.
+    Add presets until the list is taller than the display: the panel stops at the height of the display
+    (less the edge gaps), the list scrolls, and moving the highlight with Down scrolls it into view.
+    Close the picker (Esc): the panel returns to its normal size. Check it on the 720 px display too.
+35. Pick "Save current as preset…": the name screen fits the panel; Esc goes back to the picker and
+    then to the panel.
+
 ## 6. Languages and layout
 
 32. Set the language to Vietnamese. Open the panel, the bar, the sheet and the Settings presets page:
@@ -135,5 +151,5 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 
 ## Pass criteria
 
-All steps behave as written; QC-1.AC1 to AC8, QC-3.AC1 to AC7 and QC-4.AC1 to AC7 hold on the real
+All steps behave as written; QC-1.AC1 to AC11, QC-3.AC1 to AC7 and QC-4.AC1 to AC9 hold on the real
 machine. Anything that does not is a finding for the report, with the platform and the step.
