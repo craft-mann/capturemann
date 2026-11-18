@@ -216,6 +216,8 @@
 - **AC5** Wayland. Hand scroll is the only mode offered, and AC1 passes when the test scrolls by hand (a scripted wheel through the test page's own JavaScript).
 - **AC6** macOS without Accessibility. Auto scroll is shown disabled with "Allow Accessibility to scroll for you", a button to grant it, and Hand scroll still works.
 - **AC7** (agent) `capture_screenshot { mode: "long", target, direction?, max_px? }` returns the stitched image, like a normal capture. Auto scroll from an agent is **Confirm** tier because it moves the user's screen, and Hand scroll is refused for agents (`invalid_input`, reason `needs_user`).
+- **AC16** (0.3.6) Given a Long Shot that stops because a part did not line up, then the frames joined before it are kept in the image, and the result and the saved note say in one plain sentence why (the window changed size, a fixed header or footer changed, too little of the page showed, the page repeats itself, or the page changed between two parts).
+- **AC17** (0.3.6) Given an Auto scroll Long Shot, when it ends, then the page is scrolled back by the distance the run moved it, and the result says `page_offset { moved_px, restored }`; when the target cannot be scrolled back, `restored` is false and `moved_px` tells how far the page was left from where it was.
 
 **Out of scope:** tiled images over 16,384 px; scrolling inside nested frames in one shot; video of the scroll.
 

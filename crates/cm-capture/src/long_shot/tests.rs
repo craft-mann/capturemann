@@ -29,6 +29,44 @@ fn auto(page: SyntheticPage, max_px: Option<u32>) -> (LongShotResult, fake::Page
     (r, view)
 }
 
+/// A scroller that can also scroll back, as the real ones do.
+struct Back(fake::PageView);
+impl Scroller for Back {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        self.0.scroll(d, amount_px)
+    }
+    fn scroll_back(&mut self, _: Direction, amount_px: u32) -> Result<bool, CmError> {
+        self.0.back(amount_px);
+        Ok(true)
+    }
+}
+
+/// CAP-6.AC17: an Auto scroll run leaves the page where it found it, and says how far it moved.
+#[test]
+fn cap_6_ac17_the_page_is_scrolled_back_to_where_it_was() {
+    let page = SyntheticPage::new(40, 5 * 300, 300);
+    let view = page.clone().view();
+    let (mut src, mut sc) = (view.clone(), Back(view.clone()));
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(page.direction),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    let off = r.page_offset.unwrap();
+    assert!(off.moved_px > 0 && off.restored, "{off:?}");
+    assert_eq!(view.position(), 0, "the page is back at the top");
+    // A scroller that cannot scroll back: the result still says how far the page moved.
+    let (r, view) = auto(page, None);
+    let off = r.page_offset.unwrap();
+    assert!(!off.restored && off.moved_px > 0);
+    assert_eq!(off.moved_px, view.position());
+}
+
 /// CAP-6.AC1: a page five screens long, every row once and in order.
 #[test]
 fn cap_6_ac1_five_screens_every_row_once_in_order() {

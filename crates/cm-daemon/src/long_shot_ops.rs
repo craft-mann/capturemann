@@ -685,6 +685,10 @@ struct LongMeta {
     /// frames that joined before are in the image.
     #[serde(skip_serializing_if = "Option::is_none")]
     why: Option<String>,
+    /// Auto scroll: how far the page was left from where the run found it and whether it was
+    /// scrolled back (`{ moved_px, restored }`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    page_offset: Option<long_shot::PageOffset>,
     /// The longest side this run was allowed (`max_px`, at most 16,384), so that the toast can
     /// name the limit it met.
     limit_px: u32,
@@ -911,6 +915,7 @@ impl Inner {
                         _ => result.end.note_for(cfg.limits, along),
                     },
                     why: result.why.map(str::to_owned),
+                    page_offset: result.page_offset,
                     limit_px: cfg.limits.max_len,
                     header_px: result.image.header_len,
                     footer_px: result.image.footer_len,
