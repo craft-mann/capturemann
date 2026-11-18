@@ -16,6 +16,9 @@
 //!   the room, and a line of several words rarely has no word under 0.97. Needs the audio and a
 //!   recording where speech and room can be told apart ([`Reference::new`]); otherwise it keeps
 //!   everything.
+//! * [`drop_doubtful`] (0.3.6, AI-1.AC12b) writes a line as an `[unclear]` sound instead when most of
+//!   its words are low in confidence ([`LOW_CONFIDENCE`]) over audio that is not speech-like (under a
+//!   quarter of its frames 10 dB over the room), and works on recordings under 30 s too.
 //! * [`drop_ignored`] drops the lines that contain a phrase of the user's own list
 //!   (`ai.ignore_phrases`, empty by default), compared with [`fold`] (case, accents, punctuation).
 //!
@@ -43,10 +46,17 @@ pub const MIN_PHRASE_CHARS: usize = 3;
 
 /// A pause this long (seconds), or a sentence mark, ends a line.
 pub const LINE_GAP_SECS: f64 = 1.0;
-/// Audio shorter than this (seconds) has no reference level.
-const MIN_AUDIO_SECS: f64 = 30.0;
+/// A recording needs this many seconds of frames that are not digital silence to have a reference
+/// level (AI-1.AC12): the room is the 10th percentile and the speech the 90th, so each end needs
+/// a few hundred frames. Measured in `verification/benchmarks/short-audio-guard-2026-11-18.md`.
+const MIN_AUDIO_SECS: f64 = 4.0;
+/// Audio shorter than this (seconds) must show a wider range between speech and room, because
+/// its percentiles rest on fewer frames.
+const SHORT_AUDIO_SECS: f64 = 30.0;
 /// Speech and room must be at least this far apart (dB, 90th against 10th percentile).
 const MIN_RANGE_DB: f32 = 10.0;
+/// The same for audio under [`SHORT_AUDIO_SECS`].
+const MIN_RANGE_SHORT_DB: f32 = 15.0;
 /// A line shorter than this (seconds) is never judged.
 const MIN_LINE_SECS: f64 = 1.0;
 /// Level margin (dB over the room) under which five words or more are unsupported.
@@ -80,6 +90,9 @@ pub enum DropReason {
     Unsupported,
     /// The line contains a phrase of the user's ignore list.
     Ignored,
+    /// Low-confidence words over audio that is not speech-like: written as an `[unclear]` sound
+    /// instead ([`drop_doubtful`]).
+    Doubtful,
 }
 
 /// A line left out of a transcript, kept so the drop can be seen (and the line re-created by a
@@ -123,11 +136,8 @@ pub struct Reference {
 }
 
 impl Reference {
-    /// `None` when the audio is short, or speech and room are less than [`MIN_RANGE_DB`] apart.
+    /// `None` when the audio has too few frames that are not silent, or speech and room are less than [`MIN_RANGE_DB`] apart.
     pub fn new(samples: &[f32]) -> Option<Reference> {
-        if (samples.len() as f64) < MIN_AUDIO_SECS * f64::from(SAMPLE_RATE) {
-            return None;
-        }
         let db: Vec<f32> = samples
             .as_chunks::<FRAME>()
             .0
@@ -146,13 +156,19 @@ impl Reference {
             .filter(|(c, _)| !crate::audio::is_digital_silence(&c[..]))
             .map(|(_, d)| *d)
             .collect();
-        if (sorted.len() as f64) * 0.02 < MIN_AUDIO_SECS {
+        let secs = sorted.len() as f64 * 0.02;
+        if secs < MIN_AUDIO_SECS {
             return None;
         }
         sorted.sort_by(f32::total_cmp);
         let floor = sorted[sorted.len() / 10];
         let speech = sorted[sorted.len() * 9 / 10];
-        (speech - floor >= MIN_RANGE_DB).then_some(Reference { db, floor })
+        let wanted = if (samples.len() as f64) < SHORT_AUDIO_SECS * f64::from(SAMPLE_RATE) {
+            MIN_RANGE_SHORT_DB
+        } else {
+            MIN_RANGE_DB
+        };
+        (speech - floor >= wanted).then_some(Reference { db, floor })
     }
 
     /// How far (dB) the 80th percentile level between `a` and `b` seconds is over the room.
@@ -166,6 +182,95 @@ impl Reference {
         seg.sort_by(f32::total_cmp);
         Some(seg[seg.len() * 8 / 10] - self.floor)
     }
+}
+
+/// A word is low in confidence below this.
+pub const LOW_CONFIDENCE: f32 = 0.5;
+/// A line is doubtful when at least this share of its words is low in confidence.
+const LOW_SHARE: f32 = 0.5;
+/// A frame is speech-like when it is this many dB over the room.
+const SPEECH_OVER_DB: f32 = 10.0;
+/// A line is not speech-like when fewer than this share of its frames are speech-like.
+const SPEECH_SHARE_UNDER: f32 = 0.25;
+/// A line is judged only when its words cover at least this many seconds of audio (capped per
+/// word, see [`MAX_WORD_SECS`]): under that the share of 20 ms frames rests on a handful of them.
+const MIN_VOICED_SECS: f64 = 0.25;
+/// One word counts for at most this many seconds when the line's frames are read, so a last
+/// word stretched over a pause (its piece's end) does not make real speech look like room.
+const MAX_WORD_SECS: f64 = 1.0;
+
+impl Reference {
+    /// The share of the frames of `a` to `b` seconds that are [`SPEECH_OVER_DB`] over the room.
+    pub fn speech_share(&self, a: f64, b: f64) -> Option<f32> {
+        let fa = (a.max(0.0) * 50.0) as usize;
+        let fb = ((b * 50.0) as usize).max(fa + 1).min(self.db.len());
+        if fa >= fb {
+            return None;
+        }
+        let n = self.db[fa..fb]
+            .iter()
+            .filter(|d| **d - self.floor >= SPEECH_OVER_DB)
+            .count();
+        Some(n as f32 / (fb - fa) as f32)
+    }
+}
+
+/// Whether the line `words` is mostly low in confidence over audio that is not speech-like
+/// (AI-1.AC12). `words` start at `base` in the audio.
+pub fn is_doubtful(words: &[Word], base: MediaTime, reference: &Reference) -> bool {
+    if words.is_empty() {
+        return false;
+    }
+    let low = words
+        .iter()
+        .filter(|w| w.confidence < LOW_CONFIDENCE)
+        .count();
+    if (low as f32) < LOW_SHARE * words.len() as f32 {
+        return false;
+    }
+    // The frames under the words, each word read for at most MAX_WORD_SECS.
+    let (mut speechy, mut total) = (0.0f64, 0.0f64);
+    for w in words {
+        let a = (w.start - base).as_secs_f64();
+        let b = (w.end - base).as_secs_f64().min(a + MAX_WORD_SECS);
+        if let Some(share) = reference.speech_share(a, b.max(a + 0.02)) {
+            let len = (b - a).max(0.02);
+            speechy += f64::from(share) * len;
+            total += len;
+        }
+    }
+    total >= MIN_VOICED_SECS && (speechy / total) < f64::from(SPEECH_SHARE_UNDER)
+}
+
+/// The doubtful lines of `words` as `[unclear]` sounds (AI-1.AC12): their words are taken out of
+/// the transcript, and each line is kept in the dropped list with [`DropReason::Doubtful`]. Needs a
+/// [`Reference`]; without one everything stays. `sounds` are in the same time as `words`.
+pub fn drop_doubtful(
+    words: Vec<Word>,
+    samples: &[f32],
+    base: MediaTime,
+) -> (Vec<Word>, Vec<crate::transcribe::Sound>, Vec<DroppedLine>) {
+    let Some(reference) = Reference::new(samples) else {
+        return (words, Vec::new(), Vec::new());
+    };
+    let mut drop = vec![false; words.len()];
+    let (mut sounds, mut out) = (Vec::new(), Vec::new());
+    for r in lines(&words) {
+        if is_doubtful(&words[r.clone()], base, &reference) {
+            let line = dropped(&words, r.clone(), DropReason::Doubtful);
+            sounds.push(crate::transcribe::Sound {
+                kind: crate::transcribe::SoundKind::Unclear,
+                start: line.start,
+                end: line.end,
+            });
+            out.push(line);
+            drop[r].iter_mut().for_each(|d| *d = true);
+        }
+    }
+    if out.is_empty() {
+        return (words, sounds, out);
+    }
+    (without(words, &drop), sounds, out)
 }
 
 /// Whether the line `words` (audio starts at `base`) is text over a stretch that holds no speech.
@@ -401,11 +506,11 @@ mod tests {
         assert_eq!(dropped.len(), 1);
         assert!((dropped[0].start.as_secs_f64() - 85.0).abs() < 1e-6);
         assert_eq!(kept.len(), words.len() - dropped[0].words as usize);
-        // Too few frames that are not silent: no reference, everything stays.
+        // Too few frames that are not silent (under 4 s): no reference, everything stays.
         let mostly_muted: Vec<f32> = x
             .iter()
             .enumerate()
-            .map(|(i, v)| if i < 100 * 16_000 { 0.0 } else { *v })
+            .map(|(i, v)| if i < 118 * 16_000 { 0.0 } else { *v })
             .collect();
         assert!(Reference::new(&mostly_muted).is_none());
         let (kept, dropped) = drop_unsupported(words.clone(), &mostly_muted, MediaTime::ZERO);
@@ -437,6 +542,102 @@ mod tests {
         let (kept, dropped) = drop_unsupported(words.clone(), &audio(), MediaTime::ZERO);
         assert_eq!(kept, words);
         assert!(dropped.is_empty());
+    }
+
+    /// 9 s: speech-level noise in 0..3 s and 6..9 s, the room only in between.
+    fn short_audio() -> Vec<f32> {
+        (0..9 * 16_000)
+            .map(|i| {
+                let a = if (3..6).contains(&(i / 16_000)) {
+                    0.002
+                } else {
+                    0.2
+                };
+                a * ((i as f32) * 0.37).sin()
+            })
+            .collect()
+    }
+
+    /// AI-1.AC12 (0.3.6): audio under 30 s is judged when speech and room are 15 dB apart and
+    /// 4 s of it is not digital silence.
+    #[test]
+    fn short_audio_has_a_reference_when_speech_and_room_are_clearly_apart() {
+        assert!(Reference::new(&short_audio()).is_some());
+        // 3 s of content: too few frames. Flat audio: no range.
+        assert!(Reference::new(&short_audio()[..3 * 16_000]).is_none());
+        let flat: Vec<f32> = (0..9 * 16_000)
+            .map(|i| 0.1 * ((i as f32) * 0.3).sin())
+            .collect();
+        assert!(Reference::new(&flat).is_none());
+        // 12 dB apart is enough for a long recording, not for a short one.
+        let narrow = |secs: usize| -> Vec<f32> {
+            (0..secs * 16_000)
+                .map(|i| {
+                    let a = if (i / 16_000) % 2 == 0 { 0.05 } else { 0.0125 };
+                    a * ((i as f32) * 0.37).sin()
+                })
+                .collect()
+        };
+        assert!(Reference::new(&narrow(9)).is_none());
+        assert!(Reference::new(&narrow(40)).is_some());
+    }
+
+    /// AI-1.AC12 (0.3.6): mostly low-confidence words over the room become one `[unclear]` sound
+    /// entry; the same words over speech-level audio, or sure ones over the room, stay.
+    #[test]
+    fn doubtful_words_over_the_room_become_an_unclear_sound() {
+        let mut words = say("so the numbers", 0.5, 0.9);
+        words.extend(say("one two three four", 3.5, 0.2));
+        words.extend(say("then we move", 6.5, 0.9));
+        let (kept, sounds, dropped) = drop_doubtful(words.clone(), &short_audio(), MediaTime::ZERO);
+        assert_eq!(kept.len(), 6);
+        assert_eq!(dropped.len(), 1);
+        assert_eq!(dropped[0].reason, DropReason::Doubtful);
+        assert_eq!(dropped[0].words, 4);
+        assert_eq!(sounds.len(), 1);
+        assert_eq!(sounds[0].kind, crate::transcribe::SoundKind::Unclear);
+        assert_eq!(
+            (sounds[0].start, sounds[0].end),
+            (dropped[0].start, dropped[0].end)
+        );
+        // The same low confidence over speech level stays.
+        let mut loud = say("so the numbers", 0.5, 0.2);
+        loud.extend(say("then we move", 6.5, 0.1));
+        assert_eq!(
+            drop_doubtful(loud.clone(), &short_audio(), MediaTime::ZERO).0,
+            loud
+        );
+        // Sure words over the room are not doubtful.
+        let sure = say("one two three four", 3.5, 0.9);
+        assert!(drop_doubtful(sure, &short_audio(), MediaTime::ZERO)
+            .2
+            .is_empty());
+        // One low word among sure ones is not "mostly low".
+        let mut mixed = say("one two three four", 3.5, 0.9);
+        mixed[1].confidence = 0.1;
+        assert!(drop_doubtful(mixed, &short_audio(), MediaTime::ZERO)
+            .2
+            .is_empty());
+    }
+
+    /// AI-1.AC12 (0.3.6): a line with under a quarter second of audio under its words is not
+    /// judged, and a last word stretched over a long pause does not turn speech into room.
+    #[test]
+    fn a_tiny_line_and_a_stretched_last_word_are_handled() {
+        let tiny = vec![Word {
+            text: "x".into(),
+            start: media_secs(4.0),
+            end: media_secs(4.1),
+            confidence: 0.1,
+        }];
+        assert!(drop_doubtful(tiny, &short_audio(), MediaTime::ZERO)
+            .2
+            .is_empty());
+        let mut real = say("so the numbers look", 0.5, 0.2);
+        real.last_mut().unwrap().end = media_secs(9.0);
+        assert!(drop_doubtful(real, &short_audio(), MediaTime::ZERO)
+            .2
+            .is_empty());
     }
 
     #[test]
