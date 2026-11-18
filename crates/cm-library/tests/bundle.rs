@@ -461,3 +461,39 @@ fn r1_18_failed_render_write_leaves_the_render_stale() {
     assert!(!b.render_is_stale());
     assert!(ShotBundle::open(&dir).unwrap().manifest().render.is_some());
 }
+
+/// ANN-1.AC14: a shape far outside the picture is `invalid_input` and stores nothing; one that
+/// sticks out a little is accepted.
+#[test]
+fn a_shape_far_outside_the_picture_is_refused_ann_1_ac14() {
+    use cm_library::ops::{AnnotationOp, Rc};
+    let tmp = tempfile::tempdir().unwrap();
+    let mut b = new_bundle(tmp.path());
+    let rect = |r: [f64; 4]| {
+        let mut op = rect_op();
+        if let OpKind::Rect { rect, .. } = &mut op.kind {
+            *rect = Rc::from(r);
+        }
+        op
+    };
+    let _: &AnnotationOp = &rect([0.0; 4]);
+    let e = b
+        .annotate(
+            vec![rect([10.0, 10.0, 5_000_000.0, 50.0])],
+            false,
+            agent(),
+            t(1),
+        )
+        .unwrap_err();
+    assert_eq!(e.code(), ErrorCode::InvalidInput);
+    assert!(e.to_string().contains("ops[0]"), "{e}");
+    assert!(b.ops().is_empty());
+    b.annotate(
+        vec![rect([-20.0, -20.0, 300.0, 50.0])],
+        false,
+        agent(),
+        t(2),
+    )
+    .unwrap();
+    assert_eq!(b.ops().len(), 1);
+}

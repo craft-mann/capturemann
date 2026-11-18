@@ -438,7 +438,7 @@ pub fn confirm_details(p: &GuideParams) -> Option<Value> {
         rows.insert("format".into(), json!(a.format.as_str()));
         if let Some(d) = a.dest.as_deref().filter(|d| !d.is_empty()) {
             let shown = export::resolve_path(std::path::Path::new(d));
-            rows.insert("path".into(), json!(shown.display().to_string()));
+            rows.insert("path".into(), json!(export::plain_path(&shown)));
         }
         return Some(Value::Object(rows));
     }

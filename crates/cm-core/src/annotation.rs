@@ -1205,6 +1205,52 @@ pub fn validate_op(index: usize, op: &AnnotationOp) -> Result<(), CmError> {
         .map_err(|e| CmError::invalid_field(&format!("ops[{index}]"), e))
 }
 
+/// How far outside the picture a shape may reach, as a multiple of the picture's longer side
+/// (ANN-1.AC14), and the smallest reach allowed for a small picture.
+pub const OUTSIDE_FACTOR: f64 = 8.0;
+const OUTSIDE_FLOOR: f64 = 4096.0;
+
+/// Refuses an op whose points or rectangle corners lie far outside a `width` x `height` picture
+/// (ANN-1.AC14). A shape that sticks out a little is fine and stays stored; a rectangle five
+/// million pixels wide is a mistake. Errors are `invalid_input` naming `ops[index]`.
+pub fn validate_op_within(
+    index: usize,
+    op: &AnnotationOp,
+    width: u32,
+    height: u32,
+) -> Result<(), CmError> {
+    let reach = (f64::from(width.max(height)) * OUTSIDE_FACTOR).max(OUTSIDE_FLOOR);
+    let pt = |p: &Pt| p.to_array();
+    let rc = |r: &Rc| {
+        let a = r.to_array();
+        [a[0], a[1], a[0] + a[2], a[1] + a[3]]
+    };
+    let vals: Vec<f64> = match &op.kind {
+        OpKind::Arrow { from, to, .. } | OpKind::Line { from, to, .. } => {
+            pt(from).into_iter().chain(pt(to)).collect()
+        }
+        OpKind::Rect { rect, .. }
+        | OpKind::Ellipse { rect, .. }
+        | OpKind::Highlight { rect, .. }
+        | OpKind::Blur { rect, .. }
+        | OpKind::Pixelate { rect, .. } => rc(rect).to_vec(),
+        OpKind::Text { at, .. } | OpKind::Step { at, .. } | OpKind::Stamp { at, .. } => {
+            pt(at).to_vec()
+        }
+        OpKind::Callout { rect, tail, .. } => rc(rect).into_iter().chain(pt(tail)).collect(),
+        _ => Vec::new(),
+    };
+    if vals.iter().any(|v| v.abs() > reach) {
+        return Err(CmError::invalid_field(
+            &format!("ops[{index}]"),
+            format!(
+                "the shape lies far outside the {width}x{height} picture; keep it within {reach:.0} px of the picture"
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// Checks rules that span the list: at most one `spotlight` (ANN-7), at most [`MAX_MAGNIFY`]
 /// `magnify` ops (ANN-8.AC5) and base edits before every other op (ANN-9.AC4). The error is
 /// `invalid_input` naming the offending op (`ops[i]`).

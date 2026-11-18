@@ -53,6 +53,15 @@ pub enum Sniff {
     Other,
 }
 
+/// Whether the file name says the file is a PNG or JPEG picture. A file with such a name whose
+/// bytes are not a picture is reported as an unreadable picture, never sent to the video probe
+/// (IMP-6.AC6). Pure.
+pub fn extension_claims_picture(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg"))
+}
+
 /// Names a picture format from the first bytes of a file (use at least 1 KiB when the file may be
 /// an SVG). Pure.
 pub fn sniff(head: &[u8]) -> Sniff {

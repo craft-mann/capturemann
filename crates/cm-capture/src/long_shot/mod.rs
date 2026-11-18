@@ -26,6 +26,7 @@ pub use crate::sys::long_scroll::{
 };
 pub use run::{
     run_auto, run_auto_ex, run_hand, run_hand_ex, LongShotConfig, LongShotProgress, LongShotResult,
+    PageOffset,
 };
 pub use stitch::{
     limit_kind, Direction, EndReason, LimitKind, Limits, PushOutcome, Stitched, Stitcher,

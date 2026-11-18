@@ -448,6 +448,11 @@ struct State {
 pub struct PageView(Rc<RefCell<State>>);
 
 impl PageView {
+    /// Where the viewport is, px along the scroll direction.
+    pub fn position(&self) -> u32 {
+        self.0.borrow().pos
+    }
+
     pub fn scrolls(&self) -> u32 {
         self.0.borrow().scrolls
     }

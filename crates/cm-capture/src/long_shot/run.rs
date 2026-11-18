@@ -94,6 +94,23 @@ pub struct LongShotProgress {
 pub struct LongShotResult {
     pub image: Stitched,
     pub end: EndReason,
+    /// For [`EndReason::NoOverlap`]: one plain sentence on why the next part did not join. The
+    /// frames joined before it are in `image`.
+    pub why: Option<&'static str>,
+    /// Auto scroll only: how far the run left the page from where it found it, and whether it
+    /// scrolled the page back (CAP-6.AC17). `None` for Hand scroll (the person scrolls).
+    pub page_offset: Option<PageOffset>,
+}
+
+/// Where Auto scroll left the target page compared with where it found it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct PageOffset {
+    /// Physical px along the scroll direction the page was scrolled forward by the run (before
+    /// any scroll back); 0 when the run began again from the top of a page that was at its end
+    /// and reached its end.
+    pub moved_px: u32,
+    /// The page was scrolled back by `moved_px` (about; a wheel is not exact), or needed none.
+    pub restored: bool,
 }
 
 fn progress(s: &Stitcher) -> LongShotProgress {
@@ -203,6 +220,7 @@ pub fn run_auto_ex(
         on_stitch(&stitcher);
     }
     let size = f64::from(extent(&first.frame, cfg.direction));
+    let first_len = size as u32;
     let mut last_ok = first.frame.clone();
     let mut step = ((size * cfg.first_step_fraction) as u32).max(1);
     // Pixels the content moved per pixel asked, once a join has taught it (1 before): the
@@ -219,6 +237,9 @@ pub fn run_auto_ex(
     let mut share = cfg.step_fraction;
     // Going to the top of a page that was at its end is tried once.
     let mut went_to_top = false;
+    // The run began again from the top: the page is back where it was when the run reaches its
+    // end, and its original place is not known when it stops earlier.
+    let mut restarted = false;
     // A grab that fails because the window was closed ends the run with what it has.
     macro_rules! settled {
         ($l:lifetime, $e:expr) => {
@@ -456,6 +477,7 @@ pub fn run_auto_ex(
                         gain = 1.0;
                         learned = 0;
                         share = cfg.step_fraction;
+                        restarted = true;
                         continue 'run;
                     }
                 }
@@ -616,9 +638,36 @@ pub fn run_auto_ex(
             }
         }
     };
+    // The page goes back to where the run found it, as far as the scroller can.
+    let page_offset = {
+        let moved_px = if restarted && end == EndReason::ReachedEnd {
+            0
+        } else {
+            stitcher.len_px().saturating_sub(first_len)
+        };
+        let restored = if moved_px == 0 {
+            true
+        } else if restarted {
+            // Its first place is unknown: say how far it moved, do not guess a way back.
+            false
+        } else {
+            let back = scroller.scroll_back(cfg.direction, moved_px);
+            if matches!(back, Ok(true)) {
+                sleeper.sleep(LATE_SCROLL_WAIT);
+                true
+            } else {
+                false
+            }
+        };
+        Some(PageOffset { moved_px, restored })
+    };
     Ok(LongShotResult {
+        why: (end == EndReason::NoOverlap)
+            .then(|| stitcher.plain_refusal())
+            .flatten(),
         image: stitcher.finish()?,
         end,
+        page_offset,
     })
 }
 
@@ -836,8 +885,12 @@ pub fn run_hand_ex(
         }
     };
     Ok(LongShotResult {
+        why: (end == EndReason::NoOverlap)
+            .then(|| stitcher.plain_refusal())
+            .flatten(),
         image: stitcher.finish()?,
         end,
+        page_offset: None,
     })
 }
 

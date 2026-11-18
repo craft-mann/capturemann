@@ -226,6 +226,8 @@ pub struct Studio {
     /// The kind the library view was last set for (All, Recordings or Screenshots).
     shown: Option<crate::library::Filter>,
     focus: FocusHandle,
+    /// The rail's scroll position (0.3.6 P-6).
+    rail_scroll: gpui::ScrollHandle,
     _subs: Vec<Subscription>,
 }
 
@@ -302,6 +304,7 @@ impl Studio {
             rec_banner,
             shown: None,
             focus,
+            rail_scroll: gpui::ScrollHandle::new(),
             _subs: subs,
         }
     }
@@ -360,6 +363,7 @@ impl Render for Studio {
                 section,
                 audio_open,
                 dock,
+                rail_scroll: self.rail_scroll.clone(),
             },
             &self.app,
             &self.settings,

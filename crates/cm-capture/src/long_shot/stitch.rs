@@ -1616,6 +1616,28 @@ impl Stitcher {
         self.refusal.as_deref()
     }
 
+    /// The last refusal as one plain sentence for the person (CAP-6.AC16), or `None` when no
+    /// frame was refused. The technical text stays in [`Stitcher::last_refusal`].
+    pub fn plain_refusal(&self) -> Option<&'static str> {
+        let r = self.refusal.as_deref()?;
+        let has = |k: &str| r.contains(k);
+        Some(if has("the frame is") {
+            "the window changed size"
+        } else if has("fixed band changed") {
+            "a fixed header or footer changed between two parts"
+        } else if has("too little content") {
+            "too little of the page showed between the fixed header and footer"
+        } else if has("shifts match")
+            || has("shifts explain")
+            || has("several shifts")
+            || has("blank or repeating")
+        {
+            "the page repeats itself, so the position could not be told"
+        } else {
+            "the page changed between two parts (moving, loading or covered content)"
+        })
+    }
+
     /// Frames that joined so far.
     pub fn frames(&self) -> u32 {
         self.frames

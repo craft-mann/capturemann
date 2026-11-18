@@ -940,6 +940,10 @@ pub fn open(app: &Entity<AppModel>, captures: Vec<(String, String)>, cx: &mut Ap
             sheet.dest = Some(prev);
         }
         m.bulk.board = None;
+        crate::ui::preview_label::drop_intro_of(
+            &mut m.preview_card,
+            crate::ui::preview_label::PreviewFeature::Boards,
+        );
         m.bulk.sheet = Some(sheet);
         m.bulk.epoch += 1;
         cx.notify();

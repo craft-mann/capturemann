@@ -602,6 +602,31 @@ pub mod tile_metrics {
     pub const MIN_HEIGHT: f32 = 54.0;
     pub const MIN_HEIGHT_KEYS: f32 = 70.0;
 
+    /// How far the Preview tag reaches into the tile from its top edge, px (the tag is 14 px high
+    /// and sits 9 px above the edge), and the gap kept between it and the icon.
+    pub const TAG_REACH: f32 = 5.0;
+    pub const TAG_GAP: f32 = 1.5;
+    /// Room for the label text inside a tile, px (the half row of the sidebar less the tile's
+    /// border, its padding and the dock's gaps).
+    pub const LABEL_ROOM: f32 =
+        (crate::theme::scale::SIDEBAR_W - 24. - 2. - 16. - 6.) / 2. - 2. - 8.;
+
+    /// Lines a label of `text_px` px (at 11 px) takes in a tile: one, or two where it wraps.
+    pub fn label_lines(text_px: f32) -> f32 {
+        if text_px > LABEL_ROOM {
+            LABEL_LINES
+        } else {
+            1.0
+        }
+    }
+
+    /// The height at which the icon of a tile whose label takes `lines` lines starts below the
+    /// Preview tag, with the content centred (0.3.6 P-9: the Vietnamese tile put the tag on the
+    /// icon).
+    pub fn clear_of_tag(lines: f32) -> f32 {
+        2.0 * (TAG_REACH + TAG_GAP - BORDER / 2.0) + ICON + GAP + lines * LABEL_LINE
+    }
+
     /// What the rows need.
     pub fn content(with_keys: bool) -> f32 {
         let base = BORDER + ICON + GAP + LABEL_LINE * LABEL_LINES;
@@ -612,14 +637,15 @@ pub mod tile_metrics {
         }
     }
 
-    /// The tile's height: the board's, never less than the rows need.
-    pub fn height(with_keys: bool) -> f32 {
+    /// The tile's height: the board's, never less than the rows need and never so low that the
+    /// icon meets the Preview tag. `lines` is the most label lines either tile of the row takes.
+    pub fn height(with_keys: bool, lines: f32) -> f32 {
         let board = if with_keys {
             MIN_HEIGHT_KEYS
         } else {
             MIN_HEIGHT
         };
-        board.max(content(with_keys))
+        board.max(content(with_keys)).max(clear_of_tag(lines))
     }
 }
 
@@ -1169,8 +1195,23 @@ mod tests {
     #[test]
     fn dock_tile_height_holds_two_label_lines_and_the_keycaps() {
         use tile_metrics::*;
-        assert!(content(false) <= height(false) && content(true) <= height(true));
-        assert_eq!((height(false), height(true)), (54.0, 70.0));
+        assert!(content(false) <= height(false, 2.0) && content(true) <= height(true, 2.0));
+        // One-line labels keep the board's heights.
+        assert_eq!((height(false, 1.0), height(true, 1.0)), (54.0, 70.0));
+    }
+
+    /// 0.3.6 P-9: a tile whose label wraps is taller, so its icon starts below the Preview tag.
+    #[test]
+    fn a_two_line_tile_leaves_the_icon_clear_of_the_tag() {
+        use tile_metrics::*;
+        let h = height(false, 2.0);
+        let icon_top = (h - (ICON + GAP + 2.0 * LABEL_LINE)) / 2.0;
+        assert!(
+            icon_top + BORDER / 2.0 >= TAG_REACH + TAG_GAP,
+            "icon at {icon_top}"
+        );
+        assert_eq!(label_lines(LABEL_ROOM + 1.0), 2.0);
+        assert_eq!(label_lines(LABEL_ROOM - 1.0), 1.0);
     }
 
     #[test]

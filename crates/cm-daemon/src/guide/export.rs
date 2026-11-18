@@ -487,6 +487,20 @@ fn lexical(p: &Path) -> PathBuf {
     abs
 }
 
+/// A path as a person reads it: the Windows extended-path prefix (`\\?\` before a drive path,
+/// `\\?\UNC\` before a network share) is dropped, since the path means the same without it
+/// (0.3.6 P-5).
+pub fn plain_path(p: &Path) -> String {
+    let s = p.display().to_string();
+    if let Some(rest) = s.strip_prefix("\\\\?\\UNC\\") {
+        return format!("\\\\{rest}");
+    }
+    match s.strip_prefix("\\\\?\\") {
+        Some(rest) => rest.to_owned(),
+        None => s,
+    }
+}
+
 /// `p` made absolute and free of `.` and `..`, with the links of its deepest existing part
 /// resolved, so `inside/../../etc` and a link out of a trusted folder do not pass.
 pub fn resolve_path(p: &Path) -> PathBuf {
@@ -711,6 +725,17 @@ impl Inner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 0.3.6 P-5: the confirmation never shows the extended-path prefix.
+    #[test]
+    fn plain_path_drops_the_extended_prefix() {
+        assert_eq!(plain_path(Path::new("\\\\?\\C:\\lab\\out")), "C:\\lab\\out");
+        assert_eq!(
+            plain_path(Path::new("\\\\?\\UNC\\nas\\share\\a")),
+            "\\\\nas\\share\\a"
+        );
+        assert_eq!(plain_path(Path::new("/tmp/x")), "/tmp/x");
+    }
 
     fn doc() -> ExportDoc {
         let img = |n: u32| ExportImage {
