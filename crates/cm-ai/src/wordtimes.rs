@@ -48,6 +48,49 @@ pub fn repair(words: &mut [Word], audio_end: Option<MediaTime>) -> usize {
     changed
 }
 
+/// The shortest a word is made when the decoder gave it no length (20 ms).
+pub const MIN_WORD_SECS: f64 = 0.020;
+/// The last word of a piece is lengthened to its piece's end when it ends this close to it.
+pub const LAST_WORD_TAIL_SECS: f64 = 1.0;
+
+/// Gives every word an end after its start (AI-1.AC16, P-1): a word with no length ends where the
+/// next word starts, or [`MIN_WORD_SECS`] after its own start when that is closer; the last word
+/// of the piece ends where its piece ends (`piece_end`), the decoder having no later word to
+/// close it with. Starts, order and the other words are never touched. Returns the number of
+/// words whose end changed.
+pub fn close_ends(words: &mut [Word], piece_end: MediaTime) -> usize {
+    let min = ticks(MIN_WORD_SECS);
+    let mut changed = 0;
+    let n = words.len();
+    for i in 0..n {
+        let end = if i + 1 == n {
+            let near = (piece_end - words[i].end).ticks() <= ticks(LAST_WORD_TAIL_SECS);
+            if piece_end > words[i].start && near {
+                piece_end
+            } else if words[i].end > words[i].start {
+                continue;
+            } else {
+                words[i].start + MediaTime::from_ticks(min)
+            }
+        } else if words[i].end > words[i].start {
+            continue;
+        } else {
+            let next = words[i + 1].start;
+            let own = words[i].start + MediaTime::from_ticks(min);
+            if next > words[i].start {
+                next.min(own)
+            } else {
+                own
+            }
+        };
+        if words[i].end != end {
+            words[i].end = end;
+            changed += 1;
+        }
+    }
+    changed
+}
+
 fn spread(words: &mut [Word], i: usize, j: usize, audio_end: Option<MediaTime>) -> usize {
     let t0 = words[i].start.ticks();
     // The room starts at the end of the word before, or at the stack's own time when it opens
@@ -109,6 +152,37 @@ mod tests {
 
     fn secs(m: MediaTime) -> f64 {
         m.ticks() as f64 / TICKS_PER_SECOND as f64
+    }
+
+    /// AI-1.AC16 (P-1): a word with no length ends at the next start or 20 ms on, and the last
+    /// word of a piece ends where its piece ends when that is close.
+    #[test]
+    fn every_word_ends_after_it_starts_and_the_last_takes_the_piece_end() {
+        let mut v = vec![w("a", 1.0, 1.0), w("b", 1.1, 1.1), w("c", 2.0, 2.0)];
+        let n = close_ends(&mut v, MediaTime::from_ticks(ticks(2.5)));
+        assert_eq!(n, 3);
+        assert!(
+            (secs(v[0].end) - 1.02).abs() < 1e-6,
+            "20 ms, not up to the next word"
+        );
+        assert!((secs(v[1].end) - 1.12).abs() < 1e-6);
+        assert!((secs(v[2].end) - 2.5).abs() < 1e-6);
+        // A next word closer than 20 ms is the limit; longer words are not touched.
+        let mut v = vec![w("a", 1.0, 1.0), w("b", 1.01, 1.4)];
+        close_ends(&mut v, MediaTime::from_ticks(ticks(5.0)));
+        assert!((secs(v[0].end) - 1.01).abs() < 1e-6);
+        assert!(
+            (secs(v[1].end) - 1.4).abs() < 1e-6,
+            "5 s of silence after it is not its own"
+        );
+    }
+
+    #[test]
+    fn a_last_word_with_no_length_far_from_the_piece_end_gets_only_a_minimum() {
+        let mut v = vec![w("a", 1.0, 1.0)];
+        close_ends(&mut v, MediaTime::from_ticks(ticks(30.0)));
+        assert!((secs(v[0].end) - 1.02).abs() < 1e-6);
+        assert_eq!(close_ends(&mut [], MediaTime::from_ticks(ticks(1.0))), 0);
     }
 
     #[test]

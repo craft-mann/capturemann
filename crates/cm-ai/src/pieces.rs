@@ -533,7 +533,11 @@ impl Job<'_, '_> {
             self.steps.checking = true;
             let gated = self.gate_marks(&words, &range);
             let words = self.repair(words, range.clone(), gated)?;
-            return self.fill_gaps(words, range);
+            let mut words = self.fill_gaps(words, range.clone())?;
+            // Every word ends after it starts, the last one where its piece ends (P-1).
+            let piece_end = self.base + media_secs(range.end as f64 / f64::from(SAMPLE_RATE));
+            crate::wordtimes::close_ends(&mut words, piece_end);
+            return Ok(words);
         }
         Ok(words)
     }

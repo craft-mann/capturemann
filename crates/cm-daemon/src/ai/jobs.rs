@@ -416,7 +416,8 @@ impl JobHandler for TranscribeHandler {
             transcript.dropped.iter().filter(|d| d.reason == r).count()
         };
         let (lines_dropped, lines_ignored) = (
-            count(cm_ai::guard::DropReason::Unsupported),
+            count(cm_ai::guard::DropReason::Unsupported)
+                + count(cm_ai::guard::DropReason::Doubtful),
             count(cm_ai::guard::DropReason::Ignored),
         );
         let (words, glossary_replaced) = cm_ai::glossary::apply(words, &glossary);
