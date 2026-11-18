@@ -22,14 +22,13 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 }
                 Some(ShortcutAction::AddMarker) => recording::add_marker_hotkey(app, cx),
                 Some(ShortcutAction::LongShot) => crate::ui::long_shot::start(app, cx),
-                None if id == crate::ui::delay_pill::escape_hotkey_id() => {
-                    // A running Long Shot first (CAP-6), a Click Guide countdown, then a delay
-                    // (CAP-5.AC2).
-                    if !crate::ui::long_shot::stop_running(app, cx)
-                        && !crate::ui::guide_view::hud::cancel_countdown(cx)
-                    {
-                        crate::ui::delay_pill::cancel(app, cx)
-                    }
+                // A running Long Shot first (CAP-6), a Click Guide countdown, then a delay
+                // (CAP-5.AC2).
+                None if id == crate::ui::delay_pill::escape_hotkey_id()
+                    && !crate::ui::long_shot::stop_running(app, cx)
+                    && !crate::ui::guide_view::hud::cancel_countdown(cx) =>
+                {
+                    crate::ui::delay_pill::cancel(app, cx)
                 }
                 None => {}
             }

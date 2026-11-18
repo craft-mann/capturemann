@@ -526,8 +526,8 @@ pub(crate) fn measure_text_view(
     let take = (core.len() / 2).max(1).min(core.len());
     let mut sum = [0u64; 3];
     for i in &core[..take] {
-        for c in 0..3 {
-            sum[c] += u64::from(i.1[c]);
+        for (acc, v) in sum.iter_mut().zip(i.1) {
+            *acc += u64::from(v);
         }
     }
     let n = take as u64;
