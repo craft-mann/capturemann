@@ -55,7 +55,7 @@ Written on Nov 17, 2026 from `specs/plans/release-0.3.5-plan.md`, `specs/feature
 - **Window capture on Windows.** The DPI-unaware fix was checked on one machine (150 % scaling, one test window); other programs and scale factors were not tried.
 - **Transcripts.** The fix for text after muted stretches was checked on the maintainer's Vietnamese recording (reported) and on synthetic English speech; other languages and the live transcription path are not covered. A very short recording can still contain text nobody said and no `[unclear]` mark (work is planned). The last word of a transcript piece can have the same start and end time.
 - **Retype, Move area and Blueprint are not redactions**: use Blur or Pixelate to hide information.
-- The BUG-3 confirmation shows the destination, but nobody has looked at the dialog on a screen (the test tools cannot capture it; it was read through the accessibility tree on Windows).
+- The BUG-3 confirmation shows the destination. The maintainer ran the export checks by hand on macOS (a folder under Documents without a dialog, a folder outside with the dialog, an added `export.folders` entry without a dialog; reported by the maintainer, no stored report). On Windows the dialog was read through the accessibility tree only.
 - Windows files are not code-signed (SmartScreen will warn). They are the GitHub "Windows package" workflow's files and include the speaker engine ("Find speakers" ran in the regression on the installed files).
 - **Linux:** the files were tested on a ThinkPad (x86_64, Ubuntu 24.04) and in a headless aarch64 VM, where every desktop-session case is skipped; Long Shot and Click Guide were not run on Linux. Intel Mac hardware has not been tried.
 
