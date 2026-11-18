@@ -98,7 +98,8 @@ pub const FEATURES: &[Feature] = &[
         // Presets are the part agents see; the panel itself is app-only.
         tools: &["list_presets"],
         cli_commands: &["presets"],
-        cli_args: &[],
+        // `record start --preset` also names an older audio use case, so it is not marked.
+        cli_args: &[("capture screenshot", "preset")],
         // `start_recording`.`preset` also names an older audio use case, so it is not marked.
         tool_params: &[("capture_screenshot", "preset")],
     },

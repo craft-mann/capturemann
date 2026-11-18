@@ -4,15 +4,15 @@ Reference pages for the command line (`capturemann`) and the MCP server (`cm-mcp
 
 | File | What it is |
 | --- | --- |
-| [cli.md](cli.md) | Every command and subcommand of `capturemann` (105, in `--help` order): synopsis, flags with values, allowed values and defaults, confirmation behaviour, the matching MCP tool, examples, exit codes, environment variables, how the CLI finds the daemon. |
-| [mcp.md](mcp.md) | The MCP server: starting it, client config, permission tiers and the per-tool policy, idempotency, errors, events, resources and prompts, then all 89 tools with an input table, return fields, errors, CLI equivalent and an example call. |
+| [cli.md](cli.md) | Every command and subcommand of `capturemann` (107, in `--help` order): synopsis, flags with values, allowed values and defaults, confirmation behaviour, the matching MCP tool, examples, exit codes, environment variables, how the CLI finds the daemon. |
+| [mcp.md](mcp.md) | The MCP server: starting it, client config, permission tiers and the per-tool policy, idempotency, errors, events, resources and prompts, then all 90 tools with an input table, return fields, errors, CLI equivalent and an example call. |
 | [tools.json](tools.json) | The same tool facts for machines: per tool `name`, `area`, `areaTitle`, `tier` (`free` or `confirm`), `policy`, `readOnly`, `destructive`, `acceptsRequestId`, `confirmWhen`, `preview`, `previewParams`, `spec`, `cli`, `description` (as the server emits it), `inputSchema` and `outputSchema` (as emitted). |
 
 Wording rule of the repository: nothing here is "verified" without a report in `verification/`. These pages were produced from the built binaries and the source of the 0.3.4 build (worktree at commit 13cfa99a), and the examples were run on one Mac against a throw-away library. No report was stored for them.
 
 ## Where each fact comes from
 
-- **Tools** (names, descriptions, schemas, read-only and destructive hints, the `_meta.stage` of Preview tools): `tools/list` over stdio from the built `cm-mcp`. The count (89) is what the server answers, and `crates/cm-mcp/tests/stdio.rs` asserts it.
+- **Tools** (names, descriptions, schemas, read-only and destructive hints, the `_meta.stage` of Preview tools): `tools/list` over stdio from the built `cm-mcp`. The count (90) is what the server answers, and `crates/cm-mcp/tests/stdio.rs` asserts it.
 - **Tier and policy** (`tier`, `policy`): the tier sentence in each tool description and `crates/cm-daemon/src/tool_policy.rs` (`locked_allow`: read-only; `default_allow`: Free and changes something, the user can set Ask first; `default_ask`: `start_recording`; `locked_ask`: every other Confirm tool).
 - **Commands**: `capturemann --help` and `--help` of every subcommand, recursively. The tool-to-command map is the `CLI_COMMANDS` table in `crates/cm-cli/src/lib.rs`.
 - **Examples with output**: run with the built `capturemann` against a headless `cm-daemon` whose library, config folder and socket were in a throw-away folder (`CAPTUREMANN_LIBRARY`, `CAPTUREMANN_CONFIG_DIR`, `CAPTUREMANN_SOCKET`, `CAPTUREMANN_SECRETS=file`). One generated 640x400 PNG was imported with `capturemann import`. Nothing was captured or recorded, no model was downloaded, no account was connected, and no real library or running app was touched.

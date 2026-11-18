@@ -3,7 +3,7 @@
     "name": "capturemann",
     "version": "0.3.5"
   },
-  "toolCount": 89,
+  "toolCount": 90,
   "policyValues": {
     "locked_allow": "read-only: always allowed, no setting",
     "default_allow": "runs at once; the user can set it to Ask first",
@@ -412,7 +412,8 @@
       "confirmWhen": "mode is \"long\" and scroll is \"auto\" (the default): the screen moves; scroll \"hand\" is refused for agents",
       "preview": false,
       "previewParams": [
-        "mode"
+        "mode",
+        "preset"
       ],
       "spec": "CAP-1, CAP-4, CAP-5",
       "cli": "capture screenshot",
@@ -525,6 +526,11 @@
           "title": {
             "type": "string",
             "description": "Library title; defaults to `Screenshot <date> <time>`."
+          },
+          "preset": {
+            "type": "string",
+            "description": "(preview) Quick Capture preset (QC-5): the name or id of a screenshot preset from `list_presets`. It fills the options this call leaves out (`delay_s`, `copy_to_clipboard`, `mode: \"long\"` for a Long Shot preset); an argument in the same call wins. A preset holds no area, so `target` is still required. An unknown name fails with `invalid_input` naming it. A Preview feature: it may still change.",
+            "x-stage": "preview"
           },
           "request_id": {
             "type": "string",
@@ -3404,14 +3410,7 @@
           },
           "preset": {
             "type": "string",
-            "enum": [
-              "room",
-              "online",
-              "lecture",
-              "product",
-              "note"
-            ],
-            "description": "Only with `mode: \"audio\"`: the use case. `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set."
+            "description": "Either a Quick Capture preset (QC-5, a Preview feature): the name or id of a video or audio preset from `list_presets`, which fills the options this call leaves out (`mic`, `system_audio`, `camera`, `cursor`, `fps`, `countdown_s`, and `mode: \"audio\"` for an audio preset; an argument in the same call wins, `target` is still required for a screen recording, and the confirmation shows the plan the preset resolves to; an unknown name fails with `invalid_input` naming it). Or, with `mode: \"audio\"`, one of the use cases `room`, `online`, `lecture`, `product`, `note`: the use case. `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set."
           },
           "people": {
             "type": "integer",
@@ -10567,6 +10566,93 @@
           "guide_id",
           "format",
           "steps"
+        ]
+      }
+    },
+    {
+      "name": "list_presets",
+      "area": "presets",
+      "areaTitle": "Quick Capture presets (Preview)",
+      "tier": "free",
+      "policy": "locked_allow",
+      "readOnly": true,
+      "destructive": false,
+      "acceptsRequestId": false,
+      "confirmWhen": null,
+      "preview": true,
+      "previewParams": [],
+      "spec": "QC-5",
+      "cli": "presets list",
+      "description": "List the user's Quick Capture presets: named setups for a capture (a screenshot, a video or an audio recording). Each has `id`, `name`, `kind` (`screenshot`, `video`, `audio`), `target` (`region`, `window`, `display`, `long_shot`; absent for audio), the `options` tiles, `save_to`, `after` (what happens after the capture), `shortcut` and a one-line `summary`. Four starter presets exist at first: Bug report, Docs shot, Demo video and Meeting. Run one by passing its name or id as `preset` to `capture_screenshot` or `start_recording`. Read-only; presets are changed only in the CaptureMann app. `notice` is set when the file holds a preset that was skipped because it is not valid. Tier: Free (runs immediately; read-only, never asks). Spec: QC-5. (preview) Part of Quick Capture, a Preview feature: it may still change, but it is always available.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "presets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "screenshot",
+                    "video",
+                    "audio"
+                  ]
+                },
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "region",
+                    "window",
+                    "display",
+                    "long_shot"
+                  ]
+                },
+                "options": {
+                  "type": "object"
+                },
+                "save_to": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "object"
+                },
+                "shortcut": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "summary"
+              ]
+            }
+          },
+          "notice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "presets"
         ]
       }
     },
