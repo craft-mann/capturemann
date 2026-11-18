@@ -400,7 +400,7 @@ pub async fn run_steps(b: &Backend, run: &ShotRun, capture_id: &str) -> Vec<Step
     if let Some(template) = &run.save_to {
         let date = crate::save_folder::local_now().date();
         let dir = crate::quick::files::resolve_dir(template, date, dirs::home_dir().as_deref());
-        notes.push(match save_to(b, &dir, run, capture_id).await {
+        notes.push(match save_to(&daemon, &dir, run, capture_id).await {
             Ok(p) => StepNote::SavedTo(p),
             Err(reason) => StepNote::SaveFailed {
                 folder: dir.display().to_string(),
@@ -411,7 +411,9 @@ pub async fn run_steps(b: &Backend, run: &ShotRun, capture_id: &str) -> Vec<Step
     notes
 }
 
-async fn redact(daemon: &cm_daemon::Daemon, capture_id: &str) -> Result<usize, String> {
+/// Auto-redact on a stored capture: the daemon proposes the areas and they are blurred in one
+/// `annotate` (one undo step). Returns how many areas were blurred.
+pub async fn redact(daemon: &cm_daemon::Daemon, capture_id: &str) -> Result<usize, String> {
     let v = Backend::call(
         daemon,
         "suggest_redactions",
@@ -444,17 +446,15 @@ async fn redact(daemon: &cm_daemon::Daemon, capture_id: &str) -> Result<usize, S
     Ok(proposals.len())
 }
 
-async fn save_to(
-    b: &Backend,
+/// QC-4.AC7: writes the rendered picture of the capture into `dir` (made if it is not there), in
+/// the preset's format and scale. The capture itself stays in the library.
+pub async fn save_to(
+    daemon: &cm_daemon::Daemon,
     dir: &std::path::Path,
     run: &ShotRun,
     capture_id: &str,
 ) -> Result<String, String> {
-    let daemon = b
-        .daemon
-        .clone()
-        .ok_or_else(|| tr!("The library is not available"))?;
-    let (_, png) = Backend::capture_png(&daemon, capture_id).await?;
+    let (_, png) = Backend::capture_png(daemon, capture_id).await?;
     let (bytes, ext) = crate::quick::files::render_copy(&png, run.format, run.scale)?;
     let dir = dir.to_owned();
     tokio::task::spawn_blocking(move || {
@@ -580,6 +580,19 @@ pub fn edit_undo_toast(done: &AfterCapture, preset: Option<String>) -> ToastSpec
     })
 }
 
+/// QC-3.AC5: `delete_capture` as the user (the toast's Undo asks nothing: the capture was just made).
+pub async fn remove_capture(
+    daemon: &cm_daemon::Daemon,
+    capture_id: &str,
+) -> Result<Value, crate::backend::CallError> {
+    Backend::call_coded(
+        daemon,
+        "delete_capture",
+        json!({ "capture_id": capture_id }),
+    )
+    .await
+}
+
 /// QC-3.AC5: removes the capture from the library (the toast's Undo).
 pub fn undo(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
     let backend = app.read(cx).backend.clone();
@@ -591,9 +604,7 @@ pub fn undo(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
         let id2 = id.clone();
         let res = backend
             .rt
-            .spawn(async move {
-                Backend::call_coded(&daemon, "delete_capture", json!({ "capture_id": id2 })).await
-            })
+            .spawn(async move { remove_capture(&daemon, &id2).await })
             .await;
         cx.update(|cx| match res {
             Ok(Ok(_)) => {
@@ -791,6 +802,21 @@ pub fn refresh_presets(app: &Entity<AppModel>, cx: &mut App) {
         }
         cx.notify();
     });
+    sync_tray_presets(app, cx);
+}
+
+/// The tray's "Presets" submenu follows the file.
+pub fn sync_tray_presets(app: &Entity<AppModel>, cx: &mut App) {
+    let list: Vec<(String, String)> = app
+        .read(cx)
+        .quick
+        .presets
+        .iter()
+        .map(|p| (p.id.clone(), p.name.clone()))
+        .collect();
+    if let Some(t) = &app.read(cx).tray {
+        t.set_presets(&list);
+    }
 }
 
 /// QC-4.AC4: the one notice that names the skipped presets, shown once at start.

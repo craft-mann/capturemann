@@ -495,6 +495,9 @@ fn main() {
             ),
             }
         }
+        // Quick Capture: the panel's remembered choices, the presets and their own global
+        // shortcuts (after the global ones, so a clash loses to the action).
+        cm_desktop::ui::quick_flow::init(&model, cx);
         // A second launch (a desktop shortcut running `cm-desktop --launcher`, Open With on a
         // media file) reaches this app.
         #[cfg(any(unix, windows))]
@@ -525,6 +528,8 @@ fn main() {
                 // A notice about a missing extra, not a failed action: it must not cover the editor for good.
                 .dismiss_after(std::time::Duration::from_secs(10))),
         }
+        // The tray's Presets submenu (QC-4) follows presets.json.
+        cm_desktop::ui::quick_flow::sync_tray_presets(&model, cx);
 
         let app2 = model.clone();
         cx.spawn(async move |cx| {

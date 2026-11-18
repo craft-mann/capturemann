@@ -24,6 +24,7 @@ mod diagnostics;
 mod general;
 mod library_folder;
 pub mod model;
+mod presets;
 mod privacy;
 mod problem;
 mod publish_card;

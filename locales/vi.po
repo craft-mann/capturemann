@@ -12066,3 +12066,496 @@ msgstr "Nội dung"
 msgctxt "report section"
 msgid "Follow-ups for next time"
 msgstr "Việc theo dõi cho lần sau"
+
+msgid "After capture"
+msgstr "Sau khi chụp"
+
+msgid "Already used by the preset {name}"
+msgstr "Đã dùng cho mẫu {name}"
+
+msgid "Auto-redact didn’t run"
+msgstr "Không thể tự động che"
+
+msgid "Auto-redact found nothing to blur"
+msgstr "Không có gì để che"
+
+msgid "Blurred {n} area"
+msgid_plural "Blurred {n} areas"
+msgstr[0] "Đã làm mờ {n} vùng"
+
+msgid "Capture removed"
+msgstr "Đã gỡ bản chụp"
+
+msgid "Couldn’t open Quick Capture"
+msgstr "Không thể mở Chụp nhanh"
+
+msgid "Couldn’t remove the capture"
+msgstr "Không thể gỡ bản chụp"
+
+msgid "Couldn’t save"
+msgstr "Không thể lưu"
+
+msgid "Couldn’t save to the preset’s folder"
+msgstr "Không thể lưu vào thư mục của mẫu"
+
+msgid "Couldn’t save to {folder}"
+msgstr "Không thể lưu vào {folder}"
+
+msgid "Couldn’t start the transcript"
+msgstr "Không thể bắt đầu chép lời"
+
+msgid "Esc goes back"
+msgstr "Esc để quay lại"
+
+msgid "Folder, e.g. ~/Bugs/{date}"
+msgstr "Thư mục, ví dụ ~/Bugs/{date}"
+
+msgid "Give the preset a name."
+msgstr "Hãy đặt tên cho mẫu."
+
+msgid "Keeps the kind, the target and the four tiles. The area is never saved."
+msgstr "Giữ loại, đích và bốn ô tuỳ chọn. Vùng chụp không bao giờ được lưu."
+
+msgid "Kind, target and options in one panel"
+msgstr "Loại, đích và tuỳ chọn trong một bảng"
+
+msgid "Markers are on"
+msgstr "Đánh dấu đang bật"
+
+msgid "Mic and system sound, no screen"
+msgstr "Micrô và âm thanh hệ thống, không có màn hình"
+
+msgid "No presets yet"
+msgstr "Chưa có mẫu nào"
+
+msgid "No presets yet. New preset makes one."
+msgstr "Chưa có mẫu nào. Chọn Mẫu mới để tạo."
+
+msgid "One pick, or one shortcut, runs the setup"
+msgstr "Một lần chọn hoặc một phím tắt là chạy cả thiết lập"
+
+msgid "One small panel for the kind, the target and the options, with presets for the setups you repeat."
+msgstr "Một bảng nhỏ cho loại, đích và tuỳ chọn, kèm mẫu cho những thiết lập bạn hay lặp lại."
+
+msgid "Open Quick Capture"
+msgstr "Mở Chụp nhanh"
+
+msgid "Preset name, e.g. Bug report"
+msgstr "Tên mẫu, ví dụ Báo lỗi"
+
+msgid "Presets"
+msgstr "Mẫu"
+
+msgid "Presets are kept in presets.json in the settings folder; copy the file to share them."
+msgstr "Mẫu được lưu trong presets.json ở thư mục cài đặt; sao chép tệp này để chia sẻ."
+
+msgid "Quick Capture"
+msgstr "Chụp nhanh"
+
+msgid "Quick Capture…"
+msgstr "Chụp nhanh…"
+
+msgid "Saved to {folder}"
+msgstr "Đã lưu vào {folder}"
+
+msgid "Some presets were skipped"
+msgstr "Một số mẫu đã bị bỏ qua"
+
+msgid "That preset can’t run"
+msgstr "Không thể chạy mẫu này"
+
+msgid "That preset is gone"
+msgstr "Mẫu này không còn nữa"
+
+msgid "Your captures are normal captures, and your presets are a plain file you can read and share."
+msgstr "Bản chụp của bạn là bản chụp bình thường, và mẫu là một tệp thường để bạn đọc và chia sẻ."
+
+msgid "not selected"
+msgstr "chưa chọn"
+
+msgid "selected"
+msgstr "đã chọn"
+
+msgid "{date} becomes today’s date. The capture is also in your library."
+msgstr "{date} thành ngày hôm nay. Bản chụp cũng có trong thư viện."
+
+msgid "{folder}: {reason}. The capture is in your library."
+msgstr "{folder}: {reason}. Bản chụp đã có trong thư viện."
+
+msgid "{secs} s"
+msgstr "{secs} s"
+
+msgctxt "after-capture bar"
+msgid "Copy"
+msgstr "Sao chép"
+
+msgctxt "after-capture bar"
+msgid "Edit"
+msgstr "Sửa"
+
+msgctxt "after-capture bar"
+msgid "Long Shot"
+msgstr "Chụp dài"
+
+msgctxt "after-capture bar"
+msgid "Record"
+msgstr "Quay"
+
+msgctxt "after-capture bar"
+msgid "Save"
+msgstr "Lưu"
+
+msgctxt "after-capture bar"
+msgid "Text"
+msgstr "Chữ"
+
+msgctxt "after-capture bar"
+msgid "{action}, unavailable"
+msgstr "{action}, không dùng được"
+
+msgctxt "after-capture bar"
+msgid "{action}, {key}"
+msgstr "{action}, {key}"
+
+msgctxt "button"
+msgid "Change"
+msgstr "Đổi"
+
+msgctxt "button"
+msgid "Clear"
+msgstr "Xoá"
+
+msgctxt "button"
+msgid "Delete for good"
+msgstr "Xoá hẳn"
+
+msgctxt "button"
+msgid "New preset"
+msgstr "Mẫu mới"
+
+msgctxt "button"
+msgid "Save preset"
+msgstr "Lưu mẫu"
+
+msgctxt "button"
+msgid "Send feedback"
+msgstr "Gửi phản hồi"
+
+msgctxt "button"
+msgid "Undo"
+msgstr "Hoàn tác"
+
+msgctxt "capture dock"
+msgid "Capture…"
+msgstr "Chụp…"
+
+msgctxt "capture dock"
+msgid "{label}, {keys}"
+msgstr "{label}, {keys}"
+
+msgctxt "feature name"
+msgid "Quick Capture"
+msgstr "Chụp nhanh"
+
+msgctxt "field"
+msgid "Preset name"
+msgstr "Tên mẫu"
+
+msgctxt "field"
+msgid "Save to folder"
+msgstr "Thư mục lưu"
+
+msgctxt "keyboard shortcut hint"
+msgid "Add a marker"
+msgstr "Thêm dấu đánh dấu"
+
+msgctxt "launcher keyword"
+msgid "panel"
+msgstr "bảng"
+
+msgctxt "launcher keyword"
+msgid "preset"
+msgstr "mẫu"
+
+msgctxt "launcher keyword"
+msgid "screenshot"
+msgstr "ảnh chụp màn hình"
+
+msgctxt "launcher preset"
+msgid "Preset: {name}"
+msgstr "Mẫu: {name}"
+
+msgctxt "launcher verb"
+msgid "Run preset"
+msgstr "Chạy mẫu"
+
+msgctxt "preset picker"
+msgid "Edit presets…"
+msgstr "Sửa mẫu…"
+
+msgctxt "preset picker"
+msgid "No preset"
+msgstr "Không dùng mẫu"
+
+msgctxt "preset picker"
+msgid "Preset: {name}"
+msgstr "Mẫu: {name}"
+
+msgctxt "preset picker"
+msgid "Presets"
+msgstr "Mẫu"
+
+msgctxt "preset picker"
+msgid "Save current as preset"
+msgstr "Lưu thiết lập hiện tại thành mẫu"
+
+msgctxt "preset picker"
+msgid "Save current as preset…"
+msgstr "Lưu thiết lập hiện tại thành mẫu…"
+
+msgctxt "preset picker"
+msgid "{name}, {summary}"
+msgstr "{name}, {summary}"
+
+msgctxt "preset row"
+msgid "Delete {name}"
+msgstr "Xoá {name}"
+
+msgctxt "preset row"
+msgid "Edit {name}"
+msgstr "Sửa {name}"
+
+msgctxt "preset row"
+msgid "Move {name} down"
+msgstr "Chuyển {name} xuống"
+
+msgctxt "preset row"
+msgid "Move {name} up"
+msgstr "Chuyển {name} lên"
+
+msgctxt "preset row"
+msgid "{name}, {summary}"
+msgstr "{name}, {summary}"
+
+msgctxt "preset sheet"
+msgid "Auto-redact"
+msgstr "Tự động che"
+
+msgctxt "preset sheet"
+msgid "Copy to clipboard"
+msgstr "Sao chép vào bộ nhớ tạm"
+
+msgctxt "preset sheet"
+msgid "Edit preset"
+msgstr "Sửa mẫu"
+
+msgctxt "preset sheet"
+msgid "Kind and target"
+msgstr "Loại và đích"
+
+msgctxt "preset sheet"
+msgid "Microphone"
+msgstr "Micrô"
+
+msgctxt "preset sheet"
+msgid "Name"
+msgstr "Tên"
+
+msgctxt "preset sheet"
+msgid "New preset"
+msgstr "Mẫu mới"
+
+msgctxt "preset sheet"
+msgid "No tool"
+msgstr "Không có công cụ"
+
+msgctxt "preset sheet"
+msgid "Not set"
+msgstr "Chưa đặt"
+
+msgctxt "preset sheet"
+msgid "Open in editor"
+msgstr "Mở trong trình sửa"
+
+msgctxt "preset sheet"
+msgid "Options"
+msgstr "Tuỳ chọn"
+
+msgctxt "preset sheet"
+msgid "Save to"
+msgstr "Lưu vào"
+
+msgctxt "preset sheet"
+msgid "Shortcut"
+msgstr "Phím tắt"
+
+msgctxt "preset sheet"
+msgid "System audio"
+msgstr "Âm thanh hệ thống"
+
+msgctxt "preset sheet"
+msgid "Then open the tool"
+msgstr "Rồi mở công cụ"
+
+msgctxt "preset sheet"
+msgid "Transcribe after"
+msgstr "Chép lời sau khi quay"
+
+msgctxt "preset sheet"
+msgid "Webcam"
+msgstr "Webcam"
+
+msgctxt "preset summary"
+msgid "copy"
+msgstr "sao chép"
+
+msgctxt "preset summary"
+msgid "editor"
+msgstr "trình sửa"
+
+msgctxt "preset summary"
+msgid "mic"
+msgstr "micrô"
+
+msgctxt "preset summary"
+msgid "redact"
+msgstr "che"
+
+msgctxt "preset summary"
+msgid "system sound"
+msgstr "âm thanh hệ thống"
+
+msgctxt "preset summary"
+msgid "transcribe"
+msgstr "chép lời"
+
+msgctxt "preset summary"
+msgid "webcam"
+msgstr "webcam"
+
+msgctxt "quick capture"
+msgid "Enter"
+msgstr "Enter"
+
+msgctxt "quick capture"
+msgid "Preset settings"
+msgstr "Cài đặt mẫu"
+
+msgctxt "quick capture action"
+msgid "Capture"
+msgstr "Chụp"
+
+msgctxt "quick capture action"
+msgid "Capture · {name}"
+msgstr "Chụp · {name}"
+
+msgctxt "quick capture action"
+msgid "Record"
+msgstr "Quay"
+
+msgctxt "quick capture action"
+msgid "Record · {name}"
+msgstr "Quay · {name}"
+
+msgctxt "quick capture kind"
+msgid "Audio"
+msgstr "Âm thanh"
+
+msgctxt "quick capture kind"
+msgid "Screenshot"
+msgstr "Ảnh chụp"
+
+msgctxt "quick capture kind"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "quick capture kind"
+msgid "{kind}, key {n}"
+msgstr "{kind}, phím {n}"
+
+msgctxt "quick capture target"
+msgid "Display"
+msgstr "Màn hình"
+
+msgctxt "quick capture target"
+msgid "Long Shot"
+msgstr "Chụp dài"
+
+msgctxt "quick capture target"
+msgid "Region"
+msgstr "Vùng"
+
+msgctxt "quick capture target"
+msgid "Window"
+msgstr "Cửa sổ"
+
+msgctxt "quick capture target"
+msgid "{target}, {state}"
+msgstr "{target}, {state}"
+
+msgctxt "quick capture tile"
+msgid "Auto-redact"
+msgstr "Tự động che"
+
+msgctxt "quick capture tile"
+msgid "Copy"
+msgstr "Sao chép"
+
+msgctxt "quick capture tile"
+msgid "Countdown"
+msgstr "Đếm ngược"
+
+msgctxt "quick capture tile"
+msgid "Delay"
+msgstr "Trì hoãn"
+
+msgctxt "quick capture tile"
+msgid "Editor"
+msgstr "Trình sửa"
+
+msgctxt "quick capture tile"
+msgid "Markers"
+msgstr "Đánh dấu"
+
+msgctxt "quick capture tile"
+msgid "Mic"
+msgstr "Micrô"
+
+msgctxt "quick capture tile"
+msgid "System audio"
+msgstr "Âm thanh HT"
+
+msgctxt "quick capture tile"
+msgid "Transcribe"
+msgstr "Chép lời"
+
+msgctxt "quick capture tile"
+msgid "Webcam"
+msgstr "Webcam"
+
+msgctxt "quick capture tile"
+msgid "{tile}, off"
+msgstr "{tile}, tắt"
+
+msgctxt "quick capture tile"
+msgid "{tile}, on"
+msgstr "{tile}, bật"
+
+msgctxt "quick capture tile"
+msgid "{tile}, {value}"
+msgstr "{tile}, {value}"
+
+msgctxt "quick capture value"
+msgid "Off"
+msgstr "Tắt"
+
+msgctxt "settings group"
+msgid "Presets"
+msgstr "Mẫu"
+
+msgctxt "shortcut"
+msgid "Open Quick Capture"
+msgstr "Mở Chụp nhanh"
+
+msgid "List the Quick Capture presets"
+msgstr "Liệt kê các mẫu Chụp nhanh"

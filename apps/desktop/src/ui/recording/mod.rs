@@ -572,6 +572,16 @@ fn end_all(app: &Entity<AppModel>, e: &Ended, cx: &mut App) {
         },
         cx,
     );
+    // A panel audio start that ended without a capture forgets its Transcribe choice.
+    if !matches!(
+        e,
+        Ended::Stopped {
+            capture_id: Some(_),
+            ..
+        }
+    ) {
+        app.update(cx, |m, _| m.quick.transcribe_audio = false);
+    }
     if let Some(spec) = toasts::ended_toast(e) {
         if let Ended::Stopped {
             capture_id: Some(id),
@@ -579,6 +589,8 @@ fn end_all(app: &Entity<AppModel>, e: &Ended, cx: &mut App) {
         } = e
         {
             app::capture_changed(app, Some(id), cx);
+            // QC-1: an audio recording started from the panel with Transcribe on.
+            crate::ui::quick_flow::audio_ended(app, id, cx);
         }
         app::push_toast(app, spec, cx);
     }

@@ -242,6 +242,66 @@ pub fn kind_icon(k: PresetKind) -> &'static str {
     }
 }
 
+/// What a key does in the panel (QC-1 "Keys"). The window maps a key press with
+/// [`panel_key`] and does what it says, so the keyboard route is tested without a window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PanelKey {
+    /// Esc on the first screen: closes the panel.
+    Close,
+    /// Esc on the picker or the name screen, or with a value menu open: one step back.
+    Back,
+    /// Enter or Space: capture or record (a value menu open: it closes).
+    Go,
+    Kind(PresetKind),
+    /// Tab and Shift+Tab move through the four tiles.
+    NextTile,
+    PrevTile,
+    /// Up and Down toggle the focused tile or step through its values.
+    TileUp,
+    TileDown,
+    /// Left and Right change the target.
+    TargetPrev,
+    TargetNext,
+    /// P opens the preset picker.
+    Picker,
+}
+
+/// The screen the panel shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Screen {
+    Main,
+    Picker,
+    /// "Save current as preset": the name field has the keys.
+    Name,
+}
+
+pub fn panel_key(key: &str, shift: bool, screen: Screen, menu_open: bool) -> Option<PanelKey> {
+    if screen == Screen::Name {
+        return None;
+    }
+    if key == "escape" {
+        return Some(if screen != Screen::Main || menu_open {
+            PanelKey::Back
+        } else {
+            PanelKey::Close
+        });
+    }
+    if screen == Screen::Picker {
+        return None;
+    }
+    Some(match key {
+        "enter" | "space" => PanelKey::Go,
+        "tab" if shift => PanelKey::PrevTile,
+        "tab" => PanelKey::NextTile,
+        "up" => PanelKey::TileUp,
+        "down" => PanelKey::TileDown,
+        "left" => PanelKey::TargetPrev,
+        "right" => PanelKey::TargetNext,
+        "p" => PanelKey::Picker,
+        k => PanelKey::Kind(kind_of_key(k)?),
+    })
+}
+
 /// The kind a number key picks (1, 2, 3).
 pub fn kind_of_key(key: &str) -> Option<PresetKind> {
     match key {
@@ -701,6 +761,49 @@ mod tests {
         let mut b = PanelState::default();
         b.apply_preset(&p);
         assert_eq!(b.mem.audio, a.mem.audio);
+    }
+
+    /// QC-1.AC7: 1, 2, 3, Tab, Enter, Space and Esc work the panel without the mouse, and every
+    /// tile has an accessible name with its state.
+    #[test]
+    fn qc1_ac7_the_keys_and_the_accessible_names() {
+        use PanelKey::*;
+        let main = |k, shift, menu| panel_key(k, shift, Screen::Main, menu);
+        assert_eq!(main("1", false, false), Some(Kind(PresetKind::Screenshot)));
+        assert_eq!(main("2", false, false), Some(Kind(PresetKind::Video)));
+        assert_eq!(main("3", false, false), Some(Kind(PresetKind::Audio)));
+        assert_eq!(main("tab", false, false), Some(NextTile));
+        assert_eq!(main("tab", true, false), Some(PrevTile));
+        assert_eq!(main("enter", false, false), Some(Go));
+        assert_eq!(main("space", false, false), Some(Go));
+        assert_eq!(main("escape", false, false), Some(Close));
+        assert_eq!(
+            main("escape", false, true),
+            Some(Back),
+            "a value menu is left first"
+        );
+        assert_eq!(main("x", false, false), None);
+        assert_eq!(
+            panel_key("escape", false, Screen::Picker, false),
+            Some(Back)
+        );
+        assert_eq!(panel_key("enter", false, Screen::Picker, false), None);
+        assert_eq!(
+            panel_key("1", false, Screen::Name, false),
+            None,
+            "typing a name"
+        );
+        let mut s = PanelState::default();
+        assert_eq!(s.tile_aria(Tile::Copy), "Copy, on");
+        assert_eq!(s.tile_aria(Tile::Editor), "Editor, off");
+        s.set_value(Tile::Delay, 5);
+        assert_eq!(s.tile_aria(Tile::Delay), "Delay, 5 s");
+        for kind in [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio] {
+            s.set_kind(kind);
+            for t in Tile::of(kind) {
+                assert!(s.tile_aria(t).starts_with(&t.label()), "{t:?}");
+            }
+        }
     }
 
     #[test]

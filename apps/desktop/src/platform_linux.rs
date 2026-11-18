@@ -521,6 +521,11 @@ impl TrayHandle {
         );
     }
 
+    /// Replaces the "Presets" entries (QC-4).
+    pub fn set_presets(&self, presets: &[(String, String)]) {
+        self.update(|i| i.presets = presets.to_vec());
+    }
+
     /// Replaces the "Recent captures" entries (last 5, CAP-2).
     pub fn set_recents(&self, recents: &[(String, String)]) {
         self.update(|i| i.recents = recents.to_vec());

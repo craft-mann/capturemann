@@ -15,7 +15,7 @@
 //! constant changed together with the test that pins it (see `locales/README.md`, "Layout: long
 //! translations").
 
-use cm_i18n::{with_language, Lang};
+use cm_i18n::{tr, tr_ctx, with_language, Lang};
 
 use crate::shortcuts::{Platform, ShortcutAction, ShortcutMap};
 use crate::text_metrics_tests::{lines, width, Face};
@@ -1497,6 +1497,130 @@ fn cases() -> Vec<Case> {
         )
         .text("Built-in", crate::ui::window_picker::filter_built_in)
         .text("External", crate::ui::window_picker::filter_external),
+    );
+
+    // ---- Quick Capture panel (QC-1): 352 px wide, 14 px padding, so 324 px of content -----------
+    // An option tile: two share the row with an 8 px gap (158 px each); 1 px border each side, 10 px
+    // padding each side, the 28 px icon circle and its 10 px gap leave 98 px for the label (13 px,
+    // medium; the label cuts with an ellipsis, so it must fit in the two supported languages).
+    use crate::quick::state::{kind_label, target_label, Tile};
+    use cm_core::preset::{PresetKind, PresetTarget};
+    let tiles: Vec<(String, Labeler)> = [
+        Tile::Editor,
+        Tile::Copy,
+        Tile::Redact,
+        Tile::Delay,
+        Tile::Mic,
+        Tile::SystemAudio,
+        Tile::Webcam,
+        Tile::Countdown,
+        Tile::Transcribe,
+        Tile::Markers,
+    ]
+    .into_iter()
+    .map(|t| (format!("{t:?}"), Box::new(move || t.label()) as Labeler))
+    .collect();
+    v.push(
+        Case::new(
+            "Quick Capture option tile",
+            "(324 - 8) / 2 - 2 border - 20 padding - 28 circle - 10 gap",
+            (324. - 8.) / 2. - 2. - 20. - 28. - 10.,
+            ui - 1.,
+            500,
+            one,
+        )
+        .texts(tiles),
+    );
+    // A target segment: four share the row with 4 px gaps (78 px each), 1 px border, 6 px padding.
+    let targets: Vec<(String, Labeler)> = [
+        PresetTarget::Region,
+        PresetTarget::Window,
+        PresetTarget::Display,
+        PresetTarget::LongShot,
+    ]
+    .into_iter()
+    .map(|t| {
+        (
+            t.as_str().to_owned(),
+            Box::new(move || target_label(t)) as Labeler,
+        )
+    })
+    .collect();
+    v.push(
+        Case::new(
+            "Quick Capture target segment",
+            "(324 - 3*4) / 4 - 2 border - 12 padding",
+            (324. - 12.) / 4. - 2. - 12.,
+            ui - 1.,
+            400,
+            one,
+        )
+        .texts(targets),
+    );
+    // The active kind tab keeps the room left by the two 44 px icon tabs: 324 - 2 border - 6 padding
+    // - 2 * 44 - 2 * 4 gaps, less its own 20 px padding, 16 px icon and 6 px gap.
+    let kinds: Vec<(String, Labeler)> =
+        [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio]
+            .into_iter()
+            .map(|k| {
+                (
+                    k.as_str().to_owned(),
+                    Box::new(move || kind_label(k)) as Labeler,
+                )
+            })
+            .collect();
+    v.push(
+        Case::new(
+            "Quick Capture active kind tab",
+            "324 - 2 - 6 - 88 - 8 - 20 - 16 - 6",
+            324. - 2. - 6. - 88. - 8. - 20. - 16. - 6.,
+            ui - 1.,
+            500,
+            one,
+        )
+        .texts(kinds),
+    );
+    // The action bar: 324 px, 14 px padding each side, the Enter keycap (about 64 px) and a gap. The
+    // text may be cut after a preset name, so the plain words must fit with room for a short name.
+    v.push(
+        Case::new(
+            "Quick Capture action bar",
+            "324 - 28 padding - 8 gap - 64 keycap - 80 for a short preset name",
+            324. - 28. - 8. - 64. - 80.,
+            ui,
+            600,
+            one,
+        )
+        .text("Capture", || tr_ctx!("quick capture action", "Capture"))
+        .text("Record", || tr_ctx!("quick capture action", "Record")),
+    );
+    // The header title beside the mark (20 px), the Preview label and the 32 px settings button, with
+    // three 8 px gaps.
+    v.push(
+        Case::new(
+            "Quick Capture header title",
+            "324 - 20 mark - 32 settings - 3*8 gaps - Preview label",
+            324. - 20.
+                - 32.
+                - 24.
+                - crate::ui::preview_label::width(crate::ui::preview_label::Size::S),
+            ui,
+            600,
+            one,
+        )
+        .text("title", || tr!("Quick Capture")),
+    );
+    // Send feedback beside the preset pill (which keeps at least 130 px): 10 px padding each side.
+    v.push(
+        Case::new(
+            "Quick Capture Send feedback button",
+            "324 - 6 gap - 130 pill - 20 padding",
+            324. - 6. - 130. - 20.,
+            ui - 1.,
+            400,
+            one,
+        )
+        .text("Send feedback", || tr_ctx!("button", "Send feedback")),
     );
 
     v

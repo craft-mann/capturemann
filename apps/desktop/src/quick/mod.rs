@@ -45,6 +45,8 @@ pub struct QuickApp {
     pub long_run: Option<ShotRun>,
     /// The chords of the presets' registered global hotkeys.
     pub registered: Vec<crate::shortcuts::Chord>,
+    /// The preset whose Delete was clicked once (Settings asks for a second click).
+    pub delete_armed: Option<String>,
     /// The editor tool to select when the editor opens this capture (capture id, tool id).
     pub editor_tool: Option<(String, String)>,
 }

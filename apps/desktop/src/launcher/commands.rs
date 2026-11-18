@@ -838,7 +838,55 @@ mod tests {
             recording_off: (!available).then(|| "Library unavailable".to_owned()),
             guide_off: (!available).then(|| "Library unavailable".to_owned()),
             fps60_ready: false,
+            presets: &[],
         }
+    }
+
+    /// QC-1 and QC-4: Quick Capture is a row of the Capture group with its chord, and every
+    /// preset is a row "Preset: {name}" that runs it; a recording preset follows the recording
+    /// switch, a screenshot preset the library.
+    #[test]
+    fn qc1_the_launcher_has_a_quick_capture_row_and_a_row_per_preset() {
+        let map = ShortcutMap::defaults(Platform::Mac);
+        let mcp = derive(true, true, None, &[]);
+        let presets = cm_core::preset::starter_presets();
+        let mut env = env_for(Platform::Mac, &map, &mcp, true);
+        env.presets = &presets;
+        env.recording_off = Some("A recording is running".into());
+        let cmds = build(&env);
+        let at = cmds
+            .iter()
+            .position(|c| c.id == CommandId::QuickCapture)
+            .unwrap();
+        let qc = &cmds[at];
+        assert_eq!(qc.group, Group::Capture);
+        assert_eq!(qc.title, "Quick Capture");
+        assert_eq!(qc.shortcut, ["\u{2325}", "\u{21E7}", "C"]);
+        assert!(qc.preview_feature().is_some());
+        // The preset rows follow it, in file order.
+        let titles: Vec<_> = cmds[at + 1..at + 5]
+            .iter()
+            .map(|c| c.title.clone())
+            .collect();
+        assert_eq!(
+            titles,
+            [
+                "Preset: Bug report",
+                "Preset: Docs shot",
+                "Preset: Demo video",
+                "Preset: Meeting"
+            ]
+        );
+        assert_eq!(cmds[at + 1].id, CommandId::Preset(0));
+        assert!(cmds[at + 1].is_enabled(), "a screenshot preset");
+        assert!(
+            !cmds[at + 3].is_enabled(),
+            "a recording preset while recording"
+        );
+        assert!(cmds[at + 1].keywords.iter().any(|k| k == "preset"));
+        // Without presets there are no preset rows.
+        let plain = build(&env_for(Platform::Mac, &map, &mcp, true));
+        assert!(!plain.iter().any(|c| matches!(c.id, CommandId::Preset(_))));
     }
 
     /// GDE-1.AC6: where the session has no click events the command is listed but off, and the
@@ -1078,10 +1126,12 @@ mod tests {
         let mcp = derive(true, true, None, &[]);
         let map = ShortcutMap::defaults(Platform::Mac);
         let cmds = build(&env_for(Platform::Mac, &map, &mcp, true));
-        let mut ids: Vec<_> = cmds.iter().map(|c| c.id as u8).collect();
-        ids.sort_unstable();
+        let mut ids: Vec<_> = cmds.iter().map(|c| c.id).collect();
+        let n = ids.len();
         ids.dedup();
-        assert_eq!(ids.len(), cmds.len());
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), cmds.len());
+        assert_eq!(n, cmds.len());
         assert!(cmds.iter().all(|c| Group::ORDER.contains(&c.group)));
     }
 

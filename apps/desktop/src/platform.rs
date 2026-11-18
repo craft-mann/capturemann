@@ -399,6 +399,7 @@ pub fn menu_text(id: &str) -> String {
         ids::PERMISSIONS => tr!("Permissions\u{2026}"),
         ids::QUIT => tr!("Quit CaptureMann"),
         "recent" => tr!("Recent captures"),
+        "presets" => tr!("Presets"),
         "delay" => tr!("Capture delay"),
         _ => id.to_owned(),
     }
@@ -409,6 +410,8 @@ pub struct NativeTray {
     menu: Menu,
     tray: TrayIcon,
     recent: Submenu,
+    /// "Presets" (QC-4): one item per preset, `preset:<id>`.
+    presets: Submenu,
     /// "Capture delay" choices (CAP-5), one check mark among them.
     delays: Vec<(u32, CheckMenuItem)>,
     delay_menu: Submenu,
@@ -506,11 +509,33 @@ impl NativeTray {
         self.stop.set_text(menu_text(ids::REC_STOP));
         self.pause.set_text(menu_text(ids::REC_PAUSE));
         self.recent.set_text(menu_text("recent"));
+        self.presets.set_text(menu_text("presets"));
         self.delay_menu.set_text(menu_text("delay"));
         for (secs, item) in &self.delays {
             item.set_text(crate::delay::choice_label(*secs));
         }
         self.set_recents(recents);
+    }
+
+    /// Replaces the "Presets" entries: `(preset id, name)` in file order (QC-4).
+    pub fn set_presets(&self, presets: &[(String, String)]) {
+        while !self.presets.items().is_empty() {
+            self.presets.remove_at(0);
+        }
+        if presets.is_empty() {
+            let none = MenuItem::new(tr!("No presets yet"), false, None);
+            let _ = self.presets.append(&none);
+            return;
+        }
+        for (id, name) in presets {
+            let item = MenuItem::with_id(
+                MenuId::new(format!("{}{id}", ids::PRESET_PREFIX)),
+                name,
+                true,
+                None,
+            );
+            let _ = self.presets.append(&item);
+        }
     }
 
     /// Replaces the "Recent captures" entries (last 5, CAP-2).
@@ -571,6 +596,9 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
     let recent = Submenu::with_id(MenuId::new("recent"), menu_text("recent"), true);
     let none = MenuItem::new(tr!("No captures yet"), false, None);
     recent.append(&none).map_err(|e| e.to_string())?;
+    let presets = Submenu::with_id(MenuId::new("presets"), menu_text("presets"), true);
+    let no_presets = MenuItem::new(tr!("No presets yet"), false, None);
+    presets.append(&no_presets).map_err(|e| e.to_string())?;
     let delay_menu = Submenu::with_id(MenuId::new("delay"), menu_text("delay"), true);
     let plain: Vec<(&'static str, MenuItem)> = plain_menu_ids(cfg!(windows))
         .into_iter()
@@ -620,6 +648,7 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
     }
     entries.extend([
         &recent as &dyn tray_icon::menu::IsMenuItem,
+        &presets,
         &sep_b,
         plain_item(ids::SETTINGS),
         plain_item(ids::PERMISSIONS),
@@ -647,6 +676,7 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
         menu,
         tray,
         recent,
+        presets,
         delays,
         delay_menu,
         plain,

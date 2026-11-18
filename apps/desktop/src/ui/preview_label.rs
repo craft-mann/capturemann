@@ -605,6 +605,24 @@ mod tests {
         assert!(!intro_line(b).is_empty());
     }
 
+    /// QC-1.AC8: Quick Capture is a Preview feature; its Send feedback button opens the form with
+    /// the English feature name and the app version only.
+    #[test]
+    fn qc1_ac8_quick_capture_is_a_preview_with_feedback() {
+        let q = PreviewFeature::QuickCapture;
+        assert_eq!(q.key(), "quick_capture");
+        assert!(PreviewFeature::ALL.contains(&q));
+        assert!(cm_core::features::feature("quick_capture")
+            .unwrap()
+            .is_preview());
+        let u = feedback_url("Quick Capture", env!("CARGO_PKG_VERSION"));
+        assert!(u.contains("feature=Quick%20Capture"));
+        assert!(u.contains(&format!("version={}", env!("CARGO_PKG_VERSION"))));
+        assert!(!u.contains("body=") && !u.contains(' '));
+        assert_eq!(popover_lines(q).len(), 3);
+        assert!(!intro_line(q).is_empty());
+    }
+
     #[test]
     fn the_feedback_url_carries_the_feature_and_the_version_only() {
         let u = feedback_url("Long Shot", "0.3.4");

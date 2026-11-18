@@ -18,7 +18,9 @@ use gpui::{
 use crate::launcher::commands::CAPTURE_DELAY_MS;
 use crate::quick::place::panel_rect;
 use crate::quick::presets::summary_text;
-use crate::quick::state::{kind_icon, kind_label, kind_of_key, target_label, PanelState, Tile};
+use crate::quick::state::{
+    kind_icon, kind_label, panel_key, target_label, PanelKey, PanelState, Screen, Tile,
+};
 use crate::theme::{scale, type_scale, Color, Theme};
 use crate::ui::app::{self, AppModel};
 use crate::ui::components::{icon, icon_button, logo};
@@ -302,7 +304,7 @@ impl QuickPanel {
             "save_preset",
             serde_json::json!({ "preset": json }),
             move |_, res, cx| {
-                let _ = this.update(cx, |this, cx| match res {
+                this.update(cx, |this, cx| match res {
                     Ok(v) => {
                         // The new preset is the picked one: the bar names it.
                         if let Ok(p) =
@@ -346,29 +348,28 @@ impl QuickPanel {
         if m.platform || m.control || m.alt {
             return;
         }
-        if self.body == Body::Name {
-            return; // the name field has the keys
-        }
-        match k.key.as_str() {
-            "escape" => {
-                if self.body != Body::Main || self.menu.is_some() {
-                    self.back(window, cx);
-                } else {
-                    dismiss(window, cx, true);
-                }
-            }
-            _ if self.body == Body::Picker => return,
-            "enter" | "space" => {
-                if let Some(t) = self.menu.take() {
-                    let _ = t;
+        let screen = match self.body {
+            Body::Main => Screen::Main,
+            Body::Picker => Screen::Picker,
+            Body::Name => Screen::Name,
+        };
+        let Some(key) = panel_key(&k.key, m.shift, screen, self.menu.is_some()) else {
+            return;
+        };
+        match key {
+            PanelKey::Close => dismiss(window, cx, true),
+            PanelKey::Back => self.back(window, cx),
+            PanelKey::Go => {
+                if self.menu.take().is_some() {
                     cx.notify();
                 } else {
                     self.go(window, cx);
                 }
             }
-            "tab" => {
+            PanelKey::NextTile | PanelKey::PrevTile => {
                 let n = Tile::of(self.st.kind()).len();
-                self.tile = Some(match (self.tile, m.shift) {
+                let back = key == PanelKey::PrevTile;
+                self.tile = Some(match (self.tile, back) {
                     (None, false) => 0,
                     (None, true) => n - 1,
                     (Some(i), false) => (i + 1) % n,
@@ -376,22 +377,18 @@ impl QuickPanel {
                 });
                 cx.notify();
             }
-            "up" | "down" => {
-                let down = k.key == "down";
+            PanelKey::TileUp | PanelKey::TileDown => {
                 if let Some(i) = self.tile {
-                    self.step_tile(Tile::of(self.st.kind())[i], down, cx);
+                    self.step_tile(Tile::of(self.st.kind())[i], key == PanelKey::TileDown, cx);
                 }
             }
-            "left" => self.cycle_target(false, cx),
-            "right" => self.cycle_target(true, cx),
-            "p" => {
+            PanelKey::TargetPrev => self.cycle_target(false, cx),
+            PanelKey::TargetNext => self.cycle_target(true, cx),
+            PanelKey::Picker => {
                 self.body = Body::Picker;
                 cx.notify();
             }
-            key => match kind_of_key(key) {
-                Some(kind) => self.set_kind(kind, cx),
-                None => return,
-            },
+            PanelKey::Kind(kind) => self.set_kind(kind, cx),
         }
         cx.stop_propagation();
     }
