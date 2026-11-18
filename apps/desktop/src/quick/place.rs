@@ -30,6 +30,16 @@ pub fn bar_rect(area: &Rect, bar_w: f64, bar_h: f64, display: &Rect) -> Rect {
     Rect::new(x, y, w, bar_h)
 }
 
+/// The height of the panel while the preset picker is open (QC-1 "Preset picker"): the fixed parts
+/// (padding, header, the two links under the list) plus `rows` rows, never less than the normal
+/// panel and never more than `cap` (the display's visible height less the edge gaps); beyond
+/// that the list scrolls.
+pub fn picker_height(rows: usize, base: f64, cap: f64) -> f64 {
+    const FIXED: f64 = 171.0;
+    const ROW: f64 = 48.0;
+    (FIXED + rows as f64 * ROW).max(base).min(cap.max(base))
+}
+
 /// QC-1 "Opening": the panel opens under a point (the tray icon, or the pointer), kept on the
 /// display. Near the top edge it hangs below the point; elsewhere it opens centred on it with the
 /// top at the point.
@@ -50,6 +60,26 @@ mod tests {
 
     fn display() -> Rect {
         Rect::new(0.0, 0.0, 1440.0, 900.0)
+    }
+
+    #[test]
+    fn the_picker_grows_to_its_rows_and_stops_at_the_display() {
+        assert_eq!(
+            picker_height(2, 400.0, 876.0),
+            400.0,
+            "never below the panel"
+        );
+        assert_eq!(picker_height(6, 400.0, 876.0), 459.0);
+        assert_eq!(
+            picker_height(40, 400.0, 876.0),
+            876.0,
+            "capped, the list scrolls"
+        );
+        assert_eq!(
+            picker_height(40, 400.0, 300.0),
+            400.0,
+            "a tiny display keeps the panel"
+        );
     }
 
     /// QC-3.AC1: under the area.

@@ -303,6 +303,11 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
     .flex_1()
     .min_w(px(0.))
     .h(px(42.))
+    // The mic button takes 48 px of the row: tighter padding and gaps keep the label off the icon
+    // when the text is 30 % longer (QA 0.3.6 D2).
+    .px(px(10.))
+    .gap(px(4.))
+    .overflow_hidden()
     .aria_label(SharedString::from(record.action.aria(&record.keys)))
     .child(div().flex_1())
     // One chip with the whole chord (board `UiSidebar`), so the mic button fits beside it.

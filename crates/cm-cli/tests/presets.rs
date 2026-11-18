@@ -180,3 +180,24 @@ async fn qc5_ac6_screenshot_with_a_preset() {
     // Still an error without any target and without a preset.
     assert_eq!(cli(&r, &["capture", "screenshot"]).await.code, 2);
 }
+
+/// QC-5.AC7: `record start --preset <screenshot preset>` is `invalid_input` at once: it
+/// does not print "Waiting for confirmation" and nothing is asked of the user.
+#[tokio::test]
+async fn a_screenshot_preset_is_refused_before_any_confirmation() {
+    let r = rig();
+    for args in [
+        vec!["record", "start", "--preset", "Docs shot"],
+        vec!["record", "start", "--preset", "docs shot", "--display", "1"],
+    ] {
+        let o = cli(&r, &args).await;
+        assert_eq!(o.code, 2, "{args:?}: {}", o.err);
+        assert!(o.err.contains("error[invalid_input]"), "{}", o.err);
+        assert!(o.err.contains("makes screenshots"), "{}", o.err);
+        assert!(
+            !o.err.contains("Waiting for confirmation"),
+            "validated first: {}",
+            o.err
+        );
+    }
+}

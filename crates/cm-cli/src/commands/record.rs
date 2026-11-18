@@ -138,14 +138,22 @@ pub(super) async fn record_start(cx: &mut Ctx<'_>, a: RecordStartArgs) -> Result
     let camera = camera_json(&a)?;
     let mic = mic_json(&a)?;
     let mut c = cx.client().await?;
-    // QC-5: an audio preset given alone makes an audio recording (no target to add).
-    if let (Some(name), false, None, None, None) =
-        (&a.preset, a.audio, &a.display, &a.window, &region)
-    {
-        let audio = super::presets::find(&mut c, name)
-            .await?
-            .is_some_and(|p| p["kind"] == json!("audio"));
-        a.audio = audio;
+    // QC-5: a screenshot preset cannot start a recording: say so now, before the "waiting for
+    // confirmation" line and before the user is asked anything. An audio preset given alone makes
+    // an audio recording (no target to add).
+    if let Some(name) = a.preset.clone() {
+        let found = super::presets::find(&mut c, &name).await?;
+        if found
+            .as_ref()
+            .is_some_and(|p| p["kind"] == json!("screenshot"))
+        {
+            return Err(CliError::invalid_input(format!(
+                "the preset \"{name}\" makes screenshots; `record start` needs a video or audio preset"
+            )));
+        }
+        if !a.audio && a.display.is_none() && a.window.is_none() && region.is_none() {
+            a.audio = found.is_some_and(|p| p["kind"] == json!("audio"));
+        }
     }
     if a.audio {
         return record_start_audio(cx, &mut c, a, mic).await;
