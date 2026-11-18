@@ -54,6 +54,24 @@ pub fn panel_rect(point: (f64, f64), w: f64, h: f64, display: &Rect) -> Rect {
     Rect::new(x, y, w, h)
 }
 
+/// QC-1 "Opening", from the tray: the panel is centred on the tray icon `(x, y, w, h)`, hangs
+/// below it when the icon is in the upper half of the display (the menu bar) and stands above it
+/// otherwise (the taskbar); always fully on the display.
+pub fn tray_rect(icon: (f64, f64, f64, f64), w: f64, h: f64, display: &Rect) -> Rect {
+    let (ix, iy, iw, ih) = icon;
+    let x = (ix + iw / 2.0 - w / 2.0)
+        .max(display.x + EDGE)
+        .min(display.x + display.w - w - EDGE);
+    let y = if iy + ih / 2.0 < display.y + display.h / 2.0 {
+        iy + ih + BAR_GAP
+    } else {
+        iy - BAR_GAP - h
+    }
+    .max(display.y + EDGE)
+    .min(display.y + display.h - h - EDGE);
+    Rect::new(x, y, w, h)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,5 +142,20 @@ mod tests {
         let q = panel_rect((720.0, 4.0), 352.0, 420.0, &d);
         assert_eq!(q.y, EDGE);
         assert_eq!(q.x, 720.0 - 176.0);
+    }
+
+    /// QC-1: from the tray the panel is on the icon: under it in a menu bar, above it over a
+    /// taskbar, and kept on the display at the corner.
+    #[test]
+    fn the_tray_panel_sits_at_the_icon() {
+        let d = display();
+        let top = tray_rect((1200.0, 0.0, 22.0, 24.0), 352.0, 400.0, &d);
+        assert_eq!(top.y, 24.0 + BAR_GAP);
+        assert!(top.x + top.w <= d.w - EDGE + 0.1);
+        let bottom = tray_rect((1300.0, 870.0, 20.0, 30.0), 352.0, 400.0, &d);
+        assert_eq!(bottom.y, 870.0 - BAR_GAP - 400.0);
+        assert!(bottom.y + bottom.h <= d.h);
+        let mid = tray_rect((700.0, 0.0, 20.0, 24.0), 352.0, 400.0, &d);
+        assert_eq!(mid.x + mid.w / 2.0, 710.0);
     }
 }

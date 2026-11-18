@@ -401,6 +401,11 @@ fn watch_for_watcher(conn: &Connection, service: &str) {
 }
 
 impl TrayHandle {
+    /// A StatusNotifierItem has no position the app can read: the panel opens near the pointer.
+    pub fn icon_frame(&self) -> Option<(f64, f64, f64, f64)> {
+        None
+    }
+
     fn emit(&self, path: &str, interface: &str, signal: &str, body: impl serde::Serialize + Type) {
         if let Err(e) = self
             .conn

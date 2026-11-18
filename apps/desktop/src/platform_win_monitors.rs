@@ -123,6 +123,15 @@ pub fn pointer_display_id() -> Option<u32> {
     Some(ms[i].id)
 }
 
+/// A rectangle in physical desktop px (the tray icon's) as GPUI points `(x, y, w, h)`.
+pub fn rect_px_to_points(x: f64, y: f64, w: f64, h: f64) -> Option<(f64, f64, f64, f64)> {
+    let ms = monitors();
+    let i = monitors::index_at_px(&ms, x + w / 2.0, y + h / 2.0)?;
+    let (px, py) = monitors::px_to_point(&ms[i], x, y);
+    let (qx, qy) = monitors::px_to_point(&ms[i], x + w, y + h);
+    Some((px, py, qx - px, qy - py))
+}
+
 /// The pointer in GPUI points.
 pub fn mouse_location() -> Option<(f64, f64)> {
     let mut p = POINT::default();
