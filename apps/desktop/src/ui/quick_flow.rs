@@ -209,6 +209,8 @@ fn audio(app: &Entity<AppModel>, a: AudioRun, cx: &mut App) {
         // Nothing was left on: record the microphone, the one source every preset has.
         params["mic"] = json!(true);
     }
+    // The panel's own tiles only: Audio has no Countdown tile, so Settings' countdown is not used.
+    let params = crate::quick::run::audio_panel_params(params);
     app.update(cx, |m, _| m.quick.transcribe_audio = a.transcribe);
     crate::ui::recording::start_audio(app, params, Some(Map::new()), cx);
     if defaults.consent_notice {
@@ -794,7 +796,7 @@ pub fn refresh_presets(app: &Entity<AppModel>, cx: &mut App) {
                     m.quick.panel.preset = Some(p)
                 }
                 Some(_) => {}
-                None => m.quick.panel.preset = None,
+                None => m.quick.panel.clear_preset(),
             }
         }
         if first {
@@ -920,7 +922,7 @@ pub fn hotkey_preset(app: &Entity<AppModel>, id: u32, cx: &App) -> Option<String
 pub fn remember_panel(app: &Entity<AppModel>, cx: &App) {
     crate::quick::state::save(
         &cm_daemon::config::config_dir(),
-        &app.read(cx).quick.panel.mem,
+        app.read(cx).quick.panel.persisted(),
     );
 }
 

@@ -125,6 +125,14 @@ impl PanelState {
     }
 }
 
+/// The start parameters of an audio recording from the panel. The panel has no Countdown tile
+/// for Audio, so it starts at once: the call carries `countdown_s: 0` and the daemon does not
+/// fall back to the Record sheet's setting `recording.countdown_s` (L-11).
+pub fn audio_panel_params(mut params: Value) -> Value {
+    params["countdown_s"] = Value::from(0);
+    params
+}
+
 /// The run of a preset started by its shortcut. `resolved` is what the daemon's
 /// `resolve_preset_params` made of `{ preset }` for `capture_screenshot` or `start_recording`
 /// (QC-5: the same call an agent makes), so the delay, the copy choice and the sound sources are
@@ -210,6 +218,39 @@ mod tests {
             .into_iter()
             .find(|p| p.name == name)
             .unwrap()
+    }
+
+    /// L-11: an audio recording from the panel asks for no countdown, whatever Settings holds.
+    #[test]
+    fn an_audio_recording_from_the_panel_has_no_countdown() {
+        let p = audio_panel_params(json!({ "mode": "audio", "mic": true }));
+        assert_eq!(p["countdown_s"], 0);
+        assert_eq!(p["mode"], "audio");
+    }
+
+    /// L-9: a picked preset fills the tiles for as long as it is picked; what is remembered in
+    /// `quick_capture.json` stays the panel's own, and "No preset" brings the tiles back.
+    #[test]
+    fn a_preset_does_not_overwrite_the_remembered_panel_tiles() {
+        let mut s = PanelState::default();
+        s.toggle(Tile::Copy); // the panel's own choice: Copy off
+        let own = s.mem.clone();
+        s.apply_preset(&starter("Docs shot"));
+        assert_ne!(s.mem, own, "the preset fills the tiles");
+        assert_eq!(s.persisted(), &own, "but only the panel's own are written");
+        // A tile changed on top of the preset is not remembered either.
+        s.toggle(Tile::Redact);
+        assert_eq!(s.persisted(), &own);
+        // Another preset on top keeps the first set-aside tiles.
+        s.apply_preset(&starter("Bug report"));
+        assert_eq!(s.persisted(), &own);
+        s.clear_preset();
+        assert_eq!(s.mem, own, "No preset puts the panel's tiles back");
+        assert_eq!(s.persisted(), &own);
+        // Leaving by another tab does the same.
+        s.apply_preset(&starter("Demo video"));
+        s.set_kind(PresetKind::Screenshot);
+        assert_eq!(s.mem, own);
     }
 
     /// QC-3.AC1 and AC2: the bar shows only when both Editor and Copy are off.
