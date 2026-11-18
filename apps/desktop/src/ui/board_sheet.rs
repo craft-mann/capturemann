@@ -1166,6 +1166,10 @@ fn refine_sizes(app: &Entity<AppModel>, cx: &mut App) {
 pub fn close(app: &Entity<AppModel>, cx: &mut App) {
     app.update(cx, |m, cx| {
         m.bulk.board = None;
+        crate::ui::preview_label::drop_intro_of(
+            &mut m.preview_card,
+            crate::ui::preview_label::PreviewFeature::Boards,
+        );
         cx.notify();
     });
 }

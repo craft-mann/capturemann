@@ -321,6 +321,14 @@ pub fn close_card(app: &Entity<AppModel>, cx: &mut App) {
     });
 }
 
+/// Takes away the intro card of `feature` when it is the one showing (a popover the person opened
+/// stays): the card belongs to the sheet that opened it and goes when the sheet does (0.3.6 P-7).
+pub fn drop_intro_of(card: &mut Option<PreviewCard>, feature: PreviewFeature) {
+    if *card == Some(PreviewCard::Intro(feature)) {
+        *card = None;
+    }
+}
+
 /// Whether the intro of `feature` is still due: the flag is not set.
 pub fn intro_due(settings: &Map<String, Value>, feature: PreviewFeature) -> bool {
     !settings
@@ -542,6 +550,19 @@ mod tests {
                 f.id
             );
         }
+    }
+
+    #[test]
+    fn the_intro_card_goes_with_its_sheet() {
+        let b = PreviewFeature::Boards;
+        let mut card = Some(PreviewCard::Intro(b));
+        drop_intro_of(&mut card, PreviewFeature::ClickGuide);
+        assert!(card.is_some(), "another feature's card stays");
+        drop_intro_of(&mut card, b);
+        assert!(card.is_none());
+        let mut pop = Some(PreviewCard::Popover(b));
+        drop_intro_of(&mut pop, b);
+        assert!(pop.is_some(), "a popover the person opened stays");
     }
 
     #[test]
