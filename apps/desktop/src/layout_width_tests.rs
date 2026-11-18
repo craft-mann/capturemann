@@ -228,11 +228,6 @@ fn key_w(label: &str, size: f32, pad: f32, min: f32) -> f32 {
     (width(label, Face::MonoRegular, size) + 2. * pad).max(min)
 }
 
-fn keys_w(keys: &[String], size: f32, pad: f32, min: f32, gap: f32) -> f32 {
-    keys.iter().map(|k| key_w(k, size, pad, min)).sum::<f32>()
-        + gap * keys.len().saturating_sub(1) as f32
-}
-
 fn mcp_titles() -> Vec<(String, Box<dyn Fn() -> String>)> {
     use crate::agent_status::{self, McpState, McpStatus, OfflineReason};
     let mut v = vec![t("McpStatus::title(ready)", || {
@@ -820,7 +815,7 @@ fn cases() -> Vec<Case> {
         // The Record row shows the same keys as the tiles: the whole chord up to three keys,
         // else the last one.
         let keys = crate::nav::tile_keys(&keys);
-        let keys_px = keys_w(&keys, 12., 5., 20., 2.);
+        let keys_px = key_w(&keys.concat(), 11., 6., 0.);
         v.push(
             Case::new(
                 if platform == Platform::Mac {
@@ -828,8 +823,8 @@ fn cases() -> Vec<Case> {
                 } else {
                     "Dock Record row (Windows chord)"
                 },
-                "206 - 2 - 36 - 16 icon - 3*8 gaps - keycaps",
-                206. - 2. - 36. - 16. - 24. - keys_px,
+                "206 - 48 mic button - 2 - 20 padding - 16 icon - 3*4 gaps - chip (6 px padding each side, 11 px mono)",
+                206. - 48. - 2. - 20. - 16. - 12. - keys_px,
                 ui,
                 600,
                 one,
@@ -1501,7 +1496,7 @@ fn cases() -> Vec<Case> {
 
     // ---- Quick Capture panel (QC-1): 352 px wide, 14 px padding, so 324 px of content -----------
     // An option tile: two share the row with an 8 px gap (158 px each); 1 px border each side, 10 px
-    // padding each side, the 28 px icon circle and its 10 px gap leave 98 px for the label (13 px,
+    // padding each side, the 28 px icon circle and its 8 px gap leave 104 px for the label (13 px,
     // medium; the label cuts with an ellipsis, so it must fit in the two supported languages).
     use crate::quick::state::{kind_label, target_label, Tile};
     use cm_core::preset::{PresetKind, PresetTarget};
@@ -1523,8 +1518,8 @@ fn cases() -> Vec<Case> {
     v.push(
         Case::new(
             "Quick Capture option tile",
-            "(324 - 8) / 2 - 2 border - 20 padding - 28 circle - 10 gap",
-            (324. - 8.) / 2. - 2. - 20. - 28. - 10.,
+            "(324 - 8) / 2 - 2 border - 16 padding - 28 circle - 8 gap",
+            (324. - 8.) / 2. - 2. - 16. - 28. - 8.,
             ui - 1.,
             500,
             one,
