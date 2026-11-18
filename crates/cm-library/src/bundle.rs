@@ -361,6 +361,8 @@ impl ShotBundle {
         let base = scratch.ops.len();
         for (i, mut op) in ops.into_iter().enumerate() {
             cm_core::validate_op(i, &op)?;
+            let size = self.manifest.original.size;
+            cm_core::annotation::validate_op_within(i, &op, size.width, size.height)?;
             if op.id.is_empty() {
                 op.id = scratch.mint_op_id();
             }
@@ -460,6 +462,8 @@ impl ShotBundle {
         let mut seen: HashSet<String> = HashSet::new();
         for (i, mut op) in ops.into_iter().enumerate() {
             cm_core::validate_op(i, &op)?;
+            let size = self.manifest.original.size;
+            cm_core::annotation::validate_op_within(i, &op, size.width, size.height)?;
             if op.id.is_empty() {
                 loop {
                     seq += 1;
