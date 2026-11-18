@@ -1,0 +1,70 @@
+112 1557x969 first frame
+113 1557x969 step 290 (expected shift 290, frames 1) -> NoOverlap
+114 1557x969 first pair looked at again (1): the frame did not change
+115 1557x969 first pair looked at again (2): the frame did not change
+116 1557x969 scrolled back by 145 (retry 1) -> Added { new_len: 298 }
+117 1557x969 step 221 (expected shift 454, frames 2) -> NoOverlap
+118 1557x969 scrolled back by 110 (retry 1) -> NoOverlap
+119 1557x969 scrolled back by 110 (retry 2) -> Added { new_len: 1 }
+120 1557x969 step 165 (expected shift 339, frames 3) -> NoOverlap
+121 1557x969 scrolled back by 82 (retry 1) -> NoOverlap
+122 1557x969 scrolled back by 82 (retry 2) -> Added { new_len: 3 }
+123 1557x969 step 88 (expected shift 264, frames 4) -> NoOverlap
+124 1557x969 scrolled back by 44 (retry 1) -> Added { new_len: 133 }
+125 1557x969 step 87 (expected shift 263, frames 6) -> Added { new_len: 261 }
+126 1557x969 step 88 (expected shift 264, frames 7) -> Added { new_len: 265 }
+127 1557x969 step 88 (expected shift 265, frames 8) -> Added { new_len: 265 }
+128 1557x969 step 88 (expected shift 265, frames 9) -> Added { new_len: 265 }
+129 1557x969 step 88 (expected shift 265, frames 10) -> Added { new_len: 265 }
+130 1557x969 step 88 (expected shift 265, frames 11) -> Added { new_len: 265 }
+131 1557x969 step 88 (expected shift 265, frames 12) -> Added { new_len: 265 }
+132 1557x969 step 88 (expected shift 265, frames 13) -> Added { new_len: 265 }
+133 1557x969 step 88 (expected shift 265, frames 14) -> Added { new_len: 265 }
+134 1557x969 step 88 (expected shift 265, frames 15) -> Added { new_len: 265 }
+135 1557x969 step 88 (expected shift 265, frames 16) -> Added { new_len: 265 }
+136 1557x969 step 88 (expected shift 265, frames 17) -> Added { new_len: 265 }
+137 1557x969 step 88 (expected shift 265, frames 18) -> Added { new_len: 265 }
+138 1557x969 step 88 (expected shift 265, frames 19) -> Added { new_len: 265 }
+139 1557x969 step 88 (expected shift 265, frames 20) -> Added { new_len: 265 }
+140 1557x969 step 88 (expected shift 265, frames 21) -> Added { new_len: 265 }
+141 1557x969 step 88 (expected shift 265, frames 22) -> Added { new_len: 265 }
+142 1557x969 step 88 (expected shift 265, frames 23) -> Added { new_len: 265 }
+143 1557x969 step 88 (expected shift 265, frames 24) -> Added { new_len: 265 }
+144 1557x969 step 88 (expected shift 265, frames 25) -> Added { new_len: 265 }
+145 1557x969 step 88 (expected shift 265, frames 26) -> Added { new_len: 265 }
+146 1557x969 step 88 (expected shift 265, frames 27) -> Added { new_len: 265 }
+147 1557x969 step 88 (expected shift 265, frames 28) -> Added { new_len: 265 }
+148 1557x969 step 88 (expected shift 265, frames 29) -> Added { new_len: 265 }
+149 1557x969 step 88 (expected shift 265, frames 30) -> Added { new_len: 265 }
+150 1557x969 step 88 (expected shift 265, frames 31) -> Added { new_len: 265 }
+151 1557x969 step 88 (expected shift 265, frames 32) -> Added { new_len: 265 }
+152 1557x969 step 88 (expected shift 265, frames 33) -> Added { new_len: 265 }
+153 1557x969 step 88 (expected shift 265, frames 34) -> Added { new_len: 265 }
+154 1557x969 step 88 (expected shift 265, frames 35) -> Added { new_len: 265 }
+155 1557x969 step 88 (expected shift 265, frames 36) -> Added { new_len: 265 }
+156 1557x969 step 88 (expected shift 265, frames 37) -> Added { new_len: 265 }
+157 1557x969 step 88 (expected shift 265, frames 38) -> Added { new_len: 265 }
+158 1557x969 step 88 (expected shift 265, frames 39) -> Added { new_len: 265 }
+159 1557x969 step 88 (expected shift 265, frames 40) -> Added { new_len: 265 }
+160 1557x969 step 88 (expected shift 265, frames 41) -> Added { new_len: 265 }
+161 1557x969 step 88 (expected shift 265, frames 42) -> Added { new_len: 265 }
+162 1557x969 step 88 (expected shift 265, frames 43) -> Added { new_len: 265 }
+163 1557x969 step 88 (expected shift 265, frames 44) -> Added { new_len: 265 }
+164 1557x969 step 88 (expected shift 265, frames 45) -> Added { new_len: 265 }
+165 1557x969 step 88 (expected shift 265, frames 46) -> Added { new_len: 265 }
+166 1557x969 step 88 (expected shift 265, frames 47) -> Added { new_len: 265 }
+167 1557x969 step 88 (expected shift 265, frames 48) -> Added { new_len: 265 }
+168 1557x969 step 88 (expected shift 265, frames 49) -> Added { new_len: 265 }
+169 1557x969 step 88 (expected shift 265, frames 50) -> Added { new_len: 265 }
+170 1557x969 step 88 (expected shift 265, frames 51) -> Added { new_len: 265 }
+171 1557x969 step 88 (expected shift 265, frames 52) -> Added { new_len: 265 }
+172 1557x969 step 88 (expected shift 265, frames 53) -> Added { new_len: 265 }
+173 1557x969 step 88 (expected shift 265, frames 54) -> Added { new_len: 265 }
+174 1557x969 step 88 (expected shift 265, frames 55) -> Added { new_len: 265 }
+175 1557x969 step 88 (expected shift 265, frames 56) -> Added { new_len: 265 }
+176 1557x969 step 88 (expected shift 265, frames 57) -> Added { new_len: 265 }
+177 1557x969 step 88 (expected shift 265, frames 58) -> Added { new_len: 265 }
+178 1557x969 step 88 (expected shift 265, frames 59) -> Added { new_len: 265 }
+179 1557x969 step 88 (expected shift 265, frames 60) -> Added { new_len: 265 }
+180 1557x969 step 88 (expected shift 265, frames 61) -> Added { new_len: 246 }
+181 1557x969 step 91 (expected shift 264, frames 62) -> LimitReached { new_len: 170 }

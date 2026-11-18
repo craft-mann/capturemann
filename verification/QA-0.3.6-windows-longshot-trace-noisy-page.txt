@@ -1,0 +1,6 @@
+182 1557x969 first frame
+183 1557x969 step 290 (expected shift 290, frames 1) -> NoOverlap
+184 1557x969 first pair looked at again (1) -> NoOverlap
+185 1557x969 first pair looked at again (2) -> NoOverlap
+186 1557x969 scrolled back by 145 (retry 1) -> NoOverlap
+187 1557x969 scrolled back by 145 (retry 2) -> NoOverlap
