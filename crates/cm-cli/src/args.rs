@@ -117,6 +117,12 @@ pub enum Command {
         #[arg(long)]
         limit: Option<u64>,
     },
+    /// Quick Capture presets: list the user's named setups (`list_presets`). Run one with
+    /// `--preset` on `capture screenshot` or `record start`. Presets are changed in the app.
+    Presets {
+        #[command(subcommand)]
+        cmd: PresetsCmd,
+    },
     /// Print the limits, required fields, privacy options and export presets of a publishing
     /// platform (`get_platform_rules`). Today: `youtube`.
     PlatformRules {
@@ -611,6 +617,12 @@ pub enum SuggestCmd {
 }
 
 #[derive(Debug, Subcommand)]
+pub enum PresetsCmd {
+    /// List the presets: id, name, kind, target and a one-line summary.
+    List,
+}
+
+#[derive(Debug, Subcommand)]
 pub enum TargetsCmd {
     /// Same as `capturemann targets`.
     List,
@@ -625,7 +637,7 @@ pub enum CaptureCmd {
 }
 
 #[derive(Debug, Args)]
-#[command(group(ArgGroup::new("what").required(true).multiple(true).args(["display", "window", "region", "pick"])))]
+#[command(group(ArgGroup::new("what").multiple(true).args(["display", "window", "region", "pick"])))]
 pub struct ScreenshotArgs {
     /// Display id (see `targets`).
     #[arg(long, value_name = "ID", conflicts_with_all = ["window", "pick"])]
@@ -660,6 +672,12 @@ pub struct ScreenshotArgs {
     /// Library title (default: `Screenshot yyyy-MM-dd HH.mm`).
     #[arg(long)]
     pub title: Option<String>,
+    /// Run a Quick Capture preset by name or id (see `presets list`): it fills the delay, the
+    /// copy and the Long Shot mode that this command leaves out; a flag given here wins. A
+    /// preset holds no area: without `--display`, `--window` or `--region` the primary display
+    /// is captured (a Window preset needs `--window`).
+    #[arg(long, value_name = "NAME|ID", conflicts_with = "pick")]
+    pub preset: Option<String>,
     /// Long Shot (CAP-6): scroll the window (or area) and stitch one tall image. CaptureMann
     /// scrolls for you (the user confirms it when an agent runs this).
     #[arg(long, conflicts_with = "pick")]
@@ -1400,10 +1418,13 @@ pub struct RecordStartArgs {
         ]
     )]
     pub audio: bool,
-    /// Use case of an audio recording: `room` (interview, 1:1, meeting around a laptop),
-    /// `online` (call: adds system audio), `lecture`, `product` (demo call: adds system audio) or
-    /// `note` (voice note).
-    #[arg(long, requires = "audio", value_parser = ["room", "online", "lecture", "product", "note"])]
+    /// With `--audio`, the use case of the recording: `room` (interview, 1:1, meeting around a
+    /// laptop), `online` (call: adds system audio), `lecture`, `product` (demo call: adds system
+    /// audio) or `note` (voice note). Any other value is the name or id of a Quick Capture
+    /// preset (see `presets list`): it fills the options this command leaves out (a flag given
+    /// here wins), an audio preset makes an audio recording, and the confirmation shows the
+    /// resulting plan.
+    #[arg(long, value_name = "NAME|ID")]
     pub preset: Option<String>,
     /// How many people speak (1 to 8), for an audio recording: stored with it and used by the
     /// automatic speaker step. Leave it out when you do not know.

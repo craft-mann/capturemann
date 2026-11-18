@@ -562,6 +562,7 @@ pub fn all() -> Vec<ToolSpec> {
                 "scroll": { "enum": ["auto", "hand"], "default": "auto", "description": "Long Shot only." },
                 "copy_to_clipboard": { "type": "boolean", "default": false },
                 "title": { "type": "string", "description": "Library title; defaults to `Screenshot <date> <time>`." },
+                "preset": { "type": "string", "description": "Quick Capture preset (QC-5): the name or id of a screenshot preset from `list_presets`. It fills the options this call leaves out (`delay_s`, `copy_to_clipboard`, `mode: \"long\"` for a Long Shot preset); an argument in the same call wins. A preset holds no area, so `target` is still required. An unknown name fails with `invalid_input` naming it." },
                 "request_id": request_id() },
                 "required": ["target"], "additionalProperties": false }),
             output: json!({ "type": "object", "properties": {
@@ -1048,7 +1049,7 @@ pub fn all() -> Vec<ToolSpec> {
             summary: "Start a screen recording of a display, a window or a region (physical px relative to the display, like capture_screenshot), optionally with the webcam, the microphone and system audio. With `mode: \"audio\"` it records the microphone and/or system audio only (no screen, camera or cursor; `kind: \"audio\"` in the library): `target`, `size`, `fps`, `codec`, `quality`, `camera`, `cursor`, `cursor_separate` and `exclude` are then refused with `invalid_input` naming the field. The microphone is on unless `mic: false`; `preset` sets the default sources (`online` and `product` add system audio). The dialog says \"Record audio\", names the microphone and carries the line \"Let everyone know they're being recorded.\". A microphone-only recording never needs Screen Recording access; system audio without it fails with `permission_missing` (data.permission: screen). It stops after `max_duration_s` (default 4 h, at most 12 h), or with reason `system_sleep` when the computer sleeps. The user sees a confirmation that says exactly what will be recorded (unless they turned that off for AI agents in CaptureMann\u{2019}s settings; the recording indicator and a Stop button on the screen always show), then a countdown (default 3 s), and the recording shows the usual border, timer and stop button. Returns when recording has started, with the recording id, the capture id it will have in the library and the indicator facts. Fails with `busy` if a recording is running and `permission_missing` (data.permission: screen, microphone or camera) before anything is asked. Stop it with stop_recording.",
             input: json!({ "type": "object", "properties": {
                 "mode": { "type": "string", "enum": ["screen", "audio"], "default": "screen", "description": "`audio`: microphone and/or system audio only (see above)." },
-                "preset": { "type": "string", "enum": ["room", "online", "lecture", "product", "note"], "description": "Only with `mode: \"audio\"`: the use case. `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set." },
+                "preset": { "type": "string", "description": "Either a Quick Capture preset (QC-5, a Preview feature): the name or id of a video or audio preset from `list_presets`, which fills the options this call leaves out (`mic`, `system_audio`, `camera`, `cursor`, `fps`, `countdown_s`, and `mode: \"audio\"` for an audio preset; an argument in the same call wins, `target` is still required for a screen recording, and the confirmation shows the plan the preset resolves to; an unknown name fails with `invalid_input` naming it). Or, with `mode: \"audio\"`, one of the use cases `room`, `online`, `lecture`, `product`, `note`: the use case. `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set." },
                 "people": { "type": "integer", "minimum": 1, "maximum": 8, "description": "Only with `mode: \"audio\"`: how many people speak, when known. Stored with the recording; the automatic speaker step (setting `ai.auto_speakers`, on by default) uses it as the speaker count. Absent = not known (the preset decides: 2 for `room`, 3 otherwise; `note` skips the speaker step)." },
                 "target": { "description": "Required for a screen recording; refused with `mode: \"audio\"`.", "oneOf": [
                     { "type": "object", "properties": { "display_id": { "type": "integer", "minimum": 0 } },
@@ -1353,6 +1354,26 @@ pub fn all() -> Vec<ToolSpec> {
                 "next_from": { "type": ["integer", "null"] },
                 "truncated_file": { "type": "boolean", "description": "The file ended in a torn line (a crash) that was skipped." } },
                 "required": ["capture_id", "events", "count", "total_in_range"] }),
+        },
+        ToolSpec {
+            name: "list_presets",
+            tier: Tier::Free,
+            mutating: false,
+            destructive: false,
+            spec: "QC-5",
+            summary: "List the user's Quick Capture presets: named setups for a capture (a screenshot, a video or an audio recording). Each has `id`, `name`, `kind` (`screenshot`, `video`, `audio`), `target` (`region`, `window`, `display`, `long_shot`; absent for audio), the `options` tiles, `save_to`, `after` (what happens after the capture), `shortcut` and a one-line `summary`. Four starter presets exist at first: Bug report, Docs shot, Demo video and Meeting. Run one by passing its name or id as `preset` to `capture_screenshot` or `start_recording`. Read-only; presets are changed only in the CaptureMann app. `notice` is set when the file holds a preset that was skipped because it is not valid.",
+            input: json!({ "type": "object", "properties": {}, "additionalProperties": false }),
+            output: json!({ "type": "object", "properties": {
+                "presets": { "type": "array", "items": { "type": "object", "properties": {
+                    "id": { "type": "string" }, "name": { "type": "string" },
+                    "kind": { "type": "string", "enum": ["screenshot", "video", "audio"] },
+                    "target": { "type": "string", "enum": ["region", "window", "display", "long_shot"] },
+                    "options": { "type": "object" }, "save_to": { "type": "string" },
+                    "after": { "type": "object" }, "shortcut": { "type": "string" },
+                    "summary": { "type": "string" } },
+                    "required": ["id", "name", "kind", "summary"] } },
+                "notice": { "type": ["string", "null"] } },
+                "required": ["presets"] }),
         },
         ToolSpec {
             name: "get_platform_rules",

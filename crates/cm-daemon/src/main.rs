@@ -168,6 +168,10 @@ async fn run() -> ExitCode {
         .destinations(cm_storage::DestinationStore::new(
             cm_daemon::config::config_dir(),
         ))
+        // Quick Capture presets (QC-4): `presets.json` in the settings folder.
+        .presets(cm_daemon::preset_ops::PresetStore::in_dir(
+            &cm_daemon::config::config_dir(),
+        ))
         // Cloud destinations: tokens from the OS keychain (connected in the app).
         .cloud_backend(cm_daemon::storage_cloud::CloudBackend::system())
         // Publish accounts (PUB-1, PUB-2): the app writes the file, tokens are in the keychain.

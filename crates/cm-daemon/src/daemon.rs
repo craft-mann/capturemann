@@ -196,6 +196,8 @@ pub(crate) struct Inner {
     pub(crate) ai: AiServices,
     /// The destinations file (M6); `None` means no destination exists (headless tests).
     pub(crate) destinations: Option<cm_storage::DestinationStore>,
+    /// `presets.json` (QC-4); `None` means no presets (headless tests).
+    pub(crate) presets: Option<crate::preset_ops::PresetStore>,
     /// Providers and token sources of the cloud destinations (STO-2).
     pub(crate) cloud: crate::storage_cloud::CloudBackend,
     /// The publish accounts file (PUB-1); `None` means publishing is not set up (headless tests).
@@ -263,6 +265,7 @@ pub struct DaemonBuilder {
     move_copier: Arc<dyn crate::library_move::FileCopier>,
     ai: AiServices,
     destinations: Option<cm_storage::DestinationStore>,
+    presets: Option<crate::preset_ops::PresetStore>,
     cloud: crate::storage_cloud::CloudBackend,
     publish_accounts: Option<cm_publish::PublishAccountStore>,
     youtube: cm_publish::YouTubeConfig,
@@ -296,6 +299,7 @@ impl DaemonBuilder {
             move_copier: Arc::new(crate::library_move::StdCopier),
             ai: AiServices::default(),
             destinations: None,
+            presets: None,
             cloud: crate::storage_cloud::CloudBackend::default(),
             publish_accounts: None,
             youtube: cm_publish::YouTubeConfig::default(),
@@ -414,6 +418,14 @@ impl DaemonBuilder {
     /// file, the daemon only reads it). Without it no destination exists.
     pub fn destinations(mut self, store: cm_storage::DestinationStore) -> Self {
         self.destinations = Some(store);
+        self
+    }
+
+    /// Where `presets.json` lives (QC-4): the app's settings folder
+    /// (`PresetStore::in_dir(&config::config_dir())`). Without it there are no presets,
+    /// `list_presets` answers an empty list and a call with `preset` names an unknown preset.
+    pub fn presets(mut self, store: crate::preset_ops::PresetStore) -> Self {
+        self.presets = Some(store);
         self
     }
 
@@ -570,6 +582,7 @@ impl DaemonBuilder {
                 clock: self.clock,
                 ai: self.ai,
                 destinations: self.destinations,
+                presets: self.presets,
                 cloud: self.cloud,
                 publish_accounts: self.publish_accounts,
                 youtube: self.youtube,
@@ -890,7 +903,9 @@ impl Daemon {
                 "unknown method `{method}`"
             )));
         }
-        let action = Action::parse(method, params)?;
+        // QC-5: a `preset` becomes ordinary parameters before anything is checked or confirmed.
+        let resolved = self.inner.resolve_preset_params(method, params)?;
+        let action = Action::parse(method, &resolved)?;
         self.execute(ActionCall {
             actor,
             session,
@@ -1398,6 +1413,7 @@ impl Daemon {
             Action::GetDiagnostics => inner.get_diagnostics().await,
             Action::GetCursorTrack(p) => inner.get_cursor_track(p).await,
             Action::GetPlatformRules(p) => inner.get_platform_rules(p).await,
+            Action::Preset(p) => inner.preset_op(actor.is_agent(), p).await,
             Action::EstimateExport(p) => inner.estimate_export(p).await,
             Action::TestTextModel => inner.test_text_model().await,
             Action::Upload(p) => inner.upload(actor, p).await,

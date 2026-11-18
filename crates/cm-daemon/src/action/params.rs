@@ -492,6 +492,9 @@ pub enum Action {
     MoveLibrary(MoveLibraryParams),
     /// `import_media` (see [`crate::import_ops`]).
     ImportMedia(crate::import_ops::ImportMediaParams),
+    /// `list_presets`, `save_preset`, `delete_preset`, `reorder_presets` (QC-4, QC-5; see
+    /// [`crate::preset_ops`]).
+    Preset(crate::preset_ops::PresetParams),
 }
 
 /// Largest accepted `request_id`.

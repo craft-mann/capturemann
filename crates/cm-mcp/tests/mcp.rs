@@ -1042,10 +1042,20 @@ async fn rec_tools_have_the_spec_tiers_and_schemas() {
     assert_eq!(start.input_schema["additionalProperties"], false);
     let props = start.input_schema["properties"].as_object().unwrap();
     assert_eq!(props["mode"]["enum"], json!(["screen", "audio"]));
-    assert_eq!(
-        props["preset"]["enum"],
-        json!(["room", "online", "lecture", "product", "note"])
-    );
+    // `preset` is a Quick Capture preset name or id (QC-5) or, with `mode: "audio"`, one of the
+    // five audio use cases, so it is a plain string and the description lists the use cases.
+    assert_eq!(props["preset"]["type"], "string");
+    let preset_help = props["preset"]["description"].as_str().unwrap();
+    for case in [
+        "room",
+        "online",
+        "lecture",
+        "product",
+        "note",
+        "list_presets",
+    ] {
+        assert!(preset_help.contains(case), "{case}");
+    }
     let marker = get("add_marker");
     assert!(marker
         .description

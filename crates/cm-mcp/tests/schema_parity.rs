@@ -148,6 +148,9 @@ const ALIASES: &[(&str, &str)] = &[
     ("start_recording", "countdown"),
     ("start_recording", "preset"),
     ("start_recording", "people"),
+    // A Quick Capture preset is written into the call before it is parsed (QC-5): the parser
+    // itself refuses `preset` on a screenshot, so a call that was not resolved first fails loudly.
+    ("capture_screenshot", "preset"),
     // The running recording or a finished one, not both.
     ("add_marker", "recording_id"),
     ("upload", "file"),

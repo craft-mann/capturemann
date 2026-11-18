@@ -91,8 +91,9 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
     // and import_media (IMP-3).
     // and get_cursor_track (REC-7), get_platform_rules (EXP-2), estimate_export (EXP-5).
     // and recognize_text (ANN-5), suggest_blueprint (ANN-11), create_board and export_images (BRD-1, BLK-1),
-    // and the five Click Guide tools (GDE-4); six tools are Preview (create_board and the five).
-    assert_eq!(list.len(), 89);
+    // and the five Click Guide tools (GDE-4), and list_presets (QC-5); seven tools are Preview
+    // (create_board, the five and list_presets).
+    assert_eq!(list.len(), 90);
     // S24: the tools of a Preview feature say so in the listing (`_meta.stage`, "(preview)");
     // the others do not.
     let previews: Vec<&str> = list
@@ -100,7 +101,7 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
         .filter(|t| t["_meta"]["stage"] == "preview")
         .map(|t| t["name"].as_str().unwrap())
         .collect();
-    assert_eq!(previews.len(), 6, "{previews:?}");
+    assert_eq!(previews.len(), 7, "{previews:?}");
     for t in list {
         let preview = t["_meta"]["stage"] == "preview";
         assert_eq!(

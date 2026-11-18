@@ -19,7 +19,7 @@ fn usage() -> ExitCode {
 }
 
 /// The server runs on a worker thread of a runtime with 8 MB stacks and not on the main thread:
-/// a debug build of the 89-tool server overflowed the 1 MB main-thread stack of Windows
+/// a debug build of the 90-tool server overflowed the 1 MB main-thread stack of Windows
 /// (`thread 'main' has overflowed its stack`, CI, Nov 16, 2026), and polling the future on the
 /// main thread keeps it on that stack.
 fn main() -> ExitCode {

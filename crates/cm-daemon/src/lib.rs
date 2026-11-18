@@ -69,6 +69,7 @@ mod library_ops;
 pub mod logs;
 pub mod long_shot_ops;
 pub mod markers;
+pub mod preset_ops;
 pub mod publish_ops;
 mod publish_records;
 pub mod read_tools;

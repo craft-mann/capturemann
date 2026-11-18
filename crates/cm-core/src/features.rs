@@ -99,10 +99,8 @@ pub const FEATURES: &[Feature] = &[
         tools: &["list_presets"],
         cli_commands: &["presets"],
         cli_args: &[],
-        tool_params: &[
-            ("capture_screenshot", "preset"),
-            ("start_recording", "preset"),
-        ],
+        // `start_recording`.`preset` also names an older audio use case, so it is not marked.
+        tool_params: &[("capture_screenshot", "preset")],
     },
 ];
 
