@@ -94,6 +94,9 @@ pub struct LongShotProgress {
 pub struct LongShotResult {
     pub image: Stitched,
     pub end: EndReason,
+    /// For [`EndReason::NoOverlap`]: one plain sentence on why the next part did not join. The
+    /// frames joined before it are in `image`.
+    pub why: Option<&'static str>,
 }
 
 fn progress(s: &Stitcher) -> LongShotProgress {
@@ -617,6 +620,9 @@ pub fn run_auto_ex(
         }
     };
     Ok(LongShotResult {
+        why: (end == EndReason::NoOverlap)
+            .then(|| stitcher.plain_refusal())
+            .flatten(),
         image: stitcher.finish()?,
         end,
     })
@@ -836,6 +842,9 @@ pub fn run_hand_ex(
         }
     };
     Ok(LongShotResult {
+        why: (end == EndReason::NoOverlap)
+            .then(|| stitcher.plain_refusal())
+            .flatten(),
         image: stitcher.finish()?,
         end,
     })

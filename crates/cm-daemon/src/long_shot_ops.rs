@@ -681,6 +681,10 @@ struct LongMeta {
     frames: u32,
     end: EndReason,
     note: Option<String>,
+    /// For a Long Shot that stopped because a part did not line up: why, in one sentence. The
+    /// frames that joined before are in the image.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    why: Option<String>,
     /// The longest side this run was allowed (`max_px`, at most 16,384), so that the toast can
     /// name the limit it met.
     limit_px: u32,
@@ -898,8 +902,15 @@ impl Inner {
                         (long_shot::EndReason::WindowClosed, Some(t)) => {
                             Some(format!("The window \"{t}\" was closed"))
                         }
+                        (long_shot::EndReason::NoOverlap, _) => result.end.note().map(|n| {
+                            match result.why {
+                                Some(w) => format!("{n}: {w}"),
+                                None => n.to_owned(),
+                            }
+                        }),
                         _ => result.end.note_for(cfg.limits, along),
                     },
+                    why: result.why.map(str::to_owned),
                     limit_px: cfg.limits.max_len,
                     header_px: result.image.header_len,
                     footer_px: result.image.footer_len,

@@ -70,6 +70,9 @@ fn cap_6_ac3_a_jump_stops_and_never_guesses() {
     let kept = r.image.frame.height();
     assert!((300..1000).contains(&kept), "kept {kept}");
     assert_eq!(r.image.frame, page.expected_range(0, kept));
+    // 0.3.6 P-3: the result says why, in one sentence, and the frames before the jump are kept.
+    assert!(r.why.is_some(), "a refused part has a reason");
+    assert!(r.image.frames >= 2, "the frames joined so far are kept");
 }
 
 /// CAP-6.AC4: a page longer than the limit stops at the limit and the image is kept.
