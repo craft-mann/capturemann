@@ -203,6 +203,16 @@ impl StartOptions {
         Value::Object(p)
     }
 
+    /// Only the bubble position of [`StartOptions::remembered`]: what a start that must not change
+    /// the sheet's choices (the Quick Capture panel) still writes.
+    pub fn remembered_position(&self) -> Map<String, Value> {
+        let mut m = Map::new();
+        if let Some(c) = &self.camera {
+            m.insert(KEY_BUBBLE_POSITION.into(), c.position.to_json());
+        }
+        m
+    }
+
     /// The settings to remember after a start (so the next sheet opens the same way). The devices
     /// are not among them: `camera.device` and `audio.mic_device` are set in Settings -> Webcam &
     /// audio, and a device picked in the sheet counts for that recording only.

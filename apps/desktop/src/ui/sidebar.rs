@@ -334,6 +334,50 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         record_row.opacity(0.45)
     };
 
+    // QC-1: "Capture…" under Record…, a neutral primary button with its keycap.
+    let qc_keys = p
+        .shortcuts
+        .get(crate::shortcuts::ShortcutAction::OpenQuickCapture)
+        .keycaps(p.platform);
+    let qc_app = app.clone();
+    let qc_label = tr_ctx!("capture dock", "Capture\u{2026}");
+    let capture_btn = button_with_icon(
+        t,
+        "qc-open",
+        qc_label.clone(),
+        ButtonKind::Primary,
+        Some("cm-capture-region"),
+    )
+    .w_full()
+    .h(px(42.))
+    .aria_label(SharedString::from(tr_ctx!(
+        "capture dock",
+        "{label}, {keys}",
+        label = qc_label,
+        keys = qc_keys.join(" ")
+    )))
+    .child(div().flex_1())
+    .child(
+        div()
+            .h(px(22.))
+            .px(px(6.))
+            .flex()
+            .items_center()
+            .rounded(px(scale::RADIUS_XS))
+            .bg(rgba_of(t.primary_fg.with_alpha(22)))
+            .text_size(px(11.))
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(rgba_of(t.primary_fg))
+            .mono()
+            .child(SharedString::from(nav::tile_keys(&qc_keys).join(""))),
+    )
+    .on_click(move |_, _, cx| {
+        let app = qc_app.clone();
+        cx.defer(move |cx| {
+            crate::ui::quick_window::toggle(&app, crate::ui::quick_window::Anchor::Pointer, cx)
+        });
+    });
+
     let tiles = entries.iter().skip(1).map(|e| {
         let action = e.action;
         let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
@@ -388,6 +432,7 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .border_color(rgba_of(t.border))
         .bg(rgba_of(t.surface_2))
         .child(record_row)
+        .child(capture_btn)
         .child(div().flex().gap(px(6.)).children(tiles))
         // Row 2 (board S14): Long Shot and Click Guide, two to a row.
         .child(

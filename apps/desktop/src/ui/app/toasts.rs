@@ -660,6 +660,7 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
             crate::ui::long_shot::stop_all(app, cx);
         }
         ToastAction::TryHandScroll => crate::ui::long_shot::start(app, cx),
+        ToastAction::UndoQuick(id) => crate::ui::quick_flow::undo(app, &id, cx),
     }
 }
 

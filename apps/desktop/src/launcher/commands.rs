@@ -26,6 +26,10 @@ pub enum CommandId {
     ImportMedia,
     /// "New Click Guide" (GDE-1): the bar, a countdown, then clicks become steps.
     NewClickGuide,
+    /// "Quick Capture" (QC-1): the panel.
+    QuickCapture,
+    /// "Preset: {name}" (QC-4): the preset at this place in `presets.json`.
+    Preset(u16),
     OpenSettings,
     OpenPermissions,
     PublishLast,
@@ -267,6 +271,7 @@ impl Command {
         match self.id {
             CommandId::LongShot => Some(PreviewFeature::LongShot),
             CommandId::NewClickGuide => Some(PreviewFeature::ClickGuide),
+            CommandId::QuickCapture => Some(PreviewFeature::QuickCapture),
             _ => None,
         }
     }
@@ -341,6 +346,8 @@ pub struct Env<'a> {
     /// A 60 fps self-test passed on this machine and is still current, so "Record at 60 fps"
     /// can be offered (REC-3). The engine makes the final decision when the recording starts.
     pub fps60_ready: bool,
+    /// The presets of `presets.json` (QC-4): each is a row, "Preset: {name}".
+    pub presets: &'a [cm_core::preset::Preset],
 }
 
 /// Whether a 60 fps self-test passed on this machine, is not older than the daemon's staleness
@@ -400,7 +407,7 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
     let recording_off = || env.recording_off.clone();
     // (Row text is made here, when the launcher opens: the window lives for seconds and the
     // language cannot change meanwhile, so every open shows the current language.)
-    vec![
+    let mut rows = vec![
         Command {
             id: CommandId::RecordScreen,
             group: Group::Capture,
@@ -562,7 +569,7 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             glyph: Glyph::Frame,
             hint: Hint::Text(tr!("Scrolling capture")),
             shortcut: key(ShortcutAction::LongShot),
-            disabled: capture_off,
+            disabled: capture_off.clone(),
             verb: tr!("Start Long Shot"),
             options: Vec::new(),
         },
@@ -607,6 +614,28 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             shortcut: Vec::new(),
             disabled: env.guide_off.clone(),
             verb: tr!("Start a guide"),
+            options: Vec::new(),
+        },
+        Command {
+            id: CommandId::QuickCapture,
+            group: Group::Capture,
+            title: tr!("Quick Capture"),
+            keywords: keywords(
+                vec![
+                    tr_ctx!("launcher keyword", "capture"),
+                    tr_ctx!("launcher keyword", "panel"),
+                    tr_ctx!("launcher keyword", "preset"),
+                    tr_ctx!("launcher keyword", "screenshot"),
+                    tr_ctx!("launcher keyword", "record"),
+                ],
+                "Quick Capture", // i18n-ignore: the English title is searched too
+                &["capture", "panel", "preset", "screenshot", "record"],
+            ),
+            glyph: Glyph::Frame,
+            hint: Hint::Text(tr!("Kind, target and options in one panel")),
+            shortcut: key(ShortcutAction::OpenQuickCapture),
+            disabled: capture_off.clone(),
+            verb: tr!("Open Quick Capture"),
             options: Vec::new(),
         },
         Command {
@@ -750,7 +779,43 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             verb: tr!("Copy config"),
             options: Vec::new(),
         },
-    ]
+    ];
+    // QC-4: one row per preset, "Preset: {name}", in the Capture group after Quick Capture.
+    let at = rows
+        .iter()
+        .position(|c| c.id == CommandId::QuickCapture)
+        .map_or(rows.len(), |i| i + 1);
+    let preset_rows = env.presets.iter().enumerate().map(|(i, p)| {
+        let screenshot = p.kind == cm_core::preset::PresetKind::Screenshot;
+        Command {
+            id: CommandId::Preset(u16::try_from(i).unwrap_or(u16::MAX)),
+            group: Group::Capture,
+            title: tr_ctx!("launcher preset", "Preset: {name}", name = p.name),
+            keywords: keywords(
+                vec![tr_ctx!("launcher keyword", "preset"), p.name.clone()],
+                "Preset", // i18n-ignore: the English word is searched too
+                &["preset"],
+            ),
+            glyph: if screenshot {
+                Glyph::Frame
+            } else {
+                Glyph::Record
+            },
+            hint: Hint::Text(crate::quick::presets::summary_text(p)),
+            shortcut: crate::quick::presets::chord_of(p)
+                .map(|c| c.keycaps(env.platform))
+                .unwrap_or_default(),
+            disabled: if screenshot {
+                capture_off.clone()
+            } else {
+                recording_off()
+            },
+            verb: tr_ctx!("launcher verb", "Run preset"),
+            options: Vec::new(),
+        }
+    });
+    rows.splice(at..at, preset_rows);
+    rows
 }
 
 #[cfg(test)]

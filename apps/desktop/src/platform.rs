@@ -148,6 +148,10 @@ pub fn suspend_shortcuts(manager: &impl HotkeyOs, map: &ShortcutMap) {
 
 /// Menu item ids of the tray menu (CAP-2).
 pub mod ids {
+    /// "Quick Capture…" (QC-1): the first item of the menu.
+    pub const QUICK_CAPTURE: &str = "quick_capture";
+    /// A tray item that runs a preset: `preset:<id>` (QC-4).
+    pub const PRESET_PREFIX: &str = "preset:";
     pub const CAPTURE_REGION: &str = "capture_region";
     pub const CAPTURE_WINDOW: &str = "capture_window";
     pub const CAPTURE_DISPLAY: &str = "capture_display";
@@ -345,13 +349,13 @@ pub fn recording_group(recording: bool) -> [&'static str; 4] {
     }
 }
 
-/// Where the Record / Pause / Stop group starts: after the three capture items and the delay
-/// submenu when idle, at the top while recording.
+/// Where the Record / Pause / Stop group starts: after Quick Capture, the three capture items
+/// and the delay submenu when idle, at the top while recording.
 pub fn recording_group_start(recording: bool) -> usize {
     if recording {
         0
     } else {
-        4
+        5
     }
 }
 
@@ -359,6 +363,7 @@ pub fn recording_group_start(recording: bool) -> usize {
 /// (IMP-5): macOS has the menu bar item, Linux builds its own menu.
 pub fn plain_menu_ids(with_import: bool) -> Vec<&'static str> {
     let mut v = vec![
+        ids::QUICK_CAPTURE,
         ids::CAPTURE_REGION,
         ids::CAPTURE_WINDOW,
         ids::CAPTURE_DISPLAY,
@@ -378,6 +383,7 @@ pub fn plain_menu_ids(with_import: bool) -> Vec<&'static str> {
 /// `Pause recording` is set by [`NativeTray::apply_plan`] (it becomes `Resume recording`).
 pub fn menu_text(id: &str) -> String {
     match id {
+        ids::QUICK_CAPTURE => tr!("Quick Capture\u{2026}"),
         ids::CAPTURE_REGION => tr!("Capture region"),
         ids::CAPTURE_WINDOW => tr!("Capture window"),
         ids::CAPTURE_DISPLAY => tr!("Capture display"),
@@ -595,6 +601,7 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
         PredefinedMenuItem::separator(),
     );
     let mut entries: Vec<&dyn tray_icon::menu::IsMenuItem> = vec![
+        plain_item(ids::QUICK_CAPTURE),
         plain_item(ids::CAPTURE_REGION),
         plain_item(ids::CAPTURE_WINDOW),
         plain_item(ids::CAPTURE_DISPLAY),
@@ -831,7 +838,7 @@ mod tests {
             ]
         );
         // Capture region, window, display and the delay submenu come first (CAP-5).
-        assert_eq!(recording_group_start(false), 4);
+        assert_eq!(recording_group_start(false), 5);
         let mut a = recording_group(true);
         let mut b = recording_group(false);
         a.sort_unstable();

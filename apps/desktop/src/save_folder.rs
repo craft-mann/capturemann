@@ -105,7 +105,7 @@ impl SaveError {
         }
     }
 
-    fn from_io(e: &io::Error) -> SaveError {
+    pub(crate) fn from_io(e: &io::Error) -> SaveError {
         // 28 = ENOSPC (POSIX), 112 = ERROR_DISK_FULL, 39 = ERROR_HANDLE_DISK_FULL (Windows).
         let full = matches!(e.raw_os_error(), Some(28 | 112 | 39));
         match e.kind() {

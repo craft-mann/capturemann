@@ -648,6 +648,7 @@ pub fn shortcut_label(a: ShortcutAction) -> String {
         }
         ShortcutAction::AddMarker => tr_ctx!("shortcut", "Add a marker"),
         ShortcutAction::LongShot => tr_ctx!("shortcut", "Long Shot"),
+        ShortcutAction::OpenQuickCapture => tr_ctx!("shortcut", "Open Quick Capture"),
     }
 }
 
@@ -676,6 +677,7 @@ pub fn shortcut_groups() -> [(String, String, Vec<ShortcutAction>); 2] {
                 ShortcutAction::CaptureWindow,
                 ShortcutAction::CaptureDisplay,
                 ShortcutAction::LongShot,
+                ShortcutAction::OpenQuickCapture,
                 ShortcutAction::OpenLauncher,
                 ShortcutAction::OpenLibrary,
                 ShortcutAction::AnnotateLast,

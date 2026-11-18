@@ -146,6 +146,14 @@ impl Tool {
         }
     }
 
+    /// The tool with this id (`step`, `blur`, ...), when the palette offers it (a preset names its
+    /// tool this way, QC-4).
+    pub fn from_id(id: &str) -> Option<Tool> {
+        Tool::ALL
+            .into_iter()
+            .find(|t| t.id() == id && t.in_palette())
+    }
+
     /// Key used for the persisted style (`editor.tool_styles`).
     pub fn id(self) -> &'static str {
         match self {

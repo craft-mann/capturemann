@@ -272,6 +272,18 @@ impl EditorDoc {
         self.state = EditorState::new((img.width(), img.height()), snap.ops.clone(), styles);
         self.state.can_undo = snap.can_undo;
         self.state.can_redo = snap.can_redo;
+        // QC-4: a preset that opens the editor names the tool that is selected first.
+        let wanted = self.app.update(cx, |m, _| {
+            let hit = m
+                .quick
+                .editor_tool
+                .as_ref()
+                .is_some_and(|(id, _)| *id == self.capture_id);
+            hit.then(|| m.quick.editor_tool.take()).flatten()
+        });
+        if let Some(tool) = wanted.and_then(|(_, t)| crate::editor::Tool::from_id(&t)) {
+            self.state.set_tool(tool);
+        }
         self.title = snap.title;
         self.dir = snap.dir;
         self.warnings = snap.warnings;

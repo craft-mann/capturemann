@@ -153,6 +153,8 @@ pub struct AppModel {
     /// A launcher action's one-off "copy / don't copy" for the capture starting now (LNC-1
     /// Actions); read once by [`take_copy`], else the `copy_after_capture` setting applies.
     pub copy_override: Option<bool>,
+    /// Quick Capture: the panel's choices, the presets and the run in flight (QC-1, QC-3, QC-4).
+    pub quick: crate::quick::QuickApp,
     /// CAP-5: the delay that is running, with its pill.
     pub delay_run: Option<crate::ui::delay_pill::DelayRun>,
     pub delay_seq: u64,
@@ -282,6 +284,7 @@ impl AppModel {
             capture_busy: false,
             capture_delay_s: crate::delay::from_setting(settings.get(KEY_CAPTURE_DELAY)),
             copy_override: None,
+            quick: crate::quick::QuickApp::default(),
             delay_run: None,
             delay_seq: 0,
             theme_pref,

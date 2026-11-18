@@ -21,6 +21,10 @@ pub fn set_capture_delay(app: &Entity<AppModel>, secs: u32, cx: &mut App) {
 /// The delay for this capture, read from the shared settings store (what `set_settings` from
 /// the CLI or an agent wrote), not from the cached model value; the model follows.
 pub(crate) fn current_capture_delay(app: &Entity<AppModel>, cx: &mut App) -> u32 {
+    // Quick Capture: the panel's Delay tile is its own choice, never the setting (QC-1.AC6).
+    if let Some(ctx) = &app.read(cx).quick.ctx {
+        return ctx.run.delay_s;
+    }
     let secs = crate::delay::from_setting(
         app.read(cx)
             .backend
@@ -43,6 +47,13 @@ pub(crate) fn current_capture_delay(app: &Entity<AppModel>, cx: &mut App) -> u32
 /// Hotkey, tray menu or toolbar button: wait out the chosen delay if one is set (CAP-5), then
 /// run the overlay and CAP-4.
 pub fn start_capture(app: &Entity<AppModel>, mode: CaptureMode, cx: &mut App) {
+    // Any other way in forgets a Quick Capture run that never finished (a picker closed with Esc).
+    app.update(cx, |m, _| m.quick.ctx = None);
+    start_capture_inner(app, mode, cx);
+}
+
+/// [`start_capture`] without forgetting the Quick Capture run (its own start).
+pub(crate) fn start_capture_inner(app: &Entity<AppModel>, mode: CaptureMode, cx: &mut App) {
     // R19: a window screenshot starts in the window list. Tab there ("Pick on screen") runs the
     // hover mode through `start_hover_capture`, which keeps the CAP-5 delay. A window chosen in
     // the list is captured when Enter is pressed, without a delay.
@@ -68,7 +79,11 @@ pub(crate) fn start_hover_capture(app: &Entity<AppModel>, mode: CaptureMode, cx:
 /// else the "copy after capture" setting (CAP-4).
 pub(crate) fn take_copy(app: &Entity<AppModel>, cx: &mut App) -> bool {
     app.update(cx, |m, _| {
-        m.copy_override.take().unwrap_or(m.copy_after_capture)
+        let quick = m.quick.ctx.as_ref().map(|c| c.run.copy);
+        m.copy_override
+            .take()
+            .or(quick)
+            .unwrap_or(m.copy_after_capture)
     })
 }
 
@@ -110,16 +125,19 @@ pub(crate) fn run_capture(app: &Entity<AppModel>, mode: CaptureMode, cx: &mut Ap
     let app2 = app.clone();
     cx.spawn(async move |cx| {
         let b = backend.clone();
+        let area = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let area2 = area.clone();
         let flow = backend
             .rt
             .spawn(async move {
-                match b.overlay.run(mode).await {
-                    Ok(OverlayOutcome::Captured { capture_id }) => {
+                match b.overlay.run_with_area(mode).await {
+                    Ok((OverlayOutcome::Captured { capture_id }, got)) => {
+                        *area2.lock().unwrap_or_else(|e| e.into_inner()) = got;
                         let done = b.after_capture(&capture_id, copy).await;
                         Ok(CaptureFlow::Done(done))
                     }
-                    Ok(OverlayOutcome::Cancelled) => Ok(CaptureFlow::Cancelled),
-                    Ok(OverlayOutcome::SwitchToList) => Ok(CaptureFlow::SwitchToList),
+                    Ok((OverlayOutcome::Cancelled, _)) => Ok(CaptureFlow::Cancelled),
+                    Ok((OverlayOutcome::SwitchToList, _)) => Ok(CaptureFlow::SwitchToList),
                     Err(e) => Err(e),
                 }
             })
@@ -129,7 +147,13 @@ pub(crate) fn run_capture(app: &Entity<AppModel>, mode: CaptureMode, cx: &mut Ap
             Ok(Err(e)) => CaptureFlow::Overlay(e),
             Err(e) => CaptureFlow::Failed(e.to_string()),
         };
-        cx.update(|cx| finish_capture(&app2, flow, cx));
+        let got = *area.lock().unwrap_or_else(|e| e.into_inner());
+        cx.update(|cx| {
+            if let Some((display_id, rect)) = got {
+                crate::ui::quick_flow::note_area(&app2, display_id, rect, cx);
+            }
+            finish_capture(&app2, flow, cx)
+        });
     })
     .detach();
 }
@@ -145,6 +169,7 @@ pub(crate) fn run_window_capture(app: &Entity<AppModel>, window_id: u32, cx: &mu
     if busy {
         return; // CAP-2
     }
+    crate::ui::quick_flow::note_window(app, window_id, cx);
     // CAP-5: the remembered delay applies to a window chosen from the list too (the pill counts
     // down, the daemon captures that window afterwards, Esc cancels).
     let secs = current_capture_delay(app, cx);
@@ -208,6 +233,12 @@ pub(crate) fn finish_capture(app: &Entity<AppModel>, flow: CaptureFlow, cx: &mut
         }
     );
     app.update(cx, |m, _| m.capture_busy = false);
+    // A Quick Capture run ends with its capture; Tab to the window list (R19) keeps it.
+    let quick = if matches!(flow, CaptureFlow::SwitchToList) {
+        None
+    } else {
+        app.update(cx, |m, _| m.quick.ctx.take())
+    };
     match flow {
         CaptureFlow::Done(Ok(done)) => {
             let spec = {
@@ -223,7 +254,11 @@ pub(crate) fn finish_capture(app: &Entity<AppModel>, flow: CaptureFlow, cx: &mut
                 cx.notify();
             });
             refresh_tray_recents(app, cx);
-            push_toast(app, spec, cx);
+            match quick {
+                // QC-3: the bar, or the Edit / Undo toast, instead of the usual toast.
+                Some(ctx) => crate::ui::quick_flow::finish_shot(app, ctx, &done, cx),
+                None => push_toast(app, spec, cx),
+            }
             // CAP-4.AC4: the capture is in the library; the folder copy is what failed.
             if let Some(warning) = flows::folder_warning_toast(&done.folder) {
                 push_toast(app, warning, cx);

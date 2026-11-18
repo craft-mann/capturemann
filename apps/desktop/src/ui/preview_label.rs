@@ -33,13 +33,16 @@ pub enum PreviewFeature {
     LongShot,
     ClickGuide,
     Boards,
+    /// The Quick Capture panel and its presets (QC-1).
+    QuickCapture,
 }
 
 impl PreviewFeature {
-    pub const ALL: [PreviewFeature; 3] = [
+    pub const ALL: [PreviewFeature; 4] = [
         PreviewFeature::LongShot,
         PreviewFeature::ClickGuide,
         PreviewFeature::Boards,
+        PreviewFeature::QuickCapture,
     ];
 
     /// The stable key: `ui.preview_intro.<key>` is its flag.
@@ -48,6 +51,7 @@ impl PreviewFeature {
             PreviewFeature::LongShot => "long_shot",
             PreviewFeature::ClickGuide => "click_guide",
             PreviewFeature::Boards => "boards",
+            PreviewFeature::QuickCapture => "quick_capture",
         }
     }
 
@@ -57,6 +61,7 @@ impl PreviewFeature {
             PreviewFeature::LongShot => crate::nav::ExtraTile::LongShot.label(),
             PreviewFeature::ClickGuide => crate::nav::ExtraTile::ClickGuide.label(),
             PreviewFeature::Boards => tr_ctx!("feature name", "Boards"),
+            PreviewFeature::QuickCapture => tr_ctx!("feature name", "Quick Capture"),
         }
     }
 
@@ -291,6 +296,7 @@ pub fn send_feedback(feature: PreviewFeature, cx: &mut App) {
         PreviewFeature::LongShot => "Long Shot",
         PreviewFeature::ClickGuide => "Click Guide",
         PreviewFeature::Boards => "Boards",
+        PreviewFeature::QuickCapture => "Quick Capture",
     };
     cx.open_url(&feedback_url(name, env!("CARGO_PKG_VERSION")));
 }
@@ -369,6 +375,9 @@ fn popover_lines(feature: PreviewFeature) -> [String; 3] {
             PreviewFeature::Boards => {
                 tr!("Your boards and the screenshots in them are normal screenshots and stay readable.")
             }
+            PreviewFeature::QuickCapture => {
+                tr!("Your captures are normal captures, and your presets are a plain file you can read and share.")
+            }
         },
         tr!("Tell us what works and what doesn\u{2019}t."),
     ]
@@ -384,6 +393,9 @@ fn intro_line(feature: PreviewFeature) -> String {
         ),
         PreviewFeature::Boards => tr!(
             "Pick 2 to 12 screenshots and put them into one picture: a pair, a grid, a strip or a free layout."
+        ),
+        PreviewFeature::QuickCapture => tr!(
+            "One small panel for the kind, the target and the options, with presets for the setups you repeat."
         ),
     }
 }

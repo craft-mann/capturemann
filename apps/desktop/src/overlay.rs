@@ -222,6 +222,23 @@ pub fn parse_pick(
     }
 }
 
+/// The display and the rectangle (`[x, y, w, h]`, physical px relative to the display) of a
+/// capture result line; the rectangle is absent for a display or a window.
+pub fn parse_area(stdout: &str) -> Option<(u32, Option<[i64; 4]>)> {
+    let last = stdout.lines().rev().find(|l| !l.trim().is_empty())?;
+    let v: Value = serde_json::from_str(last.trim()).ok()?;
+    let display = u32::try_from(v.get("display_id")?.as_u64()?).ok()?;
+    let rect = v.get("rect").and_then(Value::as_array).and_then(|a| {
+        Some([
+            a.first()?.as_i64()?,
+            a.get(1)?.as_i64()?,
+            a.get(2)?.as_i64()?,
+            a.get(3)?.as_i64()?,
+        ])
+    });
+    Some((display, rect))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OverlayError {
     /// `cm-overlay` is not installed next to the app or on PATH.
@@ -432,6 +449,20 @@ impl OverlayLauncher {
         parse_result(code, &out, &err)
     }
 
+    /// [`OverlayLauncher::run`] and where the capture was taken (QC-3: Long Shot and Record start
+    /// from that area). The overlay already prints the display and the rectangle.
+    pub async fn run_with_area(
+        &self,
+        mode: CaptureMode,
+    ) -> Result<(OverlayOutcome, Option<(u32, Option<[i64; 4]>)>), OverlayError> {
+        let (code, out, err) = self.run_raw(mode, false).await?;
+        let outcome = parse_result(code, &out, &err)?;
+        let area = matches!(outcome, OverlayOutcome::Captured { .. })
+            .then(|| parse_area(&out))
+            .flatten();
+        Ok((outcome, area))
+    }
+
     /// Runs the picker only: the chosen target, or `None` on Esc (REC-1).
     pub async fn pick(&self, mode: CaptureMode) -> Result<Option<Picked>, OverlayError> {
         let (code, out, err) = self.run_raw(mode, true).await?;
@@ -577,6 +608,19 @@ mod tests {
                 capture_id: "shot_1".into()
             })
         );
+    }
+
+    /// QC-3: the area of a capture is read from the overlay's result line.
+    #[test]
+    fn qc3_the_area_comes_from_the_result_line() {
+        let out = "noise\n{\"capture_id\":\"s\",\"display_id\":2,\"rect\":[10,20,300,200]}\n";
+        assert_eq!(parse_area(out), Some((2, Some([10, 20, 300, 200]))));
+        assert_eq!(
+            parse_area("{\"capture_id\":\"s\",\"display_id\":1}"),
+            Some((1, None))
+        );
+        assert_eq!(parse_area("{\"capture_id\":\"s\"}"), None);
+        assert_eq!(parse_area(""), None);
     }
 
     /// R19: Tab in the hover mode ends the overlay with a hand-over, not a capture and not an error.

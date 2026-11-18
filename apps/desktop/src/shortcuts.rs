@@ -270,10 +270,12 @@ pub enum ShortcutAction {
     AddMarker,
     /// Long Shot (CAP-6): a scrolling capture. **No default chord** (design S13: "Not set").
     LongShot,
+    /// The Quick Capture panel (QC-1, Option+Shift+C).
+    OpenQuickCapture,
 }
 
 impl ShortcutAction {
-    pub const ALL: [ShortcutAction; 13] = [
+    pub const ALL: [ShortcutAction; 14] = [
         ShortcutAction::CaptureRegion,
         ShortcutAction::CaptureWindow,
         ShortcutAction::CaptureDisplay,
@@ -287,6 +289,7 @@ impl ShortcutAction {
         ShortcutAction::ToggleAudioRecording,
         ShortcutAction::AddMarker,
         ShortcutAction::LongShot,
+        ShortcutAction::OpenQuickCapture,
     ];
 
     /// Settings key (`get_settings` / `set_settings` can read and change `shortcuts.*`).
@@ -305,6 +308,7 @@ impl ShortcutAction {
             Self::ToggleAudioRecording => "shortcuts.toggle_audio_recording",
             Self::AddMarker => "shortcuts.add_marker",
             Self::LongShot => "shortcuts.long_shot",
+            Self::OpenQuickCapture => "shortcuts.open_quick_capture",
         }
     }
 
@@ -323,6 +327,7 @@ impl ShortcutAction {
             Self::ToggleAudioRecording => tr!("Start or stop audio recording"),
             Self::AddMarker => tr!("Add a marker"),
             Self::LongShot => tr!("Long Shot"),
+            Self::OpenQuickCapture => tr!("Open Quick Capture"),
         }
     }
 
@@ -347,6 +352,7 @@ impl ShortcutAction {
             Self::AddMarker => "m",
             // No default: the chord is unset (see `default_chord`).
             Self::LongShot => "",
+            Self::OpenQuickCapture => "c",
         }
     }
 
