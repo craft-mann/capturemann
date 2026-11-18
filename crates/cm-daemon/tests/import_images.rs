@@ -395,6 +395,25 @@ async fn refused_and_damaged_pictures_create_nothing() {
     }
 }
 
+/// IMP-6.AC6: a text file named `.png` is an unreadable picture, never "the video codec Png".
+#[tokio::test]
+async fn a_text_file_named_png_is_an_unreadable_picture() {
+    let r = rig();
+    let bad = r.put("bad.png", b"not-an-image");
+    let err = r
+        .import(Actor::User, json!({"paths": [s(&bad)]}))
+        .await
+        .unwrap_err();
+    match err {
+        DaemonError::WithData { data, error } => {
+            let message = error.to_string();
+            assert_eq!(data["reason"], "unreadable_file");
+            assert!(!message.contains("codec"), "{message}");
+        }
+        e => panic!("{e:?}"),
+    }
+}
+
 /// IMP-6.AC6 at job time: a file that is cut short after the check is a failed file with
 /// `unreadable_file`, and nothing is created.
 #[tokio::test]

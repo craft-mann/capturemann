@@ -475,7 +475,7 @@ pub(crate) fn make_plan(
             Ok((head, _)) => picture::sniff(&head),
             Err(_) => Sniff::Other,
         };
-        if sniffed != Sniff::Other {
+        if sniffed != Sniff::Other || picture::extension_claims_picture(&path) {
             files.push(plan_picture(&path, name, given, size_bytes, mtime, sniffed));
             continue;
         }
