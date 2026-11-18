@@ -43,4 +43,6 @@ Reports: `verification/QA-0.3.5-pass1-macos-2026-11-17-claude.md`, `QA-0.3.5-pas
 
 ## 4. Order of work and exit
 
-Phase 0 text is written. The presets core (QC-4, QC-5) is built first because the panel (QC-1) and the after-capture bar (QC-3) use its types. The transcript work and the small fixes run in parallel on disjoint files. During development only fmt, clippy and the tests of the touched crates run (plus the i18n check, and the MCP tool count when tools change). The full gate runs once, on the final tree, before release. After it: QA agent passes on the candidates and `cm-regress` on all three systems, with reports in `verification/`. The maintainer tries the release candidate by hand and sends feedback; every item from that feedback is fixed or answered before the release is published. The push and the release wait for it.
+Phase 0 text is written. The presets core (QC-4, QC-5) is built first because the panel (QC-1) and the after-capture bar (QC-3) use its types. The transcript work and the small fixes run in parallel on disjoint files. During development only fmt, clippy and the tests of the touched crates run (plus the i18n check, and the MCP tool count when tools change).
+
+After development: the maintainer tries the build by hand and sends feedback and review comments; every item is fixed or answered. Only then the full gate runs, once, on the final tree, followed by QA agent passes on the candidates and `cm-regress` on all three systems, with reports in `verification/`. The push and the release follow the regression.
