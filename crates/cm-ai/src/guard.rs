@@ -16,6 +16,9 @@
 //!   the room, and a line of several words rarely has no word under 0.97. Needs the audio and a
 //!   recording where speech and room can be told apart ([`Reference::new`]); otherwise it keeps
 //!   everything.
+//! * [`drop_doubtful`] (0.3.6, AI-1.AC12b) writes a line as an `[unclear]` sound instead when most of
+//!   its words are low in confidence ([`LOW_CONFIDENCE`]) over audio that is not speech-like (under a
+//!   quarter of its frames 10 dB over the room), and works on recordings under 30 s too.
 //! * [`drop_ignored`] drops the lines that contain a phrase of the user's own list
 //!   (`ai.ignore_phrases`, empty by default), compared with [`fold`] (case, accents, punctuation).
 //!
