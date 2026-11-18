@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-18
+
 ### Added
 - **Line styles (ANN-12).** Arrow, Line, Rectangle and Ellipse can be solid, dashed or dotted: a three-button control in the editor's shape panel (remembered per tool, one undo step) and an optional `style` on the four `annotate` ops (`solid`, `dashed`, `dotted`; solid is not written; an unknown value is `invalid_input` naming the op; an older app keeps the field and draws it solid). The arrow head stays solid.
 - **Send feedback in Settings > About**, next to Source on GitHub: opens the GitHub feedback issue form with the app version and the title `CaptureMann {version} general feedback`; nothing is sent before the click and no logs, paths or library data are included. `.github/ISSUE_TEMPLATE/feedback.yml` is the form.

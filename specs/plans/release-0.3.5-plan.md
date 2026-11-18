@@ -1,6 +1,6 @@
 # Release 0.3.5: a light release (plan, draft, Nov 17, 2026)
 
-Status: **ready to ship (Nov 17, 2026); built and merged on `main`, release planned for Nov 18, 2026; no open decision except the Linux files (`docs/development/release-day-0.3.5.md`).** Scope set by the maintainer on Nov 17, 2026: a **light** release with five parts, each labelled **BUG**, **FEATURE** or **PROCESS** below:
+Status: **released Nov 18, 2026 (tag `v0.3.5` on `9dcfb5c3`).** Scope set by the maintainer on Nov 17, 2026: a **light** release with five parts, each labelled **BUG**, **FEATURE** or **PROCESS** below:
 
 | Part | Label | What |
 | --- | --- | --- |
