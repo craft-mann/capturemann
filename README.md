@@ -28,6 +28,10 @@ through MCP and a CLI.
   <img alt="The CaptureMann editor: a screen recording with webcam, timeline and captions, the transcript, meeting minutes and publish options beside it, and a long screenshot and an agent request around the window" src="docs/images/editor.webp" width="900">
 </p>
 
+<p align="center">
+<a href="https://www.craftmann.app/capturemann/download/"><b>Download CaptureMann</b></a> for macOS, Windows and Linux
+</p>
+
 ## Features
 
 ✓ works, — not available. Notes in brackets name the limit. Current versions and downloads are on the
