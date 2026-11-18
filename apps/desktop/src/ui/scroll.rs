@@ -62,6 +62,43 @@ pub fn fill_scroll(
     scroll_area(t, handle, None, list, Some(Box::new(on_wheel)))
 }
 
+/// A thin thumb drawn over the right edge of a scrolling element that has no room for a track
+/// (the 64 px rail), only while its content overflows: the cue that it scrolls (0.3.6 P-6). Put
+/// it as a sibling of the scrolling element, which tracks `handle`; it takes no mouse input.
+pub fn thumb_overlay(t: &Theme, handle: &ScrollHandle, width: f32) -> AnyElement {
+    let bar = handle.clone();
+    let thumb = hsla_of(t.mist).opacity(0.6);
+    canvas(
+        |_, _, _| (),
+        move |bounds, _, window, _| {
+            let Some((top, height)) = thumb_geometry(
+                f32::from(bounds.size.height),
+                f32::from(bar.max_offset().y),
+                f32::from(bar.offset().y),
+            ) else {
+                return;
+            };
+            let mut b = bounds;
+            b.origin.y += px(top);
+            b.size.height = px(height);
+            window.paint_quad(quad(
+                b,
+                px(width / 2.),
+                thumb,
+                px(0.),
+                gpui::transparent_black(),
+                BorderStyle::default(),
+            ));
+        },
+    )
+    .absolute()
+    .top_0()
+    .bottom_0()
+    .right(px(1.))
+    .w(px(width))
+    .into_any_element()
+}
+
 fn scroll_area(
     t: &Theme,
     handle: &ScrollHandle,

@@ -43,6 +43,9 @@ pub struct SidebarProps {
     pub audio_open: bool,
     /// What the second dock row (Long Shot, Click Guide) needs to know (board S14).
     pub dock: DockFacts,
+    /// The scroll position of the rail, kept by the window so it survives a redraw and the thumb
+    /// can be drawn from it (0.3.6 P-6).
+    pub rail_scroll: gpui::ScrollHandle,
 }
 
 impl SidebarProps {
@@ -67,11 +70,12 @@ pub fn sidebar(
         SidebarMode::Rail => rail_body(t, p, app),
         SidebarMode::Settings => settings_body(t, p, app, settings),
     };
-    div()
+    let side = div()
         .id("sidebar")
         .role(Role::Navigation)
         .aria_label(tr_ctx!("landmark", "Main"))
-        .w(px(mode.width()))
+        .when(mode == SidebarMode::Rail, |d| d.w_full())
+        .when(mode != SidebarMode::Rail, |d| d.w(px(mode.width())))
         .h_full()
         .flex_none()
         .flex()
@@ -80,7 +84,11 @@ pub fn sidebar(
         // The rail holds fourteen 44 px buttons: on a short window (a 150 % screen gives about
         // 660 px) it scrolls instead of letting Settings fall below the window (0.3.5 Q-7).
         .when(mode == SidebarMode::Rail, |d| {
-            d.items_center().px(px(8.)).py(px(10.)).overflow_y_scroll()
+            d.items_center()
+                .px(px(8.))
+                .py(px(10.))
+                .track_scroll(&p.rail_scroll)
+                .overflow_y_scroll()
         })
         .when(mode != SidebarMode::Rail, |d| d.px(px(12.)).py(px(18.)))
         .bg(rgba_of(t.sidebar))
@@ -91,7 +99,18 @@ pub fn sidebar(
         } else {
             t.border
         }))
-        .children(body)
+        .children(body);
+    if mode != SidebarMode::Rail {
+        return side.into_any_element();
+    }
+    // The rail scrolls when the window is short; a thin thumb on its edge says so.
+    div()
+        .relative()
+        .w(px(mode.width()))
+        .h_full()
+        .flex_none()
+        .child(side)
+        .child(crate::ui::scroll::thumb_overlay(t, &p.rail_scroll, 3.))
         .into_any_element()
 }
 
