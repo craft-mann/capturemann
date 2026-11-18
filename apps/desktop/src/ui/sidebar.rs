@@ -450,7 +450,7 @@ fn keycap_row(t: &Theme, keys: &[String]) -> gpui::Div {
 /// Where the XS Preview tag sits on a dock tile: its top-right corner straddling the border (S24),
 /// px from the tile's right and top edges (negative: outside).
 pub(crate) const TAG_RIGHT: f32 = -4.;
-pub(crate) const TAG_TOP: f32 = -8.;
+pub(crate) const TAG_TOP: f32 = -9.;
 
 /// The label of a dock tile: wraps to at most `LABEL_LINES` lines of `LABEL_LINE` px at the width
 /// of the tile, each cut with an ellipsis at the end when it still does not fit, never clipped or
@@ -490,6 +490,19 @@ fn extra_tile(
         x.shortcut()
             .is_some_and(|a| !p.shortcuts.get(a).keycaps(p.platform).is_empty())
     });
+    // The most label lines either tile of the row takes: both get the height that keeps the icon
+    // clear of the Preview tag.
+    let row_lines = nav::ExtraTile::ALL
+        .into_iter()
+        .map(|x| {
+            nav::tile_metrics::label_lines(crate::ui::bar_layout::text_w(
+                &x.label(),
+                11.,
+                false,
+                400,
+            ) as f32)
+        })
+        .fold(1.0_f32, f32::max);
     let tip_model = nav::tile_tip(tile, &state, &keys);
     let mut lines = tile_lines(&tip_model);
     if rail && !disabled_state(&state) {
@@ -533,7 +546,7 @@ fn extra_tile(
     } else {
         d.flex_1()
             .min_w(px(0.))
-            .h(px(nav::tile_metrics::height(row_has_keys)))
+            .h(px(nav::tile_metrics::height(row_has_keys, row_lines)))
             .flex_col()
             .gap(px(3.))
             .px(px(4.))
@@ -919,10 +932,10 @@ mod tile_label_tests {
     /// corner, never over the icon or the label), filled with the dock's own ground.
     #[test]
     fn the_xs_tag_sits_on_the_tile_corner_as_on_the_board() {
-        assert_eq!((TAG_RIGHT, TAG_TOP), (-4., -8.));
+        assert_eq!((TAG_RIGHT, TAG_TOP), (-4., -9.));
         let m = crate::ui::preview_label::metrics(PreviewSize::Xs);
-        // Its 14 px height reaches 6 px into the tile: above the icon row (8 px of padding).
-        assert!(m.height + TAG_TOP <= 8.);
+        // Its 14 px height reaches 5 px into the tile: above the icon row (8 px of padding).
+        assert!(m.height + TAG_TOP <= nav::tile_metrics::TAG_REACH);
     }
 
     /// The same measurement on the first layout: its text item is as wide as the whole text, wider

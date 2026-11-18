@@ -478,12 +478,22 @@ fn a_shape_far_outside_the_picture_is_refused_ann_1_ac14() {
     };
     let _: &AnnotationOp = &rect([0.0; 4]);
     let e = b
-        .annotate(vec![rect([10.0, 10.0, 5_000_000.0, 50.0])], false, agent(), t(1))
+        .annotate(
+            vec![rect([10.0, 10.0, 5_000_000.0, 50.0])],
+            false,
+            agent(),
+            t(1),
+        )
         .unwrap_err();
     assert_eq!(e.code(), ErrorCode::InvalidInput);
     assert!(e.to_string().contains("ops[0]"), "{e}");
     assert!(b.ops().is_empty());
-    b.annotate(vec![rect([-20.0, -20.0, 300.0, 50.0])], false, agent(), t(2))
-        .unwrap();
+    b.annotate(
+        vec![rect([-20.0, -20.0, 300.0, 50.0])],
+        false,
+        agent(),
+        t(2),
+    )
+    .unwrap();
     assert_eq!(b.ops().len(), 1);
 }

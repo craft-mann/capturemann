@@ -149,9 +149,7 @@ pub(super) fn resolve_window(targets: &Value, needle: &str) -> Result<u64, CliEr
                 .collect();
             let lines: Vec<String> = list
                 .iter()
-                .map(|m| {
-                    format!("{} \"{}\"", m["id"], m["title"].as_str().unwrap_or(""))
-                })
+                .map(|m| format!("{} \"{}\"", m["id"], m["title"].as_str().unwrap_or("")))
                 .collect();
             let mut e = CliError::invalid_input(format!(
                 "`{needle}` matches {} windows: {}. Pass the window id to choose one.",

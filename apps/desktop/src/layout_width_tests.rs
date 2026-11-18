@@ -1855,6 +1855,26 @@ fn the_preview_label_fits_where_it_goes_in_every_language() {
             );
         }
     }
+    // 0.3.6 P-9, F5: in Vietnamese the label wraps to two lines and the tile is tall enough that
+    // its icon starts below the XS tag (the model and the measured text agree on two lines).
+    let vi_w = width(
+        &with_language(Lang::Vi, || crate::nav::ExtraTile::ClickGuide.label()),
+        Face::of(false, 400),
+        11.,
+    );
+    let tile_lines = crate::nav::tile_metrics::label_lines(vi_w);
+    assert_eq!(tile_lines, 2.0, "{vi_w:.0} px");
+    let h = crate::nav::tile_metrics::height(false, tile_lines);
+    let icon_top = (h
+        - (crate::nav::tile_metrics::ICON
+            + crate::nav::tile_metrics::GAP
+            + tile_lines * crate::nav::tile_metrics::LABEL_LINE))
+        / 2.;
+    assert!(
+        icon_top + crate::nav::tile_metrics::BORDER / 2.
+            >= crate::nav::tile_metrics::TAG_REACH + 1.0,
+        "{icon_top}"
+    );
     // CG-11: the Vietnamese tile label wraps to at most two 13 px lines, which the tile has room for.
     let vi = with_language(Lang::Vi, || crate::nav::ExtraTile::ClickGuide.label());
     let n = lines(&vi, Face::of(false, 400), 11., DOCK_ROW2_ROOM).unwrap_or(99);

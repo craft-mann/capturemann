@@ -906,12 +906,12 @@ impl Inner {
                         (long_shot::EndReason::WindowClosed, Some(t)) => {
                             Some(format!("The window \"{t}\" was closed"))
                         }
-                        (long_shot::EndReason::NoOverlap, _) => result.end.note().map(|n| {
-                            match result.why {
+                        (long_shot::EndReason::NoOverlap, _) => {
+                            result.end.note().map(|n| match result.why {
                                 Some(w) => format!("{n}: {w}"),
                                 None => n.to_owned(),
-                            }
-                        }),
+                            })
+                        }
                         _ => result.end.note_for(cfg.limits, along),
                     },
                     why: result.why.map(str::to_owned),
