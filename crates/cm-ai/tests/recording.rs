@@ -612,3 +612,105 @@ fn a_line_written_over_a_stretch_with_no_speech_is_dropped_and_recorded() {
         on.dropped
     );
 }
+
+/// A 16 kHz mono WAV of `secs` seconds: speech-level noise outside `quiet` (seconds), the room
+/// only inside it.
+fn write_wav_with_quiet(path: &Path, secs: usize, quiet: std::ops::Range<usize>) {
+    let rate = 16_000u32;
+    let n = secs * rate as usize;
+    let mut data = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let q = (quiet.start * rate as usize..quiet.end * rate as usize).contains(&i);
+        let amp = if q { 0.002 } else { 0.2 };
+        let s = (amp * (i as f32 * 0.37).sin() * 32767.0) as i16;
+        data.extend_from_slice(&s.to_le_bytes());
+    }
+    let mut out = Vec::new();
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&rate.to_le_bytes());
+    out.extend_from_slice(&(rate * 2).to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    out.extend_from_slice(&data);
+    std::fs::write(path, out).unwrap();
+}
+
+/// AI-1.AC12 (0.3.6): in a 12 s recording, a line the decoder doubts over the room becomes an
+/// `[unclear]` sound, its words leave `words`, the drop is kept with the reason `doubtful`, and
+/// the same run with the setting off keeps the words. Doubtful words over speech-level audio stay.
+#[test]
+fn a_doubtful_line_over_the_room_in_short_audio_becomes_an_unclear_sound() {
+    if ffmpeg().is_none() {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    write_wav_with_quiet(&dir.path().join("mic.wav"), 12, 4..8);
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {"file": "mic.wav", "start": 0, "end": ticks(12.0)}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    let at = |text: &str, secs: f64, confidence: f32| cm_ai::transcribe::Word {
+        text: text.into(),
+        start: media_secs(secs),
+        end: media_secs(secs + 0.4),
+        confidence,
+    };
+    let mut words: Vec<_> = (0..8)
+        .map(|i| at("said", 0.5 + i as f64 * 0.4, 0.9))
+        .collect();
+    // Doubtful but audible (speech level): kept.
+    words.extend((0..3).map(|i| at("mumbled", 3.2 + i as f64 * 0.2, 0.2)));
+    // Doubtful over the room: becomes a sound (four words, so the five-word rule is not it).
+    words.extend((0..4).map(|i| at("invented", 5.0 + i as f64 * 0.4, 0.2)));
+    words.extend((0..6).map(|i| at("later", 8.5 + i as f64 * 0.4, 0.9)));
+    let t = Windowed(words);
+    let run = |drop: bool| {
+        transcribe_recording(
+            dir.path(),
+            &t,
+            &TranscribeOptions {
+                model_id: Some("scripted"),
+                drop_unsupported_lines: drop,
+                ..Default::default()
+            },
+            &mut |_| true,
+        )
+        .unwrap()
+    };
+    let on = run(true);
+    assert!(
+        on.words.iter().all(|w| w.text != "invented"),
+        "{:?}",
+        on.words
+    );
+    assert!(on.words.iter().any(|w| w.text == "mumbled"));
+    let doubtful: Vec<_> = on
+        .dropped
+        .iter()
+        .filter(|d| d.reason == cm_ai::guard::DropReason::Doubtful)
+        .collect();
+    assert_eq!(doubtful.len(), 1, "{:?}", on.dropped);
+    assert_eq!(doubtful[0].words, 4);
+    let unclear: Vec<_> = on
+        .sounds
+        .iter()
+        .filter(|s| s.kind == cm_ai::transcribe::SoundKind::Unclear)
+        .collect();
+    assert_eq!(unclear.len(), 1, "{:?}", on.sounds);
+    assert!((unclear[0].start.as_secs_f64() - 5.0).abs() < 1e-3);
+    let off = run(false);
+    assert!(off.words.iter().any(|w| w.text == "invented"));
+    assert!(off.dropped.is_empty());
+}
