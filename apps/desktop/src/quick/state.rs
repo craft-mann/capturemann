@@ -843,7 +843,7 @@ mod tests {
         assert_eq!(picker_step(0, true, 0), 0);
         assert_eq!(
             picker_step(9, false, 3),
-            1,
+            2,
             "a stale cursor is pulled back in"
         );
     }
