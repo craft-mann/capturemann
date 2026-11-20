@@ -256,7 +256,8 @@ impl QuickPanel {
             window,
             |this, _, ev: &TextFieldEvent, window, cx| match ev {
                 TextFieldEvent::Submitted => this.save_named(window, cx),
-                TextFieldEvent::Escaped => this.back(window, cx),
+                // QC-1 "Keys": Esc on the name screen goes back to the picker it came from.
+                TextFieldEvent::Escaped => this.open_picker(window, cx),
                 TextFieldEvent::Changed(_) => {
                     this.name_error = None;
                     cx.notify();
@@ -529,32 +530,33 @@ impl QuickPanel {
         }
         let json = self.st.to_preset_json(&name);
         let this = cx.entity();
+        let handle = window.window_handle();
         crate::ui::quick_flow::preset_call(
             &self.app,
             "save_preset",
             serde_json::json!({ "preset": json }),
             move |_, res, cx| {
-                this.update(cx, |this, cx| match res {
-                    Ok(v) => {
-                        // The new preset is the picked one: the bar names it.
-                        if let Ok(p) =
-                            serde_json::from_value::<Preset>(v.get("preset").cloned().unwrap_or(v))
-                        {
-                            this.st.apply_preset(&p);
-                            this.changed(cx);
+                let _ = handle.update(cx, |_, window, cx| {
+                    this.update(cx, |this, cx| match res {
+                        Ok(v) => {
+                            // The new preset is the picked one: the bar names it.
+                            if let Ok(p) = serde_json::from_value::<Preset>(
+                                v.get("preset").cloned().unwrap_or(v),
+                            ) {
+                                this.st.apply_preset(&p);
+                                this.changed(cx);
+                            }
+                            this.back(window, cx);
                         }
-                        this.body = Body::Main;
-                        cx.notify();
-                    }
-                    Err(e) => {
-                        this.name_error = Some(e);
-                        cx.notify();
-                    }
+                        Err(e) => {
+                            this.name_error = Some(e);
+                            cx.notify();
+                        }
+                    });
                 });
             },
             cx,
         );
-        let _ = window;
     }
 
     fn open_name(&mut self, window: &mut Window, cx: &mut Context<Self>) {

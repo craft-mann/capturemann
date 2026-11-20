@@ -258,7 +258,11 @@ impl PresetSheet {
                 self.end_key(cx);
             }
             // QC-4.AC5: refused, with the owner named.
-            Err(owner) => self.key_error = Some(owner.to_string()),
+            Err(owner) => {
+                self.key_error = Some(owner.to_string());
+                // The note sits under the shortcut row at the end of the body: bring it into view.
+                self.scroll.scroll_to_bottom();
+            }
         }
         cx.notify();
     }

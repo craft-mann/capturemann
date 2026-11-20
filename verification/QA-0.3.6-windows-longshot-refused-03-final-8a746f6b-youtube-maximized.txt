@@ -1,0 +1,3 @@
+frame size 1920x1008 px (last 1920x1008 px)
+reason: no shift matches (header 147, footer 6, 1008 lines); closest: shift 813 with 26 of 26 compared lines differing; with up to 57 differing pixels per line allowed: no shift matches (header 204, footer 6, 1008 lines); closest: shift 759 with 23 of 23 compared lines differing; with stretches of lines left out: no shift matches even with stretches of lines left out; with a band of columns: no shift matches; run state: trim None, full mask None, bands None, hint Some(302); same pair with the hint left out: no; with the bands left out: no; with both left out: no
+auto scroll, the pair the step of 302 px made (expected shift 302, 1 frames so far)
