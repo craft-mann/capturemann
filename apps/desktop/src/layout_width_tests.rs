@@ -15,7 +15,7 @@
 //! constant changed together with the test that pins it (see `locales/README.md`, "Layout: long
 //! translations").
 
-use cm_i18n::{tr, tr_ctx, with_language, Lang};
+use cm_i18n::{tr_ctx, with_language, Lang};
 
 use crate::shortcuts::{Platform, ShortcutAction, ShortcutMap};
 use crate::text_metrics_tests::{lines, width, Face};
@@ -1494,94 +1494,17 @@ fn cases() -> Vec<Case> {
         .text("External", crate::ui::window_picker::filter_external),
     );
 
-    // ---- Quick Capture panel (QC-1): 352 px wide, 14 px padding, so 324 px of content -----------
-    // An option tile: two share the row with an 8 px gap (158 px each); 1 px border each side, 10 px
-    // padding each side, the 28 px icon circle and its 8 px gap leave 104 px for the label (13 px,
-    // medium; the label cuts with an ellipsis, so it must fit in the two supported languages).
-    use crate::quick::state::{kind_label, target_label, Tile};
-    use cm_core::preset::{PresetKind, PresetTarget};
-    let tiles: Vec<(String, Labeler)> = [
-        Tile::Editor,
-        Tile::Copy,
-        Tile::Redact,
-        Tile::Delay,
-        Tile::Mic,
-        Tile::SystemAudio,
-        Tile::Webcam,
-        Tile::Countdown,
-        Tile::Transcribe,
-        Tile::Markers,
-    ]
-    .into_iter()
-    .map(|t| (format!("{t:?}"), Box::new(move || t.label()) as Labeler))
-    .collect();
+    // ---- Quick Capture bar (QC-1): icon buttons carry no text; the texts are the action's two ----
+    // lines, the popover's rows and buttons (360 px wide, 8 px padding, 1 px border).
+    use crate::quick::place::{bar as qc_bar, POP_W};
+    // The action button: 1 px border each side, 12 px left and 8 px right padding, the 16 px icon
+    // and the 22 px Enter keycap with an 8 px gap each. "Capture" and "Record" are one line at 14
+    // px semibold; the preset name under them is cut with an ellipsis.
     v.push(
         Case::new(
-            "Quick Capture option tile",
-            "(324 - 8) / 2 - 2 border - 16 padding - 28 circle - 8 gap",
-            (324. - 8.) / 2. - 2. - 16. - 28. - 8.,
-            ui - 1.,
-            500,
-            one,
-        )
-        .texts(tiles),
-    );
-    // A target segment: four share the row with 4 px gaps (78 px each), 1 px border, 6 px padding.
-    let targets: Vec<(String, Labeler)> = [
-        PresetTarget::Region,
-        PresetTarget::Window,
-        PresetTarget::Display,
-        PresetTarget::LongShot,
-    ]
-    .into_iter()
-    .map(|t| {
-        (
-            t.as_str().to_owned(),
-            Box::new(move || target_label(t)) as Labeler,
-        )
-    })
-    .collect();
-    v.push(
-        Case::new(
-            "Quick Capture target segment",
-            "(324 - 3*4) / 4 - 2 border - 12 padding",
-            (324. - 12.) / 4. - 2. - 12.,
-            ui - 1.,
-            400,
-            one,
-        )
-        .texts(targets),
-    );
-    // The active kind tab keeps the room left by the two 44 px icon tabs: 324 - 2 border - 6 padding
-    // - 2 * 44 - 2 * 4 gaps, less its own 20 px padding, 16 px icon and 6 px gap.
-    let kinds: Vec<(String, Labeler)> =
-        [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio]
-            .into_iter()
-            .map(|k| {
-                (
-                    k.as_str().to_owned(),
-                    Box::new(move || kind_label(k)) as Labeler,
-                )
-            })
-            .collect();
-    v.push(
-        Case::new(
-            "Quick Capture active kind tab",
-            "324 - 2 - 6 - 88 - 8 - 20 - 16 - 6",
-            324. - 2. - 6. - 88. - 8. - 20. - 16. - 6.,
-            ui - 1.,
-            500,
-            one,
-        )
-        .texts(kinds),
-    );
-    // The action bar: 324 px, 14 px padding each side, the Enter keycap (about 64 px) and a gap. The
-    // text may be cut after a preset name, so the plain words must fit with room for a short name.
-    v.push(
-        Case::new(
-            "Quick Capture action bar",
-            "324 - 28 padding - 8 gap - 64 keycap - 80 for a short preset name",
-            324. - 28. - 8. - 64. - 80.,
+            "Quick Capture action button",
+            "140 - 2 border - 20 padding - 16 icon - 22 keycap - 2*8 gaps",
+            qc_bar::ACTION_W as f32 - 2. - 20. - 16. - 22. - 16.,
             ui,
             600,
             one,
@@ -1589,34 +1512,75 @@ fn cases() -> Vec<Case> {
         .text("Capture", || tr_ctx!("quick capture action", "Capture"))
         .text("Record", || tr_ctx!("quick capture action", "Record")),
     );
-    // The header title beside the mark (20 px), the Preview label and the 32 px settings button, with
-    // three 8 px gaps.
+    // The picker's links: 360 - 2 border - 16 padding, then 10 px padding each side, the 14 px
+    // icon and an 8 px gap.
     v.push(
         Case::new(
-            "Quick Capture header title",
-            "324 - 20 mark - 32 settings - 3*8 gaps - Preview label",
-            324. - 20.
-                - 32.
-                - 24.
-                - crate::ui::preview_label::width(crate::ui::preview_label::Size::S),
-            ui,
-            600,
-            one,
-        )
-        .text("title", || tr!("Quick Capture")),
-    );
-    // Send feedback beside the preset pill (which keeps at least 130 px): 10 px padding each side.
-    v.push(
-        Case::new(
-            "Quick Capture Send feedback button",
-            "324 - 6 gap - 130 pill - 20 padding",
-            324. - 6. - 130. - 20.,
+            "Quick Capture picker link",
+            "360 - 18 - 20 - 14 icon - 8 gap",
+            POP_W as f32 - 18. - 20. - 14. - 8.,
             ui - 1.,
             400,
             one,
         )
-        .text("Send feedback", || tr_ctx!("button", "Send feedback")),
+        .text("Save current as preset", || {
+            tr_ctx!("preset picker", "Save current as preset\u{2026}")
+        })
+        .text("Edit presets", || {
+            tr_ctx!("preset picker", "Edit presets\u{2026}")
+        }),
     );
+    // A value of the Delay or Countdown menu: four share the row with 8 px gaps, 1 px border.
+    let values: Vec<(String, Labeler)> = [0u32, 3, 5, 10]
+        .into_iter()
+        .map(|n| {
+            (
+                n.to_string(),
+                Box::new(move || crate::quick::state::seconds_text(n)) as Labeler,
+            )
+        })
+        .collect();
+    v.push(
+        Case::new(
+            "Quick Capture value menu button",
+            "(360 - 18 - 3*8) / 4 - 2 border",
+            (POP_W as f32 - 18. - 24.) / 4. - 2.,
+            ui,
+            400,
+            one,
+        )
+        .texts(values),
+    );
+    // The name screen's two buttons share the row with an 8 px gap.
+    v.push(
+        Case::new(
+            "Quick Capture name screen buttons",
+            "(360 - 18 - 8) / 2",
+            (POP_W as f32 - 18. - 8.) / 2.,
+            ui,
+            600,
+            one,
+        )
+        .text("Cancel", || tr_ctx!("button", "Cancel"))
+        .text("Save preset", || tr_ctx!("button", "Save preset")),
+    );
+    // The corner badge of a value button (9 px mono, 44 px button, 3 px from the corner).
+    let mut badge = Case::new(
+        "Quick Capture value badge",
+        "44 - 2*3 corner - 4 for the icon's column",
+        44. - 6. - 4.,
+        9.,
+        400,
+        one,
+    )
+    .text("3s", || {
+        crate::quick::state::seconds_badge(3).unwrap_or_default()
+    })
+    .text("10s", || {
+        crate::quick::state::seconds_badge(10).unwrap_or_default()
+    });
+    badge.mono = true;
+    v.push(badge);
 
     v
 }
