@@ -207,6 +207,8 @@ pub struct Remembered {
     pub shot: ShotTiles,
     pub video: VideoTiles,
     pub audio: AudioTiles,
+    /// The bar is collapsed to its compact form (QC-1.AC21). One value for every kind.
+    pub collapsed: bool,
 }
 
 impl Default for Remembered {
@@ -218,6 +220,7 @@ impl Default for Remembered {
             shot: ShotTiles::default(),
             video: VideoTiles::default(),
             audio: AudioTiles::default(),
+            collapsed: false,
         }
     }
 }
@@ -310,12 +313,13 @@ pub enum Ctl {
     Tile(Tile),
     Preset,
     Action,
-    Settings,
-    Feedback,
+    /// The chevron at the right end: collapses or expands the bar (QC-1.AC21).
+    Toggle,
 }
 
-/// Every control of the bar for `kind`, left to right.
-pub fn controls(kind: PresetKind) -> Vec<Ctl> {
+/// Every control of the bar for `kind`, left to right; `collapsed`: only the ones the compact
+/// bar shows (the kinds, the preset, the action and the toggle).
+pub fn controls(kind: PresetKind, collapsed: bool) -> Vec<Ctl> {
     let mut v: Vec<Ctl> = [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio]
         .into_iter()
         .map(Ctl::Kind)
@@ -325,9 +329,11 @@ pub fn controls(kind: PresetKind) -> Vec<Ctl> {
         PresetKind::Video => &VIDEO_TARGETS,
         PresetKind::Audio => &[],
     };
-    v.extend(targets.iter().copied().map(Ctl::Target));
-    v.extend(Tile::of(kind).into_iter().map(Ctl::Tile));
-    v.extend([Ctl::Preset, Ctl::Action, Ctl::Settings, Ctl::Feedback]);
+    if !collapsed {
+        v.extend(targets.iter().copied().map(Ctl::Target));
+        v.extend(Tile::of(kind).into_iter().map(Ctl::Tile));
+    }
+    v.extend([Ctl::Preset, Ctl::Action, Ctl::Toggle]);
     v
 }
 
@@ -397,8 +403,8 @@ pub enum PanelKey {
     /// Ctrl+1 to Ctrl+4 pick the first four presets (the index is 0 to 3), with or without the
     /// picker open.
     Preset(usize),
-    /// Cmd+, (macOS) or Ctrl+, opens the preset settings.
-    Settings,
+    /// O collapses or expands the bar.
+    Toggle,
     /// Up and Down in the picker move the highlighted row.
     PickerUp,
     PickerDown,
@@ -439,22 +445,21 @@ pub struct Mods {
 pub const PRESET_KEYS: usize = 4;
 
 /// What `key` (lower case, as GPUI names it) does in the bar. Plain keys act; a key with Cmd,
-/// Ctrl or Alt held is ignored except Ctrl+1 to Ctrl+4 (presets) and Cmd+, or Ctrl+, (settings).
-/// While the name field is open it owns the keyboard: every key is its.
+/// Ctrl or Alt held is ignored except Ctrl+1 to Ctrl+4 (presets). While the name field is open
+/// it owns the keyboard: every key is its. While the bar is `collapsed` the keys of the hidden
+/// controls (the targets, the options) do nothing.
 pub fn panel_key(
     key: &str,
     mods: Mods,
     screen: Screen,
     menu_open: bool,
     kind: PresetKind,
+    collapsed: bool,
 ) -> Option<PanelKey> {
     if screen == Screen::Name || mods.alt {
         return None;
     }
     if mods.ctrl || mods.platform {
-        if key == "," {
-            return Some(PanelKey::Settings);
-        }
         let n = key
             .parse::<usize>()
             .ok()
@@ -488,7 +493,7 @@ pub fn panel_key(
         return None;
     }
     let target_of = |t: PresetTarget| {
-        controls(kind)
+        controls(kind, collapsed)
             .contains(&Ctl::Target(t))
             .then_some(PanelKey::Target(t))
     };
@@ -496,16 +501,19 @@ pub fn panel_key(
         "enter" | "space" => Some(PanelKey::Go),
         "up" => Some(PanelKey::TileUp),
         "down" => Some(PanelKey::TileDown),
-        "left" => Some(PanelKey::TargetPrev),
-        "right" => Some(PanelKey::TargetNext),
+        "left" => (!collapsed).then_some(PanelKey::TargetPrev),
+        "right" => (!collapsed).then_some(PanelKey::TargetNext),
         "p" => Some(PanelKey::Picker),
+        "o" => Some(PanelKey::Toggle),
         "r" => target_of(PresetTarget::Region),
         "w" => target_of(PresetTarget::Window),
         "d" => target_of(PresetTarget::Display),
         "l" => target_of(PresetTarget::LongShot),
-        k => kind_of_key(k)
-            .map(PanelKey::Kind)
-            .or_else(|| Tile::for_key(kind, k).map(PanelKey::Tile)),
+        k => kind_of_key(k).map(PanelKey::Kind).or_else(|| {
+            Tile::for_key(kind, k)
+                .filter(|_| !collapsed)
+                .map(PanelKey::Tile)
+        }),
     }
 }
 
@@ -545,6 +553,30 @@ impl PanelState {
             }
             self.mem.kind = k;
         }
+    }
+
+    pub fn collapsed(&self) -> bool {
+        self.mem.collapsed
+    }
+
+    /// Collapses or expands the bar. The setting is the panel's own, so it is also set on the
+    /// tiles set aside while a preset is picked (it never comes back with "No preset").
+    pub fn set_collapsed(&mut self, collapsed: bool) {
+        self.mem.collapsed = collapsed;
+        if let Some(base) = self.base.as_mut() {
+            base.collapsed = collapsed;
+        }
+    }
+
+    /// The toggle's tooltip and accessible name: the action it does and its key ("Collapse
+    /// \u{00B7} key O"); the state is the control's expanded or collapsed state.
+    pub fn toggle_tip(&self) -> String {
+        let name = if self.mem.collapsed {
+            tr_ctx!("quick capture", "Expand")
+        } else {
+            tr_ctx!("quick capture", "Collapse")
+        };
+        tip_text(&name, None, Some("O"), None)
     }
 
     /// What `quick_capture.json` holds: the panel's own choices, never a picked preset's.
@@ -1034,7 +1066,11 @@ mod tests {
     }
 
     fn key(k: &str, kind: PresetKind) -> Option<PanelKey> {
-        panel_key(k, Mods::default(), Screen::Main, false, kind)
+        panel_key(k, Mods::default(), Screen::Main, false, kind, false)
+    }
+
+    fn key_c(k: &str, kind: PresetKind) -> Option<PanelKey> {
+        panel_key(k, Mods::default(), Screen::Main, false, kind, true)
     }
 
     /// QC-1.AC7: the keys work the bar without the mouse: 1 2 3 for the kind, R W D L for the
@@ -1056,11 +1092,11 @@ mod tests {
             ..Mods::default()
         };
         assert_eq!(
-            panel_key("tab", shift, Screen::Main, false, Video),
+            panel_key("tab", shift, Screen::Main, false, Video, false),
             Some(PrevControl)
         );
         assert_eq!(
-            panel_key("escape", Mods::default(), Screen::Main, true, Video),
+            panel_key("escape", Mods::default(), Screen::Main, true, Video, false),
             Some(Back),
             "a value menu is left first"
         );
@@ -1091,7 +1127,7 @@ mod tests {
         // Every letter is one control: no key picks two.
         for kind in [Screenshot, Video, Audio] {
             let mut seen = std::collections::HashSet::new();
-            for c in controls(kind) {
+            for c in controls(kind, false) {
                 let k = match c {
                     Ctl::Kind(k) => kind_key(k),
                     Ctl::Target(t) => target_key(t),
@@ -1100,11 +1136,12 @@ mod tests {
                 };
                 assert!(seen.insert(k), "{kind:?}: {k} twice");
             }
+            assert!(!seen.contains("O"), "O is the toggle");
         }
     }
 
     /// QC-1.AC7: with Cmd, Ctrl or Alt held the letters are not the bar's; Ctrl+1 to Ctrl+4
-    /// pick a preset and Cmd+, or Ctrl+, opens the settings.
+    /// pick a preset; Cmd+, and Ctrl+, are no longer the bar's (the settings key is gone).
     #[test]
     fn qc1_ac7_modified_keys_are_ignored_except_the_listed_ones() {
         use PanelKey::*;
@@ -1124,13 +1161,16 @@ mod tests {
             (Screen::Main, PresetKind::Screenshot),
             (Screen::Picker, PresetKind::Video),
         ] {
-            let k = |key, m| panel_key(key, m, screen, false, kind);
+            let k = |key, m| panel_key(key, m, screen, false, kind, false);
             assert_eq!(k("1", ctrl), Some(Preset(0)));
             assert_eq!(k("4", ctrl), Some(Preset(3)));
             assert_eq!(k("5", ctrl), None);
             assert_eq!(k("1", cmd), None, "Cmd+1 is not a preset key");
-            assert_eq!(k(",", cmd), Some(Settings));
-            assert_eq!(k(",", ctrl), Some(Settings));
+            assert_eq!(k(",", cmd), None);
+            assert_eq!(k(",", ctrl), None);
+            assert_eq!(k("o", ctrl), None);
+            assert_eq!(k("o", cmd), None);
+            assert_eq!(k("o", alt), None);
             assert_eq!(k("c", ctrl), None);
             assert_eq!(k("c", cmd), None);
             assert_eq!(k("r", alt), None);
@@ -1141,7 +1181,14 @@ mod tests {
             ..Mods::default()
         };
         assert_eq!(
-            panel_key("e", shift, Screen::Main, false, PresetKind::Screenshot),
+            panel_key(
+                "e",
+                shift,
+                Screen::Main,
+                false,
+                PresetKind::Screenshot,
+                false
+            ),
             None
         );
     }
@@ -1158,6 +1205,7 @@ mod tests {
                 Screen::Picker,
                 false,
                 PresetKind::Screenshot,
+                false,
             )
         };
         assert_eq!(pick("up"), Some(PickerUp));
@@ -1168,6 +1216,7 @@ mod tests {
         assert_eq!(pick("1"), None);
         assert_eq!(pick("p"), None);
         assert_eq!(pick("r"), None);
+        assert_eq!(pick("o"), None, "O is a letter like the others here");
     }
 
     /// QC-1.AC9: while the name of a new preset is typed every key goes to the field: the bar
@@ -1183,11 +1232,11 @@ mod tests {
             ..Mods::default()
         };
         for k in [
-            "1", "r", "w", "e", "c", "p", "enter", "space", "escape", "tab", ",",
+            "1", "r", "w", "e", "c", "p", "o", "enter", "space", "escape", "tab", ",",
         ] {
             for m in [Mods::default(), ctrl, cmd] {
                 assert_eq!(
-                    panel_key(k, m, Screen::Name, false, PresetKind::Screenshot),
+                    panel_key(k, m, Screen::Name, false, PresetKind::Screenshot, false),
                     None,
                     "{k}"
                 );
@@ -1240,14 +1289,112 @@ mod tests {
     /// QC-1: Tab walks the controls left to right; audio has no target.
     #[test]
     fn the_controls_of_each_kind() {
-        let n = |k| controls(k).len();
-        assert_eq!(n(PresetKind::Screenshot), 3 + 4 + 4 + 4);
-        assert_eq!(n(PresetKind::Video), 3 + 3 + 4 + 4);
-        assert_eq!(n(PresetKind::Audio), 3 + 4 + 4);
-        assert!(controls(PresetKind::Audio)
+        let n = |k| controls(k, false).len();
+        assert_eq!(n(PresetKind::Screenshot), 3 + 4 + 4 + 3);
+        assert_eq!(n(PresetKind::Video), 3 + 3 + 4 + 3);
+        assert_eq!(n(PresetKind::Audio), 3 + 4 + 3);
+        assert!(controls(PresetKind::Audio, false)
             .iter()
             .all(|c| !matches!(c, Ctl::Target(_))));
-        assert_eq!(controls(PresetKind::Video).last(), Some(&Ctl::Feedback));
+        assert_eq!(
+            controls(PresetKind::Video, false).last(),
+            Some(&Ctl::Toggle)
+        );
+    }
+
+    /// QC-1.AC21: the compact bar has the kinds, the preset, the action and the toggle only,
+    /// for every kind.
+    #[test]
+    fn qc1_ac21_the_collapsed_bar_has_the_short_list_of_controls() {
+        for kind in [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio] {
+            let c = controls(kind, true);
+            assert_eq!(c.len(), 3 + 3, "{kind:?}");
+            assert_eq!(c[3], Ctl::Preset);
+            assert_eq!(c[5], Ctl::Toggle);
+            assert!(c
+                .iter()
+                .all(|c| !matches!(c, Ctl::Target(_) | Ctl::Tile(_))));
+        }
+    }
+
+    /// QC-1.AC21: O toggles in either state; the keys of the hidden controls do nothing while
+    /// collapsed; 1 2 3, P, Ctrl+1..4, Enter, Space and Esc still work.
+    #[test]
+    fn qc1_ac21_keys_while_collapsed() {
+        use PanelKey::{Close, Go, Kind, Picker, Preset, Target, Toggle};
+        use PresetKind::*;
+        assert_eq!(key("o", Screenshot), Some(Toggle));
+        assert_eq!(key_c("o", Video), Some(Toggle));
+        for k in ["r", "w", "d", "l", "e", "c", "a", "t", "left", "right"] {
+            assert_eq!(key_c(k, Screenshot), None, "{k}");
+        }
+        for k in ["m", "s", "b", "t"] {
+            assert_eq!(key_c(k, Video), None, "{k}");
+        }
+        for k in ["n", "k"] {
+            assert_eq!(key_c(k, Audio), None, "{k}");
+        }
+        assert_eq!(key_c("1", Video), Some(Kind(Screenshot)));
+        assert_eq!(key_c("3", Video), Some(Kind(Audio)));
+        assert_eq!(key_c("p", Video), Some(Picker));
+        assert_eq!(key_c("enter", Video), Some(Go));
+        assert_eq!(key_c("space", Video), Some(Go));
+        assert_eq!(key_c("escape", Video), Some(Close));
+        let ctrl = Mods {
+            ctrl: true,
+            ..Mods::default()
+        };
+        assert_eq!(
+            panel_key("2", ctrl, Screen::Main, false, Video, true),
+            Some(Preset(1))
+        );
+        // Expanded, the same letters work again.
+        assert_eq!(key("r", Screenshot), Some(Target(PresetTarget::Region)));
+        assert_eq!(
+            key("e", Screenshot),
+            Some(PanelKey::Tile(super::Tile::Editor))
+        );
+    }
+
+    /// QC-1.AC21: the toggle's text names the action and the key.
+    #[test]
+    fn qc1_ac21_the_toggle_names_action_and_key() {
+        let mut s = PanelState::default();
+        assert_eq!(s.toggle_tip(), "Collapse \u{00B7} key O");
+        s.set_collapsed(true);
+        assert_eq!(s.toggle_tip(), "Expand \u{00B7} key O");
+    }
+
+    /// QC-1.AC21: the collapsed state is remembered in `quick_capture.json`, once for every
+    /// kind; an old file without the field loads as expanded; a picked preset does not take it
+    /// away and "No preset" does not bring the old one back.
+    #[test]
+    fn qc1_ac21_the_collapsed_state_is_remembered() {
+        let dir = std::env::temp_dir().join(format!("cm-qc-collapsed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!load(&dir).collapsed, "no file: expanded");
+        let mut s = PanelState::default();
+        s.set_collapsed(true);
+        s.set_kind(PresetKind::Video);
+        save(&dir, s.persisted());
+        let back = load(&dir);
+        assert!(back.collapsed);
+        assert_eq!(back.kind, PresetKind::Video);
+        let text = std::fs::read_to_string(state_path(&dir)).unwrap();
+        assert!(text.contains("\"collapsed\": true"), "{text}");
+        // An old file, written before the field existed.
+        std::fs::write(state_path(&dir), r#"{"kind":"video"}"#).unwrap();
+        let old = load(&dir);
+        assert!(!old.collapsed);
+        assert_eq!(old.kind, PresetKind::Video);
+        let _ = std::fs::remove_dir_all(&dir);
+        // With a preset picked the change is still the panel's own.
+        let mut p = PanelState::default();
+        p.apply_preset(&cm_core::preset::starter_presets()[0]);
+        p.set_collapsed(true);
+        assert!(p.persisted().collapsed);
+        p.clear_preset();
+        assert!(p.collapsed(), "No preset keeps the toggle");
     }
 
     #[test]

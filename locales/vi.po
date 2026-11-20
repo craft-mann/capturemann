@@ -12238,10 +12238,6 @@ msgid "Save preset"
 msgstr "Lưu mẫu"
 
 msgctxt "button"
-msgid "Send feedback"
-msgstr "Gửi phản hồi"
-
-msgctxt "button"
 msgid "Undo"
 msgstr "Hoàn tác"
 
@@ -12430,12 +12426,16 @@ msgid "webcam"
 msgstr "webcam"
 
 msgctxt "quick capture"
+msgid "Collapse"
+msgstr "Thu gọn"
+
+msgctxt "quick capture"
 msgid "Enter"
 msgstr "Enter"
 
 msgctxt "quick capture"
-msgid "Preset settings"
-msgstr "Cài đặt mẫu"
+msgid "Expand"
+msgstr "Mở rộng"
 
 msgctxt "quick capture action"
 msgid "Capture"
