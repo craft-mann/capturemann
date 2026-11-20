@@ -12125,9 +12125,6 @@ msgstr "Loại, đích và tuỳ chọn trong một bảng"
 msgid "Markers are on"
 msgstr "Đánh dấu đang bật"
 
-msgid "Mic and system sound, no screen"
-msgstr "Micrô và âm thanh hệ thống, không có màn hình"
-
 msgid "No presets yet"
 msgstr "Chưa có mẫu nào"
 
@@ -12301,10 +12298,6 @@ msgid "No preset"
 msgstr "Không dùng mẫu"
 
 msgctxt "preset picker"
-msgid "Preset: {name}"
-msgstr "Mẫu: {name}"
-
-msgctxt "preset picker"
 msgid "Presets"
 msgstr "Mẫu"
 
@@ -12472,10 +12465,6 @@ msgctxt "quick capture kind"
 msgid "Video"
 msgstr "Video"
 
-msgctxt "quick capture kind"
-msgid "{kind}, key {n}"
-msgstr "{kind}, phím {n}"
-
 msgctxt "quick capture target"
 msgid "Display"
 msgstr "Màn hình"
@@ -12492,9 +12481,33 @@ msgctxt "quick capture target"
 msgid "Window"
 msgstr "Cửa sổ"
 
-msgctxt "quick capture target"
-msgid "{target}, {state}"
-msgstr "{target}, {state}"
+msgctxt "quick capture"
+msgid "Preset"
+msgstr "Mẫu"
+
+msgctxt "quick capture badge"
+msgid "{secs}s"
+msgstr "{secs}s"
+
+msgctxt "quick capture state"
+msgid "off"
+msgstr "tắt"
+
+msgctxt "quick capture state"
+msgid "on"
+msgstr "bật"
+
+msgctxt "quick capture tip"
+msgid "{name} · {state}"
+msgstr "{name} · {state}"
+
+msgctxt "quick capture tip"
+msgid "{tip} · anywhere {chord}"
+msgstr "{tip} · phím tắt chung {chord}"
+
+msgctxt "quick capture tip"
+msgid "{tip} · key {key}"
+msgstr "{tip} · phím {key}"
 
 msgctxt "quick capture tile"
 msgid "Auto-redact"
@@ -12535,14 +12548,6 @@ msgstr "Chép lời"
 msgctxt "quick capture tile"
 msgid "Webcam"
 msgstr "Webcam"
-
-msgctxt "quick capture tile"
-msgid "{tile}, off"
-msgstr "{tile}, tắt"
-
-msgctxt "quick capture tile"
-msgid "{tile}, on"
-msgstr "{tile}, bật"
 
 msgctxt "quick capture tile"
 msgid "{tile}, {value}"

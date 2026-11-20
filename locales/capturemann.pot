@@ -3188,9 +3188,6 @@ msgstr ""
 msgid "Merge {name} into another speaker"
 msgstr ""
 
-msgid "Mic and system sound, no screen"
-msgstr ""
-
 msgid "Microphone"
 msgstr ""
 
@@ -10546,10 +10543,6 @@ msgid "No preset"
 msgstr ""
 
 msgctxt "preset picker"
-msgid "Preset: {name}"
-msgstr ""
-
-msgctxt "preset picker"
 msgid "Presets"
 msgstr ""
 
@@ -10714,6 +10707,10 @@ msgid "Enter"
 msgstr ""
 
 msgctxt "quick capture"
+msgid "Preset"
+msgstr ""
+
+msgctxt "quick capture"
 msgid "Preset settings"
 msgstr ""
 
@@ -10733,6 +10730,10 @@ msgctxt "quick capture action"
 msgid "Record · {name}"
 msgstr ""
 
+msgctxt "quick capture badge"
+msgid "{secs}s"
+msgstr ""
+
 msgctxt "quick capture kind"
 msgid "Audio"
 msgstr ""
@@ -10745,8 +10746,12 @@ msgctxt "quick capture kind"
 msgid "Video"
 msgstr ""
 
-msgctxt "quick capture kind"
-msgid "{kind}, key {n}"
+msgctxt "quick capture state"
+msgid "off"
+msgstr ""
+
+msgctxt "quick capture state"
+msgid "on"
 msgstr ""
 
 msgctxt "quick capture target"
@@ -10763,10 +10768,6 @@ msgstr ""
 
 msgctxt "quick capture target"
 msgid "Window"
-msgstr ""
-
-msgctxt "quick capture target"
-msgid "{target}, {state}"
 msgstr ""
 
 msgctxt "quick capture tile"
@@ -10810,15 +10811,19 @@ msgid "Webcam"
 msgstr ""
 
 msgctxt "quick capture tile"
-msgid "{tile}, off"
-msgstr ""
-
-msgctxt "quick capture tile"
-msgid "{tile}, on"
-msgstr ""
-
-msgctxt "quick capture tile"
 msgid "{tile}, {value}"
+msgstr ""
+
+msgctxt "quick capture tip"
+msgid "{name} · {state}"
+msgstr ""
+
+msgctxt "quick capture tip"
+msgid "{tip} · anywhere {chord}"
+msgstr ""
+
+msgctxt "quick capture tip"
+msgid "{tip} · key {key}"
 msgstr ""
 
 msgctxt "quick capture value"
