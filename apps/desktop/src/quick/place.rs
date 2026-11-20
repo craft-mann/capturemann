@@ -30,23 +30,170 @@ pub fn bar_rect(area: &Rect, bar_w: f64, bar_h: f64, display: &Rect) -> Rect {
     Rect::new(x, y, w, bar_h)
 }
 
-/// The height of the panel while the preset picker is open (QC-1 "Preset picker"): the fixed parts
-/// (padding, header, the two links under the list) plus `rows` rows, never less than the normal
-/// panel and never more than `cap` (the display's visible height less the edge gaps); beyond
-/// that the list scrolls.
-///
-/// `rows` is the number of presets; the list also has the "No preset" row. Row heights come from
-/// the same constants the picker draws with ([`picker_list_height`]), not from a guess.
-pub fn picker_height(presets: usize, base: f64, cap: f64) -> f64 {
-    (PICKER_FIXED + picker_list_height(presets))
-        .max(base)
-        .min(cap.max(base))
+// ---- the Quick Capture bar (QC-1 "Size") ---------------------------------------------------------
+
+/// The pieces the bar is drawn with (px). The window sizes come from them, so the drawing and
+/// the placement cannot drift apart.
+pub mod bar {
+    /// A button: 44 wide, 48 high, with an 18 px icon and the key in 10 px mono under it.
+    pub const CELL_W: f64 = 44.0;
+    pub const CELL_H: f64 = 48.0;
+    /// The gap between buttons of one group, and a recessed track's padding and border.
+    pub const CELL_GAP: f64 = 2.0;
+    pub const TRACK_PAD: f64 = 2.0;
+    pub const TRACK_BORDER: f64 = 1.0;
+    /// A divider: 1 px and 4 px each side.
+    pub const SEP_W: f64 = 9.0;
+    /// The logo with the Preview tag under it.
+    pub const LOGO_W: f64 = 52.0;
+    /// The action button, and the margin before it.
+    pub const ACTION_W: f64 = 140.0;
+    pub const ACTION_ML: f64 = 4.0;
+    /// Settings and Send feedback.
+    pub const ICON_BTN_W: f64 = 38.0;
+    /// The bar's padding (sides; top and bottom is `PAD_Y`), its border and the gap between its
+    /// items.
+    pub const PAD_X: f64 = 6.0;
+    pub const PAD_Y: f64 = 2.0;
+    pub const BORDER: f64 = 1.0;
+    pub const GAP: f64 = 4.0;
+    pub const TRACK_H: f64 = CELL_H + 2.0 * TRACK_PAD + 2.0 * TRACK_BORDER;
+
+    /// A recessed track holding `n` buttons.
+    pub const fn track_w(n: usize) -> f64 {
+        n as f64 * CELL_W + (n - 1) as f64 * CELL_GAP + 2.0 * TRACK_PAD + 2.0 * TRACK_BORDER
+    }
+    /// A group of `n` buttons with no track.
+    pub const fn group_w(n: usize) -> f64 {
+        n as f64 * CELL_W + (n - 1) as f64 * CELL_GAP
+    }
+    const SIDES: f64 = 2.0 * (PAD_X + BORDER);
+    /// Row one of the two-row bar: logo, kind, target.
+    pub const ROW1_W: f64 = SIDES + LOGO_W + track_w(3) + SEP_W + track_w(4) + 3.0 * GAP;
+    /// Row two: options, preset, action, settings, feedback.
+    pub const ROW2_W: f64 =
+        SIDES + group_w(4) + SEP_W + CELL_W + ACTION_ML + ACTION_W + 2.0 * ICON_BTN_W + 5.0 * GAP;
+    /// One row: everything, with a divider after the targets and the options and one before
+    /// the preset; ten gaps.
+    pub const ONE_ROW_W: f64 = SIDES
+        + LOGO_W
+        + track_w(3)
+        + SEP_W
+        + track_w(4)
+        + SEP_W
+        + group_w(4)
+        + SEP_W
+        + CELL_W
+        + ACTION_ML
+        + ACTION_W
+        + 2.0 * ICON_BTN_W
+        + 10.0 * GAP;
 }
 
-/// Everything in the picker's panel that is not the list: padding, header, the rule and the two
-/// links under the list, measured on the real panel on X11 (a list area of 223 px in a
-/// 433 px panel).
-pub const PICKER_FIXED: f64 = 210.0;
+/// The bar's width in one row. The same for Screenshot, Video and Audio, so switching the kind
+/// never moves anything.
+pub const BAR_W: f64 = bar::ONE_ROW_W;
+/// The bar's height in one row.
+pub const BAR_H: f64 = bar::TRACK_H + 2.0 * bar::PAD_Y + 2.0 * bar::BORDER;
+/// The two-row bar: kind and target, then options and action.
+pub const TWO_ROW_W: f64 = bar::ROW2_W;
+pub const TWO_ROW_H: f64 = 2.0 * bar::TRACK_H + bar::GAP + 2.0 * bar::PAD_Y + 2.0 * bar::BORDER;
+/// Room under the bar for the tooltip. The window always has it, so a tooltip is never cut at the
+/// window's edge.
+pub const TIP_ROOM: f64 = 40.0;
+/// Gap between the bar and the popover (picker, value menu, name screen).
+pub const POP_GAP: f64 = 6.0;
+/// The popover's width.
+pub const POP_W: f64 = 360.0;
+/// The least display width, in points, that holds the bar in one row.
+pub const ONE_ROW_MIN: f64 = 900.0;
+
+/// Whether the bar splits into two rows on a display `display_w` points wide: below 900 points,
+/// and wherever the one-row bar would not fit with its edge gaps.
+pub fn two_rows(display_w: f64) -> bool {
+    display_w < ONE_ROW_MIN.max(BAR_W + 2.0 * EDGE)
+}
+
+/// The bar itself (without the tooltip room) on a display `display_w` wide.
+pub fn bar_size(display_w: f64) -> (f64, f64) {
+    if two_rows(display_w) {
+        (TWO_ROW_W, TWO_ROW_H)
+    } else {
+        (BAR_W, BAR_H)
+    }
+}
+
+/// The window at rest: the bar and the tooltip room under it.
+pub fn window_size(display_w: f64) -> (f64, f64) {
+    let (w, h) = bar_size(display_w);
+    (w, h + TIP_ROOM)
+}
+
+/// The height of the popover while the preset picker is open (QC-1 "Preset picker"): the fixed
+/// parts (padding, the rule, the two links under the list) plus the rows, never more than `cap`
+/// (the room the display leaves); beyond that the list scrolls.
+///
+/// `presets` is the number of presets; the list also has the "No preset" row. Row heights come
+/// from the same constants the picker draws with ([`picker_list_height`]), not from a guess.
+pub fn popover_height(presets: usize, cap: f64) -> f64 {
+    (POPOVER_FIXED + picker_list_height(presets)).min(cap.max(POPOVER_MIN))
+}
+
+/// The least a popover is drawn with: the value menu and the name screen fit in it.
+pub const POPOVER_MIN: f64 = 200.0;
+/// The value menu's height and the name screen's height (with the room for one error line).
+pub const MENU_H: f64 = 112.0;
+pub const NAME_H: f64 = 214.0;
+
+/// Everything in the picker's popover that is not the list: padding and border, the rule and
+/// the two links under the list (8 + 8 padding, 2 border, 6 + 1 + 6 + 40 + 6 + 40).
+pub const POPOVER_FIXED: f64 = 117.0;
+
+/// Where the window goes while a popover of height `pop_h` is open: the bar stays where it is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PopoverPlace {
+    /// The window's frame (global points).
+    pub frame: Rect,
+    /// The popover is above the bar (the display has no room under it).
+    pub upward: bool,
+    /// The popover's height: `pop_h`, or less when neither side has the room (it then scrolls).
+    pub pop_h: f64,
+}
+
+/// The popover hangs under the bar. When the display has no room there it stands above the bar
+/// instead (the window grows upward, so the bar does not move) if `movable` (the window can be
+/// moved: macOS and Windows); else it keeps under the bar and takes the room there is. `home` is
+/// the window at rest (the bar and the tooltip room), `bar_h` the bar's height.
+pub fn popover_place(
+    home: &Rect,
+    bar_h: f64,
+    pop_h: f64,
+    display: &Rect,
+    movable: bool,
+) -> PopoverPlace {
+    let below = display.y + display.h - EDGE - (home.y + bar_h + POP_GAP);
+    let above = home.y - EDGE - POP_GAP;
+    let down = |h: f64| PopoverPlace {
+        frame: Rect::new(home.x, home.y, home.w, bar_h + POP_GAP + h.max(TIP_ROOM)),
+        upward: false,
+        pop_h: h,
+    };
+    let up = |h: f64| PopoverPlace {
+        frame: Rect::new(home.x, home.y - POP_GAP - h, home.w, h + POP_GAP + home.h),
+        upward: true,
+        pop_h: h,
+    };
+    if pop_h <= below {
+        down(pop_h)
+    } else if movable && pop_h <= above {
+        up(pop_h)
+    } else if movable && above > below {
+        up(above.max(0.0))
+    } else {
+        down(below.max(TIP_ROOM))
+    }
+}
+
 /// Vertical padding of a picker row (top and bottom each), its border (each side) and the least
 /// height of a row.
 pub const ROW_PAD_Y: f64 = 6.0;
@@ -137,12 +284,43 @@ mod tests {
         let row = picker_row_height(true);
         assert!((54.0..=56.0).contains(&row), "{row}");
         assert_eq!(picker_row_height(false), ROW_MIN_H);
-        // The four starters: every row is inside the panel the picker asks for.
-        let h = picker_height(4, 400.0, 876.0);
-        assert!(h - PICKER_FIXED >= picker_list_height(4));
+        // The four starters: every row is inside the popover the picker asks for.
+        let h = popover_height(4, 876.0);
+        assert!(h - POPOVER_FIXED >= picker_list_height(4));
+    }
+
+    /// QC-1.AC1: the bar is 60 px high and one width for every kind; the window at rest adds
+    /// the tooltip room.
+    #[test]
+    fn qc1_ac1_the_bar_is_one_slim_row() {
+        assert_eq!(BAR_H, 60.0);
+        assert_eq!(BAR_W, 909.0);
+        assert_eq!(bar::track_w(3), 142.0);
+        assert_eq!(bar::track_w(4), 188.0);
+        assert_eq!(window_size(1920.0), (BAR_W, BAR_H + TIP_ROOM));
+        // The same size whatever the kind: the window size has no kind in it.
+        assert_eq!(bar_size(1440.0), (BAR_W, BAR_H));
+    }
+
+    /// QC-1.AC1: below 900 points the bar splits into two rows (and wherever the one row would
+    /// not fit with its edge gaps); the two rows are narrower and taller.
+    #[test]
+    fn qc1_ac1_two_rows_on_a_narrow_display() {
+        assert!(two_rows(899.0));
+        assert!(two_rows(800.0));
         assert!(
-            h > 411.0,
-            "the old 48 px guess gave 411 and cut the last row"
+            two_rows(BAR_W + 2.0 * EDGE - 1.0),
+            "one row must not touch the edge"
+        );
+        assert!(!two_rows(BAR_W + 2.0 * EDGE));
+        assert!(!two_rows(1440.0));
+        let (w1, h1) = bar_size(1440.0);
+        let (w2, h2) = bar_size(800.0);
+        assert!(w2 < w1 && h2 > h1);
+        assert!(bar::ROW1_W <= w2, "row one fits the two-row width");
+        assert!(
+            w2 + 2.0 * EDGE <= 800.0,
+            "the two rows fit a narrow display"
         );
     }
 
@@ -159,36 +337,61 @@ mod tests {
         assert_eq!(x11_pixels_to_points((5.0, 6.0), 0.0, 1920.0), (5.0, 6.0));
     }
 
-    /// QC-1 "Opening": no pointer (Wayland) centres the panel; a pointer is used as it is.
+    /// QC-1 "Opening": no pointer (Wayland) centres the bar; a pointer is used as it is.
     #[test]
     fn without_a_pointer_the_panel_is_centred() {
         let d = display();
-        let (x, y) = open_point(None, 400.0, &d);
-        let r = panel_rect((x, y), 352.0, 400.0, &d);
+        let (w, h) = window_size(d.w);
+        let (x, y) = open_point(None, h, &d);
+        let r = panel_rect((x, y), w, h, &d);
         assert_eq!(r.x + r.w / 2.0, 720.0);
         assert_eq!(r.y + r.h / 2.0, 450.0);
-        assert_eq!(open_point(Some((300.0, 300.0)), 400.0, &d), (300.0, 300.0));
+        assert_eq!(open_point(Some((300.0, 300.0)), h, &d), (300.0, 300.0));
     }
 
     #[test]
-    fn the_picker_grows_to_its_rows_and_stops_at_the_display() {
+    fn the_picker_grows_to_its_rows_and_stops_at_the_room() {
         assert_eq!(
-            picker_height(2, 400.0, 876.0),
-            400.0,
-            "never below the panel"
+            popover_height(0, 876.0),
+            POPOVER_FIXED + picker_list_height(0)
         );
-        let six = PICKER_FIXED + picker_list_height(6);
-        assert_eq!(picker_height(6, 400.0, 876.0), six);
+        let six = POPOVER_FIXED + picker_list_height(6);
+        assert_eq!(popover_height(6, 876.0), six);
+        assert_eq!(popover_height(40, 500.0), 500.0, "capped, the list scrolls");
         assert_eq!(
-            picker_height(40, 400.0, 876.0),
-            876.0,
-            "capped, the list scrolls"
+            popover_height(40, 100.0),
+            POPOVER_MIN,
+            "a tiny room keeps the least"
         );
-        assert_eq!(
-            picker_height(40, 400.0, 300.0),
-            400.0,
-            "a tiny display keeps the panel"
-        );
+    }
+
+    /// QC-1 "Preset picker": the popover hangs under the bar; near the bottom it stands above the
+    /// bar (the bar does not move) where the window can be moved, else it takes the room under.
+    #[test]
+    fn the_popover_fits_the_display() {
+        let d = display();
+        let (w, h) = window_size(d.w);
+        let home = Rect::new(200.0, 100.0, w, h);
+        let p = popover_place(&home, BAR_H, 300.0, &d, true);
+        assert!(!p.upward);
+        assert_eq!((p.frame.x, p.frame.y), (home.x, home.y), "the bar stays");
+        assert_eq!(p.frame.h, BAR_H + POP_GAP + 300.0);
+        assert!(p.frame.y + p.frame.h <= d.h - EDGE);
+        // Near the bottom: above the bar, the bar's own screen position unchanged.
+        let low = Rect::new(200.0, 760.0, w, h);
+        let p = popover_place(&low, BAR_H, 300.0, &d, true);
+        assert!(p.upward);
+        assert_eq!(p.frame.y + p.pop_h + POP_GAP, low.y, "the bar stays");
+        assert_eq!(p.frame.y + p.frame.h, low.y + low.h);
+        assert!(p.frame.y >= d.y + EDGE);
+        // Not movable (Linux): under the bar, the list takes the room there is.
+        let p = popover_place(&low, BAR_H, 300.0, &d, false);
+        assert!(!p.upward);
+        assert!(p.pop_h < 300.0);
+        assert!(p.frame.y + p.frame.h <= d.h - EDGE + TIP_ROOM, "{p:?}");
+        // A long list on a short display is capped on the larger side.
+        let p = popover_place(&home, BAR_H, 2000.0, &d, true);
+        assert!(p.frame.y >= d.y && p.frame.y + p.frame.h <= d.h);
     }
 
     /// QC-3.AC1: under the area.
@@ -224,29 +427,31 @@ mod tests {
         }
     }
 
-    /// QC-1: the panel opens at the point, clamped to the display.
+    /// QC-1: the bar opens at the point, clamped to the display.
     #[test]
     fn the_panel_is_clamped_to_the_display() {
         let d = display();
-        let p = panel_rect((1430.0, 880.0), 352.0, 420.0, &d);
+        let (w, h) = window_size(d.w);
+        let p = panel_rect((1430.0, 880.0), w, h, &d);
         assert!(p.x + p.w <= d.w && p.y + p.h <= d.h);
-        let q = panel_rect((720.0, 4.0), 352.0, 420.0, &d);
+        let q = panel_rect((720.0, 4.0), w, h, &d);
         assert_eq!(q.y, EDGE);
-        assert_eq!(q.x, 720.0 - 176.0);
+        assert_eq!(q.x, 720.0 - w / 2.0);
     }
 
-    /// QC-1: from the tray the panel is on the icon: under it in a menu bar, above it over a
+    /// QC-1: from the tray the bar is on the icon: under it in a menu bar, above it over a
     /// taskbar, and kept on the display at the corner.
     #[test]
     fn the_tray_panel_sits_at_the_icon() {
         let d = display();
-        let top = tray_rect((1200.0, 0.0, 22.0, 24.0), 352.0, 400.0, &d);
+        let (w, h) = window_size(d.w);
+        let top = tray_rect((1200.0, 0.0, 22.0, 24.0), w, h, &d);
         assert_eq!(top.y, 24.0 + BAR_GAP);
         assert!(top.x + top.w <= d.w - EDGE + 0.1);
-        let bottom = tray_rect((1300.0, 870.0, 20.0, 30.0), 352.0, 400.0, &d);
-        assert_eq!(bottom.y, 870.0 - BAR_GAP - 400.0);
+        let bottom = tray_rect((1300.0, 870.0, 20.0, 30.0), w, h, &d);
+        assert_eq!(bottom.y, 870.0 - BAR_GAP - h);
         assert!(bottom.y + bottom.h <= d.h);
-        let mid = tray_rect((700.0, 0.0, 20.0, 24.0), 352.0, 400.0, &d);
+        let mid = tray_rect((700.0, 0.0, 20.0, 24.0), w, h, &d);
         assert_eq!(mid.x + mid.w / 2.0, 710.0);
     }
 }

@@ -1,8 +1,8 @@
-# QC-1 manual script: Quick Capture (the panel, the after-capture bar, presets)
+# QC-1 manual script: Quick Capture (the bar, the after-capture bar, presets)
 
-Covers what the automated tests cannot: the panel, the after-capture bar and the preset sheet seen
+Covers what the automated tests cannot: the Quick Capture bar, the after-capture bar and the preset sheet seen
 by eye, the keyboard route, the real pickers, a real capture, a real recording and the global
-shortcuts. Everything else (the panel's state and keys, the run decisions, the folder with the
+shortcuts. Everything else (the bar's state, keys and tooltip texts, its size and the two-row rule, the placement, the run decisions, the folder with the
 date, the Auto-redact step, Undo, the presets file and its shortcut conflicts, the layout of the
 labels in English and Vietnamese) is covered by `cargo test -p cm-desktop --lib` and
 `cargo test -p cm-daemon preset`. The record steps read your screen, microphone and camera once:
@@ -10,11 +10,11 @@ use a window you made up for this, keep the takes short and delete them afterwar
 
 Report each run in `verification/` (template in its README). Say "verified" only with a report.
 
-Use the bundle (`make run-bundle-dev`) when permissions matter. To look at the panel without a
+Use the bundle (`make run-bundle-dev`) when permissions matter. To look at the bar without a
 shortcut: `cm-desktop --demo-quick-capture`. Use a private settings folder when you try the
 presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc-lib`.
 
-## 1. Opening the panel (QC-1 "Opening")
+## 1. Opening the bar (QC-1 "Opening")
 
 1. **Shortcut.** Press Option+Shift+C (macOS) or Ctrl+Alt+Shift+C (Windows, Linux). Expected: the panel
    opens near the pointer, on the display that has it (move the pointer to a corner and press it again:
@@ -38,38 +38,69 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 6b. **Hotkey taken.** With another app holding Option+Shift+C: Settings > Shortcuts shows "Couldn't
    register: used by another app" on that row, and the tray item still opens the panel.
 
-## 2. The panel (QC-1, QC-4)
+## 2. The bar (QC-1, QC-4)
 
-7. **Layout.** Top to bottom: the header (mark, "Quick Capture", the Preview label, the settings button;
-   under it the preset pill and Send feedback), the three kind tabs (only the active tab shows its name),
-   the target row, four option tiles (2 by 2), the action bar. Corners round, the HUD surface, the keys
-   inside the action bar. Red appears only on the Record bar (Video and Audio). It opens on the kind you
-   used last.
-8. **Kinds.** Press 1, 2, 3 (or click). Screenshot: Region, Window, Display, Long Shot; tiles Editor, Copy,
-   Auto-redact, Delay; bar "Capture" (neutral). Video: Region, Window, Display; tiles Mic, System audio,
-   Webcam, Countdown; bar "Record" (red). Audio: the line "Mic and system sound, no screen", no target
-   row; tiles Mic, System audio, Transcribe, Markers; bar "Record" (red).
-9. **Tiles.** Click a toggle tile: it fills its icon circle. Click Delay: a menu of Off, 3 s, 5 s, 10 s
-   replaces the grid; pick 5 s. Close and open the panel: every tile is where you left it, per kind.
-   **Check Settings > Capture & recording:** "Before a screenshot" still shows its old value, and
-   Settings > General "After capture" is unchanged (QC-1.AC6). A capture from a dock tile follows
-   Settings, not the panel.
-10. **Keyboard.** Without the mouse: 1, 2, 3 switch the kind; Tab moves through the four tiles (a ring on
-    the focused one); Up or Down toggles the focused tile or steps its value; Left and Right change the
-    target; P opens the preset picker; Enter or Space captures; Esc closes (Esc in a menu or the picker
-    goes back first). In the picker (QC-1.AC9): Up and Down move the ring and stop at the first and the
-    last row (No preset at the top, Edit presets… at the bottom), Enter or Space chooses the
-    highlighted row, Esc closes the picker only and the panel stays; the highlighted row scrolls into
-    view when the list is long. With VoiceOver or Narrator, every control has a name that includes its state
-    ("Copy, on", "Delay, 5 s", "Region, selected").
-11. **Not in the picture.** Take a Region screenshot from the panel with Copy on. Expected: the panel is
+7. **Layout.** One row, 60 px high, about 900 px wide, rounded corners, the HUD surface. Left to right:
+   the mark with a small **Preview** tag under it, the three kinds (1 2 3), the targets (R W D L), four
+   options, the preset (P, with a menu badge), the action (Capture or Record, with the Enter key),
+   settings (the key under it is Cmd+, on macOS and Ctrl+, elsewhere) and **Send feedback** (a speech
+   bubble icon). **No button has a text label**: each shows an 18 px icon with its key in small mono type
+   under it. The selected kind and target are a raised chip inside a darker track; an option that is on has
+   a lighter fill and a dot under the icon; Delay and Countdown show their value ("3s") as a badge in the
+   corner, or a chevron when off. Red appears only on the Record button (Video and Audio). It opens on the
+   kind you used last.
+8. **Kinds, and the same width.** Press 1, 2, 3 (or click). Screenshot: Region, Window, Display, Long Shot;
+   options Editor, Copy, Auto-redact, Delay; "Capture" (neutral). Video: Region, Window, Display; options
+   Mic, System audio, Webcam, Countdown; "Record" (red, with a dark dot). Audio: no targets, the slot
+   shows the microphone meter (unlit: the bar does not open the microphone); options Mic, System audio,
+   Transcribe, Markers; "Record" (red). **The bar keeps the same width and every button stays where it
+   is** when you switch between the three kinds. Take a screenshot of each kind and compare (the bar is
+   hidden from captures: use `CM_DEMO_CAPTURABLE=1` for a look, or a phone photo).
+9. **Options.** Click a toggle option: it gets the lighter fill and the dot. Click Delay: a small menu
+   of Off, 3 s, 5 s, 10 s opens under the bar; pick 5 s (the badge reads "5s"). Close and open the bar:
+   every option is where you left it, per kind. **Check Settings > Capture & recording:** "Before a
+   screenshot" still shows its old value, and Settings > General "After capture" is unchanged (QC-1.AC6).
+   A capture from a dock tile follows Settings, not the bar.
+10. **Keyboard.** Without the mouse: 1, 2, 3 switch the kind; R, W, D, L choose the target (L does nothing
+    on Video and Audio; R does nothing on Audio); on Screenshot E, C, A toggle Editor, Copy, Auto-redact and
+    T opens the Delay menu; on Video M, S, B toggle Mic, System audio, Webcam and T opens the Countdown menu;
+    on Audio M, S, N, K toggle Mic, System audio, Transcribe, Markers; Left and Right cycle the target; P
+    opens the preset picker; Enter or Space captures or records; Cmd+, (macOS) or Ctrl+, opens the preset
+    settings; Esc closes (Esc in a menu or the picker goes back first). Hold Cmd, Ctrl or Alt with a letter
+    (Cmd+C, Ctrl+R, Alt+E): nothing happens in the bar. Tab and Shift+Tab move a visible ring through the
+    controls left to right; Up or Down on a focused Delay or Countdown steps its value. In the picker
+    (QC-1.AC9): Up and Down move the ring and stop at the first and the last row (No preset at the top,
+    Edit presets… at the bottom), Enter or Space chooses the highlighted row, Esc closes the picker only and
+    the bar stays; the highlighted row scrolls into view when the list is long.
+10b. **Ctrl+1 to Ctrl+4** (QC-1.AC17). With the bar open and the picker closed, press Ctrl+2: the second
+    preset is picked and the action shows its name on a second line. Open the picker and press Ctrl+3:
+    the third preset is picked and the picker closes. Each of the first four rows shows its key (Ctrl+1 to
+    Ctrl+4; Control with the digit on macOS).
+10c. **The name field owns the keys.** Open the picker, choose **Save current as preset…**, type "reddit
+    caps 1 w" (letters, digits, spaces). Expected: the field holds exactly that, the kind, target and
+    options did not change, Enter saves, Esc goes back.
+10d. **Accessible names.** With VoiceOver or Narrator each button reads the same text as its tooltip: its
+    name, its state and its key ("Copy · on · key C", "Countdown · 3 s · key T", "Region · selected · key
+    R"); on, off and selected are announced as the control's state.
+10e. **Tooltips** (QC-1.AC8, AC19). Rest the pointer on a button: after about 0.4 s a tooltip appears under
+    it with the name, the state and the bar key; move away: it goes. Press Tab to a button and wait:
+    the same tooltip appears for the focused button. On a kind (1 2 3) it adds "anywhere" and the global
+    shortcut (Screenshot Option+Shift+1, Video Option+Shift+R, Audio Option+Shift+V on macOS; the Ctrl+Alt+Shift
+    forms elsewhere). Rebind one of them in Settings > Shortcuts: the tooltip shows the new chord. The
+    tooltip is never cut at the edge of the bar, also at the ends of the row.
+11. **Not in the picture.** Take a Region screenshot from the bar with Copy on. Expected: the bar is
     gone before the picker opens and is not in the picture. Do it with Delay 3 s too: the pill counts
-    down with no panel on screen.
-11b. **Wayland.** A portal screenshot or a recording started by another program while the panel is
-    open can show the panel: there is no way to exclude a window there (spec, Window behaviour). Check
-    that the panel closes before a capture started from it.
-12. **Preview.** The Preview label is in the header; hover it for its tooltip. **Send feedback** opens the
-    browser on the feedback form with the feature "Quick Capture" and the app version only.
+    down with no bar on screen.
+11b. **Wayland.** A portal screenshot or a recording started by another program while the bar is
+    open can show the bar: there is no way to exclude a window there (spec, Window behaviour). Check
+    that the bar closes before a capture started from it.
+12. **Preview.** The small Preview tag under the mark: hover it for its tooltip. **Send feedback** (the
+    speech bubble after Settings) opens the browser on the feedback form with the feature "Quick Capture"
+    and the app version only.
+12b. **Two rows** (QC-1.AC1). On a display narrower than 900 points (or a window-manager scaled mode, for
+    example a 1280 x 720 display at 150 %), open the bar: two rows, kind and target on top, then options,
+    preset, action, settings and feedback; all keys and tooltips work as in one row, nothing is cut
+    at the display's edge. On a wide display: one row.
 
 ## 3. A capture from the panel (QC-1, QC-3)
 
@@ -112,9 +143,9 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 
 24. **Starters.** Open the picker (the pill, or P). Expected: No preset, Bug report, Docs shot, Demo video,
     Meeting, each with a one-line summary, then **Save current as preset…** and **Edit presets…**. Pick
-    "Bug report": the kind, target and tiles fill, and the bar reads "Capture · Bug report". Pick "Demo
+    "Bug report": the kind, target and options fill, and the bar reads "Capture · Bug report". Pick "Demo
     video": the bar is red and reads "Record · Demo video". Switching the tab drops the preset. Pick "Docs shot", close the panel, open `quick_capture.json`: it still
-    holds the tiles you had before (QC-1.AC13); choose No preset: the tiles are back as they were.
+    holds the options you had before (QC-1.AC13); choose No preset: the options are back as they were.
 25. **Save current.** Set up something, pick **Save current as preset…**, name it, Save. It is the picked
     preset, appears in the picker, and `presets.json` in the settings folder holds the same setup.
     A field you add by hand to that file (for example `"team": "docs"`) is still there after the next save.
@@ -140,25 +171,31 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 31. **Hand-edited file.** Break one preset in `presets.json` (for example a video preset with
     `"target": "long_shot"`). Restart. Expected: one notice names that preset, the others load.
 
-## 5b. The panel's height with the picker (QC-4.AC8)
+## 5b. The picker's popover (QC-4.AC8, QC-1.AC16)
 
-34. Open the picker with the four starters: the panel grows to show every row (a preset row is about 55 px),
-    "Meeting" and its summary are fully visible, no row is cut off.
-    Add presets until the list is taller than the display: the panel stops at the height of the display
-    (less the edge gaps), the list scrolls, and moving the highlight with Down scrolls it into view.
-    Close the picker (Esc): the panel returns to its normal size. Check it on the 720 px display too.
-35. Pick "Save current as preset…": the name screen fits the panel; Esc goes back to the picker and
-    then to the panel.
+34. Open the picker with the four starters: a popover opens under the bar, aligned to its right end, tall
+    enough to show every row (a preset row is about 55 px), "Meeting" and its summary are fully visible, no
+    row is cut off. The bar does not move. Add presets until the list is taller than the room on the display:
+    the popover stops at the room (less the edge gaps), the list scrolls, and moving the highlight with
+    Down scrolls it into view. Close the picker (Esc): the window returns to its size at rest.
+    Check it on the 720 px display too.
+34b. **Near the bottom edge.** Open the bar from the Windows taskbar icon or a tray icon at the bottom of
+    the display (or move the pointer near the bottom edge on X11 and press the shortcut). Open the
+    picker: on macOS and Windows the popover opens above the bar and the bar stays where it was; on Linux
+    the popover takes the room under the bar and scrolls. It is fully on the display either way. Do the same
+    with Delay's menu and the name screen.
+35. Pick "Save current as preset…": the name screen opens as the popover and fits it; Esc goes back to the
+    picker and then to the bar.
 
 ## 6. Languages and layout
 
-32. Set the language to Vietnamese. Open the panel, the bar, the sheet and the Settings presets page:
-    nothing overlaps or is cut at the default width; the tile labels, the targets, the action bar and
-    "Gửi phản hồi" fit. Then `CAPTUREMANN_PSEUDO_LOCALE=1`: report any clipped text.
-33. Light and dark theme: the panel and the bar are dark in both (floating surfaces); the Settings page
+32. Set the language to Vietnamese. Open the Quick Capture bar, the after-capture bar, the sheet and the Settings presets page:
+    nothing overlaps or is cut; the Preview tag, the action's word and the preset name under it, the
+    popover rows and the tooltips fit (the bar has no other text). Then `CAPTUREMANN_PSEUDO_LOCALE=1`: report any clipped text.
+33. Light and dark theme: the Quick Capture bar and the after-capture bar are dark in both (floating surfaces); the Settings page
     follows the theme.
 
 ## Pass criteria
 
-All steps behave as written; QC-1.AC1 to AC11, QC-3.AC1 to AC7 and QC-4.AC1 to AC9 hold on the real
+All steps behave as written; QC-1.AC1 to AC19, QC-3.AC1 to AC7 and QC-4.AC1 to AC9 hold on the real
 machine. Anything that does not is a finding for the report, with the platform and the step.

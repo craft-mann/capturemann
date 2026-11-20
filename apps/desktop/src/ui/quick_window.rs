@@ -1,38 +1,44 @@
-//! The Quick Capture panel (QC-1, QC-4): one small card with the kind, the target, four option
-//! tiles and one action bar. A borderless floating panel like the Launcher: it takes the keyboard
-//! (the app is activated, the previous app gets focus back on close), it is excluded from screen
-//! capture, and it closes before the capture starts and waits [`CAPTURE_DELAY_MS`] first.
+//! The Quick Capture bar (QC-1, QC-4): one slim row of icon buttons with the kind, the target, the
+//! options of the kind, the preset, the action and the settings, every key printed under its
+//! icon. A borderless floating window like the Launcher: it takes the keyboard (the app is
+//! activated, the previous app gets focus back on close), it is excluded from screen capture, and
+//! it closes before the capture starts and waits [`CAPTURE_DELAY_MS`] first.
 //!
-//! The window only draws `quick::state::PanelState` and sends what the user chose to
-//! `ui::quick_flow`; the capture itself is the existing actions.
+//! The window is the bar plus a strip under it for the tooltips; the preset picker, a value menu
+//! and the name screen open as a popover in that place. The window only draws
+//! `quick::state::PanelState` and sends what the user chose to `ui::quick_flow`; the capture
+//! itself is the existing actions.
 
 use std::time::Duration;
 
-use cm_core::preset::{Preset, PresetKind};
+use cm_core::preset::{Preset, PresetKind, PresetTarget};
 use cm_i18n::{tr, tr_ctx};
 use gpui::{
-    div, prelude::*, px, App, Context, Entity, FocusHandle, FontWeight, Global, KeyDownEvent,
-    MouseButton, Render, Role, ScrollHandle, SharedString, Window, WindowHandle,
+    deferred, div, prelude::*, px, App, Context, Entity, FocusHandle, FontWeight, Global,
+    KeyDownEvent, MouseButton, Render, Role, ScrollHandle, SharedString, Window, WindowHandle,
 };
 
 use crate::launcher::commands::CAPTURE_DELAY_MS;
-use crate::quick::place::panel_rect;
+use crate::quick::place::{self, bar, panel_rect};
 use crate::quick::presets::summary_text;
 use crate::quick::state::{
-    kind_icon, kind_label, panel_key, picker_step, target_label, PanelKey, PanelState, Screen, Tile,
+    controls, kind_icon, kind_key, panel_key, picker_step, seconds_badge, target_icon, target_key,
+    tip_text, Ctl, Mods, PanelKey, PanelState, Screen, Tile,
 };
-use crate::theme::{scale, type_scale, Color, Theme};
+use crate::recording::geometry::Rect;
+use crate::shortcuts::{Platform, ShortcutAction};
+use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::{self, AppModel};
-use crate::ui::components::{icon, icon_button, logo};
+use crate::ui::components::{icon, logo};
 use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
 use crate::ui::preview_label::{label as preview_label, send_feedback, PreviewFeature, Size};
 use crate::ui::recording::{panel_options, pointer_display, visible_part};
 use crate::ui::text_field::{TextField, TextFieldEvent};
 
-pub const WIDTH: f32 = 352.;
-pub const HEIGHT: f32 = 400.;
+/// How long the pointer or the keyboard focus rests on a control before its tooltip shows.
+pub const TIP_DELAY_MS: u64 = 400;
 
-/// Where the panel opens (QC-1 "Opening").
+/// Where the bar opens (QC-1 "Opening").
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Anchor {
     /// The shortcut, the dock and the Launcher: near the pointer, on the display that has it.
@@ -44,7 +50,7 @@ pub enum Anchor {
 struct PanelSlot(Option<WindowHandle<QuickPanel>>);
 impl Global for PanelSlot {}
 
-/// The app that was frontmost when the panel opened (macOS), to hand focus back to.
+/// The app that was frontmost when the bar opened (macOS), to hand focus back to.
 struct PreviousApp(Option<i32>);
 impl Global for PreviousApp {}
 
@@ -58,7 +64,7 @@ fn dismiss(window: &mut Window, cx: &mut App, restore: bool) {
     }
 }
 
-/// The shortcut, the tray item, the dock button and the Launcher row: opens the panel, or closes
+/// The shortcut, the tray item, the dock button and the Launcher row: opens the bar, or closes
 /// it when it is already open.
 pub fn toggle(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
     let open = cx.try_global::<PanelSlot>().and_then(|s| s.0).filter(|h| {
@@ -82,30 +88,30 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
         return;
     };
     let visible = visible_part(&display.1);
+    // One row where the display is wide enough, else two (QC-1 "Size"); the window adds the strip
+    // for the tooltips.
+    let (win_w, win_h) = place::window_size(visible.w);
     let pointer = crate::ui::launcher_window::pointer(cx)
         .map(|p| (f64::from(f32::from(p.x)), f64::from(f32::from(p.y))));
-    let (px_, py_) = crate::quick::place::open_point(pointer, f64::from(HEIGHT), &visible);
-    let max_h = visible.h - 2.0 * crate::quick::place::EDGE;
-    // From the tray the panel is on the icon where the system gives its position (macOS status
+    let (px_, py_) = crate::quick::place::open_point(pointer, win_h, &visible);
+    // From the tray the bar is on the icon where the system gives its position (macOS status
     // item, Windows notification area); where it does not (Linux) it opens near the pointer.
     let icon = (anchor == Anchor::Tray)
         .then(|| app.read(cx).tray.as_ref().and_then(|t| t.icon_frame()))
         .flatten()
         .filter(|(ix, iy, _, _)| visible_contains(&display.1, *ix, *iy));
     let global = match icon {
-        Some(icon) => {
-            crate::quick::place::tray_rect(icon, f64::from(WIDTH), f64::from(HEIGHT), &visible)
-        }
-        None => panel_rect((px_, py_), f64::from(WIDTH), f64::from(HEIGHT), &visible),
+        Some(icon) => crate::quick::place::tray_rect(icon, win_w, win_h, &visible),
+        None => panel_rect((px_, py_), win_w, win_h, &visible),
     };
     cx.set_global(PreviousApp(crate::launcher::focus::frontmost_other_app()));
     let app2 = app.clone();
     let opened = cx.open_window(
         panel_options(display, global, true, false),
         move |window, cx| {
-            // The panel is never in a screenshot or a recording (QC-1.AC2).
+            // The bar is never in a screenshot or a recording (QC-1.AC2).
             crate::platform_window::exclude_from_capture(window);
-            cx.new(|cx| QuickPanel::new(app2, state, max_h, window, cx))
+            cx.new(|cx| QuickPanel::new(app2, state, global, visible, window, cx))
         },
     );
     match opened {
@@ -130,7 +136,7 @@ fn visible_contains(display: &crate::recording::geometry::Rect, x: f64, y: f64) 
     display.contains(x, y)
 }
 
-/// What the body of the card shows.
+/// What the popover under the bar shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Body {
     Main,
@@ -138,6 +144,39 @@ enum Body {
     Picker,
     /// "Save current as preset…": asks for the name.
     Name,
+}
+
+/// Where a tooltip sits against its control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TipAt {
+    Left,
+    Center,
+    Right,
+}
+
+/// A corner badge on a button.
+enum Badge {
+    /// A value ("3s").
+    Text(String),
+    /// A menu (the chevron).
+    Menu,
+}
+
+/// What a bar button looks like.
+struct Cell {
+    ctl: Ctl,
+    id: SharedString,
+    glyph: &'static str,
+    /// The key printed under the icon.
+    key: Option<String>,
+    /// The tooltip text, also the accessible name.
+    tip: String,
+    /// The raised chip in a recessed track (the selected kind and target).
+    selected: bool,
+    /// The light fill and the dot (an option that is on).
+    on: bool,
+    badge: Option<Badge>,
+    at: TipAt,
 }
 
 pub struct QuickPanel {
@@ -148,11 +187,27 @@ pub struct QuickPanel {
     body: Body,
     /// The highlighted picker row: 0 is "No preset", then the presets, then the two links.
     pick_at: usize,
-    /// The tallest the panel may grow while the picker shows every preset.
-    max_h: f64,
-    /// The tile with the keyboard focus (Tab).
-    tile: Option<usize>,
-    /// The value tile whose menu is open.
+    /// The window at rest (the bar and the tooltip strip), global points.
+    home: Rect,
+    /// The visible part of the display the bar is on.
+    visible: Rect,
+    /// Two rows, on a narrow display.
+    two_rows: bool,
+    /// The window can be moved (macOS, Windows): a popover without room under the bar opens
+    /// above it.
+    movable: bool,
+    /// The popover is open above the bar, and its height.
+    upward: bool,
+    pop_h: f64,
+    /// The control with the keyboard focus (Tab).
+    ctl: Option<Ctl>,
+    /// The control under the pointer.
+    hover: Option<Ctl>,
+    /// The control whose tooltip is waiting or showing, and whether it shows.
+    tip: Option<Ctl>,
+    tip_shown: bool,
+    tip_seq: u64,
+    /// The value control whose menu is open.
     menu: Option<Tile>,
     name: Entity<TextField>,
     name_error: Option<String>,
@@ -163,7 +218,8 @@ impl QuickPanel {
     fn new(
         app: Entity<AppModel>,
         st: PanelState,
-        max_h: f64,
+        home: Rect,
+        visible: Rect,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -205,8 +261,17 @@ impl QuickPanel {
             scroll: ScrollHandle::new(),
             body: Body::Main,
             pick_at: 0,
-            max_h,
-            tile: None,
+            home,
+            visible,
+            two_rows: place::two_rows(visible.w),
+            movable: crate::platform_window::NativeWindow::for_frame(window).is_some(),
+            upward: false,
+            pop_h: 0.,
+            ctl: None,
+            hover: None,
+            tip: None,
+            tip_shown: false,
+            tip_seq: 0,
             menu: None,
             name,
             name_error: None,
@@ -214,7 +279,15 @@ impl QuickPanel {
         }
     }
 
-    /// Writes the panel's choices to the app and to `quick_capture.json`.
+    fn bar_h(&self) -> f64 {
+        if self.two_rows {
+            place::TWO_ROW_H
+        } else {
+            place::BAR_H
+        }
+    }
+
+    /// Writes the bar's choices to the app and to `quick_capture.json`.
     fn changed(&mut self, cx: &mut Context<Self>) {
         let st = self.st.clone();
         self.app.update(cx, |m, _| m.quick.panel = st);
@@ -222,25 +295,49 @@ impl QuickPanel {
         cx.notify();
     }
 
+    /// One step back: the popover closes and the bar has the keys again.
     fn back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.body = Body::Main;
         self.menu = None;
-        self.fit_height(window, cx);
+        self.close_popover(window, cx);
         window.focus(&self.focus, cx);
         cx.notify();
     }
 
-    /// The panel is as tall as the picker's list needs while the picker shows, else normal.
-    fn fit_height(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let h = match self.body {
-            Body::Picker => {
-                let presets = self.app.read(cx).quick.presets.len();
-                crate::quick::place::picker_height(presets, f64::from(HEIGHT), self.max_h)
+    // ---- the popover and the window around it ---------------------------------------------
+
+    /// Opens the popover under the bar (above it when the display has no room under it) with
+    /// `want` px of height.
+    fn show_popover(&mut self, want: f64, window: &mut Window, cx: &mut Context<Self>) {
+        self.set_tip(None, cx);
+        let p = place::popover_place(&self.home, self.bar_h(), want, &self.visible, self.movable);
+        self.upward = p.upward;
+        self.pop_h = p.pop_h;
+        self.apply_frame(p.frame, window, cx);
+    }
+
+    fn close_popover(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.pop_h == 0. {
+            return;
+        }
+        self.upward = false;
+        self.pop_h = 0.;
+        self.apply_frame(self.home, window, cx);
+    }
+
+    /// Gives the window `frame` (global points). Moving the window and resizing it must not
+    /// happen inside a window update on macOS, so it goes through a task; elsewhere the size
+    /// changes in place.
+    fn apply_frame(&self, frame: Rect, window: &mut Window, cx: &mut Context<Self>) {
+        if self.movable {
+            if let Some(n) = crate::platform_window::NativeWindow::for_frame(window) {
+                cx.spawn(async move |_, _| n.set_frame(frame.x, frame.y, frame.w, frame.h))
+                    .detach();
+                return;
             }
-            _ => f64::from(HEIGHT),
-        };
+        }
         cx.defer_in(window, move |_, window, _| {
-            window.resize(gpui::size(px(WIDTH), px(h as f32)));
+            window.resize(gpui::size(px(frame.w as f32), px(frame.h as f32)));
         });
     }
 
@@ -258,9 +355,10 @@ impl QuickPanel {
                 .map_or(0, |i| i + 1)
         });
         self.body = Body::Picker;
+        self.menu = None;
         self.scroll
             .scroll_to_item(self.pick_at.min(self.pick_rows(cx) - 3));
-        self.fit_height(window, cx);
+        self.show_popover(place::popover_height(presets.len(), f64::MAX), window, cx);
         cx.notify();
     }
 
@@ -276,11 +374,13 @@ impl QuickPanel {
         }
     }
 
-    fn set_kind(&mut self, k: PresetKind, cx: &mut Context<Self>) {
+    fn set_kind(&mut self, k: PresetKind, window: &mut Window, cx: &mut Context<Self>) {
         self.st.set_kind(k);
-        self.tile = None;
-        self.menu = None;
+        self.ctl = None;
         self.changed(cx);
+        if self.menu.take().is_some() {
+            self.close_popover(window, cx);
+        }
     }
 
     /// Enter or Space: close, wait, run (QC-1 "Window behaviour").
@@ -290,7 +390,7 @@ impl QuickPanel {
         self.changed(cx);
         dismiss(window, cx, true);
         let app = self.app.clone();
-        // The panel is gone by then: the wait runs on the app, not on the closed window.
+        // The bar is gone by then: the wait runs on the app, not on the closed window.
         cx.defer(move |cx| {
             cx.spawn(async move |cx| {
                 cx.background_executor()
@@ -302,9 +402,12 @@ impl QuickPanel {
         });
     }
 
-    fn click_tile(&mut self, t: Tile, cx: &mut Context<Self>) {
+    /// A click or the key of an option: a toggle flips, a value control opens its menu.
+    fn click_tile(&mut self, t: Tile, window: &mut Window, cx: &mut Context<Self>) {
         if t.has_values() {
             self.menu = Some(t);
+            self.body = Body::Main;
+            self.show_popover(place::MENU_H, window, cx);
             cx.notify();
         } else {
             self.st.toggle(t);
@@ -331,6 +434,14 @@ impl QuickPanel {
         self.changed(cx);
     }
 
+    fn set_target(&mut self, t: PresetTarget, window: &mut Window, cx: &mut Context<Self>) {
+        self.st.set_target(t);
+        self.changed(cx);
+        if self.menu.take().is_some() {
+            self.close_popover(window, cx);
+        }
+    }
+
     fn cycle_target(&mut self, forward: bool, cx: &mut Context<Self>) {
         let ts = self.st.targets();
         let Some(cur) = self
@@ -354,7 +465,7 @@ impl QuickPanel {
             Some(p) => self.st.apply_preset(&p),
             None => self.st.clear_preset(),
         }
-        self.tile = None;
+        self.ctl = None;
         self.changed(cx);
         self.back(window, cx);
     }
@@ -398,9 +509,10 @@ impl QuickPanel {
 
     fn open_name(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.body = Body::Name;
+        self.menu = None;
         self.name_error = None;
         self.name.update(cx, |f, cx| f.set_text("", cx));
-        self.fit_height(window, cx);
+        self.show_popover(place::NAME_H, window, cx);
         let handle = self.name.read(cx).focus.clone();
         window.focus(&handle, cx);
         cx.notify();
@@ -412,18 +524,77 @@ impl QuickPanel {
         cx.defer(move |cx| crate::ui::quick_flow::open_presets_page(&app, cx));
     }
 
+    /// What a click, or Enter on a focused button, does.
+    fn activate(&mut self, ctl: Ctl, window: &mut Window, cx: &mut Context<Self>) {
+        match ctl {
+            Ctl::Kind(k) => self.set_kind(k, window, cx),
+            Ctl::Target(t) => self.set_target(t, window, cx),
+            Ctl::Tile(t) => self.click_tile(t, window, cx),
+            Ctl::Preset => self.open_picker(window, cx),
+            Ctl::Action => self.go(window, cx),
+            Ctl::Settings => self.open_settings(window, cx),
+            Ctl::Feedback => send_feedback(PreviewFeature::QuickCapture, cx),
+        }
+    }
+
+    // ---- tooltips -------------------------------------------------------------------------
+
+    fn hover_ctl(&mut self, ctl: Ctl, over: bool, cx: &mut Context<Self>) {
+        if over {
+            self.hover = Some(ctl);
+        } else if self.hover == Some(ctl) {
+            self.hover = None;
+        }
+        let want = self.hover.or(self.ctl);
+        self.set_tip(want, cx);
+    }
+
+    /// The tooltip waits [`TIP_DELAY_MS`] on the control the pointer or the keyboard focus is on
+    /// before it shows.
+    fn set_tip(&mut self, want: Option<Ctl>, cx: &mut Context<Self>) {
+        if self.tip == want {
+            return;
+        }
+        self.tip = want;
+        self.tip_shown = false;
+        self.tip_seq += 1;
+        cx.notify();
+        if want.is_none() {
+            return;
+        }
+        let seq = self.tip_seq;
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(Duration::from_millis(TIP_DELAY_MS))
+                .await;
+            this.update(cx, |this, cx| {
+                if this.tip_seq == seq {
+                    this.tip_shown = true;
+                    cx.notify();
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    // ---- keys -----------------------------------------------------------------------------
+
     fn on_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let k = &ev.keystroke;
         let m = k.modifiers;
-        if m.platform || m.control || m.alt {
-            return;
-        }
         let screen = match self.body {
             Body::Main => Screen::Main,
             Body::Picker => Screen::Picker,
             Body::Name => Screen::Name,
         };
-        let Some(key) = panel_key(&k.key, m.shift, screen, self.menu.is_some()) else {
+        let mods = Mods {
+            shift: m.shift,
+            ctrl: m.control,
+            alt: m.alt,
+            platform: m.platform,
+        };
+        let Some(key) = panel_key(&k.key, mods, screen, self.menu.is_some(), self.st.kind()) else {
             return;
         };
         match key {
@@ -431,30 +602,46 @@ impl QuickPanel {
             PanelKey::Back => self.back(window, cx),
             PanelKey::Go => {
                 if self.menu.take().is_some() {
+                    self.close_popover(window, cx);
                     cx.notify();
+                } else if let Some(c @ (Ctl::Preset | Ctl::Settings | Ctl::Feedback)) = self.ctl {
+                    self.activate(c, window, cx);
                 } else {
                     self.go(window, cx);
                 }
             }
-            PanelKey::NextTile | PanelKey::PrevTile => {
-                let n = Tile::of(self.st.kind()).len();
-                let back = key == PanelKey::PrevTile;
-                self.tile = Some(match (self.tile, back) {
+            PanelKey::NextControl | PanelKey::PrevControl => {
+                let all = controls(self.st.kind());
+                let n = all.len();
+                let at = self.ctl.and_then(|c| all.iter().position(|x| *x == c));
+                let back = key == PanelKey::PrevControl;
+                let next = match (at, back) {
                     (None, false) => 0,
                     (None, true) => n - 1,
                     (Some(i), false) => (i + 1) % n,
                     (Some(i), true) => (i + n - 1) % n,
-                });
+                };
+                self.ctl = Some(all[next]);
+                let want = self.hover.or(self.ctl);
+                self.set_tip(want, cx);
                 cx.notify();
             }
             PanelKey::TileUp | PanelKey::TileDown => {
-                if let Some(i) = self.tile {
-                    self.step_tile(Tile::of(self.st.kind())[i], key == PanelKey::TileDown, cx);
+                if let Some(Ctl::Tile(t)) = self.ctl {
+                    self.step_tile(t, key == PanelKey::TileDown, cx);
                 }
             }
+            PanelKey::Target(t) => self.set_target(t, window, cx),
+            PanelKey::Tile(t) => self.click_tile(t, window, cx),
             PanelKey::TargetPrev => self.cycle_target(false, cx),
             PanelKey::TargetNext => self.cycle_target(true, cx),
             PanelKey::Picker => self.open_picker(window, cx),
+            PanelKey::Preset(i) => {
+                if let Some(p) = self.app.read(cx).quick.presets.get(i).cloned() {
+                    self.pick_preset(Some(p), window, cx);
+                }
+            }
+            PanelKey::Settings => self.open_settings(window, cx),
             PanelKey::PickerUp | PanelKey::PickerDown => {
                 let rows = self.pick_rows(cx);
                 self.pick_at = picker_step(self.pick_at, key == PanelKey::PickerDown, rows);
@@ -463,9 +650,78 @@ impl QuickPanel {
                 cx.notify();
             }
             PanelKey::PickerGo => self.pick_go(window, cx),
-            PanelKey::Kind(kind) => self.set_kind(kind, cx),
+            PanelKey::Kind(kind) => self.set_kind(kind, window, cx),
         }
         cx.stop_propagation();
+    }
+
+    // ---- texts ----------------------------------------------------------------------------
+
+    fn platform(&self, cx: &Context<Self>) -> Platform {
+        self.app.read(cx).platform
+    }
+
+    /// The chord of a global shortcut as the app has it set ("⌥⇧R", "Ctrl+Alt+Shift+R");
+    /// `None` when the action has no chord.
+    fn global_chord(&self, a: ShortcutAction, cx: &Context<Self>) -> Option<String> {
+        let m = self.app.read(cx);
+        let caps = m.shortcuts.get(a).keycaps(m.platform);
+        (!caps.is_empty()).then(|| {
+            if m.platform == Platform::Mac {
+                caps.concat()
+            } else {
+                caps.join("+")
+            }
+        })
+    }
+
+    /// The key that opens the settings, as printed: "⌘," on macOS, "Ctrl," elsewhere.
+    fn settings_key(&self, cx: &Context<Self>) -> String {
+        if self.platform(cx) == Platform::Mac {
+            "\u{2318},".to_owned()
+        } else {
+            "Ctrl,".to_owned()
+        }
+    }
+
+    /// The first four presets' keys in the picker: "⌃1", "Ctrl+1".
+    fn preset_key(&self, n: usize, cx: &Context<Self>) -> String {
+        if self.platform(cx) == Platform::Mac {
+            format!("\u{2303}{n}")
+        } else {
+            format!("Ctrl+{n}")
+        }
+    }
+
+    /// The tooltip and accessible name of a control (QC-1 "Tooltips").
+    fn tip_of(&self, ctl: Ctl, cx: &Context<Self>) -> String {
+        match ctl {
+            Ctl::Kind(k) => {
+                let action = match k {
+                    PresetKind::Screenshot => ShortcutAction::CaptureRegion,
+                    PresetKind::Video => ShortcutAction::ToggleRecording,
+                    PresetKind::Audio => ShortcutAction::ToggleAudioRecording,
+                };
+                let chord = self.global_chord(action, cx);
+                self.st.kind_tip(k, chord.as_deref())
+            }
+            Ctl::Target(t) => self.st.target_tip(t),
+            Ctl::Tile(t) => self.st.tile_tip(t),
+            Ctl::Preset => self.st.preset_tip(),
+            Ctl::Action => tip_text(
+                &self.st.action_text().0,
+                None,
+                Some(&tr_ctx!("quick capture", "Enter")),
+                None,
+            ),
+            Ctl::Settings => tip_text(
+                &tr_ctx!("quick capture", "Preset settings"),
+                None,
+                Some(&self.settings_key(cx)),
+                None,
+            ),
+            Ctl::Feedback => tr_ctx!("button", "Send feedback"),
+        }
     }
 }
 
@@ -489,287 +745,524 @@ fn pill_button(
 }
 
 impl QuickPanel {
-    fn header(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
-        let name = self
-            .st
-            .preset
-            .as_ref()
-            .map_or_else(|| tr_ctx!("preset picker", "No preset"), |p| p.name.clone());
-        let picker_aria = tr_ctx!("preset picker", "Preset: {name}", name = name.clone());
-        let picker = pill_button(t, "qc-preset-pill", picker_aria)
-            .h(px(32.))
-            .flex_1()
-            .min_w(px(0.))
-            .px(px(10.))
+    /// The tooltip, under its control, in a layer above the rest of the bar.
+    fn tip_el(&self, t: &Theme, text: String, at: TipAt) -> impl IntoElement {
+        let top = px((bar::CELL_H + 10.) as f32);
+        let wrap = div().absolute().top(top).w(px(0.)).flex();
+        let wrap = match at {
+            TipAt::Left => wrap.left(px(0.)).justify_start(),
+            TipAt::Center => wrap.left(px((bar::CELL_W / 2.) as f32)).justify_center(),
+            TipAt::Right => wrap.right(px(0.)).justify_end(),
+        };
+        deferred(
+            wrap.child(
+                div()
+                    .id("qc-tip")
+                    .role(Role::Tooltip)
+                    .flex_none()
+                    .whitespace_nowrap()
+                    .px(px(8.))
+                    .py(px(4.))
+                    .rounded(px(scale::RADIUS_SM))
+                    .bg(rgba_of(t.raised))
+                    .border_1()
+                    .border_color(rgba_of(t.line))
+                    .text_color(rgba_of(t.text))
+                    .text_size(px(type_scale::CAPTION))
+                    .child(SharedString::from(text)),
+            ),
+        )
+        .with_priority(2)
+    }
+
+    /// A bar button: 44 x 48, the icon, the key under it, a badge in the corner, a dot when on.
+    fn cell(&self, t: &Theme, c: Cell, cx: &mut Context<Self>) -> gpui::Stateful<gpui::Div> {
+        let ctl = c.ctl;
+        let focused = self.ctl == Some(ctl);
+        let showing = self.tip_shown && self.tip == Some(ctl) && self.pop_h == 0.;
+        let (fg, key_fg) = if c.selected || c.on {
+            (t.text, t.text_2)
+        } else {
+            (t.mist, t.mist)
+        };
+        let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
+        let mut d = div()
+            .id(c.id)
+            .role(Role::Button)
+            .aria_label(SharedString::from(c.tip.clone()))
+            .focusable()
+            .tab_stop(true)
+            .relative()
+            .w(px(bar::CELL_W as f32))
+            .h(px(bar::CELL_H as f32))
             .flex()
+            .flex_none()
+            .flex_col()
             .items_center()
-            .gap(px(6.))
-            .rounded(px(scale::RADIUS_PILL))
+            .justify_center()
+            .gap(px(3.))
+            .rounded(px(scale::RADIUS_MD))
             .border_1()
-            .border_color(rgba_of(t.line))
-            .bg(rgba_of(t.surface_2))
-            .text_size(px(type_scale::UI - 1.))
-            .text_color(rgba_of(if self.st.preset.is_some() {
-                t.text
+            .border_color(if focused {
+                rgba_of(t.text)
+            } else if c.selected {
+                rgba_of(t.line)
             } else {
-                t.text_3
+                rgba_of(crate::theme::Color(0))
+            })
+            .cursor_pointer()
+            .focus_visible(move |s| s.border_color(focus))
+            .on_hover(cx.listener(move |this, over: &bool, _, cx| this.hover_ctl(ctl, *over, cx)))
+            .on_click(cx.listener(move |this, _, window, cx| this.activate(ctl, window, cx)));
+        d = if c.selected {
+            d.bg(rgba_of(t.raised)).aria_selected(true)
+        } else if c.on {
+            d.bg(rgba_of(t.surface_2))
+                .hover(move |s| s.bg(hover))
+                .aria_toggled(gpui::Toggled::True)
+        } else if matches!(ctl, Ctl::Tile(_)) {
+            d.hover(move |s| s.bg(hover))
+                .aria_toggled(gpui::Toggled::False)
+        } else {
+            d.hover(move |s| s.bg(hover)).aria_selected(false)
+        };
+        d.child(icon(c.glyph, 18., fg))
+            .child(
+                div()
+                    .h(px(10.))
+                    .text_size(px(10.))
+                    .line_height(px(10.))
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(rgba_of(key_fg))
+                    .mono()
+                    .child(SharedString::from(c.key.unwrap_or_default())),
+            )
+            .children(c.badge.map(|b| {
+                div()
+                    .absolute()
+                    .top(px(3.))
+                    .right(px(3.))
+                    .text_size(px(9.))
+                    .line_height(px(10.))
+                    .text_color(rgba_of(t.text_2))
+                    .mono()
+                    .child(match b {
+                        Badge::Text(s) => div().child(SharedString::from(s)),
+                        Badge::Menu => div().child(icon("chevron-down", 9., t.text_2)),
+                    })
             }))
-            .on_click(cx.listener(|this, _, window, cx| this.open_picker(window, cx)))
-            .child(icon("bookmark", 14., t.text_3))
-            .child(crate::ui::components::shrink_text(name).flex_1())
-            .child(icon("chevron-down", 14., t.text_3));
-        let feedback = pill_button(t, "qc-feedback", tr_ctx!("button", "Send feedback"))
-            .h(px(32.))
-            .px(px(10.))
+            .children((c.on && !c.selected).then(|| {
+                div()
+                    .absolute()
+                    .bottom(px(3.))
+                    .left(px(((bar::CELL_W - 3.) / 2.) as f32))
+                    .size(px(3.))
+                    .rounded(px(1.5))
+                    .bg(rgba_of(t.text))
+            }))
+            .children(showing.then(|| self.tip_el(t, self.tip_of(ctl, cx), c.at)))
+    }
+
+    /// The recessed track under a group of selectable buttons.
+    fn track(t: &Theme) -> gpui::Div {
+        div()
             .flex()
             .flex_none()
             .items_center()
-            .rounded(px(scale::RADIUS_MD))
-            .text_size(px(type_scale::UI - 1.))
-            .text_color(rgba_of(t.text_2))
-            .on_click(|_, _, cx| send_feedback(PreviewFeature::QuickCapture, cx))
-            .child(SharedString::from(tr_ctx!("button", "Send feedback")));
-        let settings = icon_button(
-            t,
-            "qc-settings",
-            "settings",
-            tr_ctx!("quick capture", "Preset settings"),
-            false,
-            None,
-        )
-        .size(px(32.))
-        .on_click(cx.listener(|this, _, window, cx| this.open_settings(window, cx)));
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(8.))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(8.))
-                    .child(logo(t, 20.))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(0.))
-                            .flex()
-                            .items_center()
-                            .gap(px(8.))
-                            .child(
-                                div()
-                                    .text_size(px(type_scale::UI))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .whitespace_nowrap()
-                                    .child(SharedString::from(tr!("Quick Capture"))),
-                            )
-                            .child(preview_label(
-                                t,
-                                Size::S,
-                                PreviewFeature::QuickCapture,
-                                None,
-                                None,
-                            )),
-                    )
-                    .child(settings),
-            )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(6.))
-                    .child(picker)
-                    .child(feedback),
-            )
-    }
-
-    fn kind_tabs(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
-        let active = self.st.kind();
-        div()
-            .flex()
-            .gap(px(4.))
-            .p(px(3.))
-            .rounded(px(scale::RADIUS_MD))
-            .bg(rgba_of(t.surface_2))
+            .gap(px(bar::CELL_GAP as f32))
+            .p(px(bar::TRACK_PAD as f32))
+            .rounded(px(12.))
+            .bg(rgba_of(t.field))
             .border_1()
             .border_color(rgba_of(t.border))
-            .children(
-                [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio]
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, k)| {
-                        let on = k == active;
-                        let label = kind_label(k);
-                        let mut b = pill_button(
-                            t,
-                            SharedString::from(format!("qc-kind-{i}")),
-                            tr_ctx!(
-                                "quick capture kind",
-                                "{kind}, key {n}",
-                                kind = label.clone(),
-                                n = i + 1
-                            ),
-                        )
-                        .h(px(36.))
-                        .px(px(10.))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .gap(px(6.))
-                        .rounded(px(scale::RADIUS_SM))
-                        .text_size(px(type_scale::UI - 1.))
-                        .font_weight(FontWeight::MEDIUM)
-                        .aria_selected(on)
-                        .on_click(cx.listener(move |this, _, _, cx| this.set_kind(k, cx)));
-                        b = if on {
-                            b.flex_1().bg(rgba_of(t.raised)).text_color(rgba_of(t.text))
-                        } else {
-                            b.w(px(44.)).flex_none().text_color(rgba_of(t.text_3))
-                        };
-                        // Only the active tab shows its name.
-                        b.child(icon(kind_icon(k), 16., if on { t.text } else { t.text_3 }))
-                            .when(on, |d| d.child(SharedString::from(label)))
-                    }),
+    }
+
+    fn sep(t: &Theme) -> gpui::Div {
+        div()
+            .w(px(1.))
+            .h(px(28.))
+            .flex_none()
+            .mx(px(4.))
+            .bg(rgba_of(t.border))
+    }
+
+    fn cell_at(&self, ctl: Ctl, kind_cells: bool) -> TipAt {
+        if self.two_rows {
+            return match ctl {
+                Ctl::Preset | Ctl::Action | Ctl::Settings | Ctl::Feedback => TipAt::Right,
+                _ => TipAt::Left,
+            };
+        }
+        match ctl {
+            Ctl::Kind(_) => TipAt::Left,
+            Ctl::Action | Ctl::Settings | Ctl::Feedback => TipAt::Right,
+            _ => {
+                let _ = kind_cells;
+                TipAt::Center
+            }
+        }
+    }
+
+    fn kind_track(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
+        let active = self.st.kind();
+        Self::track(t).children(
+            [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio]
+                .into_iter()
+                .enumerate()
+                .map(|(i, k)| {
+                    let ctl = Ctl::Kind(k);
+                    self.cell(
+                        t,
+                        Cell {
+                            ctl,
+                            id: SharedString::from(format!("qc-kind-{i}")),
+                            glyph: kind_icon(k),
+                            key: Some(kind_key(k).to_owned()),
+                            tip: self.tip_of(ctl, cx),
+                            selected: k == active,
+                            on: false,
+                            badge: None,
+                            at: self.cell_at(ctl, true),
+                        },
+                        cx,
+                    )
+                }),
+        )
+    }
+
+    /// The targets; for audio the slot shows the microphone level instead.
+    fn target_slot(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
+        if self.st.kind() == PresetKind::Audio {
+            return self.level_meter(t);
+        }
+        let cur = self.st.target();
+        Self::track(t).children(self.st.targets().iter().enumerate().map(|(i, &tg)| {
+            let ctl = Ctl::Target(tg);
+            self.cell(
+                t,
+                Cell {
+                    ctl,
+                    id: SharedString::from(format!("qc-target-{i}")),
+                    glyph: target_icon(tg),
+                    key: Some(target_key(tg).to_owned()),
+                    tip: self.tip_of(ctl, cx),
+                    selected: Some(tg) == cur,
+                    on: false,
+                    badge: None,
+                    at: self.cell_at(ctl, false),
+                },
+                cx,
+            )
+        }))
+    }
+
+    /// Audio has no target: the slot holds the microphone level, in the same width so nothing
+    /// moves when the kind changes. The bar draws it unlit: a level without recording would
+    /// open the microphone (and light the system's recording indicator) just to show a bar, so
+    /// the live level stays in the recording sheet and on the HUD.
+    fn level_meter(&self, t: &Theme) -> gpui::Div {
+        let bars = crate::recording::hud_layout::METER_SHAPE;
+        Self::track(t)
+            .w(px(bar::track_w(4) as f32))
+            .h(px(bar::TRACK_H as f32))
+            .gap(px(10.))
+            .px(px(14.))
+            .child(
+                div()
+                    .id("qc-mic-level")
+                    .role(Role::Meter)
+                    .aria_label(tr!("Microphone level"))
+                    .flex()
+                    .items_center()
+                    .gap(px(10.))
+                    .child(icon("mic", 18., t.mist))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(3.))
+                            .children(bars.iter().map(|h| {
+                                div()
+                                    .w(px(4.))
+                                    .h(px(f32::from(*h)))
+                                    .rounded(px(1.5))
+                                    .bg(rgba_of(t.line))
+                            })),
+                    ),
             )
     }
 
-    fn target_row(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
-        if self.st.kind() == PresetKind::Audio {
-            return div()
-                .h(px(36.))
-                .flex()
-                .items_center()
-                .px(px(4.))
-                .text_size(px(type_scale::UI - 1.))
-                .text_color(rgba_of(t.text_3))
-                .child(SharedString::from(tr!("Mic and system sound, no screen")));
-        }
-        let cur = self.st.target();
+    fn options(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
         div()
             .flex()
-            .gap(px(4.))
-            .children(self.st.targets().iter().enumerate().map(|(i, &tg)| {
-                let on = Some(tg) == cur;
-                pill_button(
+            .flex_none()
+            .items_center()
+            .gap(px(bar::CELL_GAP as f32))
+            .children(Tile::of(self.st.kind()).into_iter().map(|tile| {
+                let ctl = Ctl::Tile(tile);
+                let badge = if tile.has_values() {
+                    seconds_badge(self.st.value_of(tile))
+                        .map(Badge::Text)
+                        .or(Some(Badge::Menu))
+                } else {
+                    None
+                };
+                self.cell(
                     t,
-                    SharedString::from(format!("qc-target-{i}")),
-                    tr_ctx!(
-                        "quick capture target",
-                        "{target}, {state}",
-                        target = target_label(tg),
-                        state = if on {
-                            tr!("selected")
-                        } else {
-                            tr!("not selected")
-                        }
-                    ),
+                    Cell {
+                        ctl,
+                        id: SharedString::from(tile.id()),
+                        glyph: tile.icon(),
+                        key: Some(tile.key().to_owned()),
+                        tip: self.tip_of(ctl, cx),
+                        selected: false,
+                        on: self.st.is_on(tile),
+                        badge,
+                        at: self.cell_at(ctl, false),
+                    },
+                    cx,
                 )
-                .h(px(32.))
-                // Each tab is as wide as its label needs and shares what is left (L-10: at
-                // +30 % text "Long Shot" wrapped to two lines and was clipped in an equal cell).
-                .flex_auto()
-                .min_w(px(0.))
-                .px(px(6.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded(px(scale::RADIUS_SM))
-                .border_1()
-                .border_color(rgba_of(if on { t.line } else { t.border }))
-                .bg(rgba_of(if on { t.raised } else { Color(0) }))
-                .text_size(px(type_scale::UI - 1.))
-                .text_color(rgba_of(if on { t.text } else { t.text_3 }))
-                .aria_selected(on)
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.st.set_target(tg);
-                    this.changed(cx);
-                }))
-                .child(crate::ui::components::ellipsis_text(target_label(tg)))
             }))
     }
 
-    fn tiles(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
-        if let Some(menu) = self.menu {
-            return self.value_menu(t, menu, cx);
-        }
-        let tiles = Tile::of(self.st.kind());
-        let cell = |i: usize, tile: Tile, cx: &mut Context<Self>| {
-            let on = self.st.is_on(tile);
-            let focused = self.tile == Some(i);
-            let (circle_bg, circle_fg) = if on {
-                (t.primary_bg, t.primary_fg)
-            } else {
-                (t.raised, t.text_3)
-            };
-            pill_button(t, tile.id(), self.st.tile_aria(tile))
-                .h(px(52.))
-                .flex_1()
-                .min_w(px(0.))
-                .px(px(8.))
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .rounded(px(scale::RADIUS_MD))
-                .border_1()
-                .border_color(rgba_of(if focused { t.text } else { t.border }))
-                .bg(rgba_of(t.surface_2))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.tile = Some(i);
-                    this.click_tile(tile, cx);
-                }))
-                .child(
-                    div()
-                        .size(px(28.))
-                        .flex_none()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .rounded(px(14.))
-                        .bg(rgba_of(circle_bg))
-                        .child(icon(tile.icon(), 14., circle_fg)),
-                )
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w(px(0.))
-                        .flex()
-                        .flex_col()
-                        .child(
-                            div()
-                                .text_size(px(type_scale::UI - 1.))
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(rgba_of(if on { t.text } else { t.text_2 }))
-                                .child(crate::ui::components::ellipsis_text(tile.label())),
-                        )
-                        .children(self.st.value_text(tile).map(|v| {
-                            div()
-                                .text_size(px(11.))
-                                .text_color(rgba_of(t.text_3))
-                                .child(crate::ui::components::ellipsis_text(v))
-                        })),
-                )
-        };
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(8.))
-            .child(
-                div()
-                    .flex()
-                    .gap(px(8.))
-                    .child(cell(0, tiles[0], cx))
-                    .child(cell(1, tiles[1], cx)),
-            )
-            .child(
-                div()
-                    .flex()
-                    .gap(px(8.))
-                    .child(cell(2, tiles[2], cx))
-                    .child(cell(3, tiles[3], cx)),
-            )
+    fn preset_cell(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Stateful<gpui::Div> {
+        let ctl = Ctl::Preset;
+        self.cell(
+            t,
+            Cell {
+                ctl,
+                id: "qc-preset-pill".into(),
+                glyph: "bookmark",
+                key: Some("P".to_owned()),
+                tip: self.tip_of(ctl, cx),
+                selected: false,
+                on: self.st.preset.is_some(),
+                badge: Some(Badge::Menu),
+                at: self.cell_at(ctl, false),
+            },
+            cx,
+        )
     }
 
-    /// The small menu of a value tile (Delay, Countdown): its choices, in place of the grid.
+    /// Settings and Send feedback: 38 px wide icon buttons.
+    fn icon_cell(
+        &self,
+        t: &Theme,
+        ctl: Ctl,
+        id: &'static str,
+        glyph: &'static str,
+        key: Option<String>,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<gpui::Div> {
+        self.cell(
+            t,
+            Cell {
+                ctl,
+                id: id.into(),
+                glyph,
+                key,
+                tip: self.tip_of(ctl, cx),
+                selected: false,
+                on: false,
+                badge: None,
+                at: self.cell_at(ctl, false),
+            },
+            cx,
+        )
+        .w(px(bar::ICON_BTN_W as f32))
+    }
+
+    /// The action: the only filled control. Capture is neutral, Record is the record red; the
+    /// picked preset's name is a second line.
+    fn action(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Stateful<gpui::Div> {
+        let ctl = Ctl::Action;
+        let (main, name) = self.st.action_lines();
+        let (_, record) = self.st.action_text();
+        let (bg, hover, fg) = if record {
+            (t.rec, t.rec_hover, t.on_rec)
+        } else {
+            (t.primary_bg, t.primary_hover, t.primary_fg)
+        };
+        let focused = self.ctl == Some(ctl);
+        let showing = self.tip_shown && self.tip == Some(ctl) && self.pop_h == 0.;
+        let focus = rgba_of(t.text);
+        div()
+            .id("qc-action")
+            .role(Role::Button)
+            .aria_label(SharedString::from(self.tip_of(ctl, cx)))
+            .focusable()
+            .tab_stop(true)
+            .relative()
+            .h(px(bar::CELL_H as f32))
+            .w(px(bar::ACTION_W as f32))
+            .ml(px(bar::ACTION_ML as f32))
+            .pl(px(12.))
+            .pr(px(8.))
+            .flex()
+            .flex_none()
+            .items_center()
+            .gap(px(8.))
+            .rounded(px(12.))
+            .border_1()
+            .border_color(if focused { rgba_of(t.ink) } else { rgba_of(bg) })
+            .bg(rgba_of(bg))
+            .text_color(rgba_of(fg))
+            .cursor_pointer()
+            .hover(move |s| s.bg(rgba_of(hover)))
+            .focus_visible(move |s| s.border_color(focus))
+            .on_hover(cx.listener(move |this, over: &bool, _, cx| this.hover_ctl(ctl, *over, cx)))
+            .on_click(cx.listener(|this, _, window, cx| this.go(window, cx)))
+            // The record dot on Record, the camera shutter's frame on Capture.
+            .child(if record {
+                div()
+                    .size(px(10.))
+                    .flex_none()
+                    .rounded(px(5.))
+                    .bg(rgba_of(t.ink))
+                    .into_any_element()
+            } else {
+                icon("cm-capture-region", 16., fg).into_any_element()
+            })
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .flex()
+                    .flex_col()
+                    .child(
+                        div()
+                            .text_size(px(type_scale::UI))
+                            .line_height(px(16.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .whitespace_nowrap()
+                            .child(SharedString::from(main)),
+                    )
+                    .children(name.map(|n| {
+                        div()
+                            .text_size(px(10.5))
+                            .line_height(px(12.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .opacity(0.7)
+                            .child(crate::ui::components::ellipsis_text(n))
+                    })),
+            )
+            .child(
+                div()
+                    .h(px(22.))
+                    .min_w(px(22.))
+                    .px(px(4.))
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(6.))
+                    .bg(rgba_of(t.ink.with_alpha(33)))
+                    .text_size(px(12.))
+                    .mono()
+                    .child(SharedString::from("\u{21B5}")),
+            )
+            .children(showing.then(|| self.tip_el(t, self.tip_of(ctl, cx), TipAt::Right)))
+    }
+
+    /// The logo with the Preview tag under it: the tag the spec asks Quick Capture to keep.
+    fn logo_slot(&self, t: &Theme) -> gpui::Div {
+        div()
+            .w(px(bar::LOGO_W as f32))
+            .h(px(bar::CELL_H as f32))
+            .flex()
+            .flex_none()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .gap(px(4.))
+            .child(logo(t, 18.))
+            .child(preview_label(
+                t,
+                Size::Xs,
+                PreviewFeature::QuickCapture,
+                None,
+                None,
+            ))
+    }
+
+    fn bar(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
+        let frame = div()
+            .w(px(if self.two_rows {
+                place::TWO_ROW_W
+            } else {
+                place::BAR_W
+            } as f32))
+            .h(px(self.bar_h() as f32))
+            .flex_none()
+            .px(px(bar::PAD_X as f32))
+            .py(px(bar::PAD_Y as f32))
+            .flex()
+            .rounded(px(scale::RADIUS_XL))
+            .border_1()
+            .border_color(rgba_of(t.line))
+            .bg(rgba_of(t.surface.with_alpha(245)))
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation());
+        let settings_key = self.settings_key(cx);
+        let kind = self.kind_track(t, cx);
+        let target = self.target_slot(t, cx);
+        let options = self.options(t, cx);
+        let preset = self.preset_cell(t, cx);
+        let action = self.action(t, cx);
+        let settings = self.icon_cell(
+            t,
+            Ctl::Settings,
+            "qc-settings",
+            "settings",
+            Some(settings_key),
+            cx,
+        );
+        let feedback = self.icon_cell(t, Ctl::Feedback, "qc-feedback", "message-square", None, cx);
+        let row = || {
+            div()
+                .flex()
+                .items_center()
+                .gap(px(bar::GAP as f32))
+                .h(px(bar::TRACK_H as f32))
+        };
+        if self.two_rows {
+            frame
+                .flex_col()
+                .gap(px(bar::GAP as f32))
+                .child(
+                    row()
+                        .child(self.logo_slot(t))
+                        .child(kind)
+                        .child(Self::sep(t))
+                        .child(target),
+                )
+                .child(
+                    row()
+                        .child(options)
+                        .child(Self::sep(t))
+                        .child(preset)
+                        .child(action)
+                        .child(settings)
+                        .child(feedback),
+                )
+        } else {
+            frame
+                .items_center()
+                .gap(px(bar::GAP as f32))
+                .child(self.logo_slot(t))
+                .child(kind)
+                .child(Self::sep(t))
+                .child(target)
+                .child(Self::sep(t))
+                .child(options)
+                .child(Self::sep(t))
+                .child(preset)
+                .child(action)
+                .child(settings)
+                .child(feedback)
+        }
+    }
+
+    /// The small menu of a value control (Delay, Countdown): its choices.
     fn value_menu(&self, t: &Theme, tile: Tile, cx: &mut Context<Self>) -> gpui::Div {
         let current = self.st.value_of(tile);
         div()
@@ -799,7 +1292,7 @@ impl QuickPanel {
                                 value = text.clone()
                             ),
                         )
-                        .h(px(52.))
+                        .h(px(44.))
                         .flex_1()
                         .flex()
                         .items_center()
@@ -811,10 +1304,11 @@ impl QuickPanel {
                         .text_size(px(type_scale::UI))
                         .text_color(rgba_of(if on { t.text } else { t.text_2 }))
                         .aria_selected(on)
-                        .on_click(cx.listener(move |this, _, _, cx| {
+                        .on_click(cx.listener(move |this, _, window, cx| {
                             this.st.set_value(tile, secs);
                             this.menu = None;
                             this.changed(cx);
+                            this.close_popover(window, cx);
                         }))
                         .child(SharedString::from(text))
                     })),
@@ -827,61 +1321,16 @@ impl QuickPanel {
             )
     }
 
-    fn action_bar(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Stateful<gpui::Div> {
-        let (text, record) = self.st.action_text();
-        let (bg, hover, fg) = if record {
-            (t.rec, t.rec_hover, t.on_rec)
-        } else {
-            (t.primary_bg, t.primary_hover, t.primary_fg)
-        };
-        let platform = self.app.read(cx).platform;
-        let keys = vec![tr_ctx!("quick capture", "Enter")];
-        let _ = platform;
-        div()
-            .id("qc-action")
-            .role(Role::Button)
-            .aria_label(SharedString::from(text.clone()))
-            .focusable()
-            .tab_stop(true)
-            .h(px(44.))
-            .w_full()
-            .px(px(14.))
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap(px(8.))
-            .rounded(px(12.))
-            .bg(rgba_of(bg))
-            .text_color(rgba_of(fg))
-            .text_size(px(type_scale::UI))
-            .font_weight(FontWeight::SEMIBOLD)
-            .cursor_pointer()
-            .hover(move |s| s.bg(rgba_of(hover)))
-            .on_click(cx.listener(|this, _, window, cx| this.go(window, cx)))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w(px(0.))
-                    .child(crate::ui::components::shrink_text(text)),
-            )
-            .children(keys.into_iter().map(move |k| {
-                div()
-                    .px(px(7.))
-                    .py(px(2.))
-                    .rounded(px(scale::RADIUS_XS))
-                    .bg(rgba_of(t.ink.with_alpha(18)))
-                    .text_size(px(11.))
-                    .font_weight(FontWeight::MEDIUM)
-                    .mono()
-                    .child(SharedString::from(format!("\u{21B5} {k}")))
-            }))
-    }
-
     fn picker(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
         let presets = self.app.read(cx).quick.presets.clone();
         let picked = self.st.preset.as_ref().map(|p| p.id.clone());
         let at = self.pick_at;
-        let row = |id: String, title: String, sub: Option<String>, on: bool, cur: bool| {
+        let row = |id: String,
+                   title: String,
+                   sub: Option<String>,
+                   key: Option<String>,
+                   on: bool,
+                   cur: bool| {
             pill_button(
                 t,
                 SharedString::from(id),
@@ -931,6 +1380,14 @@ impl QuickPanel {
                             .child(crate::ui::components::shrink_text(s))
                     })),
             )
+            .children(key.map(|k| {
+                div()
+                    .flex_none()
+                    .text_size(px(11.))
+                    .text_color(rgba_of(t.mist))
+                    .mono()
+                    .child(SharedString::from(k))
+            }))
             .children(on.then(|| icon("check", 14., t.text)))
         };
         let mut rows: Vec<gpui::AnyElement> = Vec::new();
@@ -938,6 +1395,7 @@ impl QuickPanel {
             row(
                 "qc-pick-none".into(),
                 tr_ctx!("preset picker", "No preset"),
+                None,
                 None,
                 picked.is_none(),
                 at == 0,
@@ -952,6 +1410,7 @@ impl QuickPanel {
                     format!("qc-pick-{i}"),
                     p.name.clone(),
                     Some(summary_text(&p)),
+                    (i < crate::quick::state::PRESET_KEYS).then(|| self.preset_key(i + 1, cx)),
                     on,
                     at == i + 1,
                 )
@@ -1090,27 +1549,40 @@ impl QuickPanel {
                     ),
             )
     }
+
+    /// The popover under (or over) the bar, when one is open.
+    fn popover(&self, t: &Theme, cx: &mut Context<Self>) -> Option<gpui::Div> {
+        let content = match (self.body, self.menu) {
+            (Body::Picker, _) => self.picker(t, cx),
+            (Body::Name, _) => self.name_body(t, cx),
+            (Body::Main, Some(tile)) => self.value_menu(t, tile, cx),
+            (Body::Main, None) => return None,
+        };
+        Some(
+            div()
+                .w(px(place::POP_W as f32))
+                .h(px(self.pop_h as f32))
+                .flex_none()
+                .ml_auto()
+                .p(px(8.))
+                .flex()
+                .flex_col()
+                .rounded(px(scale::RADIUS_XL))
+                .border_1()
+                .border_color(rgba_of(t.line))
+                .bg(rgba_of(t.surface))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(content),
+        )
+    }
 }
 
 impl Render for QuickPanel {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::overlay();
-        let body = match self.body {
-            Body::Main => div()
-                .flex_1()
-                .flex()
-                .flex_col()
-                .gap(px(10.))
-                .child(self.kind_tabs(&t, cx))
-                .child(self.target_row(&t, cx))
-                .child(self.tiles(&t, cx))
-                .child(div().flex_1())
-                .child(self.action_bar(&t, cx)),
-            Body::Picker => self.picker(&t, cx),
-            Body::Name => self.name_body(&t, cx),
-        };
-        let _ = window;
-        div()
+        let bar = self.bar(&t, cx);
+        let pop = self.popover(&t, cx);
+        let root = div()
             .id("quick-capture")
             .role(Role::Dialog)
             .aria_label(tr!("Quick Capture"))
@@ -1121,20 +1593,13 @@ impl Render for QuickPanel {
             .font_features(ui_features())
             .text_color(rgba_of(t.text))
             .text_size(px(type_scale::UI))
-            .child(
-                div()
-                    .size_full()
-                    .p(px(14.))
-                    .flex()
-                    .flex_col()
-                    .gap(px(12.))
-                    .rounded(px(18.))
-                    .border_1()
-                    .border_color(rgba_of(t.line))
-                    .bg(rgba_of(t.surface))
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(self.header(&t, cx))
-                    .child(body),
-            )
+            .flex()
+            .flex_col()
+            .gap(px(place::POP_GAP as f32));
+        if self.upward {
+            root.children(pop).child(bar)
+        } else {
+            root.child(bar).children(pop)
+        }
     }
 }
