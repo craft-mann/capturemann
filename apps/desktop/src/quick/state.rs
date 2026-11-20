@@ -83,6 +83,29 @@ impl Tile {
         }
     }
 
+    /// The bar key that toggles (or opens the menu of) the tile (QC-1 "Keys"). The letters are
+    /// distinct inside a kind; T is the Delay of a screenshot and the Countdown of a video.
+    pub fn key(self) -> &'static str {
+        match self {
+            Tile::Editor => "E",
+            Tile::Copy => "C",
+            Tile::Redact => "A",
+            Tile::Delay | Tile::Countdown => "T",
+            Tile::Mic => "M",
+            Tile::SystemAudio => "S",
+            Tile::Webcam => "B",
+            Tile::Transcribe => "N",
+            Tile::Markers => "K",
+        }
+    }
+
+    /// The tile of `kind` a pressed letter picks.
+    pub fn for_key(kind: PresetKind, key: &str) -> Option<Tile> {
+        Tile::of(kind)
+            .into_iter()
+            .find(|t| t.key().eq_ignore_ascii_case(key))
+    }
+
     pub fn id(self) -> &'static str {
         match self {
             Tile::Editor => "qc-tile-editor",
@@ -106,6 +129,11 @@ pub fn seconds_text(secs: u32) -> String {
     } else {
         tr!("{secs} s", secs = secs)
     }
+}
+
+/// The corner badge of a value control ("3s"); `None` while it is off.
+pub fn seconds_badge(secs: u32) -> Option<String> {
+    (secs > 0).then(|| tr_ctx!("quick capture badge", "{secs}s", secs = secs))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -240,27 +268,125 @@ pub fn kind_label(k: PresetKind) -> String {
 
 pub fn kind_icon(k: PresetKind) -> &'static str {
     match k {
-        PresetKind::Screenshot => "cm-capture-region",
-        PresetKind::Video => "cm-record",
-        PresetKind::Audio => "mic",
+        PresetKind::Screenshot => "image",
+        PresetKind::Video => "video",
+        PresetKind::Audio => "audio-lines",
     }
 }
 
-/// What a key does in the panel (QC-1 "Keys"). The window maps a key press with
-/// [`panel_key`] and does what it says, so the keyboard route is tested without a window.
+/// The bar key of a kind (QC-1 "Keys").
+pub fn kind_key(k: PresetKind) -> &'static str {
+    match k {
+        PresetKind::Screenshot => "1",
+        PresetKind::Video => "2",
+        PresetKind::Audio => "3",
+    }
+}
+
+pub fn target_icon(t: PresetTarget) -> &'static str {
+    match t {
+        PresetTarget::Region => "crop",
+        PresetTarget::Window => "app-window",
+        PresetTarget::Display => "monitor",
+        PresetTarget::LongShot => "long-shot",
+    }
+}
+
+/// The bar key of a target (QC-1 "Keys").
+pub fn target_key(t: PresetTarget) -> &'static str {
+    match t {
+        PresetTarget::Region => "R",
+        PresetTarget::Window => "W",
+        PresetTarget::Display => "D",
+        PresetTarget::LongShot => "L",
+    }
+}
+
+/// One control of the bar, in the order Tab walks them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Ctl {
+    Kind(PresetKind),
+    Target(PresetTarget),
+    Tile(Tile),
+    Preset,
+    Action,
+    Settings,
+    Feedback,
+}
+
+/// Every control of the bar for `kind`, left to right.
+pub fn controls(kind: PresetKind) -> Vec<Ctl> {
+    let mut v: Vec<Ctl> = [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio]
+        .into_iter()
+        .map(Ctl::Kind)
+        .collect();
+    let targets: &[PresetTarget] = match kind {
+        PresetKind::Screenshot => &SHOT_TARGETS,
+        PresetKind::Video => &VIDEO_TARGETS,
+        PresetKind::Audio => &[],
+    };
+    v.extend(targets.iter().copied().map(Ctl::Target));
+    v.extend(Tile::of(kind).into_iter().map(Ctl::Tile));
+    v.extend([Ctl::Preset, Ctl::Action, Ctl::Settings, Ctl::Feedback]);
+    v
+}
+
+/// The text of a control's tooltip and its accessible name: the name, its state when it has one
+/// and the bar key ("Countdown \u{00B7} 3 s \u{00B7} key T"); a kind adds the global shortcut.
+/// One string for both, so a screen reader hears what the tooltip says.
+pub fn tip_text(
+    name: &str,
+    state: Option<&str>,
+    key: Option<&str>,
+    global: Option<&str>,
+) -> String {
+    let mut s = match state {
+        Some(state) => tr_ctx!(
+            "quick capture tip",
+            "{name} \u{00B7} {state}",
+            name = name,
+            state = state
+        ),
+        None => name.to_owned(),
+    };
+    if let Some(key) = key {
+        s = tr_ctx!(
+            "quick capture tip",
+            "{tip} \u{00B7} key {key}",
+            tip = s,
+            key = key
+        );
+    }
+    if let Some(chord) = global {
+        s = tr_ctx!(
+            "quick capture tip",
+            "{tip} \u{00B7} anywhere {chord}",
+            tip = s,
+            chord = chord
+        );
+    }
+    s
+}
+
+/// What a key does in the bar (QC-1 "Keys"). The window maps a key press with [`panel_key`] and
+/// does what it says, so the keyboard route is tested without a window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelKey {
-    /// Esc on the first screen: closes the panel.
+    /// Esc on the first screen: closes the bar.
     Close,
     /// Esc on the picker or the name screen, or with a value menu open: one step back.
     Back,
     /// Enter or Space: capture or record (a value menu open: it closes).
     Go,
     Kind(PresetKind),
-    /// Tab and Shift+Tab move through the four tiles.
-    NextTile,
-    PrevTile,
-    /// Up and Down toggle the focused tile or step through its values.
+    /// R, W, D, L: the target (only the targets the kind has).
+    Target(PresetTarget),
+    /// E, C, A, T, M, S, B, N, K: the option of the kind.
+    Tile(Tile),
+    /// Tab and Shift+Tab move the focus through the controls.
+    NextControl,
+    PrevControl,
+    /// Up and Down step the focused value control (or toggle the focused option).
     TileUp,
     TileDown,
     /// Left and Right change the target.
@@ -268,6 +394,11 @@ pub enum PanelKey {
     TargetNext,
     /// P opens the preset picker.
     Picker,
+    /// Ctrl+1 to Ctrl+4 pick the first four presets (the index is 0 to 3), with or without the
+    /// picker open.
+    Preset(usize),
+    /// Cmd+, (macOS) or Ctrl+, opens the preset settings.
+    Settings,
     /// Up and Down in the picker move the highlighted row.
     PickerUp,
     PickerDown,
@@ -285,18 +416,50 @@ pub fn picker_step(cur: usize, down: bool, rows: usize) -> usize {
     }
 }
 
-/// The screen the panel shows.
+/// The screen the bar shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     Main,
     Picker,
-    /// "Save current as preset": the name field has the keys.
+    /// "Save current as preset": the name field has the keyboard.
     Name,
 }
 
-pub fn panel_key(key: &str, shift: bool, screen: Screen, menu_open: bool) -> Option<PanelKey> {
-    if screen == Screen::Name {
+/// The modifier keys held with a key press.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Mods {
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    /// Cmd on macOS, the Windows key elsewhere.
+    pub platform: bool,
+}
+
+/// How many presets Ctrl+1 to Ctrl+n pick directly.
+pub const PRESET_KEYS: usize = 4;
+
+/// What `key` (lower case, as GPUI names it) does in the bar. Plain keys act; a key with Cmd,
+/// Ctrl or Alt held is ignored except Ctrl+1 to Ctrl+4 (presets) and Cmd+, or Ctrl+, (settings).
+/// While the name field is open it owns the keyboard: every key is its.
+pub fn panel_key(
+    key: &str,
+    mods: Mods,
+    screen: Screen,
+    menu_open: bool,
+    kind: PresetKind,
+) -> Option<PanelKey> {
+    if screen == Screen::Name || mods.alt {
         return None;
+    }
+    if mods.ctrl || mods.platform {
+        if key == "," {
+            return Some(PanelKey::Settings);
+        }
+        let n = key
+            .parse::<usize>()
+            .ok()
+            .filter(|n| (1..=PRESET_KEYS).contains(n))?;
+        return (mods.ctrl && !mods.platform).then_some(PanelKey::Preset(n - 1));
     }
     if key == "escape" {
         return Some(if screen != Screen::Main || menu_open {
@@ -313,17 +476,37 @@ pub fn panel_key(key: &str, shift: bool, screen: Screen, menu_open: bool) -> Opt
             _ => None,
         };
     }
-    Some(match key {
-        "enter" | "space" => PanelKey::Go,
-        "tab" if shift => PanelKey::PrevTile,
-        "tab" => PanelKey::NextTile,
-        "up" => PanelKey::TileUp,
-        "down" => PanelKey::TileDown,
-        "left" => PanelKey::TargetPrev,
-        "right" => PanelKey::TargetNext,
-        "p" => PanelKey::Picker,
-        k => PanelKey::Kind(kind_of_key(k)?),
-    })
+    if key == "tab" {
+        return Some(if mods.shift {
+            PanelKey::PrevControl
+        } else {
+            PanelKey::NextControl
+        });
+    }
+    // Shift with anything else is not the bar's (a typed capital, a stray chord).
+    if mods.shift {
+        return None;
+    }
+    let target_of = |t: PresetTarget| {
+        controls(kind)
+            .contains(&Ctl::Target(t))
+            .then_some(PanelKey::Target(t))
+    };
+    match key {
+        "enter" | "space" => Some(PanelKey::Go),
+        "up" => Some(PanelKey::TileUp),
+        "down" => Some(PanelKey::TileDown),
+        "left" => Some(PanelKey::TargetPrev),
+        "right" => Some(PanelKey::TargetNext),
+        "p" => Some(PanelKey::Picker),
+        "r" => target_of(PresetTarget::Region),
+        "w" => target_of(PresetTarget::Window),
+        "d" => target_of(PresetTarget::Display),
+        "l" => target_of(PresetTarget::LongShot),
+        k => kind_of_key(k)
+            .map(PanelKey::Kind)
+            .or_else(|| Tile::for_key(kind, k).map(PanelKey::Tile)),
+    }
 }
 
 /// The kind a number key picks (1, 2, 3).
@@ -495,6 +678,17 @@ impl PanelState {
         (text, record)
     }
 
+    /// The action button's two lines: "Capture" or "Record", and the picked preset's name under
+    /// it (QC-1 "Action").
+    pub fn action_lines(&self) -> (String, Option<String>) {
+        let main = if self.mem.kind == PresetKind::Screenshot {
+            tr_ctx!("quick capture action", "Capture")
+        } else {
+            tr_ctx!("quick capture action", "Record")
+        };
+        (main, self.preset.as_ref().map(|p| p.name.clone()))
+    }
+
     /// QC-4.AC1: picks `p`: kind, target and the tiles are filled from it.
     pub fn apply_preset(&mut self, p: &Preset) {
         if self.preset.is_none() {
@@ -618,20 +812,57 @@ impl PanelState {
         v
     }
 
-    /// The accessible name of a tile: the label and its state ("Copy, on", "Delay, 5 s").
-    pub fn tile_aria(&self, t: Tile) -> String {
-        match self.value_text(t) {
-            Some(v) => tr_ctx!(
-                "quick capture tile",
-                "{tile}, {value}",
-                tile = t.label(),
-                value = v
-            ),
-            None if self.is_on(t) => {
-                tr_ctx!("quick capture tile", "{tile}, on", tile = t.label())
-            }
-            None => tr_ctx!("quick capture tile", "{tile}, off", tile = t.label()),
+    /// The tooltip and accessible name of an option: its state and its bar key ("Copy \u{00B7} on
+    /// \u{00B7} key C", "Countdown \u{00B7} 3 s \u{00B7} key T").
+    pub fn tile_tip(&self, t: Tile) -> String {
+        let state = match self.value_text(t) {
+            Some(v) => v,
+            None if self.is_on(t) => tr_ctx!("quick capture state", "on"),
+            None => tr_ctx!("quick capture state", "off"),
+        };
+        tip_text(&t.label(), Some(&state), Some(t.key()), None)
+    }
+
+    fn selected_text(on: bool) -> String {
+        if on {
+            tr!("selected")
+        } else {
+            tr!("not selected")
         }
+    }
+
+    /// A kind's tooltip: state, bar key and the global shortcut that starts it (`global` is the
+    /// chord as the app has it set, `None` when it has none).
+    pub fn kind_tip(&self, k: PresetKind, global: Option<&str>) -> String {
+        tip_text(
+            &kind_label(k),
+            Some(&Self::selected_text(self.mem.kind == k)),
+            Some(kind_key(k)),
+            global,
+        )
+    }
+
+    pub fn target_tip(&self, t: PresetTarget) -> String {
+        tip_text(
+            &target_label(t),
+            Some(&Self::selected_text(self.target() == Some(t))),
+            Some(target_key(t)),
+            None,
+        )
+    }
+
+    /// The preset control: the picked preset's name, or "No preset".
+    pub fn preset_tip(&self) -> String {
+        let name = self
+            .preset
+            .as_ref()
+            .map_or_else(|| tr_ctx!("preset picker", "No preset"), |p| p.name.clone());
+        tip_text(
+            &tr_ctx!("quick capture", "Preset"),
+            Some(&name),
+            Some("P"),
+            None,
+        )
     }
 }
 
@@ -802,53 +1033,221 @@ mod tests {
         assert_eq!(b.mem.audio, a.mem.audio);
     }
 
-    /// QC-1.AC7: 1, 2, 3, Tab, Enter, Space and Esc work the panel without the mouse, and every
-    /// tile has an accessible name with its state.
+    fn key(k: &str, kind: PresetKind) -> Option<PanelKey> {
+        panel_key(k, Mods::default(), Screen::Main, false, kind)
+    }
+
+    /// QC-1.AC7: the keys work the bar without the mouse: 1 2 3 for the kind, R W D L for the
+    /// target, the letters of the kind's four options, P, Enter, Space, Tab and Esc.
     #[test]
-    fn qc1_ac7_the_keys_and_the_accessible_names() {
-        use PanelKey::*;
-        let main = |k, shift, menu| panel_key(k, shift, Screen::Main, menu);
-        assert_eq!(main("1", false, false), Some(Kind(PresetKind::Screenshot)));
-        assert_eq!(main("2", false, false), Some(Kind(PresetKind::Video)));
-        assert_eq!(main("3", false, false), Some(Kind(PresetKind::Audio)));
-        assert_eq!(main("tab", false, false), Some(NextTile));
-        assert_eq!(main("tab", true, false), Some(PrevTile));
-        assert_eq!(main("enter", false, false), Some(Go));
-        assert_eq!(main("space", false, false), Some(Go));
-        assert_eq!(main("escape", false, false), Some(Close));
+    fn qc1_ac7_the_keys() {
+        use PanelKey::{Back, Close, Go, Kind, NextControl, Picker, PrevControl, Target};
+        use PresetKind::*;
+        assert_eq!(key("1", Video), Some(Kind(Screenshot)));
+        assert_eq!(key("2", Screenshot), Some(Kind(Video)));
+        assert_eq!(key("3", Screenshot), Some(Kind(Audio)));
+        assert_eq!(key("enter", Audio), Some(Go));
+        assert_eq!(key("space", Audio), Some(Go));
+        assert_eq!(key("escape", Screenshot), Some(Close));
+        assert_eq!(key("p", Video), Some(Picker));
+        assert_eq!(key("tab", Video), Some(NextControl));
+        let shift = Mods {
+            shift: true,
+            ..Mods::default()
+        };
         assert_eq!(
-            main("escape", false, true),
+            panel_key("tab", shift, Screen::Main, false, Video),
+            Some(PrevControl)
+        );
+        assert_eq!(
+            panel_key("escape", Mods::default(), Screen::Main, true, Video),
             Some(Back),
             "a value menu is left first"
         );
-        assert_eq!(main("x", false, false), None);
+        // Targets: Long Shot only for a screenshot, none for audio.
+        assert_eq!(key("r", Screenshot), Some(Target(PresetTarget::Region)));
+        assert_eq!(key("w", Video), Some(Target(PresetTarget::Window)));
+        assert_eq!(key("d", Video), Some(Target(PresetTarget::Display)));
+        assert_eq!(key("l", Screenshot), Some(Target(PresetTarget::LongShot)));
+        assert_eq!(key("l", Video), None);
+        assert_eq!(key("r", Audio), None);
+        // Options per kind.
+        assert_eq!(key("e", Screenshot), Some(PanelKey::Tile(Tile::Editor)));
+        assert_eq!(key("c", Screenshot), Some(PanelKey::Tile(Tile::Copy)));
+        assert_eq!(key("a", Screenshot), Some(PanelKey::Tile(Tile::Redact)));
+        assert_eq!(key("t", Screenshot), Some(PanelKey::Tile(Tile::Delay)));
+        assert_eq!(key("m", Video), Some(PanelKey::Tile(Tile::Mic)));
+        assert_eq!(key("s", Video), Some(PanelKey::Tile(Tile::SystemAudio)));
+        assert_eq!(key("b", Video), Some(PanelKey::Tile(Tile::Webcam)));
+        assert_eq!(key("t", Video), Some(PanelKey::Tile(Tile::Countdown)));
+        assert_eq!(key("n", Audio), Some(PanelKey::Tile(Tile::Transcribe)));
+        assert_eq!(key("k", Audio), Some(PanelKey::Tile(Tile::Markers)));
         assert_eq!(
-            panel_key("escape", false, Screen::Picker, false),
-            Some(Back)
+            key("b", Screenshot),
+            None,
+            "B is the webcam of a video only"
         );
-        // QC-1.AC9: the picker takes Up, Down and Enter; Esc leaves the picker only.
-        let pick = |k| panel_key(k, false, Screen::Picker, false);
+        assert_eq!(key("x", Screenshot), None);
+        // Every letter is one control: no key picks two.
+        for kind in [Screenshot, Video, Audio] {
+            let mut seen = std::collections::HashSet::new();
+            for c in controls(kind) {
+                let k = match c {
+                    Ctl::Kind(k) => kind_key(k),
+                    Ctl::Target(t) => target_key(t),
+                    Ctl::Tile(t) => t.key(),
+                    _ => continue,
+                };
+                assert!(seen.insert(k), "{kind:?}: {k} twice");
+            }
+        }
+    }
+
+    /// QC-1.AC7: with Cmd, Ctrl or Alt held the letters are not the bar's; Ctrl+1 to Ctrl+4
+    /// pick a preset and Cmd+, or Ctrl+, opens the settings.
+    #[test]
+    fn qc1_ac7_modified_keys_are_ignored_except_the_listed_ones() {
+        use PanelKey::*;
+        let ctrl = Mods {
+            ctrl: true,
+            ..Mods::default()
+        };
+        let cmd = Mods {
+            platform: true,
+            ..Mods::default()
+        };
+        let alt = Mods {
+            alt: true,
+            ..Mods::default()
+        };
+        for (screen, kind) in [
+            (Screen::Main, PresetKind::Screenshot),
+            (Screen::Picker, PresetKind::Video),
+        ] {
+            let k = |key, m| panel_key(key, m, screen, false, kind);
+            assert_eq!(k("1", ctrl), Some(Preset(0)));
+            assert_eq!(k("4", ctrl), Some(Preset(3)));
+            assert_eq!(k("5", ctrl), None);
+            assert_eq!(k("1", cmd), None, "Cmd+1 is not a preset key");
+            assert_eq!(k(",", cmd), Some(Settings));
+            assert_eq!(k(",", ctrl), Some(Settings));
+            assert_eq!(k("c", ctrl), None);
+            assert_eq!(k("c", cmd), None);
+            assert_eq!(k("r", alt), None);
+            assert_eq!(k("1", alt), None);
+        }
+        let shift = Mods {
+            shift: true,
+            ..Mods::default()
+        };
+        assert_eq!(
+            panel_key("e", shift, Screen::Main, false, PresetKind::Screenshot),
+            None
+        );
+    }
+
+    /// QC-1.AC9: the picker takes Up, Down, Enter and Space, and Esc leaves it only; the number
+    /// and letter keys are not the picker's.
+    #[test]
+    fn qc1_ac9_the_picker_keys() {
+        use PanelKey::*;
+        let pick = |k| {
+            panel_key(
+                k,
+                Mods::default(),
+                Screen::Picker,
+                false,
+                PresetKind::Screenshot,
+            )
+        };
         assert_eq!(pick("up"), Some(PickerUp));
         assert_eq!(pick("down"), Some(PickerDown));
         assert_eq!(pick("enter"), Some(PickerGo));
-        assert_eq!(pick("1"), None, "no number keys in the picker");
+        assert_eq!(pick("space"), Some(PickerGo));
+        assert_eq!(pick("escape"), Some(Back));
+        assert_eq!(pick("1"), None);
         assert_eq!(pick("p"), None);
-        assert_eq!(
-            panel_key("1", false, Screen::Name, false),
-            None,
-            "typing a name"
-        );
+        assert_eq!(pick("r"), None);
+    }
+
+    /// QC-1.AC9: while the name of a new preset is typed every key goes to the field: the bar
+    /// takes none, so a letter or a digit is never a kind, a target or an option.
+    #[test]
+    fn qc1_ac9_letters_go_to_the_name_field() {
+        let ctrl = Mods {
+            ctrl: true,
+            ..Mods::default()
+        };
+        let cmd = Mods {
+            platform: true,
+            ..Mods::default()
+        };
+        for k in [
+            "1", "r", "w", "e", "c", "p", "enter", "space", "escape", "tab", ",",
+        ] {
+            for m in [Mods::default(), ctrl, cmd] {
+                assert_eq!(
+                    panel_key(k, m, Screen::Name, false, PresetKind::Screenshot),
+                    None,
+                    "{k}"
+                );
+            }
+        }
+    }
+
+    /// QC-1.AC8: every control has one text for its tooltip and its accessible name: the name,
+    /// the state and the bar key; a kind adds the global shortcut.
+    #[test]
+    fn qc1_ac8_the_tooltip_text_names_state_and_key() {
         let mut s = PanelState::default();
-        assert_eq!(s.tile_aria(Tile::Copy), "Copy, on");
-        assert_eq!(s.tile_aria(Tile::Editor), "Editor, off");
+        assert_eq!(s.tile_tip(Tile::Copy), "Copy \u{00B7} on \u{00B7} key C");
+        assert_eq!(
+            s.tile_tip(Tile::Editor),
+            "Editor \u{00B7} off \u{00B7} key E"
+        );
         s.set_value(Tile::Delay, 5);
-        assert_eq!(s.tile_aria(Tile::Delay), "Delay, 5 s");
+        assert_eq!(s.tile_tip(Tile::Delay), "Delay \u{00B7} 5 s \u{00B7} key T");
+        s.set_kind(PresetKind::Video);
+        assert_eq!(
+            s.tile_tip(Tile::Countdown),
+            "Countdown \u{00B7} 3 s \u{00B7} key T"
+        );
+        assert_eq!(
+            s.kind_tip(PresetKind::Video, Some("\u{2325}\u{21E7}R")),
+            "Video \u{00B7} selected \u{00B7} key 2 \u{00B7} anywhere \u{2325}\u{21E7}R"
+        );
+        assert_eq!(
+            s.kind_tip(PresetKind::Audio, None),
+            "Audio \u{00B7} not selected \u{00B7} key 3"
+        );
+        assert_eq!(
+            s.target_tip(PresetTarget::Display),
+            "Display \u{00B7} selected \u{00B7} key D"
+        );
+        assert_eq!(s.preset_tip(), "Preset \u{00B7} No preset \u{00B7} key P");
         for kind in [PresetKind::Screenshot, PresetKind::Video, PresetKind::Audio] {
             s.set_kind(kind);
             for t in Tile::of(kind) {
-                assert!(s.tile_aria(t).starts_with(&t.label()), "{t:?}");
+                let tip = s.tile_tip(t);
+                assert!(
+                    tip.starts_with(&t.label()) && tip.ends_with(t.key()),
+                    "{tip}"
+                );
             }
         }
+    }
+
+    /// QC-1: Tab walks the controls left to right; audio has no target.
+    #[test]
+    fn the_controls_of_each_kind() {
+        let n = |k| controls(k).len();
+        assert_eq!(n(PresetKind::Screenshot), 3 + 4 + 4 + 4);
+        assert_eq!(n(PresetKind::Video), 3 + 3 + 4 + 4);
+        assert_eq!(n(PresetKind::Audio), 3 + 4 + 4);
+        assert!(controls(PresetKind::Audio)
+            .iter()
+            .all(|c| !matches!(c, Ctl::Target(_))));
+        assert_eq!(controls(PresetKind::Video).last(), Some(&Ctl::Feedback));
     }
 
     #[test]
