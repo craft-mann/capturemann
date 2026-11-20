@@ -740,6 +740,8 @@ fn pill_button(
         .focusable()
         .tab_stop(true)
         .cursor_pointer()
+        .occlude()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .hover(move |s| s.bg(hover))
         .focus_visible(move |s| s.border_color(focus))
 }
@@ -813,6 +815,8 @@ impl QuickPanel {
             .cursor_pointer()
             .focus_visible(move |s| s.border_color(focus))
             .on_hover(cx.listener(move |this, over: &bool, _, cx| this.hover_ctl(ctl, *over, cx)))
+            .occlude()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(cx.listener(move |this, _, window, cx| this.activate(ctl, window, cx)));
         d = if c.selected {
             d.bg(rgba_of(t.raised)).aria_selected(true)
@@ -1111,6 +1115,8 @@ impl QuickPanel {
             .hover(move |s| s.bg(rgba_of(hover)))
             .focus_visible(move |s| s.border_color(focus))
             .on_hover(cx.listener(move |this, over: &bool, _, cx| this.hover_ctl(ctl, *over, cx)))
+            .occlude()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(cx.listener(|this, _, window, cx| this.go(window, cx)))
             // The record dot on Record, the camera shutter's frame on Capture.
             .child(if record {
@@ -1199,9 +1205,12 @@ impl QuickPanel {
             .flex()
             .rounded(px(scale::RADIUS_XL))
             .border_1()
-            .border_color(rgba_of(t.line))
-            .bg(rgba_of(t.surface.with_alpha(245)))
-            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation());
+            .border_color(rgba_of(t.text_3.with_alpha(150)))
+            .bg(rgba_of(t.surface))
+            // The bar's background is the grip (its buttons stop the press), so it can be dragged.
+            .cursor_grab()
+            .map(crate::platform_window::drag_grip)
+            .on_mouse_down(MouseButton::Left, |_, window, _| window.start_window_move());
         let settings_key = self.settings_key(cx);
         let kind = self.kind_track(t, cx);
         let target = self.target_slot(t, cx);
@@ -1569,7 +1578,7 @@ impl QuickPanel {
                 .flex_col()
                 .rounded(px(scale::RADIUS_XL))
                 .border_1()
-                .border_color(rgba_of(t.line))
+                .border_color(rgba_of(t.text_3.with_alpha(150)))
                 .bg(rgba_of(t.surface))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(content),

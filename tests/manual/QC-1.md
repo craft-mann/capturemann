@@ -102,6 +102,9 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
     preset, action, settings and feedback; all keys and tooltips work as in one row, nothing is cut
     at the display's edge. On a wide display: one row.
 
+- Drag the bar by its background (between the groups, or the logo): it follows the pointer and stays open; pressing and dragging on a button does not move it, and a click on a button still works. (QC-1.AC20)
+- On a dark and a light wallpaper the bar and the open picker are solid with a visible edge line; nothing behind shows through.
+
 ## 3. A capture from the panel (QC-1, QC-3)
 
 13. **Region, Copy on.** Screenshot > Region, Copy on, Editor off. Enter. Expected: the panel closes, the
