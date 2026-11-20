@@ -110,7 +110,18 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
         panel_options(display, global, true, false),
         move |window, cx| {
             // The bar is never in a screenshot or a recording (QC-1.AC2).
-            crate::platform_window::exclude_from_capture(window);
+            // No system shadow or border: the window is taller than the bar (tooltip strip) and
+            // the system would outline the whole rectangle.
+            if let Err(e) = crate::platform_window::apply(
+                window,
+                crate::platform_window::Tweaks {
+                    exclude_from_capture: !crate::recording::demo::capturable(),
+                    no_shadow: true,
+                    ..Default::default()
+                },
+            ) {
+                log::warn!("could not tweak the Quick Capture window: {e}");
+            }
             cx.new(|cx| QuickPanel::new(app2, state, global, visible, window, cx))
         },
     );
