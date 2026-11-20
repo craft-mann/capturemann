@@ -107,7 +107,7 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
     cx.set_global(PreviousApp(crate::launcher::focus::frontmost_other_app()));
     let app2 = app.clone();
     let opened = cx.open_window(
-        panel_options(display, global, true, false),
+        panel_options(display, global, true, true),
         move |window, cx| {
             // The bar is never in a screenshot or a recording (QC-1.AC2).
             // No system shadow or border: the window is taller than the bar (tooltip strip) and
