@@ -222,7 +222,6 @@ pub struct QuickPanel {
     menu: Option<Tile>,
     name: Entity<TextField>,
     name_error: Option<String>,
-    was_active: bool,
 }
 
 impl QuickPanel {
@@ -236,14 +235,6 @@ impl QuickPanel {
     ) -> Self {
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
-        cx.observe_window_activation(window, |this, window, cx| {
-            if window.is_window_active() {
-                this.was_active = true;
-            } else if this.was_active {
-                dismiss(window, cx, false);
-            }
-        })
-        .detach();
         let name = cx.new(|cx| {
             TextField::new(
                 tr_ctx!("field", "Preset name"),
@@ -286,7 +277,6 @@ impl QuickPanel {
             menu: None,
             name,
             name_error: None,
-            was_active: false,
         }
     }
 

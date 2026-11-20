@@ -116,6 +116,8 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 - Drag the bar by its background (between the groups, or the logo): it follows the pointer and stays open; pressing and dragging on a button does not move it, and a click on a button still works. (QC-1.AC20)
 - On a dark and a light wallpaper the bar and the open picker are solid with a visible edge line; nothing behind shows through.
 
+- Click on another window or on the desktop: the bar stays open. Esc (with the bar focused), the shortcut or the tray item closes it. (QC-1 Window behaviour)
+
 ## 3. A capture from the panel (QC-1, QC-3)
 
 13. **Region, Copy on.** Screenshot > Region, Copy on, Editor off. Enter. Expected: the panel closes, the
