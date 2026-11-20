@@ -5,6 +5,21 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.3.6] - Unreleased
+
+### Added
+- **Quick Capture (QC-1, QC-3, QC-4, QC-5), marked Preview.** One slim icon-only bar (⌥⇧C, Ctrl+Alt+Shift+C on Windows and Linux; first item of the tray and menu-bar menu, a Capture… button in the sidebar dock, a row in the Launcher): kind (1 2 3), target (R W D L), the options of the kind (E C A T, M S B T, M S N K), preset (P, Ctrl+1 to Ctrl+4) and Capture or Record. Tooltips give each name, state and key; the bar is opaque, can be dragged by its background, collapses to a compact form (chevron or key O, remembered), stays open until closed, and splits into two rows on a display narrower than 933 px. Its options are remembered per kind and apart from Settings.
+- **After-capture bar (QC-3):** after a panel screenshot with Editor and Copy off, a small bar offers Edit, Copy, Save, Text, Long Shot and Record for that area.
+- **Presets (QC-4):** an editor in Settings, four starters (Bug report, Docs shot, Demo video, Meeting), per-preset shortcuts, `presets.json`.
+- **Agents and CLI (QC-5):** the `list_presets` tool (90 tools), a `preset` argument on `capture_screenshot` and `start_recording`, `capturemann presets list` and `--preset`.
+
+### Changed
+- Transcripts: a doubtful line over audio that is not speech-like is written as `[unclear]` and its words are left out (AI-1.AC12, AC12b, AC16); audio under 30 s is judged when speech and room are clearly apart; every word has an end after its start and the last word of a piece takes the end of its piece. Existing transcripts are unchanged; Re-generate uses the fix.
+
+### Fixed
+- A text file named `.png` is rejected as an unreadable image; `annotate` refuses a shape far outside the image; `annotate --out` on a large image no longer answers `internal`; the ambiguous-window error lists only the matching windows; Long Shot says why it stopped and how far it moved the page; the Windows export dialog no longer shows `\\?\`; the Windows rail shows that it scrolls; the Boards intro card closes with its sheet; Vietnamese Click Guide tiles and the Preview pill fit.
+- Linux: the Quick Capture bar, the after-capture bar, the preset sheet and the Launcher take the keyboard on X11; toasts no longer stay held by a hover that ended with its window.
+
 ## [0.3.5] - 2026-11-18
 
 ### Added

@@ -728,7 +728,7 @@ impl QuickPanel {
         if self.platform(cx) == Platform::Mac {
             format!("\u{2303}{n}")
         } else {
-            format!("Ctrl+{n}")
+            format!("Ctrl+{n}") // i18n-ignore: a key chord, as shortcuts elsewhere
         }
     }
 
