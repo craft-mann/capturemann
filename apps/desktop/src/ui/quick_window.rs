@@ -235,6 +235,14 @@ impl QuickPanel {
     ) -> Self {
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
+        // The bar no longer closes when it loses the activation, so it takes the keys back
+        // whenever it is active again (after another app or window had them).
+        cx.observe_window_activation(window, |this, window, cx| {
+            if window.is_window_active() {
+                window.focus(&this.focus, cx);
+            }
+        })
+        .detach();
         let name = cx.new(|cx| {
             TextField::new(
                 tr_ctx!("field", "Preset name"),
@@ -673,6 +681,15 @@ impl QuickPanel {
                 let want = self.hover.or(self.ctl);
                 self.set_tip(want, cx);
                 cx.notify();
+            }
+            // An open value menu takes the arrows: they step its values (QC-1 "Keys").
+            PanelKey::TileUp | PanelKey::TileDown | PanelKey::TargetPrev | PanelKey::TargetNext
+                if self.menu.is_some() =>
+            {
+                if let Some(t) = self.menu {
+                    let down = matches!(key, PanelKey::TileDown | PanelKey::TargetNext);
+                    self.step_tile(t, down, cx);
+                }
             }
             PanelKey::TileUp | PanelKey::TileDown => {
                 if let Some(Ctl::Tile(t)) = self.ctl {
@@ -1241,7 +1258,13 @@ impl QuickPanel {
             // The bar's background is the grip (its buttons stop the press), so it can be dragged.
             .cursor_grab()
             .map(crate::platform_window::drag_grip)
-            .on_mouse_down(MouseButton::Left, |_, window, _| window.start_window_move());
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, window, cx| {
+                    window.focus(&this.focus, cx);
+                    window.start_window_move();
+                }),
+            );
         let kind = self.kind_track(t, cx);
         let preset = self.preset_cell(t, cx);
         let action = self.action(t, cx);
