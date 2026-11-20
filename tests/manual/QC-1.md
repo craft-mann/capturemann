@@ -40,11 +40,11 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 
 ## 2. The bar (QC-1, QC-4)
 
-7. **Layout.** One row, 60 px high, about 900 px wide, rounded corners, the HUD surface. Left to right:
+7. **Layout.** One row, 60 px high, about 870 px wide, rounded corners, the HUD surface. Left to right:
    the mark with a small **Preview** tag under it, the three kinds (1 2 3), the targets (R W D L), four
    options, the preset (P, with a menu badge), the action (Capture or Record, with the Enter key),
-   settings (the key under it is Cmd+, on macOS and Ctrl+, elsewhere) and **Send feedback** (a speech
-   bubble icon). **No button has a text label**: each shows an 18 px icon with its key in small mono type
+   and the expand/collapse toggle (a chevron with the key O under it). There is no Settings button and no
+   Send feedback button. **No button has a text label**: each shows an 18 px icon with its key in small mono type
    under it. The selected kind and target are a raised chip inside a darker track; an option that is on has
    a lighter fill and a dot under the icon; Delay and Countdown show their value ("3s") as a badge in the
    corner, or a chevron when off. Red appears only on the Record button (Video and Audio). It opens on the
@@ -65,8 +65,8 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
     on Video and Audio; R does nothing on Audio); on Screenshot E, C, A toggle Editor, Copy, Auto-redact and
     T opens the Delay menu; on Video M, S, B toggle Mic, System audio, Webcam and T opens the Countdown menu;
     on Audio M, S, N, K toggle Mic, System audio, Transcribe, Markers; Left and Right cycle the target; P
-    opens the preset picker; Enter or Space captures or records; Cmd+, (macOS) or Ctrl+, opens the preset
-    settings; Esc closes (Esc in a menu or the picker goes back first). Hold Cmd, Ctrl or Alt with a letter
+    opens the preset picker; O collapses or expands the bar; Enter or Space captures or records; Cmd+, and
+    Ctrl+, do nothing; Esc closes (Esc in a menu or the picker goes back first). Hold Cmd, Ctrl or Alt with a letter
     (Cmd+C, Ctrl+R, Alt+E): nothing happens in the bar. Tab and Shift+Tab move a visible ring through the
     controls left to right; Up or Down on a focused Delay or Countdown steps its value. In the picker
     (QC-1.AC9): Up and Down move the ring and stop at the first and the last row (No preset at the top,
@@ -94,14 +94,25 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 11b. **Wayland.** A portal screenshot or a recording started by another program while the bar is
     open can show the bar: there is no way to exclude a window there (spec, Window behaviour). Check
     that the bar closes before a capture started from it.
-12. **Preview.** The small Preview tag under the mark: hover it for its tooltip. **Send feedback** (the
-    speech bubble after Settings) opens the browser on the feedback form with the feature "Quick Capture"
-    and the app version only.
+12. **Preview.** The small Preview tag under the mark: hover it for its tooltip. The bar has no Send
+    feedback button (QC-1.AC8); it is in About.
 12b. **Two rows** (QC-1.AC1). On a display narrower than 900 points (or a window-manager scaled mode, for
     example a 1280 x 720 display at 150 %), open the bar: two rows, kind and target on top, then options,
-    preset, action, settings and feedback; all keys and tooltips work as in one row, nothing is cut
+    preset, action and the toggle; all keys and tooltips work as in one row, nothing is cut
     at the display's edge. On a wide display: one row.
 
+12c. **Collapse and expand** (QC-1.AC21 to AC25). Click the chevron at the right end (or press O): the
+    bar becomes the mark with the Preview tag, 1 2 3, P, the action and the toggle, in one row, with its left
+    edge where it was. The tooltip of the chevron reads "Collapse · key O" before and "Expand · key O" after;
+    with a screen reader it is announced as expanded or collapsed. Collapsed: R, W, D, L, E, C, A, T, M, S,
+    B, N, K, Left and Right do nothing; 1, 2, 3, P, Ctrl+1 to Ctrl+4, Enter, Space, Esc and O work; Tab walks
+    only the visible controls. Switch the kind in both states: the collapsed bar has the same width for
+    Screenshot, Video and Audio. Open the Delay menu, then press O: the menu closes. Open the picker (P),
+    then click the chevron: the picker stays under the bar. Put the bar near the right edge of the display and
+    expand it: it moves left just enough to be fully on the display. On a display narrower than 900 points
+    the collapsed bar is one row. Close the bar while collapsed and open it again (also after quitting the
+    app): it opens collapsed. Delete `collapsed` from `quick_capture.json`: it opens expanded. Settings is
+    unchanged by all of this.
 - Drag the bar by its background (between the groups, or the logo): it follows the pointer and stays open; pressing and dragging on a button does not move it, and a click on a button still works. (QC-1.AC20)
 - On a dark and a light wallpaper the bar and the open picker are solid with a visible edge line; nothing behind shows through.
 
@@ -152,8 +163,8 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 25. **Save current.** Set up something, pick **Save current as preset…**, name it, Save. It is the picked
     preset, appears in the picker, and `presets.json` in the settings folder holds the same setup.
     A field you add by hand to that file (for example `"team": "docs"`) is still there after the next save.
-26. **Settings > Capture & recording > Presets** (the top of the page; the panel's settings button and
-    **Edit presets…** open it). Move a preset up and down; Edit opens the sheet; Delete asks for a second
+26. **Settings > Capture & recording > Presets** (the top of the page; **Edit presets…** in the
+    picker opens it). Move a preset up and down; Edit opens the sheet; Delete asks for a second
     click ("Delete for good"). Delete all four starters, quit and start again: they do not come back.
 27. **Edit sheet.** Name (it shows the preset's name when you edit an existing one; on X11 click it and type); Kind and Target; the toggles (Copy to clipboard, Auto-redact, Open in editor for
     a screenshot); "Then open the tool" (after Open in editor); Save to; Shortcut with **Change**;
@@ -200,5 +211,5 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 
 ## Pass criteria
 
-All steps behave as written; QC-1.AC1 to AC19, QC-3.AC1 to AC7 and QC-4.AC1 to AC9 hold on the real
+All steps behave as written; QC-1.AC1 to AC25, QC-3.AC1 to AC7 and QC-4.AC1 to AC9 hold on the real
 machine. Anything that does not is a finding for the report, with the platform and the step.
