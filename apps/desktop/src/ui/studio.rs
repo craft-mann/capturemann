@@ -85,7 +85,8 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("secondary-f", FocusSearch, None),
         // EXP-5: opens the Export popover on a recording page or in its editor.
         KeyBinding::new("secondary-e", OpenExport, None),
-        KeyBinding::new("secondary-1", ShowLibrary, None),
+        // Not while the Quick Capture bar is focused: there Ctrl+1 picks the first preset (QC-1.AC17).
+        KeyBinding::new("secondary-1", ShowLibrary, Some("!QuickCapture")),
         KeyBinding::new("secondary-,", ShowSettings, None),
         KeyBinding::new("secondary-i", ImportMedia, None),
         KeyBinding::new("secondary-q", QuitApp, None),

@@ -257,7 +257,10 @@ impl QuickPanel {
             |this, _, ev: &TextFieldEvent, window, cx| match ev {
                 TextFieldEvent::Submitted => this.save_named(window, cx),
                 // QC-1 "Keys": Esc on the name screen goes back to the picker it came from.
-                TextFieldEvent::Escaped => this.open_picker(window, cx),
+                TextFieldEvent::Escaped => {
+                    window.focus(&this.focus, cx);
+                    this.open_picker(window, cx);
+                }
                 TextFieldEvent::Changed(_) => {
                     this.name_error = None;
                     cx.notify();
@@ -1649,6 +1652,7 @@ impl Render for QuickPanel {
         let pop = self.popover(&t, cx);
         let root = div()
             .id("quick-capture")
+            .key_context("QuickCapture")
             .role(Role::Dialog)
             .aria_label(tr!("Quick Capture"))
             .size_full()
