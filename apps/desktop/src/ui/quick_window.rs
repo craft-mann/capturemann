@@ -1,6 +1,6 @@
 //! The Quick Capture bar (QC-1, QC-4): one slim row of icon buttons with the kind, the target, the
-//! options of the kind, the preset, the action and the settings, every key printed under its
-//! icon. A borderless floating window like the Launcher: it takes the keyboard (the app is
+//! options of the kind, the preset, the action and a toggle that collapses the bar to its
+//! compact form, every key printed under its icon. A borderless floating window like the Launcher: it takes the keyboard (the app is
 //! activated, the previous app gets focus back on close), it is excluded from screen capture, and
 //! it closes before the capture starts and waits [`CAPTURE_DELAY_MS`] first.
 //!
@@ -31,7 +31,7 @@ use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::{self, AppModel};
 use crate::ui::components::{icon, logo};
 use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
-use crate::ui::preview_label::{label as preview_label, send_feedback, PreviewFeature, Size};
+use crate::ui::preview_label::{label as preview_label, PreviewFeature, Size};
 use crate::ui::recording::{panel_options, pointer_display, visible_part};
 use crate::ui::text_field::{TextField, TextFieldEvent};
 
@@ -88,9 +88,9 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
         return;
     };
     let visible = visible_part(&display.1);
-    // One row where the display is wide enough, else two (QC-1 "Size"); the window adds the strip
-    // for the tooltips.
-    let (win_w, win_h) = place::window_size(visible.w);
+    // One row where the display is wide enough, else two (QC-1 "Size"), or the compact bar when
+    // it was left collapsed; the window adds the strip for the tooltips.
+    let (win_w, win_h) = place::window_size_view(visible.w, state.collapsed());
     let pointer = crate::ui::launcher_window::pointer(cx)
         .map(|p| (f64::from(f32::from(p.x)), f64::from(f32::from(p.y))));
     let (px_, py_) = crate::quick::place::open_point(pointer, win_h, &visible);
@@ -202,7 +202,7 @@ pub struct QuickPanel {
     home: Rect,
     /// The visible part of the display the bar is on.
     visible: Rect,
-    /// Two rows, on a narrow display.
+    /// Two rows, on a narrow display (the expanded bar only: the collapsed bar is one row).
     two_rows: bool,
     /// The window can be moved (macOS, Windows): a popover without room under the bar opens
     /// above it.
@@ -290,8 +290,13 @@ impl QuickPanel {
         }
     }
 
+    /// The bar is drawn in two rows: a narrow display and the expanded bar.
+    fn rows2(&self) -> bool {
+        self.two_rows && !self.st.collapsed()
+    }
+
     fn bar_h(&self) -> f64 {
-        if self.two_rows {
+        if self.rows2() {
             place::TWO_ROW_H
         } else {
             place::BAR_H
@@ -383,6 +388,42 @@ impl QuickPanel {
             i if i == n + 1 => self.open_name(window, cx),
             _ => self.open_settings(window, cx),
         }
+    }
+
+    /// The toggle or the key O (QC-1.AC21): the bar is collapsed or expanded, the window takes
+    /// the new size to the right of its left edge and stays on the display, the choice is
+    /// remembered. A value menu (of a control that may now be hidden) closes; the picker and the
+    /// name screen stay open and are placed again.
+    fn toggle_collapsed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let collapsed = !self.st.collapsed();
+        self.st.set_collapsed(collapsed);
+        self.menu = None;
+        let shown = controls(self.st.kind(), collapsed);
+        if self.ctl.is_some_and(|c| !shown.contains(&c)) {
+            self.ctl = None;
+        }
+        if self.tip.is_some_and(|c| !shown.contains(&c)) {
+            self.set_tip(None, cx);
+        }
+        let size = place::window_size_view(self.visible.w, collapsed);
+        self.home = place::toggled_home(&self.home, size, &self.visible, self.movable);
+        let want = match self.body {
+            Body::Picker => {
+                let n = self.app.read(cx).quick.presets.len();
+                Some(place::popover_height(n, f64::MAX))
+            }
+            Body::Name => Some(place::NAME_H),
+            Body::Main => None,
+        };
+        match want {
+            Some(h) => self.show_popover(h, window, cx),
+            None => {
+                self.upward = false;
+                self.pop_h = 0.;
+                self.apply_frame(self.home, window, cx);
+            }
+        }
+        self.changed(cx);
     }
 
     fn set_kind(&mut self, k: PresetKind, window: &mut Window, cx: &mut Context<Self>) {
@@ -543,8 +584,7 @@ impl QuickPanel {
             Ctl::Tile(t) => self.click_tile(t, window, cx),
             Ctl::Preset => self.open_picker(window, cx),
             Ctl::Action => self.go(window, cx),
-            Ctl::Settings => self.open_settings(window, cx),
-            Ctl::Feedback => send_feedback(PreviewFeature::QuickCapture, cx),
+            Ctl::Toggle => self.toggle_collapsed(window, cx),
         }
     }
 
@@ -605,7 +645,14 @@ impl QuickPanel {
             alt: m.alt,
             platform: m.platform,
         };
-        let Some(key) = panel_key(&k.key, mods, screen, self.menu.is_some(), self.st.kind()) else {
+        let Some(key) = panel_key(
+            &k.key,
+            mods,
+            screen,
+            self.menu.is_some(),
+            self.st.kind(),
+            self.st.collapsed(),
+        ) else {
             return;
         };
         match key {
@@ -615,14 +662,14 @@ impl QuickPanel {
                 if self.menu.take().is_some() {
                     self.close_popover(window, cx);
                     cx.notify();
-                } else if let Some(c @ (Ctl::Preset | Ctl::Settings | Ctl::Feedback)) = self.ctl {
+                } else if let Some(c @ (Ctl::Preset | Ctl::Toggle)) = self.ctl {
                     self.activate(c, window, cx);
                 } else {
                     self.go(window, cx);
                 }
             }
             PanelKey::NextControl | PanelKey::PrevControl => {
-                let all = controls(self.st.kind());
+                let all = controls(self.st.kind(), self.st.collapsed());
                 let n = all.len();
                 let at = self.ctl.and_then(|c| all.iter().position(|x| *x == c));
                 let back = key == PanelKey::PrevControl;
@@ -652,7 +699,7 @@ impl QuickPanel {
                     self.pick_preset(Some(p), window, cx);
                 }
             }
-            PanelKey::Settings => self.open_settings(window, cx),
+            PanelKey::Toggle => self.toggle_collapsed(window, cx),
             PanelKey::PickerUp | PanelKey::PickerDown => {
                 let rows = self.pick_rows(cx);
                 self.pick_at = picker_step(self.pick_at, key == PanelKey::PickerDown, rows);
@@ -686,15 +733,6 @@ impl QuickPanel {
         })
     }
 
-    /// The key that opens the settings, as printed: "⌘," on macOS, "Ctrl," elsewhere.
-    fn settings_key(&self, cx: &Context<Self>) -> String {
-        if self.platform(cx) == Platform::Mac {
-            "\u{2318},".to_owned()
-        } else {
-            "Ctrl,".to_owned()
-        }
-    }
-
     /// The first four presets' keys in the picker: "⌃1", "Ctrl+1".
     fn preset_key(&self, n: usize, cx: &Context<Self>) -> String {
         if self.platform(cx) == Platform::Mac {
@@ -725,13 +763,7 @@ impl QuickPanel {
                 Some(&tr_ctx!("quick capture", "Enter")),
                 None,
             ),
-            Ctl::Settings => tip_text(
-                &tr_ctx!("quick capture", "Preset settings"),
-                None,
-                Some(&self.settings_key(cx)),
-                None,
-            ),
-            Ctl::Feedback => tr_ctx!("button", "Send feedback"),
+            Ctl::Toggle => self.st.toggle_tip(),
         }
     }
 }
@@ -829,7 +861,10 @@ impl QuickPanel {
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(cx.listener(move |this, _, window, cx| this.activate(ctl, window, cx)));
-        d = if c.selected {
+        d = if ctl == Ctl::Toggle {
+            d.hover(move |s| s.bg(hover))
+                .aria_expanded(!self.st.collapsed())
+        } else if c.selected {
             d.bg(rgba_of(t.raised)).aria_selected(true)
         } else if c.on {
             d.bg(rgba_of(t.surface_2))
@@ -902,15 +937,15 @@ impl QuickPanel {
     }
 
     fn cell_at(&self, ctl: Ctl, kind_cells: bool) -> TipAt {
-        if self.two_rows {
+        if self.rows2() {
             return match ctl {
-                Ctl::Preset | Ctl::Action | Ctl::Settings | Ctl::Feedback => TipAt::Right,
+                Ctl::Preset | Ctl::Action | Ctl::Toggle => TipAt::Right,
                 _ => TipAt::Left,
             };
         }
         match ctl {
             Ctl::Kind(_) => TipAt::Left,
-            Ctl::Action | Ctl::Settings | Ctl::Feedback => TipAt::Right,
+            Ctl::Action | Ctl::Toggle => TipAt::Right,
             _ => {
                 let _ = kind_cells;
                 TipAt::Center
@@ -1059,23 +1094,20 @@ impl QuickPanel {
         )
     }
 
-    /// Settings and Send feedback: 38 px wide icon buttons.
-    fn icon_cell(
-        &self,
-        t: &Theme,
-        ctl: Ctl,
-        id: &'static str,
-        glyph: &'static str,
-        key: Option<String>,
-        cx: &mut Context<Self>,
-    ) -> gpui::Stateful<gpui::Div> {
+    /// The toggle at the right end: a 38 px wide chevron with its key, "O", under it.
+    fn toggle_cell(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Stateful<gpui::Div> {
+        let ctl = Ctl::Toggle;
         self.cell(
             t,
             Cell {
                 ctl,
-                id: id.into(),
-                glyph,
-                key,
+                id: "qc-toggle".into(),
+                glyph: if self.st.collapsed() {
+                    "chevron-right"
+                } else {
+                    "chevron-left"
+                },
+                key: Some("O".to_owned()),
                 tip: self.tip_of(ctl, cx),
                 selected: false,
                 on: false,
@@ -1204,11 +1236,9 @@ impl QuickPanel {
 
     fn bar(&self, t: &Theme, cx: &mut Context<Self>) -> gpui::Div {
         let frame = div()
-            .w(px(if self.two_rows {
-                place::TWO_ROW_W
-            } else {
-                place::BAR_W
-            } as f32))
+            .w(px(
+                place::bar_size_view(self.visible.w, self.st.collapsed()).0 as f32,
+            ))
             .h(px(self.bar_h() as f32))
             .flex_none()
             .px(px(bar::PAD_X as f32))
@@ -1222,21 +1252,10 @@ impl QuickPanel {
             .cursor_grab()
             .map(crate::platform_window::drag_grip)
             .on_mouse_down(MouseButton::Left, |_, window, _| window.start_window_move());
-        let settings_key = self.settings_key(cx);
         let kind = self.kind_track(t, cx);
-        let target = self.target_slot(t, cx);
-        let options = self.options(t, cx);
         let preset = self.preset_cell(t, cx);
         let action = self.action(t, cx);
-        let settings = self.icon_cell(
-            t,
-            Ctl::Settings,
-            "qc-settings",
-            "settings",
-            Some(settings_key),
-            cx,
-        );
-        let feedback = self.icon_cell(t, Ctl::Feedback, "qc-feedback", "message-square", None, cx);
+        let toggle = self.toggle_cell(t, cx);
         let row = || {
             div()
                 .flex()
@@ -1244,7 +1263,20 @@ impl QuickPanel {
                 .gap(px(bar::GAP as f32))
                 .h(px(bar::TRACK_H as f32))
         };
-        if self.two_rows {
+        if self.st.collapsed() {
+            return frame
+                .items_center()
+                .gap(px(bar::GAP as f32))
+                .child(self.logo_slot(t))
+                .child(kind)
+                .child(Self::sep(t))
+                .child(preset)
+                .child(action)
+                .child(toggle);
+        }
+        let target = self.target_slot(t, cx);
+        let options = self.options(t, cx);
+        if self.rows2() {
             frame
                 .flex_col()
                 .gap(px(bar::GAP as f32))
@@ -1261,8 +1293,7 @@ impl QuickPanel {
                         .child(Self::sep(t))
                         .child(preset)
                         .child(action)
-                        .child(settings)
-                        .child(feedback),
+                        .child(toggle),
                 )
         } else {
             frame
@@ -1277,8 +1308,7 @@ impl QuickPanel {
                 .child(Self::sep(t))
                 .child(preset)
                 .child(action)
-                .child(settings)
-                .child(feedback)
+                .child(toggle)
         }
     }
 

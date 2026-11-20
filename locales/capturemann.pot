@@ -9063,10 +9063,6 @@ msgid "Search again"
 msgstr ""
 
 msgctxt "button"
-msgid "Send feedback"
-msgstr ""
-
-msgctxt "button"
 msgid "Set up report"
 msgstr ""
 
@@ -10703,15 +10699,19 @@ msgid "unlisted"
 msgstr ""
 
 msgctxt "quick capture"
+msgid "Collapse"
+msgstr ""
+
+msgctxt "quick capture"
 msgid "Enter"
 msgstr ""
 
 msgctxt "quick capture"
-msgid "Preset"
+msgid "Expand"
 msgstr ""
 
 msgctxt "quick capture"
-msgid "Preset settings"
+msgid "Preset"
 msgstr ""
 
 msgctxt "quick capture action"

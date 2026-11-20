@@ -49,7 +49,7 @@ pub mod bar {
     /// The action button, and the margin before it.
     pub const ACTION_W: f64 = 140.0;
     pub const ACTION_ML: f64 = 4.0;
-    /// Settings and Send feedback.
+    /// The expand/collapse toggle.
     pub const ICON_BTN_W: f64 = 38.0;
     /// The bar's padding (sides; top and bottom is `PAD_Y`), its border and the gap between its
     /// items.
@@ -70,11 +70,11 @@ pub mod bar {
     const SIDES: f64 = 2.0 * (PAD_X + BORDER);
     /// Row one of the two-row bar: logo, kind, target.
     pub const ROW1_W: f64 = SIDES + LOGO_W + track_w(3) + SEP_W + track_w(4) + 3.0 * GAP;
-    /// Row two: options, preset, action, settings, feedback.
+    /// Row two: options, preset, action, toggle.
     pub const ROW2_W: f64 =
-        SIDES + group_w(4) + SEP_W + CELL_W + ACTION_ML + ACTION_W + 2.0 * ICON_BTN_W + 5.0 * GAP;
+        SIDES + group_w(4) + SEP_W + CELL_W + ACTION_ML + ACTION_W + ICON_BTN_W + 4.0 * GAP;
     /// One row: everything, with a divider after the targets and the options and one before
-    /// the preset; ten gaps.
+    /// the preset; nine gaps.
     pub const ONE_ROW_W: f64 = SIDES
         + LOGO_W
         + track_w(3)
@@ -86,8 +86,19 @@ pub mod bar {
         + CELL_W
         + ACTION_ML
         + ACTION_W
-        + 2.0 * ICON_BTN_W
-        + 10.0 * GAP;
+        + ICON_BTN_W
+        + 9.0 * GAP;
+    /// The collapsed bar: logo, the kind track, a divider, the preset, the action and the
+    /// toggle; five gaps. The same for every kind.
+    pub const COLLAPSED_W: f64 = SIDES
+        + LOGO_W
+        + track_w(3)
+        + SEP_W
+        + CELL_W
+        + ACTION_ML
+        + ACTION_W
+        + ICON_BTN_W
+        + 5.0 * GAP;
 }
 
 /// The bar's width in one row. The same for Screenshot, Video and Audio, so switching the kind
@@ -95,6 +106,8 @@ pub mod bar {
 pub const BAR_W: f64 = bar::ONE_ROW_W;
 /// The bar's height in one row.
 pub const BAR_H: f64 = bar::TRACK_H + 2.0 * bar::PAD_Y + 2.0 * bar::BORDER;
+/// The collapsed bar's width (one row, whatever the display), QC-1.AC21.
+pub const COLLAPSED_W: f64 = bar::COLLAPSED_W;
 /// The two-row bar: kind and target, then options and action.
 pub const TWO_ROW_W: f64 = bar::ROW2_W;
 pub const TWO_ROW_H: f64 = 2.0 * bar::TRACK_H + bar::GAP + 2.0 * bar::PAD_Y + 2.0 * bar::BORDER;
@@ -125,8 +138,44 @@ pub fn bar_size(display_w: f64) -> (f64, f64) {
 
 /// The window at rest: the bar and the tooltip room under it.
 pub fn window_size(display_w: f64) -> (f64, f64) {
-    let (w, h) = bar_size(display_w);
+    window_size_view(display_w, false)
+}
+
+/// [`bar_size`] of the bar as it is shown: the collapsed bar is one row of a fixed width on
+/// every display (the two rows are for the expanded bar only).
+pub fn bar_size_view(display_w: f64, collapsed: bool) -> (f64, f64) {
+    if collapsed {
+        (COLLAPSED_W, BAR_H)
+    } else {
+        bar_size(display_w)
+    }
+}
+
+/// [`window_size`] of the bar as it is shown, expanded or collapsed.
+pub fn window_size_view(display_w: f64, collapsed: bool) -> (f64, f64) {
+    let (w, h) = bar_size_view(display_w, collapsed);
     (w, h + TIP_ROOM)
+}
+
+/// The window at rest after the bar is collapsed or expanded: `size` is the new
+/// [`window_size_view`]. The left and the top edge stay where they are; the window grows or
+/// shrinks to the right and down, and where that would leave the display it is moved just far
+/// enough to be fully on it (`movable`: the window can be moved; else it keeps its corner).
+pub fn toggled_home(home: &Rect, size: (f64, f64), display: &Rect, movable: bool) -> Rect {
+    let (w, h) = size;
+    if !movable {
+        return Rect::new(home.x, home.y, w, h);
+    }
+    let fit = |pos: f64, len: f64, lo: f64, span: f64| {
+        let hi = lo + span - len - EDGE;
+        pos.min(hi).max(lo + EDGE)
+    };
+    Rect::new(
+        fit(home.x, w, display.x, display.w),
+        fit(home.y, h, display.y, display.h),
+        w,
+        h,
+    )
 }
 
 /// The height of the popover while the preset picker is open (QC-1 "Preset picker"): the fixed
@@ -294,7 +343,7 @@ mod tests {
     #[test]
     fn qc1_ac1_the_bar_is_one_slim_row() {
         assert_eq!(BAR_H, 60.0);
-        assert_eq!(BAR_W, 909.0);
+        assert_eq!(BAR_W, 867.0);
         assert_eq!(bar::track_w(3), 142.0);
         assert_eq!(bar::track_w(4), 188.0);
         assert_eq!(window_size(1920.0), (BAR_W, BAR_H + TIP_ROOM));
@@ -312,7 +361,7 @@ mod tests {
             two_rows(BAR_W + 2.0 * EDGE - 1.0),
             "one row must not touch the edge"
         );
-        assert!(!two_rows(BAR_W + 2.0 * EDGE));
+        assert!(!two_rows(ONE_ROW_MIN.max(BAR_W + 2.0 * EDGE)));
         assert!(!two_rows(1440.0));
         let (w1, h1) = bar_size(1440.0);
         let (w2, h2) = bar_size(800.0);
@@ -322,6 +371,64 @@ mod tests {
             w2 + 2.0 * EDGE <= 800.0,
             "the two rows fit a narrow display"
         );
+    }
+
+    /// QC-1.AC21: the collapsed bar is one row of one fixed width on every display, narrower than
+    /// the expanded bar, as high as the one-row bar and never two rows.
+    #[test]
+    fn qc1_ac21_the_collapsed_bar_is_one_fixed_row() {
+        assert_eq!(COLLAPSED_W, 463.0);
+        for w in [600.0, 800.0, 899.0, 1440.0, 3000.0] {
+            assert_eq!(bar_size_view(w, true), (COLLAPSED_W, BAR_H), "{w}");
+            assert_eq!(window_size_view(w, true), (COLLAPSED_W, BAR_H + TIP_ROOM));
+            assert_eq!(window_size_view(w, false), window_size(w));
+        }
+        const {
+            assert!(COLLAPSED_W < BAR_W);
+            // The popovers are as wide as the window, and it fits a narrow display.
+            assert!(COLLAPSED_W >= POP_W);
+            assert!(COLLAPSED_W + 2.0 * EDGE <= 800.0);
+        }
+    }
+
+    /// QC-1.AC21: toggling keeps the left edge (and the top) where they are and the window fully
+    /// on the display; where the window cannot be moved it keeps its corner.
+    #[test]
+    fn qc1_ac21_toggling_keeps_the_bar_on_the_display() {
+        let d = display();
+        let (cw, ch) = window_size_view(d.w, true);
+        let (ew, eh) = window_size_view(d.w, false);
+        // In the middle: the left edge stays, the window grows to the right.
+        let small = Rect::new(300.0, 200.0, cw, ch);
+        let big = toggled_home(&small, (ew, eh), &d, true);
+        assert_eq!((big.x, big.y), (300.0, 200.0));
+        assert_eq!((big.w, big.h), (ew, eh));
+        // Near the right edge: moved left just enough.
+        let small = Rect::new(1100.0, 200.0, cw, ch);
+        let big = toggled_home(&small, (ew, eh), &d, true);
+        assert_eq!(big.x + big.w, d.x + d.w - EDGE);
+        assert!(big.x < small.x);
+        // Collapsing never needs a move.
+        let back = toggled_home(&big, (cw, ch), &d, true);
+        assert_eq!((back.x, back.y), (big.x, big.y));
+        // The taller two-row bar near the bottom of a narrow display: moved up to stay on it.
+        let narrow = Rect::new(0.0, 0.0, 800.0, 600.0);
+        let (tw, th) = window_size(narrow.w);
+        let low = Rect::new(100.0, 600.0 - EDGE - ch, cw, ch);
+        let tall = toggled_home(&low, (tw, th), &narrow, true);
+        assert!(tall.y + tall.h <= narrow.y + narrow.h - EDGE + 0.001);
+        assert!(tall.x + tall.w <= narrow.x + narrow.w - EDGE + 0.001);
+        // Not movable (Linux): the corner stays.
+        let big = toggled_home(&Rect::new(1100.0, 200.0, cw, ch), (ew, eh), &d, false);
+        assert_eq!((big.x, big.y), (1100.0, 200.0));
+        // Always fully on the display for any start.
+        for x in [0.0, 50.0, 700.0, 1400.0] {
+            for y in [0.0, 400.0, 880.0] {
+                let r = toggled_home(&Rect::new(x, y, cw, ch), (ew, eh), &d, true);
+                assert!(r.x >= d.x && r.x + r.w <= d.x + d.w, "{r:?}");
+                assert!(r.y >= d.y && r.y + r.h <= d.y + d.h, "{r:?}");
+            }
+        }
     }
 
     #[test]
