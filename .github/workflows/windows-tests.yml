@@ -64,11 +64,15 @@ jobs:
 
       # `cargo test --no-run --message-format=json` names every test program it linked; each is copied to
       # <package>__<target>.exe (cargo's own names carry a hash). Library unit tests are <package>__lib.exe.
-      # The runner image carries two Visual Studio C++ toolsets; without this step cc-rs picks one for C++ and
-      # CMake finds the other on PATH for ASM, and whisper.cpp fails to configure ("ASM compiler identification
-      # is unknown", Nov 21, 2026). The step puts one toolset on PATH, INCLUDE and LIB.
-      - name: Use one Visual Studio C++ toolset
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      # A cached CMake build of whisper.cpp remembers the compiler path of the runner image it was made on; after an
+      # image update (Visual Studio toolset 14.51 -> 14.52, Nov 21, 2026) CMake stops with "CMAKE_ASM_COMPILER ... is
+      # not a full path to an existing compiler tool". Dropping the cached whisper-rs-sys build output makes the build
+      # script configure again; the rest of the cache stays.
+      - name: Drop the cached whisper.cpp CMake build (stale compiler paths)
+        shell: pwsh
+        run: |
+          Get-ChildItem target -Directory -Recurse -Depth 3 -Filter 'whisper-rs-sys-*' -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "removing $($_.FullName)"; Remove-Item -Recurse -Force $_.FullName }
       - name: Build the test programs and the examples
         shell: pwsh
         run: |
