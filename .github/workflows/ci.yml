@@ -139,13 +139,13 @@ jobs:
       # run fails to LINK (a missing system library, or a C runtime mismatch), see vendor/sherpa-onnx-sys/build.rs.
       # A cached CMake build of whisper.cpp remembers the compiler path of the runner image it was made on; after an
       # image update (Visual Studio toolset 14.51 -> 14.52, Nov 21, 2026) CMake stops with "CMAKE_ASM_COMPILER ... is
-      # not a full path to an existing compiler tool". Dropping the cached whisper-rs-sys build output makes the build
+      # not a full path to an existing compiler tool". Dropping the cached whisper-rs-sys build output and its fingerprint makes the build
       # script configure again; the rest of the cache stays.
       - name: Drop the cached whisper.cpp CMake build (stale compiler paths)
         shell: pwsh
         if: runner.os == 'Windows'
         run: |
-          Get-ChildItem target -Directory -Recurse -Depth 3 -Filter 'whisper-rs-sys-*' -ErrorAction SilentlyContinue |
+          Get-ChildItem target -Directory -Recurse -Depth 3 -Filter 'whisper-rs-sys*' -Force -ErrorAction SilentlyContinue |
             ForEach-Object { Write-Host "removing $($_.FullName)"; Remove-Item -Recurse -Force $_.FullName }
       - name: Clippy (Windows)
         if: runner.os == 'Windows'
