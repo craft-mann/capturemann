@@ -32,7 +32,8 @@ $SegSha = '220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079'
 $SegBytes = 5992913
 
 $EmbDownload = '3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx'
-$EmbUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$EmbDownload"
+# Mirrored in this repository (release models-sherpa-2026-11-21); see fetch-models.sh.
+$EmbUrl = "https://github.com/craft-mann/capturemann/releases/download/models-sherpa-2026-11-21/campplus-sv-zh-en-16k-advanced.onnx"
 $EmbFile = 'campplus-sv-zh-en-16k-advanced.onnx'
 $EmbSha = 'aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2'
 $EmbBytes = 28281164

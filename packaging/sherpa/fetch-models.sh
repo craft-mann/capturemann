@@ -29,7 +29,9 @@ SEG_SHA256="220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
 SEG_BYTES="5992913"
 
 EMB_DOWNLOAD="3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
-EMB_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/${EMB_DOWNLOAD}"
+# Mirrored in this repository (release models-sherpa-2026-11-21): k2-fsa replaced the file under its old name on Nov 19, 2026
+# (28,281,165 bytes, another SHA-256). The pin below is the file 0.2.3 to 0.3.5 shipped.
+EMB_URL="https://github.com/craft-mann/capturemann/releases/download/models-sherpa-2026-11-21/campplus-sv-zh-en-16k-advanced.onnx"
 EMB_FILE="campplus-sv-zh-en-16k-advanced.onnx"
 EMB_SHA256="aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
 EMB_BYTES="28281164"
