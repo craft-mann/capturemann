@@ -75,7 +75,10 @@ jobs:
         run: brew install ffmpeg
       - name: Install FFmpeg (Windows)
         if: runner.os == 'Windows'
-        run: choco install ffmpeg --no-progress -y
+        # Pinned: Chocolatey's newest ffmpeg moved from 9.0.2 to 9.1.0 on Nov 21, 2026 and the exporter test
+        # cam1_rounded_bubble_is_a_rounded_rectangle then read another pixel colour (the product ships its own
+        # pinned LGPL build, packaging/ffmpeg/build-windows.sh; this one only runs the tests).
+        run: choco install ffmpeg --version 9.0.2 --no-progress -y
       # Chocolatey puts a ShimGen launcher named ffmpeg.exe on PATH: it starts the real ffmpeg.exe and waits for it.
       # Cancelling an export kills the launcher only, so the real ffmpeg.exe kept its `.part` file open for seconds
       # (os error 32) and the EXP-4 cancel tests failed about every second run. Point the tests at the real binary.
