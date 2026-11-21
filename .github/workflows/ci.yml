@@ -137,6 +137,12 @@ jobs:
         run: cargo test --workspace --locked --no-fail-fast
       # The `sherpa` default feature is on for Windows too now (the /MD libraries fetched above). If the first
       # run fails to LINK (a missing system library, or a C runtime mismatch), see vendor/sherpa-onnx-sys/build.rs.
+      # The runner image carries two Visual Studio C++ toolsets; without this step cc-rs picks one for C++ and
+      # CMake finds the other on PATH for ASM, and whisper.cpp fails to configure ("ASM compiler identification
+      # is unknown", Nov 21, 2026). The step puts one toolset on PATH, INCLUDE and LIB.
+      - name: Use one Visual Studio C++ toolset
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        if: runner.os == 'Windows'
       - name: Clippy (Windows)
         if: runner.os == 'Windows'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings

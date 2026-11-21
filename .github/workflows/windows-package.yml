@@ -129,6 +129,11 @@ jobs:
           packaging\sherpa\fetch-models.ps1
           if (-not $?) { throw 'fetch-models.ps1 failed' }
           Get-ChildItem -Recurse packaging\sherpa\out\models | Select-Object FullName, Length
+      # The runner image carries two Visual Studio C++ toolsets; without this step cc-rs picks one for C++ and
+      # CMake finds the other on PATH for ASM, and whisper.cpp fails to configure ("ASM compiler identification
+      # is unknown", Nov 21, 2026). The step puts one toolset on PATH, INCLUDE and LIB.
+      - name: Use one Visual Studio C++ toolset
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: Build the zip and the installer
         shell: pwsh
         env:
