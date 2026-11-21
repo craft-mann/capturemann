@@ -33,6 +33,8 @@ fn fx() -> Fx {
     )
     .text_recognizer(rec)
     .presets(PresetStore::in_dir(&dir.path().join("cfg")))
+    // Undo deletes the capture: never the real Trash (a hosted Windows runner has none).
+    .trasher(cm_daemon::testing::FakeTrasher::new())
     .build();
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
