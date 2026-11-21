@@ -27,7 +27,7 @@ Written on Nov 21, 2026 from `release-day-0.3.5.md` (the pattern; read its secti
 ## Tag and publish
 
 1. **[M]** `CHANGELOG.md`: `## [0.3.6] - Unreleased` becomes `## [0.3.6] - <date>` and a new empty `## [Unreleased]` goes above; `CLAUDE.md` says "0.3.6 is released" with the final facts; `docs/project/status.md`; header of `specs/plans/release-0.3.6-plan.md` ("released <date>"). Commit and push; wait for CI and the Security scan. These docs commits sit above the tag if the tag stays on the commit the files were built from: say so in the text.
-2. **[M]** `git tag -a v0.3.6 -m "CaptureMann 0.3.6" 1778431b` and `git push public v0.3.6` (never reuse a tag).
+2. **[M]** `git tag -a v0.3.6 -m "CaptureMann 0.3.6"` on the docs commit above `1778431b` (done Nov 22) and `git push public v0.3.6` (never reuse a tag).
 3. **[A]** `packaging/windows/release-files.sh` (checksums, winget manifest), then `scripts/check-release-assets.sh 0.3.6 <folder>`.
 4. **[M]** `gh release create v0.3.6 -R craft-mann/capturemann --draft --title "CaptureMann 0.3.6: Quick Capture" --notes-file release-body.md` and upload the files; check the list; download one file per system; publish. The release `models-sherpa-2026-11-21` is a pre-release mirror and must stay a pre-release (never Latest).
 5. **After:** Homebrew cask (`scripts/update-homebrew-cask.sh 0.3.6 /Users/trungtran/source/repos/homebrew-tap`), winget (`release-day-0.3.2.md`, section 7), APT, the plugin (`tests/manual/PLUGIN-1.md`), website download links and the feature page (`docs/website-features.md`), post-release hash checks, then the big disk cleanup (`target/` is about 300 GB; keep the two DMGs until the release is public).
