@@ -1,6 +1,6 @@
 # Release 0.3.6: Quick Capture and stabilisation (plan)
 
-Status: **build started Nov 18, 2026.** Quick Capture was moved here from 0.3.5 by the maintainer on Nov 17, 2026. The plan states final requirements only; behaviour and acceptance criteria are in the feature spec.
+Status: **released Nov 22, 2026 (tag `v0.3.6` on `1778431b`).** Build started Nov 18, 2026. Quick Capture was moved here from 0.3.5 by the maintainer on Nov 17, 2026. The plan states final requirements only; behaviour and acceptance criteria are in the feature spec.
 
 ## 1. Quick Capture (QC-1, QC-3, QC-4, QC-5)
 

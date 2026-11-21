@@ -5,7 +5,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
-## [0.3.6] - Unreleased
+## [0.3.6] - 2026-11-22
 
 ### Added
 - **Quick Capture (QC-1, QC-3, QC-4, QC-5), marked Preview.** One slim icon-only bar (⌥⇧C, Ctrl+Alt+Shift+C on Windows and Linux; first item of the tray and menu-bar menu, a Capture… button in the sidebar dock, a row in the Launcher): kind (1 2 3), target (R W D L), the options of the kind (E C A T, M S B T, M S N K), preset (P, Ctrl+1 to Ctrl+4) and Capture or Record. Tooltips give each name, state and key; the bar is opaque, can be dragged by its background, collapses to a compact form (chevron or key O, remembered), stays open until closed, and splits into two rows on a display narrower than 900 points. Its options are remembered per kind and apart from Settings.
