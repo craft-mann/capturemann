@@ -179,6 +179,47 @@ pub fn hwnd(window: &Window) -> Option<HWND> {
     }
 }
 
+/// Foreground-lock workaround for a window opened by a hotkey: Windows gives the keyboard only to
+/// the foreground window, and with the desktop or another program in front a new window is not
+/// given it (Windows QA F-1). Joins the input queue of the thread that owns the foreground, asks
+/// for the foreground and leaves the queue again. Returns whether `window` is the foreground
+/// window afterwards.
+pub fn take_foreground(window: &Window) -> bool {
+    use windows::Win32::System::Threading::AttachThreadInput;
+    use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, GetForegroundWindow, SetForegroundWindow,
+    };
+
+    let Some(h) = hwnd(window) else {
+        return false;
+    };
+    // SAFETY: `h` is the live top-level window GPUI owns; the calls take plain values and the
+    // input queue attachment is undone before returning.
+    unsafe {
+        let fg = GetForegroundWindow();
+        if fg == h {
+            return true;
+        }
+        let this_thread = GetCurrentThreadId();
+        let fg_thread = if fg.0.is_null() {
+            0
+        } else {
+            GetWindowThreadProcessId(fg, None)
+        };
+        let attached = fg_thread != 0
+            && fg_thread != this_thread
+            && AttachThreadInput(this_thread, fg_thread, true).as_bool();
+        let _ = BringWindowToTop(h);
+        let _ = SetForegroundWindow(h);
+        let _ = SetFocus(Some(h));
+        if attached {
+            let _ = AttachThreadInput(this_thread, fg_thread, false);
+        }
+        GetForegroundWindow() == h
+    }
+}
+
 /// The monitor a window is on, by handle.
 fn monitor_of(h: HWND) -> Option<Monitor> {
     // SAFETY: `h` is the live top-level window GPUI owns.

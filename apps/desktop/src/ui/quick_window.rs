@@ -130,6 +130,14 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
             crate::surfaces::opened(crate::surfaces::Surface::QuickCapture, h);
             cx.set_global(PanelSlot(Some(h)));
             crate::surfaces::activate_app(cx, "quick capture opened");
+            // Windows only gives the keyboard to the foreground window: with the desktop or another
+            // program in front the bar opened without it (Windows QA F-1). The other systems take the
+            // keys through the app activation above.
+            if cfg!(windows) {
+                let _ = h.update(cx, |_, window, _| {
+                    crate::platform_window::take_foreground(window);
+                });
+            }
             crate::surfaces::take_keyboard_x11(cx, h);
         }
         Err(e) => app::push_toast(

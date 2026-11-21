@@ -520,6 +520,20 @@ pub fn centered_frame(visible: (f64, f64, f64, f64), w: f64, h: f64) -> (f64, f6
     (vx + (vw - w) / 2.0, vy + (vh - h) / 2.0, w, h)
 }
 
+/// Windows: makes `window` the foreground window (see `platform_win_monitors::take_foreground`);
+/// `true` everywhere else, where the toolkit and the app activation give the keyboard.
+pub fn take_foreground(window: &Window) -> bool {
+    #[cfg(windows)]
+    {
+        crate::platform_win_monitors::take_foreground(window)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = window;
+        true
+    }
+}
+
 /// Makes `window` the frontmost, key window of this app and activates the app: for dialogs that
 /// must never end up behind the library window (permissions, confirmations). When `visible` is
 /// given (the visible frame of the pointer's display, global points) the window is first centered
