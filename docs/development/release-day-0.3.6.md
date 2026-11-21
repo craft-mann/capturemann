@@ -10,18 +10,24 @@ Written on Nov 21, 2026 from `release-day-0.3.5.md` (the pattern; read its secti
 - **QA passes:** macOS `77d50772`, Windows `8a746f6b`, Linux `57f50732` and the recheck `103290cd` (reports named in the text).
 - **CI lessons of Nov 21:** the speaker model is fetched from the mirror release `models-sherpa-2026-11-21` (k2-fsa replaced the upstream file); Windows CI drops the cached whisper.cpp CMake build; Chocolatey ffmpeg is pinned to 9.0.2. Never run `packaging/sherpa/fetch-models.sh` in the repo checkout.
 
+## Done by the morning of Nov 22, 2026 (everything before the tag)
+
+- **Windows files:** built by the Windows package workflow run 44914326579 on `1778431b` (it makes the bar take the foreground window on Windows, finding F-1 of the `96b85253` pass); installed and checked on the ThinkPad: standard 57 / 0 and full 68 / 0, F-1 not reproduced in 28 tries (`QA-0.3.6-windows-ci-package-1778431b-*`). The `96b85253` package had hardware 68 / 0 too.
+- **Linux files:** x86_64 and aarch64 tarballs and `.deb` files of `96b85253`, checked, regressed and **signed by the maintainer** (all eight `.minisig` verify with `packaging/linux/minisign.pub`).
+- **macOS DMGs:** renamed and re-hashed copies of the notarized files (byte-identical, stapled).
+- **Staging folder:** `/Users/trungtran/release-0.3.6/upload/`, 25 files (4 Linux packages with 16 sidecars, 2 DMGs and 2 Windows files with `.sha256` each, `SHA256SUMS.txt`); `scripts/check-release-assets.sh 0.3.6 /Users/trungtran/release-0.3.6/upload` says OK. The Windows `.sha256` files were rewritten from `hash *name` to `hash  name` (the checker wants two spaces; the hashes are the CI's).
+- **Text:** `release-0.3.6-github-text.md` has no `<FILL>` left. **Tag on `1778431b`** (the latest code commit; docs commits above it); the macOS and Linux files are of `96b85253`, which differs only by that Windows-only change, and the text says so.
+- **CI:** green on `1778431b` (CI run 44914294415 after a rerun of a cancelled macOS job; Security scan; Windows package).
+
 ## Still open before the tag
 
-1. **[A] Windows final regression** on the installed files of the Windows package run 44898477660 (standard, full, hardware with screen): the earlier Windows pass ran on `8a746f6b` and does not include the Ctrl+1, Esc and drag fixes. Needs the ThinkPad booted into Windows and logged in.
-2. **[A] Linux final files:** build from the release commit on the ThinkPad (`packaging/linux/release-build.sh --src ~/wt/main --commit <sha> --jobs 3`; the `96b85253` build started Nov 21), `packaging/linux/check-package.sh`, `cm-regress` standard and full on the installed `.deb`, copy the four files; aarch64 in the VM (`~/VMs/cm-linux/ssh.cmd`) if shipped.
-3. **[M] Linux signing:** minisign the tarballs and `.deb` files; APT repository update afterwards (0.3.0 to 0.3.6).
-4. **[M] Rename and hash the DMGs:** `CaptureMann-v0.3.6-macos-arm64.dmg` and `CaptureMann-v0.3.6-macos-x86_64.dmg`, write `.sha256` again.
-5. **[A] Fill the text:** every `<FILL: ...>` in `release-0.3.6-github-text.md`, the licences sentence from a diff of `Cargo.lock` and `THIRD_PARTY_LICENSES.md` against `v0.3.5`.
+1. **[M] Review** the release text (`release-0.3.6-github-text.md`), the staging folder and this file; decide full release or pre-release.
+2. **[M]** `CHANGELOG.md` date, `CLAUDE.md` wording ("released"), `docs/project/status.md`, plan header; push; CI green again (docs only).
 
 ## Tag and publish
 
 1. **[M]** `CHANGELOG.md`: `## [0.3.6] - Unreleased` becomes `## [0.3.6] - <date>` and a new empty `## [Unreleased]` goes above; `CLAUDE.md` says "0.3.6 is released" with the final facts; `docs/project/status.md`; header of `specs/plans/release-0.3.6-plan.md` ("released <date>"). Commit and push; wait for CI and the Security scan. These docs commits sit above the tag if the tag stays on the commit the files were built from: say so in the text.
-2. **[M]** `git tag -a v0.3.6 -m "CaptureMann 0.3.6"` on the commit the files were built from (`96b85253`) and `git push public v0.3.6`.
+2. **[M]** `git tag -a v0.3.6 -m "CaptureMann 0.3.6" 1778431b` and `git push public v0.3.6` (never reuse a tag).
 3. **[A]** `packaging/windows/release-files.sh` (checksums, winget manifest), then `scripts/check-release-assets.sh 0.3.6 <folder>`.
 4. **[M]** `gh release create v0.3.6 -R craft-mann/capturemann --draft --title "CaptureMann 0.3.6: Quick Capture" --notes-file release-body.md` and upload the files; check the list; download one file per system; publish. The release `models-sherpa-2026-11-21` is a pre-release mirror and must stay a pre-release (never Latest).
 5. **After:** Homebrew cask (`scripts/update-homebrew-cask.sh 0.3.6 /Users/trungtran/source/repos/homebrew-tap`), winget (`release-day-0.3.2.md`, section 7), APT, the plugin (`tests/manual/PLUGIN-1.md`), website download links and the feature page (`docs/website-features.md`), post-release hash checks, then the big disk cleanup (`target/` is about 300 GB; keep the two DMGs until the release is public).
