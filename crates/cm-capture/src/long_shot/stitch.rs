@@ -497,8 +497,12 @@ enum Prior {
     Trusted,
 }
 
-/// Most of the compared lines of a robust match that may differ.
-const ROBUST_BAD_SHARE: f64 = 0.5;
+/// Most of the compared lines of a robust match that may differ, when the step does not name the
+/// shift. A third at most: two frames that did not overlap at all (the wheel moved the page twice
+/// as far as asked) matched at a shift on their few repeating lines while the text lines of every
+/// row differed, 49 % of the lines, and were joined with ten rows left out; with the step naming
+/// the shift the limit is [`ROBUST_HINTED_BAD_SHARE`] (Windows, Edge, Nov 22, 2026).
+const ROBUST_BAD_SHARE: f64 = 0.35;
 /// Most separate stretches of differing lines (a translucent header, a floating button, a
 /// scrollbar thumb).
 const ROBUST_MAX_RUNS: usize = 3;

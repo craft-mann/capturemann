@@ -3350,3 +3350,44 @@ fn lsreal_panels_that_stay_put_are_left_out_of_the_comparison_of_a_trimmed_run()
         }
     }
 }
+
+/// Windows, Edge, Nov 22, 2026 (the 0.3.7 QA run): the wheel moved a page of numbered rows about
+/// twice as far as asked, so the third frame (rows 29 to 41) did not overlap the second (rows 8 to
+/// 20). The two matched at a shift of 737 lines on the bars that repeat from row to row, with the
+/// text lines of the rows in between counted as stretches that differ (49 % of the compared
+/// lines), and were joined: the stitched image had ten rows missing and the run ended with
+/// `reached_end`. The join is refused, so that the run scrolls back and looks again.
+#[test]
+fn lsreal_frames_that_do_not_overlap_are_not_joined() {
+    fn load(name: &str) -> Frame {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/data/long_shot_edge_rows")
+            .join(name);
+        let file = std::fs::File::open(path).expect("open frame");
+        let mut decoder = png::Decoder::new(std::io::BufReader::new(file));
+        decoder.set_transformations(png::Transformations::EXPAND);
+        let mut reader = decoder.read_info().expect("png header");
+        let mut buf = vec![0; reader.output_buffer_size().expect("png size")];
+        let info = reader.next_frame(&mut buf).expect("png data");
+        buf.truncate(info.buffer_size());
+        let rgba = match info.color_type {
+            png::ColorType::Rgba => buf,
+            png::ColorType::Rgb => buf
+                .chunks(3)
+                .flat_map(|p| [p[0], p[1], p[2], 255])
+                .collect(),
+            other => panic!("unsupported colour type {other:?}"),
+        };
+        Frame::new(info.width, info.height, rgba).expect("frame")
+    }
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&load("frame-1.png"), None);
+    let got = s.push(&load("frame-2.png"), Some(302));
+    assert!(
+        matches!(got, PushOutcome::Added { .. }),
+        "{got:?} {:?}",
+        s.last_refusal()
+    );
+    let got = s.push(&load("frame-3.png"), Some(699));
+    assert_eq!(got, PushOutcome::NoOverlap, "{:?}", s.last_refusal());
+}
