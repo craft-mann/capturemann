@@ -1,13 +1,29 @@
-# CaptureMann APT repository (Linux, 0.3.0)
+# CaptureMann APT repository (Linux)
 
 A signed APT repository for Ubuntu 24.04 / Debian 13 and later, `amd64` and `arm64`, so that
 `sudo apt install capturemann` installs the app with its libraries and `sudo apt upgrade` updates it. It is
 static files only: no server program. The tarball (minisign) and the single `.deb` downloads stay as they are.
 
-Status: the tooling is built and proved in a clean Ubuntu 24.04 environment (reports in `verification/`, names
-`L1-linux-0.3.0-packaging-apt-*`). **Nothing is published**: the repository key does not exist yet and the host is
-not chosen (see "Decisions for the maintainer"). Everything below that shows a URL uses `https://apt.example.org/capturemann/`
-as the placeholder.
+Status: **published** (since 0.3.0; updated for 0.3.6 on Nov 22, 2026). The repository is the release `apt` of
+`craft-mann/capturemann` (decision A below: GitHub release assets, flat layout), signed with the key
+`516C CD4F C7B3 5167 8803 F71B DEB1 BB54 FAEF 557D`; it carries 0.3.0 to 0.3.6 for `amd64` and `arm64`. The tooling is
+proved in a clean Ubuntu 24.04 environment (`L1-linux-0.3.0-packaging-apt-*`, and for the published repository
+`QA-0.3.6-linux-aarch64-public-release-2026-11-22-claude.md`). The sections below that show `https://apt.example.org/capturemann/`
+use it as a placeholder for the pool layout; the published one is:
+
+```sh
+sudo install -d -m 0755 /usr/share/keyrings
+sudo curl -fsSL https://github.com/craft-mann/capturemann/releases/download/apt/capturemann-archive-keyring.gpg \
+  -o /usr/share/keyrings/capturemann-archive-keyring.gpg
+sudo curl -fsSL https://github.com/craft-mann/capturemann/releases/download/apt/capturemann.sources \
+  -o /etc/apt/sources.list.d/capturemann.sources
+sudo apt update && sudo apt install capturemann
+```
+
+Needs `curl` and `ca-certificates` (a minimal image has neither: `sudo apt install curl ca-certificates`) and the Ubuntu
+**`universe`** component, because the app depends on libraries that live there (`libva2`, `libva-drm2`): a minimal
+install or a `debootstrap` root has only `main` and `apt install capturemann` stops with "libva2 not installable"
+until `universe` is enabled (`sudo add-apt-repository universe`).
 
 ## For users (to go on the website and the release page once the host is chosen)
 
