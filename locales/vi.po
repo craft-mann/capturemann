@@ -12567,3 +12567,15 @@ msgstr "Mở Chụp nhanh"
 
 msgid "List the Quick Capture presets"
 msgstr "Liệt kê các mẫu Chụp nhanh"
+
+msgid "FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+msgstr "Không tìm thấy FFmpeg: hãy cài bằng trình quản lý gói của bạn (ví dụ sudo apt install ffmpeg) hoặc đặt CM_FFMPEG trỏ tới tệp thực thi ffmpeg. Bản phát hành CaptureMann đã kèm sẵn một bản FFmpeg."
+
+msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+msgstr "Không thể chạy FFmpeg tại `{path}` (không có quyền truy cập). Hãy cài FFmpeg bằng trình quản lý gói của bạn (ví dụ sudo apt install ffmpeg) hoặc đặt CM_FFMPEG trỏ đến tệp thực thi ffmpeg. Bản phát hành CaptureMann đã tích hợp sẵn FFmpeg."
+
+msgid "FFmpeg isn’t installed, so the combined video was not made. Install it with your package manager (for example sudo apt install ffmpeg), then press Export on the recording."
+msgstr "Chưa cài FFmpeg nên video gộp chưa được tạo. Hãy cài bằng trình quản lý gói của bạn (ví dụ sudo apt install ffmpeg), rồi nhấn Xuất trên bản ghi."
+
+msgid "The recording is saved, but the single MP4 needs FFmpeg. Install it with your package manager (for example sudo apt install ffmpeg), then press Export on the recording."
+msgstr "Đã lưu bản ghi, nhưng MP4 đơn cần FFmpeg. Hãy cài bằng trình quản lý gói của bạn (ví dụ sudo apt install ffmpeg), rồi nhấn Xuất trên bản ghi."

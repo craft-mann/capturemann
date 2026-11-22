@@ -174,6 +174,7 @@ if [ "${CM_SKIP_LICENSES:-0}" != "1" ]; then
     licenses="$tmp/THIRD_PARTY_LICENSES.md"
   else
     tail -5 "$tmp/gen.log" >&2
+    [ "${CM_REQUIRE_LICENSES:-0}" = "1" ] && { echo "error: could not generate the Linux THIRD_PARTY_LICENSES.md; CM_REQUIRE_LICENSES=1 refuses the checked-in macOS list" >&2; exit 1; }
     echo "    warning: could not generate the Linux list (needs the crates fetched); shipping the checked-in macOS one" >&2
   fi
 fi

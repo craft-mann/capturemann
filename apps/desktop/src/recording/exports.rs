@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use cm_i18n::{tr, tr_ctx};
 use serde_json::Value;
 
+use crate::permissions::Os;
 use crate::toast::{ToastAction, ToastKind, ToastSpec};
 
 /// Progress toasts update in steps of this many percent. The toast window is updated in place now
@@ -663,7 +664,7 @@ pub fn export_skipped_toast(capture_id: &str) -> ToastSpec {
 /// recording is saved; this is information, not an error.
 fn export_skipped_toast_now(capture_id: &str) -> ToastSpec {
     ToastSpec::new(ToastKind::Info, tr!("Saved without a single MP4"))
-        .body(export_skipped_body(cfg!(windows)))
+        .body(export_skipped_body(Os::current()))
         .button(
             tr_ctx!("button", "Open"),
             ToastAction::OpenCapture(capture_id.to_owned()),
@@ -676,30 +677,34 @@ pub fn export_failed_toast(capture_id: &str, reason: &str, ffmpeg_missing: bool)
     ToastSpec::live(move || export_failed_toast_now(&capture_id, &reason, ffmpeg_missing))
 }
 
-/// The body of the one-time hint when FFmpeg is missing; `windows` picks the wording (no Homebrew
-/// on Windows, where the app includes its own copy).
-fn export_skipped_body(windows: bool) -> String {
-    if windows {
-        tr!(
+/// The body of the one-time hint when FFmpeg is missing; `os` picks the wording (Homebrew on the Mac, the package
+/// manager on Linux, nothing to install on Windows, where the app includes its own copy).
+fn export_skipped_body(os: Os) -> String {
+    match os {
+        Os::Windows => tr!(
             "FFmpeg wasn\u{2019}t found, so the combined video was not made. Reinstall CaptureMann (it includes its own copy), then press Export on the recording."
-        )
-    } else {
-        tr!(
+        ),
+        Os::Linux => tr!(
+            "FFmpeg isn\u{2019}t installed, so the combined video was not made. Install it with your package manager (for example sudo apt install ffmpeg), then press Export on the recording."
+        ),
+        Os::Mac => tr!(
             "FFmpeg isn\u{2019}t installed, so the combined video was not made. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
-        )
+        ),
     }
 }
 
-/// The body of the toast for a failed export whose FFmpeg is missing; `windows` picks the wording.
-fn ffmpeg_missing_body(windows: bool) -> String {
-    if windows {
-        tr!(
+/// The body of the toast for a failed export whose FFmpeg is missing; `os` picks the wording.
+fn ffmpeg_missing_body(os: Os) -> String {
+    match os {
+        Os::Windows => tr!(
             "The recording is saved, but the single MP4 needs FFmpeg. Reinstall CaptureMann (it includes its own copy), or set CM_FFMPEG to ffmpeg.exe, then press Export on the recording."
-        )
-    } else {
-        tr!(
+        ),
+        Os::Linux => tr!(
+            "The recording is saved, but the single MP4 needs FFmpeg. Install it with your package manager (for example sudo apt install ffmpeg), then press Export on the recording."
+        ),
+        Os::Mac => tr!(
             "The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
-        )
+        ),
     }
 }
 
@@ -718,7 +723,7 @@ fn export_failed_toast_now(capture_id: &str, reason: &str, ffmpeg_missing: bool)
     }
     if ffmpeg_missing {
         return ToastSpec::new(ToastKind::Error, tr!("FFmpeg not found"))
-            .body(ffmpeg_missing_body(cfg!(windows)))
+            .body(ffmpeg_missing_body(Os::current()))
             .button(
                 tr_ctx!("button", "Open"),
                 ToastAction::OpenCapture(capture_id.to_owned()),
@@ -776,9 +781,13 @@ mod tests {
         );
         let toast = export_skipped_toast("rec_1");
         assert_eq!(toast.kind, ToastKind::Info);
-        assert_eq!(toast.body.unwrap(), export_skipped_body(cfg!(windows)));
-        assert!(export_skipped_body(false).contains("brew install ffmpeg"));
-        assert!(!export_skipped_body(true).contains("brew"));
+        assert_eq!(toast.body.unwrap(), export_skipped_body(Os::current()));
+        assert!(export_skipped_body(Os::Mac).contains("brew install ffmpeg"));
+        assert!(!export_skipped_body(Os::Windows).contains("brew"));
+        assert!(
+            !export_skipped_body(Os::Linux).contains("brew")
+                && export_skipped_body(Os::Linux).contains("package manager")
+        );
     }
 
     /// REC-1: queued -> progress in 5% steps -> done; the toasts follow.
@@ -865,9 +874,13 @@ mod tests {
         assert!(reason.contains("FFmpeg was not found"));
         let toast = export_failed_toast("rec_1", reason, *ffmpeg_missing);
         assert_eq!(toast.title, "FFmpeg not found");
-        assert_eq!(toast.body.unwrap(), ffmpeg_missing_body(cfg!(windows)));
-        assert!(ffmpeg_missing_body(false).contains("brew install ffmpeg"));
-        assert!(!ffmpeg_missing_body(true).contains("brew"));
+        assert_eq!(toast.body.unwrap(), ffmpeg_missing_body(Os::current()));
+        assert!(ffmpeg_missing_body(Os::Mac).contains("brew install ffmpeg"));
+        assert!(!ffmpeg_missing_body(Os::Windows).contains("brew"));
+        assert!(
+            !ffmpeg_missing_body(Os::Linux).contains("brew")
+                && ffmpeg_missing_body(Os::Linux).contains("package manager")
+        );
         assert_eq!(toast.kind, ToastKind::Error);
 
         t.on_event("export.queued", &queued("j2", false));
@@ -929,7 +942,7 @@ mod tests {
         });
         // Not the damaged-app case: the developer hint stays.
         let toast = export_failed_toast("rec_1", cm_media::tools::not_found_message(), true);
-        assert_eq!(toast.body.unwrap(), ffmpeg_missing_body(cfg!(windows)));
+        assert_eq!(toast.body.unwrap(), ffmpeg_missing_body(Os::current()));
         // A generic failure shows the reason, worded by id when it has one.
         let toast = export_failed_toast("rec_1", "FFmpeg failed (exit status: 1): boom", false);
         assert!(toast.body.unwrap().contains("boom"));

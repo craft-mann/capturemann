@@ -229,10 +229,11 @@ pub fn check_app_install(
     }
 }
 
-/// Processes of an app copy that macOS runs from its translocated (quarantine) location,
-/// `/private/var/folders/.../AppTranslocation/...`. The same program started through LaunchServices
-/// from a quarantined copy is such a process: it is not a second instance of the product under test.
-/// Empty on Windows.
+/// `cm-desktop` processes that macOS runs from the translocated (quarantine) location of an app
+/// copy, `/private/var/folders/.../AppTranslocation/...`. The same program started through
+/// LaunchServices from a quarantined copy is such a process: not a second instance. Only the
+/// executable (the first word of the command line) counts, so another program that merely mentions
+/// the folder is never listed. Empty on Windows.
 pub fn translocated_pids() -> Vec<u32> {
     #[cfg(windows)]
     {
@@ -246,13 +247,36 @@ pub fn translocated_pids() -> Vec<u32> {
         else {
             return Vec::new();
         };
-        String::from_utf8_lossy(&out.stdout)
-            .lines()
-            .filter_map(|l| {
-                let (pid, cmd) = l.trim().split_once(' ')?;
-                cmd.contains("/AppTranslocation/")
-                    .then(|| pid.parse().ok())?
-            })
-            .collect()
+        parse_translocated(&String::from_utf8_lossy(&out.stdout))
+    }
+}
+
+#[cfg_attr(windows, allow(dead_code))]
+fn parse_translocated(ps: &str) -> Vec<u32> {
+    ps.lines()
+        .filter_map(|l| {
+            let (pid, cmd) = l.trim().split_once(' ')?;
+            let exe = cmd.trim_start().split(".app/").next().unwrap_or("");
+            let full = cmd.trim_start();
+            (full.contains("/AppTranslocation/")
+                && exe.contains("/AppTranslocation/")
+                && full.contains("/Contents/MacOS/cm-desktop"))
+            .then(|| pid.parse().ok())?
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod translocated_tests {
+    use super::parse_translocated;
+
+    #[test]
+    fn only_a_translocated_cm_desktop_is_listed() {
+        let ps = "  101 /private/var/folders/x/AppTranslocation/ABC/d/CaptureMann.app/Contents/MacOS/cm-desktop
+\
+  102 /private/var/folders/x/AppTranslocation/ABC/d/Slack.app/Contents/MacOS/Slack\n\
+  103 grep AppTranslocation\n\
+  104 /Applications/CaptureMann.app/Contents/MacOS/cm-desktop\n";
+        assert_eq!(parse_translocated(ps), vec![101]);
     }
 }

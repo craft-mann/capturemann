@@ -483,7 +483,7 @@ fn main() {
                 for (action, res) in &status {
                     if let Err(e) = res {
                         if action.is_available() {
-                            log::warn!("could not register {}: {e}", action.label());
+                            log::warn!("could not register the global shortcut {}: {e}", action.label());
                         }
                     }
                 }

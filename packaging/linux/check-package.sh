@@ -138,6 +138,8 @@ need_doc LICENSE; need_doc NOTICE; need_doc THIRD_PARTY_LICENSES.md
 if [ -s "$docs/LICENSE" ]; then grep -q 'Apache License' "$docs/LICENSE" || fail "LICENSE is not the Apache License text"; fi
 if [ -s "$docs/THIRD_PARTY_LICENSES.md" ]; then
   [ "$(wc -c < "$docs/THIRD_PARTY_LICENSES.md")" -gt 50000 ] || fail "THIRD_PARTY_LICENSES.md is suspiciously small"
+  # Written by gen-third-party.sh: the macOS list would say apple-darwin here.
+  grep -q '^Crate set:.*linux' "$docs/THIRD_PARTY_LICENSES.md" || fail "THIRD_PARTY_LICENSES.md is not the Linux crate set (header line 'Crate set:')"
 fi
 if [ "$kind" = deb ]; then
   need_doc copyright; need_doc changelog.gz

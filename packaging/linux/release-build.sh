@@ -62,7 +62,7 @@ step() { local name="$1"; shift; log "== $name"; "$@" >"$out/logs/$name.log" 2>&
 step sherpa ${n[@]+"${n[@]}"} bash -c 'bash packaging/sherpa/fetch-linux.sh && bash packaging/sherpa/fetch-models.sh'
 step ffmpeg ${n[@]+"${n[@]}"} bash packaging/ffmpeg/build-linux.sh
 step llama ${n[@]+"${n[@]}"} bash packaging/llama/build-linux.sh
-export CM_LINUX_OUT="$out" CM_REQUIRE_SHERPA=1 CM_REQUIRE_SPEAKER_MODELS=1 CM_REQUIRE_LLAMA=1 CM_REQUIRE_FFMPEG=1
+export CM_LINUX_OUT="$out" CM_REQUIRE_SHERPA=1 CM_REQUIRE_SPEAKER_MODELS=1 CM_REQUIRE_LLAMA=1 CM_REQUIRE_FFMPEG=1 CM_REQUIRE_LICENSES=1
 export CM_FFMPEG_BUNDLE="$tree/packaging/ffmpeg/out-linux-$arch" CM_LLAMA_BUNDLE="$tree/packaging/llama/out"
 step tarball ${n[@]+"${n[@]}"} bash packaging/linux/build-linux.sh
 step deb bash packaging/linux/build-deb.sh

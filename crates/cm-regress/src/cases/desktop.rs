@@ -257,8 +257,15 @@ fn registration_refusals(ctx: &Ctx) -> Vec<String> {
     if let Ok(rd) = std::fs::read_dir(ctx.config.join("logs")) {
         for e in rd.flatten() {
             if let Ok(t) = std::fs::read_to_string(e.path()) {
-                for l in t.lines().filter(|l| l.contains("could not register")) {
-                    let l = l.split("could not register").nth(1).unwrap_or(l).trim();
+                for l in t
+                    .lines()
+                    .filter(|l| l.contains("could not register the global shortcut"))
+                {
+                    let l = l
+                        .split("could not register the global shortcut")
+                        .nth(1)
+                        .unwrap_or(l)
+                        .trim();
                     out.push(crate::util::cut(l, 120));
                 }
             }
@@ -359,12 +366,11 @@ fn second_launch(ctx: &mut Ctx) -> R {
         "visible windows of the first instance: {before} before, {after} after"
     ));
     // A quarantined copy that LaunchServices runs from its translocated location is another process
-    // of macOS, not a second instance: leave it out (and stop it with the case).
-    let translocated = sys::translocated_pids();
-    for p in &translocated {
-        if let Ok(mut t) = ctx.tracker.lock() {
-            t.push(*p);
-        }
+    // of macOS, not a second instance. Not when the app under test runs translocated itself: then a
+    // real stray instance would look the same.
+    let mut translocated = sys::translocated_pids();
+    if translocated.contains(&app.pid) {
+        translocated.clear();
     }
     if !translocated.is_empty() {
         ctx.note(format!(

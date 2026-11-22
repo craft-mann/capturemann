@@ -2266,6 +2266,9 @@ msgstr ""
 msgid "FFmpeg isn’t installed, so the combined video was not made. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
 msgstr ""
 
+msgid "FFmpeg isn’t installed, so the combined video was not made. Install it with your package manager (for example sudo apt install ffmpeg), then press Export on the recording."
+msgstr ""
+
 msgid "FFmpeg not found"
 msgstr ""
 
@@ -6258,6 +6261,9 @@ msgid "The recording is saved, but the single MP4 needs FFmpeg, and the copy ins
 msgstr ""
 
 msgid "The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
+msgstr ""
+
+msgid "The recording is saved, but the single MP4 needs FFmpeg. Install it with your package manager (for example sudo apt install ffmpeg), then press Export on the recording."
 msgstr ""
 
 msgid "The recording is saved, but the single MP4 needs FFmpeg. Reinstall CaptureMann (it includes its own copy), or set CM_FFMPEG to ffmpeg.exe, then press Export on the recording."
