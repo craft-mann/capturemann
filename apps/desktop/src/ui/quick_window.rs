@@ -215,6 +215,8 @@ pub struct QuickPanel {
     /// The window can be moved (macOS, Windows): a popover without room under the bar opens
     /// above it.
     movable: bool,
+    /// A drag in progress on X11: the pointer and the window's corner (root pixels) at the press.
+    x11_drag: Option<(f64, f64, i32, i32)>,
     /// The popover is open above the bar, and its height.
     upward: bool,
     pop_h: f64,
@@ -287,6 +289,7 @@ impl QuickPanel {
             visible,
             two_rows: place::two_rows(visible.w),
             movable: crate::platform_window::NativeWindow::for_frame(window).is_some(),
+            x11_drag: None,
             upward: false,
             pop_h: 0.,
             ctl: None,
@@ -1275,7 +1278,44 @@ impl QuickPanel {
                 MouseButton::Left,
                 cx.listener(|this, _, window, cx| {
                     window.focus(&this.focus, cx);
+                    // X11: the bar is an override-redirect window, so the window manager never
+                    // moves it; the app follows the pointer itself (Linux QA N-3).
+                    if let (Some((px_, py_, _, _)), Some((ox, oy))) = (
+                        crate::platform_window::x11_pointer(),
+                        crate::platform_window::x11_window_origin(window),
+                    ) {
+                        this.x11_drag = Some((px_, py_, ox, oy));
+                        return;
+                    }
                     window.start_window_move();
+                }),
+            )
+            .on_mouse_move(cx.listener(|this, ev: &gpui::MouseMoveEvent, window, _| {
+                let Some((sx, sy, ox, oy)) = this.x11_drag else {
+                    return;
+                };
+                if ev.pressed_button != Some(MouseButton::Left) {
+                    this.x11_drag = None;
+                    return;
+                }
+                if let Some((x, y, _, _)) = crate::platform_window::x11_pointer() {
+                    crate::platform_window::x11_move_to(
+                        window,
+                        ox + (x - sx).round() as i32,
+                        oy + (y - sy).round() as i32,
+                    );
+                }
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _, window, _| {
+                    if this.x11_drag.take().is_some() {
+                        // The bar's place is now where it was dropped.
+                        if let Some((ox, oy)) = crate::platform_window::x11_window_origin(window) {
+                            this.home.x = f64::from(ox);
+                            this.home.y = f64::from(oy);
+                        }
+                    }
                 }),
             );
         let kind = self.kind_track(t, cx);

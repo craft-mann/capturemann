@@ -374,6 +374,63 @@ pub fn x11_pointer() -> Option<(f64, f64, f64, f64)> {
     }
 }
 
+/// X11 only: the window's top-left corner in root-window pixels. `None` elsewhere.
+pub fn x11_window_origin(window: &Window) -> Option<(i32, i32)> {
+    #[cfg(target_os = "linux")]
+    {
+        use x11rb::connection::Connection;
+        use x11rb::protocol::xproto::ConnectionExt;
+        let id = x11_window_id(window)?;
+        let (conn, screen) = x11rb::connect(None).ok()?;
+        let root = conn.setup().roots.get(screen)?.root;
+        let t = conn
+            .translate_coordinates(id, root, 0, 0)
+            .ok()?
+            .reply()
+            .ok()?;
+        Some((i32::from(t.dst_x), i32::from(t.dst_y)))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = window;
+        None
+    }
+}
+
+/// X11 only: moves the window so its top-left corner is at `(x, y)` in root-window pixels. The
+/// Quick Capture bar is an override-redirect window, so the window manager never moves it: the app
+/// moves it itself, with the X server (Linux QA N-3). Elsewhere: nothing.
+pub fn x11_move_to(window: &Window, x: i32, y: i32) {
+    #[cfg(target_os = "linux")]
+    {
+        use x11rb::connection::Connection;
+        use x11rb::protocol::xproto::{ConfigureWindowAux, ConnectionExt};
+        let Some(id) = x11_window_id(window) else {
+            return;
+        };
+        let Ok((conn, _)) = x11rb::connect(None) else {
+            return;
+        };
+        let _ = conn.configure_window(id, &ConfigureWindowAux::new().x(x).y(y));
+        let _ = conn.flush();
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (window, x, y);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn x11_window_id(window: &Window) -> Option<u32> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    let handle = HasWindowHandle::window_handle(window).ok()?;
+    match handle.as_raw() {
+        RawWindowHandle::Xcb(h) => Some(h.window.get()),
+        RawWindowHandle::Xlib(h) => Some(h.window as u32),
+        _ => None,
+    }
+}
+
 /// The CGWindowID of `window` when it is on screen (visible and not minimized), `None`
 /// otherwise and where the platform has no such id. Only for the library window, which
 /// recordings and screenshots include (see `studio_window`).
