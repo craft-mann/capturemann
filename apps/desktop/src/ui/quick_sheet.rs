@@ -18,6 +18,7 @@ use crate::ui::app::{self, AppModel};
 use crate::ui::components::{keycaps, switch};
 use crate::ui::paint::{rgba_of, ui_features, UI_FONT};
 use crate::ui::recording::{panel_options, pointer_display, visible_part};
+use crate::ui::studio::{FocusNext, FocusPrev};
 use crate::ui::text_field::{TextField, TextFieldEvent};
 
 pub const WIDTH: f32 = 440.;
@@ -703,6 +704,11 @@ impl Render for PresetSheet {
             })
             .size_full()
             .track_focus(&self.focus)
+            // Tab and Shift+Tab move between the fields and buttons of the sheet (QC-4; N-7: on
+            // X11 the key did nothing here because only the Studio and the confirm window handled
+            // the actions).
+            .on_action(cx.listener(|_, _: &FocusNext, window, cx| window.focus_next(cx)))
+            .on_action(cx.listener(|_, _: &FocusPrev, window, cx| window.focus_prev(cx)))
             .on_key_down(cx.listener(Self::on_key))
             .font_family(UI_FONT)
             .font_features(ui_features())
