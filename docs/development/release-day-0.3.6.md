@@ -34,4 +34,6 @@ Written on Nov 21, 2026 from `release-day-0.3.5.md` (the pattern; read its secti
 
 ## Known open items for 0.3.7
 
+The plan is `specs/plans/release-0.3.7-plan.md`; this list is its source.
+
 The FFmpeg-missing message names Homebrew on Linux (`crates/cm-core/src/message.rs` lines 138 and 164, `crates/cm-media/src/tools.rs` line 38; case `regress.ffmpeg_missing_wording` fails in a clean Linux root without a system FFmpeg; low impact, the packages bundle FFmpeg); D4 (invented outro over room-only noise), X11 drag and Wayland placement of the bar, Tab in the preset sheet on X11, the Windows `ai.transcribe` case limit (600 s, `--timeout-scale` does not change it), `desktop.hotkey_overlay` guard (match the hotkey holder, not the process name), Long Shot's first-step loss on Windows, P-3 not reproduced, F-4 (the bar opens 5 px high on Windows), headless Wayland checks of Long Shot and Click Guide.
