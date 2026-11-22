@@ -41,6 +41,8 @@ Written on Nov 21, 2026 from `specs/plans/release-0.3.6-plan.md`, `specs/feature
 
 ## What was checked
 
+**Which commit built what:** the Windows files are of `1778431b`, the macOS DMGs and the Linux files are of `96b85253`; the two differ only in a Windows-only change (the bar takes the foreground window, so it has the keyboard when the desktop is in front). The tag `v0.3.6` sits on the commit above `1778431b` that holds only the changelog, documents and reports.
+
 Reports are in `verification/` and all are **PARTIAL**. The overlay windows (bars, HUD, picker, toasts, dialogs) cannot be captured by the test tools: they were driven and read through input and the accessibility tree, and the maintainer looked at the macOS bar by hand (reported by the maintainer, no stored report).
 
 | System | Result | Report |
