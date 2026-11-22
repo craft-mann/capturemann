@@ -84,6 +84,8 @@ impl Log for Logger {
     fn log(&self, r: &Record) {
         let level = if r.target() == "gpui_apple::text_system" {
             effective_level(r.target(), r.level(), &r.args().to_string())
+        } else if closed_window_callback(r.target(), r.file(), &r.args().to_string()) {
+            log::Level::Debug
         } else {
             r.level()
         };
@@ -124,6 +126,20 @@ fn effective_level(target: &str, level: log::Level, message: &str) -> log::Level
     } else {
         level
     }
+}
+
+/// GPUI's activation callback looks the window up after a close has already removed it, so every
+/// close of an overlay window on Windows wrote `window not found` at error level (0.3.6 Windows F-8).
+/// Nothing is wrong and nothing can be changed by us or the user. Only this exact message from
+/// GPUI's `window.rs` (no target, as for `RefCell already borrowed`) is lowered to debug; any other
+/// message from that file, and the same text from anywhere else, still shows.
+fn closed_window_callback(target: &str, file: Option<&str>, message: &str) -> bool {
+    target.is_empty()
+        && message == "window not found"
+        && file.is_some_and(|f| {
+            let f = f.replace('\\', "/");
+            f.contains("/gpui-pre-") && f.ends_with("/src/window.rs")
+        })
 }
 
 /// The target to print for a record. GPUI's `log_err` leaves the target empty for a crate built from
@@ -245,6 +261,31 @@ mod tests {
             attributable_target(&Record::builder().target("").build()),
             "unknown"
         );
+    }
+
+    #[test]
+    fn only_gpuis_window_not_found_after_a_close_is_lowered() {
+        let f = Some("/Users/x/.cargo/registry/src/index/gpui-pre-0.3.9/src/window.rs");
+        assert!(closed_window_callback("", f, "window not found"));
+        assert!(closed_window_callback(
+            "",
+            Some(r"C:\u\gpui-pre-0.3.9\src\window.rs"),
+            "window not found"
+        ));
+        // Another text, another file, a named target: still shown.
+        assert!(!closed_window_callback("", f, "RefCell already borrowed"));
+        assert!(!closed_window_callback(
+            "",
+            Some("/a/gpui-pre-0.3.9/src/app.rs"),
+            "window not found"
+        ));
+        assert!(!closed_window_callback("cm_desktop", f, "window not found"));
+        assert!(!closed_window_callback(
+            "",
+            Some("apps/desktop/src/main.rs"),
+            "window not found"
+        ));
+        assert!(!closed_window_callback("", None, "window not found"));
     }
 
     /// The two lines of the 0.2.6 logs are lowered to debug; nothing else about fonts is.
