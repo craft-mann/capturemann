@@ -1,6 +1,6 @@
-# Release 0.3.7: Quick Capture on Linux and Windows, transcripts, test suite (plan)
+# Release 0.3.7: bug fixes and stabilisation (plan)
 
-Status: **draft, written Nov 22, 2026 after the release of 0.3.6.** The plan states final requirements only; each item names where it was found. Reports are in `verification/` (`*-0.3.6-*`). The order of work is at the end.
+Status: **draft, written Nov 22, 2026 after the release of 0.3.6; scope set by the maintainer the same day: no new features, only bug fixes and stabilisation.** An item that adds a capability the specs do not already promise does not belong here. The plan states final requirements only; each item names where it was found. Reports are in `verification/` (`*-0.3.6-*`). The order of work is at the end.
 
 ## 1. Quick Capture
 
@@ -12,7 +12,7 @@ Spec: `specs/features/21-quick-capture.md`.
 - **Tab in the preset sheet.** Tab moves from the Name field to the next field of the Edit preset sheet on X11. (N-7.)
 - **Open position on Windows.** The bar opens at the pointer without moving by 5 px on its first resize. (Windows F-4.)
 - **Picker above the bar.** When the picker opens above the bar on Windows, the window rectangle does not jump to the top of the display; only the picker area changes. (Windows F-3.)
-- **Keys with the picker open.** The spec states what plain 1, 2, 3 and Tab do while the picker is open (they do nothing today; only Ctrl+1 to Ctrl+4 and the arrows are specified), and the bar does it. (Windows F-2.)
+- **Keys with the picker open.** The spec states that plain 1, 2, 3 and Tab do nothing while the picker is open (only Ctrl+1 to Ctrl+4, the arrows, Enter, Space and Esc are specified); no behaviour changes. (Windows F-2.)
 - **The strip under the bar.** The empty strip under the bar (room for tooltips) does not take clicks meant for the windows below it; checked on macOS, Windows and Linux. (macOS K5.)
 - **Log noise.** Closing the bar writes no "window not found" error line, and opening the recording bar writes no "RefCell already borrowed" error line. (macOS K3, Windows F-8.)
 - **Boards intro.** The Boards intro card appears while its sheet is open and closes with it, or the plan of 0.3.6 (P-7) is reworded to say it appears after the sheet. (Windows F-7.)
@@ -39,9 +39,9 @@ Spec: `specs/features/21-quick-capture.md`.
 - `desktop.second_launch` does not count a copy that macOS runs from a translocated location as a second instance. (macOS public check.)
 - The Windows rail and the other overlay windows have an accessibility name test that does not depend on a screen capture, because the overlay windows are excluded from capture.
 
-## 6. Carried over
+## 6. Not in 0.3.7 (backlog, new features)
 
-In-app update (Velopack spikes done, `specs/plans/release-0.3.3-plan.md`), windowed audio, WebP and HEIC image import, a headless daemon on macOS, Click Guide on Linux, and a winget package that gets accepted (pull requests 472327, 477195 and 483031 are open).
+In-app update (Velopack spikes done, `specs/plans/release-0.3.3-plan.md`), windowed audio, WebP and HEIC image import, a headless daemon on macOS, Click Guide on Linux, and a winget package that gets accepted (pull requests 472327, 477195 and 483031 are open; this is an account matter, not code).
 
 ## 7. Order of work and exit
 
