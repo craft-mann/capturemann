@@ -1284,6 +1284,7 @@ impl QuickPanel {
                         crate::platform_window::x11_pointer(),
                         crate::platform_window::x11_window_origin(window),
                     ) {
+                        log::debug!("x11 drag start at {px_},{py_}, window at {ox},{oy}");
                         this.x11_drag = Some((px_, py_, ox, oy));
                         return;
                     }
@@ -1294,6 +1295,7 @@ impl QuickPanel {
                 let Some((sx, sy, ox, oy)) = this.x11_drag else {
                     return;
                 };
+                log::debug!("x11 drag move, pressed {:?}", ev.pressed_button);
                 if ev.pressed_button != Some(MouseButton::Left) {
                     this.x11_drag = None;
                     return;

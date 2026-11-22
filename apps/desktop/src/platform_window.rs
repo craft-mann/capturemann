@@ -411,8 +411,12 @@ pub fn x11_move_to(window: &Window, x: i32, y: i32) {
         let Ok((conn, _)) = x11rb::connect(None) else {
             return;
         };
-        let _ = conn.configure_window(id, &ConfigureWindowAux::new().x(x).y(y));
-        let _ = conn.flush();
+        // `check` waits for the server's answer, so the request is processed before the connection
+        // closes (without it the move did not happen on the lab laptop).
+        let r = conn
+            .configure_window(id, &ConfigureWindowAux::new().x(x).y(y))
+            .map(|c| c.check());
+        log::debug!("x11 move window {id} to {x},{y}: {r:?}");
     }
     #[cfg(not(target_os = "linux"))]
     {
