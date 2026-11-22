@@ -139,6 +139,13 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
                 });
             }
             crate::surfaces::take_keyboard_x11(cx, h);
+            // The system can place a new window a few pixels off the requested frame (3 px high on
+            // the lab laptop's Windows, DPI rounding); every later resize used the exact frame, so
+            // the bar moved by that amount the first time the picker closed (Windows F-4). Give the
+            // window its exact frame once, now.
+            let _ = h.update(cx, |panel, window, cx| {
+                panel.apply_frame(panel.home, window, cx);
+            });
         }
         Err(e) => app::push_toast(
             app,
