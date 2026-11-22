@@ -303,11 +303,17 @@ mod tests {
                 "message": reason, "data": {"job_id": "j1", "reason": reason}}}),
         };
         publish_job_event(&bus, failed(cm_media::tools::NOT_FOUND_MESSAGE_UNIX));
+        publish_job_event(&bus, failed(cm_media::tools::NOT_FOUND_MESSAGE_LINUX));
         publish_job_event(&bus, failed(cm_media::tools::NOT_FOUND_MESSAGE_WINDOWS));
         publish_job_event(&bus, failed("FFmpeg failed (exit status: 1): boom"));
         let a = rx.try_recv().unwrap();
         assert_eq!(a.data["error"]["data"]["reason_code"], "ffmpeg_not_found");
         assert_eq!(a.data["error"]["code"], "job_failed");
+        let l = rx.try_recv().unwrap();
+        assert_eq!(
+            l.data["error"]["data"]["reason_code"],
+            "ffmpeg_not_found_linux"
+        );
         let w = rx.try_recv().unwrap();
         assert_eq!(
             w.data["error"]["data"]["reason_code"],

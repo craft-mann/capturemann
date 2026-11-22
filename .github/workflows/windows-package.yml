@@ -147,6 +147,7 @@ jobs:
           CM_REQUIRE_LLAMA: '1'
           CM_REQUIRE_SHERPA: '1'
           CM_REQUIRE_SPEAKER_MODELS: '1'
+          CM_REQUIRE_LICENSES: '1'
         run: packaging\windows\build-windows.ps1
       - name: List the files
         shell: pwsh

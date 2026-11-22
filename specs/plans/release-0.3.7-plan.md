@@ -24,13 +24,13 @@ Spec: `specs/features/21-quick-capture.md`.
 
 ## 3. Messages and errors
 
-- **FFmpeg not found.** The message that FFmpeg was not found names the right way to install it on each system: Homebrew only on macOS, the package manager on Linux, the bundled copy on Windows. The text lives in `crates/cm-core/src/message.rs` (lines 138 and 164) and `crates/cm-media/src/tools.rs` (line 38) and is shared today. Case `regress.ffmpeg_missing_wording` passes in a clean Linux root. (Linux aarch64 public check, issue 1.)
+- **FFmpeg not found.** The message that FFmpeg was not found names the right way to install it on each system: Homebrew on macOS, the package manager on Linux (for example `apt install ffmpeg`), nothing to install on Windows (the bundled copy is used). Today `cm_media::tools` already has a Unix and a Windows text, but the Unix text (`NOT_FOUND_MESSAGE_UNIX`, `crates/cm-media/src/tools.rs` line 38) names Homebrew on Linux too, and the catalogue entries `ffmpeg_not_found` and `ffmpeg_permission_denied` in `crates/cm-core/src/message.rs` (lines 138 and 164) hard-code the Homebrew text. All three places give the per-system text. Case `regress.ffmpeg_missing_wording` passes in a clean Linux root. (Linux aarch64 public check, issue 1.)
 - **Ambiguous window error.** The error for an ambiguous window title lists no titles of windows of other applications beyond what is needed to choose by id. (0.3.5 G4.)
 
 ## 4. Windows
 
 - **Long Shot.** The first scroll step of Long Shot on Windows is not lost. The scroll-back that recovers it stays. The maximised Edge window with a second tab that once ended after 2 frames (P-3) is tried again with the traces kept (`refused-NN.txt`, `trace.txt`). (Windows F-9, P-3.)
-- **Licence list.** The Windows package carries the third-party licence list (open since 0.3.4).
+- **Licence list.** The licence list in the Windows package is the Windows crate set, never the macOS one (open since 0.3.4: the lab build fell back to the checked-in macOS list when bash or Python were missing). `build-windows.ps1` fails under `CM_REQUIRE_LICENSES=1` (set in the "Windows package" workflow) instead of falling back; the list names its crate set in a header line (`Crate set: ...`), and `package.files` checks that line on Windows and Linux.
 
 ## 5. The regression suite (`cm-regress`)
 

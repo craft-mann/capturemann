@@ -228,3 +228,31 @@ pub fn check_app_install(
         Err("the app bundle and DMG check is only implemented on macOS".to_owned())
     }
 }
+
+/// Processes of an app copy that macOS runs from its translocated (quarantine) location,
+/// `/private/var/folders/.../AppTranslocation/...`. The same program started through LaunchServices
+/// from a quarantined copy is such a process: it is not a second instance of the product under test.
+/// Empty on Windows.
+pub fn translocated_pids() -> Vec<u32> {
+    #[cfg(windows)]
+    {
+        Vec::new()
+    }
+    #[cfg(not(windows))]
+    {
+        let Ok(out) = Command::new("ps")
+            .args(["-A", "-o", "pid=,command="])
+            .output()
+        else {
+            return Vec::new();
+        };
+        String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter_map(|l| {
+                let (pid, cmd) = l.trim().split_once(' ')?;
+                cmd.contains("/AppTranslocation/")
+                    .then(|| pid.parse().ok())?
+            })
+            .collect()
+    }
+}

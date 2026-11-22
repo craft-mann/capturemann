@@ -153,6 +153,28 @@ fn files(ctx: &mut Ctx) -> R {
         ctx.note(format!(
             "licence: {lic:?}, third party: {third:?}, notice: {notice:?}"
         ));
+        // The list must be the crate set of this system, not the macOS one (it says which in its header).
+        if let Some(t) = &third {
+            let head = std::fs::read_to_string(t)
+                .map(|s| s.lines().take(8).collect::<Vec<_>>().join("\n"))
+                .unwrap_or_default();
+            let want = match sys::PLATFORM {
+                "windows" => Some("windows"),
+                "linux" => Some("linux"),
+                _ => None,
+            };
+            if let Some(w) = want {
+                let set = head
+                    .lines()
+                    .find(|l| l.starts_with("Crate set:"))
+                    .unwrap_or("");
+                if !set.contains(w) {
+                    missing.push(format!(
+                        "THIRD_PARTY_LICENSES is not the {w} crate set (header line: '{set}')"
+                    ));
+                }
+            }
+        }
         if find_named(&dir, 2, &|n| n.starts_with("readme")).is_none() {
             ctx.note("note: no README in the package folder");
         }

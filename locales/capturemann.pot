@@ -2251,6 +2251,9 @@ msgstr ""
 msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
 msgstr ""
 
+msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+msgstr ""
+
 msgid "FFmpeg could not read a frame at that position."
 msgstr ""
 
@@ -2276,6 +2279,9 @@ msgid "FFmpeg was not found: CaptureMann includes its own copy, so reinstall Cap
 msgstr ""
 
 msgid "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+msgstr ""
+
+msgid "FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
 msgstr ""
 
 msgid "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or {os_name} blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"

@@ -250,6 +250,23 @@ fn alive(pid: u32) -> bool {
     sys::list_processes().iter().any(|(p, _)| *p == pid)
 }
 
+/// The "could not register <shortcut>: <reason>" lines of the app's log: the system refused a global
+/// shortcut because another program owns it.
+fn registration_refusals(ctx: &Ctx) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(ctx.config.join("logs")) {
+        for e in rd.flatten() {
+            if let Ok(t) = std::fs::read_to_string(e.path()) {
+                for l in t.lines().filter(|l| l.contains("could not register")) {
+                    let l = l.split("could not register").nth(1).unwrap_or(l).trim();
+                    out.push(crate::util::cut(l, 120));
+                }
+            }
+        }
+    }
+    out
+}
+
 fn log_tail(ctx: &Ctx) -> String {
     let mut s = String::new();
     if let Ok(rd) = std::fs::read_dir(ctx.config.join("logs")) {
@@ -341,10 +358,26 @@ fn second_launch(ctx: &mut Ctx) -> R {
     ctx.note(format!(
         "visible windows of the first instance: {before} before, {after} after"
     ));
+    // A quarantined copy that LaunchServices runs from its translocated location is another process
+    // of macOS, not a second instance: leave it out (and stop it with the case).
+    let translocated = sys::translocated_pids();
+    for p in &translocated {
+        if let Ok(mut t) = ctx.tracker.lock() {
+            t.push(*p);
+        }
+    }
+    if !translocated.is_empty() {
+        ctx.note(format!(
+            "ignored translocated copies (quarantined app, run by macOS from AppTranslocation): {translocated:?}"
+        ));
+    }
     let others = sys::list_processes()
         .iter()
         .filter(|(p, n)| {
-            *p != app.pid && !baseline.contains(p) && n.to_lowercase().starts_with("cm-desktop")
+            *p != app.pid
+                && !baseline.contains(p)
+                && !translocated.contains(p)
+                && n.to_lowercase().starts_with("cm-desktop")
         })
         .count();
     check!(others == 0, "{others} other cm-desktop process(es) are still running: the second launch did not hand over");
@@ -367,20 +400,19 @@ fn overlay_windows() -> Vec<WinInfo> {
 }
 
 fn hotkey_overlay(ctx: &mut Ctx) -> R {
-    // Another CaptureMann (the maintainer's own, or one left by an earlier run) holds the same global
-    // hotkey and opens its own overlay too, so the case would count two overlays for one monitor.
-    let others: Vec<u32> = sys::list_processes()
-        .iter()
-        .filter(|(_, n)| n.to_lowercase().starts_with("cm-desktop"))
-        .map(|(p, _)| *p)
-        .collect();
-    if !others.is_empty() {
-        return skip(format!(
-            "another CaptureMann is running (pid {others:?}) and answers the same hotkey: quit it, then run this case"
-        ));
-    }
     let _app = start_app(ctx, &[])?;
     std::thread::sleep(Duration::from_secs(4));
+    // Another program (the maintainer's own CaptureMann, or one left by an earlier run) may hold the
+    // same global shortcut: the app logs "could not register ..." for a shortcut the system refused,
+    // and then the chord goes to that program, not to the app under test. Ask the app, not the
+    // process list.
+    let refused = registration_refusals(ctx);
+    if !refused.is_empty() {
+        return skip(format!(
+            "another program holds a global shortcut of the app ({}): quit it, then run this case",
+            refused.join("; ")
+        ));
+    }
     let t = ctx.cli_ok(&["targets", "--displays-only"])?;
     let ds = displays(&t);
     check!(!ds.is_empty(), "no displays");

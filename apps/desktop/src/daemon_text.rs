@@ -434,6 +434,9 @@ fn translated(p: &MessageParts) -> Option<String> {
         "ffmpeg_not_found" => tr!(
             "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
         ),
+        "ffmpeg_not_found_linux" => tr!(
+            "FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+        ),
         "ffmpeg_not_found_windows" => tr!(
             "FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
         ),
@@ -452,6 +455,10 @@ fn translated(p: &MessageParts) -> Option<String> {
         ),
         "ffmpeg_permission_denied" => tr!(
             "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
+            path = g("path")
+        ),
+        "ffmpeg_permission_denied_linux" => tr!(
+            "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
             path = g("path")
         ),
         "ffmpeg_permission_denied_windows" => tr!(

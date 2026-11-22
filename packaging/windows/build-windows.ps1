@@ -37,6 +37,7 @@
     CM_WINDOWS_CRT_STATIC=0    link the Microsoft C runtime dynamically (default: static, so the
                                user needs no "Visual C++ Redistributable")
     CM_WINDOWS_CONSOLE=1       keep the console subsystem on cm-desktop and cm-overlay (debugging)
+    CM_REQUIRE_LICENSES=1      fail unless the Windows THIRD_PARTY_LICENSES.md is generated (never ship the macOS list)
     CM_SKIP_LICENSES=1         use the checked-in THIRD_PARTY_LICENSES.md (macOS crate set)
     CM_SKIP_LIBCHECK=1         skip the dumpbin dependency policy check (testing only)
     CM_WINDOWS_ALLOW_MISSING   comma-separated program names that may be absent (testing only)
@@ -286,6 +287,7 @@ try {
     if ($ok) { $licenses = $gen }
     else {
       if (Test-Path (Join-Path $tmp 'gen.log')) { Get-Content (Join-Path $tmp 'gen.log') -Tail 5 | Write-Host }
+      if ($env:CM_REQUIRE_LICENSES -eq '1') { Fail 'could not generate the Windows THIRD_PARTY_LICENSES.md (needs bash, python3 and the crates fetched); CM_REQUIRE_LICENSES=1 refuses the checked-in macOS list' }
       Write-Warning 'could not generate the Windows list (needs bash, python3 and the crates fetched); shipping the checked-in macOS one'
     }
   }

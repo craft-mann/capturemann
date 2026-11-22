@@ -96,8 +96,8 @@ pub(super) fn parse_region(s: &str) -> Result<[i64; 4], CliError> {
 /// Window id, or the one window whose title or app contains `needle` (case-insensitive).
 /// A window whose title equals `needle` (case-insensitively) wins over partial matches. When
 /// several windows match and none is an exact title match the call fails with
-/// `invalid_input`, `data.reason: "ambiguous_target"` and `data.matches` (`id`, `app`,
-/// `title`), so the caller picks one by id (CAP-1.AC8, BUG-9). Never guesses.
+/// `invalid_input`, `data.reason: "ambiguous_target"` and `data.matches` (`id`, `app`, and a
+/// shortened `title` only where two matches share an application), so the caller picks one by id (CAP-1.AC8, BUG-9). Never guesses.
 /// Longest window title, in characters, that an ambiguity error repeats.
 const SHORT_TITLE_CHARS: usize = 30;
 
@@ -141,15 +141,27 @@ pub(super) fn resolve_window(targets: &Value, needle: &str) -> Result<u64, CliEr
             .as_u64()
             .ok_or_else(|| CliError::not_found(format!("no window matches `{needle}`"))),
         many => {
+            // The id and the application are enough to choose. A (shortened) title is listed only
+            // where two matches belong to the same application; another application's window
+            // keeps its title out of the error.
+            let app_of = |w: &Value| w["app"].as_str().unwrap_or("").to_owned();
             let list: Vec<Value> = many
                 .iter()
                 .map(|w| {
-                    json!({ "id": w["id"], "title": short_title(w["title"].as_str().unwrap_or("")) })
+                    let app = app_of(w);
+                    if many.iter().filter(|o| app_of(o) == app).count() > 1 {
+                        json!({ "id": w["id"], "app": app, "title": short_title(w["title"].as_str().unwrap_or("")) })
+                    } else {
+                        json!({ "id": w["id"], "app": app })
+                    }
                 })
                 .collect();
             let lines: Vec<String> = list
                 .iter()
-                .map(|m| format!("{} \"{}\"", m["id"], m["title"].as_str().unwrap_or("")))
+                .map(|m| match m["title"].as_str() {
+                    Some(t) => format!("{} ({}) \"{t}\"", m["id"], m["app"].as_str().unwrap_or("")),
+                    None => format!("{} ({})", m["id"], m["app"].as_str().unwrap_or("")),
+                })
                 .collect();
             let mut e = CliError::invalid_input(format!(
                 "`{needle}` matches {} windows: {}. Pass the window id to choose one.",
@@ -583,8 +595,12 @@ mod resolve_window_tests {
         assert_eq!(e.data["reason"], "ambiguous_target");
         assert_eq!(e.data["matches"].as_array().unwrap().len(), 2);
         assert_eq!(e.data["matches"][1]["title"], "Mail - private");
-        assert!(e.data["matches"][1].get("app").is_none());
-        assert!(e.message.contains("1 \"Mail - work\""), "{}", e.message);
+        assert_eq!(e.data["matches"][1]["app"], "Mail");
+        assert!(
+            e.message.contains("1 (Mail) \"Mail - work\""),
+            "{}",
+            e.message
+        );
         // Only the matching windows appear, and a long title is cut short.
         assert!(!e.message.contains("Calendar"), "{}", e.message);
         let long = json!({ "windows": [
@@ -595,6 +611,18 @@ mod resolve_window_tests {
         let t = e.data["matches"][0]["title"].as_str().unwrap();
         assert_eq!(t.chars().count(), 31);
         assert!(!e.message.contains("subject line"), "{}", e.message);
+        // Windows of other applications are listed without their titles.
+        let mixed = json!({ "windows": [
+            { "id": 1, "title": "Notes - bank statement", "app": "Notes" },
+            { "id": 2, "title": "Browser - notes on bank", "app": "Browser" },
+        ]});
+        let e = resolve_window(&mixed, "notes").unwrap_err();
+        assert!(e.data["matches"][0].get("title").is_none());
+        assert!(
+            e.message.contains("1 (Notes)") && !e.message.contains("bank"),
+            "{}",
+            e.message
+        );
     }
 
     /// An image the daemon left out (too large for one reply line) is copied from the stored file.

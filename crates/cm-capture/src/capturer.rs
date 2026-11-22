@@ -333,14 +333,28 @@ impl Capturer {
                 "No window title contains \"{needle}\""
             ))),
             [one] => Ok((*one).clone()),
-            many => Err(CmError::invalid_input(format!(
-                "\"{needle}\" matches {} windows: {}. Pass the window id to choose one.",
-                many.len(),
-                many.iter()
-                    .map(|w| format!("{} ({}) \"{}\"", w.id, w.app, w.title))
+            many => {
+                // The id and the application are what the caller needs to choose. A title is added
+                // only where two matches belong to the same application (the id and the name alone
+                // would not tell them apart); a window of another application keeps its title to
+                // itself.
+                let list = many
+                    .iter()
+                    .map(|w| {
+                        if many.iter().filter(|o| o.app == w.app).count() > 1 {
+                            let t: String = w.title.chars().take(60).collect();
+                            format!("{} ({}) \"{t}\"", w.id, w.app)
+                        } else {
+                            format!("{} ({})", w.id, w.app)
+                        }
+                    })
                     .collect::<Vec<_>>()
-                    .join("; ")
-            ))),
+                    .join("; ");
+                Err(CmError::invalid_input(format!(
+                    "\"{needle}\" matches {} windows: {list}. Pass the window id to choose one.",
+                    many.len()
+                )))
+            }
         }
     }
 
@@ -1020,6 +1034,36 @@ mod tests {
         let m = e.to_string();
         assert!(m.contains("1 (Mail)") && m.contains("2 (Mail)"), "{m}");
         assert_eq!(c.find_window("MAIL").unwrap().id, 3);
+    }
+
+    /// 0.3.5 G4: windows of different applications are listed by id and application only; their
+    /// titles stay out of the error.
+    #[test]
+    fn find_window_ambiguous_keeps_other_applications_titles_out() {
+        let b = FakeBackend::new()
+            .with_display(1, 0, 0, 300, 300, 1.0)
+            .with_window(
+                1,
+                "Notes - bank statement",
+                "Notes",
+                100,
+                1,
+                (0, 0, 10, 10),
+                false,
+            )
+            .with_window(
+                2,
+                "Browser - notes on bank",
+                "Browser",
+                100,
+                1,
+                (0, 0, 10, 10),
+                false,
+            );
+        let c = Capturer::new(b);
+        let m = c.find_window("notes").unwrap_err().to_string();
+        assert!(m.contains("1 (Notes)") && m.contains("2 (Browser)"), "{m}");
+        assert!(!m.contains("bank"), "{m}");
     }
 
     #[test]

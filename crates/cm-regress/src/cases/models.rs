@@ -221,6 +221,8 @@ fn transcribe(ctx: &mut Ctx) -> R {
         Some(f) => import_file(ctx, f)?,
         None => import_file(ctx, &clips.join("clip-h264.mp4"))?,
     };
+    // The daemon-side wait follows `--timeout-scale` like the limit on the CLI process itself.
+    let t600 = ctx.secs(600).as_secs().to_string();
     let r = ctx.cli_long(
         &[
             "ai",
@@ -230,7 +232,7 @@ fn transcribe(ctx: &mut Ctx) -> R {
             "en",
             "--wait",
             "--timeout",
-            "600",
+            &t600,
         ],
         700,
     )?;
@@ -359,6 +361,7 @@ fn speakers(ctx: &mut Ctx) -> R {
     ctx.cli_ok(&["ai", "models", "import", &model_id, &m])?;
     ctx.cli_ok(&["ai", "models", "use", &model_id])?;
     let (id, _) = import_file(ctx, &speech)?;
+    let t600 = ctx.secs(600).as_secs().to_string();
     let t = ctx.cli_long(
         &[
             "ai",
@@ -368,7 +371,7 @@ fn speakers(ctx: &mut Ctx) -> R {
             "en",
             "--wait",
             "--timeout",
-            "600",
+            &t600,
         ],
         700,
     )?;
@@ -377,6 +380,7 @@ fn speakers(ctx: &mut Ctx) -> R {
         "transcribe before the speakers failed: {}",
         crate::util::cut(&crate::util::one_line(&t.out.text()), 300)
     );
+    let t300 = ctx.secs(300).as_secs().to_string();
     let r = ctx.cli_long(
         &[
             "ai",
@@ -386,7 +390,7 @@ fn speakers(ctx: &mut Ctx) -> R {
             "2",
             "--wait",
             "--timeout",
-            "300",
+            &t300,
         ],
         360,
     )?;
