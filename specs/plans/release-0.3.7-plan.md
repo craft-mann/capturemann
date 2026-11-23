@@ -15,7 +15,7 @@ Spec: `specs/features/21-quick-capture.md`.
 - **Keys with the picker open.** The spec states that plain 1, 2, 3 and Tab do nothing while the picker is open (only Ctrl+1 to Ctrl+4, the arrows, Enter, Space and Esc are specified); no behaviour changes. (Windows F-2.)
 - **The strip under the bar.** The empty strip under the bar (room for tooltips) does not take clicks meant for the windows below it; checked on macOS, Windows and Linux. (macOS K5.)
 - **Log noise.** Closing the bar writes no "window not found" error line, and opening the recording bar writes no "RefCell already borrowed" error line. (macOS K3, Windows F-8.)
-- **Boards intro.** The Boards intro card appears while its sheet is open and closes with it, or the plan of 0.3.6 (P-7) is reworded to say it appears after the sheet. (Windows F-7.)
+- **Boards intro.** The Boards intro card appears while its sheet is open and closes with it, as the plan of 0.3.6 (P-7) says (decided Nov 23, 2026: the app changes, not the plan; spec AC5 follows). (Windows F-7.)
 
 ## 2. Transcripts
 
