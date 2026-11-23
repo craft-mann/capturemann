@@ -7,8 +7,8 @@ Status: **draft, written Nov 22, 2026 after the release of 0.3.6; scope set by t
 Spec: `specs/features/21-quick-capture.md`.
 
 - **X11 drag.** On X11 the bar can be moved by dragging its background. The window is an override-redirect window, so the window manager never moves it; the app moves it itself with the X server. (Linux final QA N-3.)
-- **Wayland placement.** On a Wayland session the bar and the after-capture bar open where the user expects: the bar centred on the display and the after-capture bar under the captured area, as far as the portal or the compositor allows. Where nothing can place them, the spec says where they open. (N-4, N-5.)
-- **Raised library window.** On Wayland a click on the library window does not hide the open bar; the bar stays above it or the spec says why it cannot. (N-6.)
+- **Wayland placement.** On a Wayland session the bar and the after-capture bar open where the user expects: the bar centred on the display and the after-capture bar under the captured area, as far as the portal or the compositor allows. Where nothing can place them, the spec says where they open: it does (Linux limits and AC12 name the top-left on GNOME), because a Wayland client cannot place its own window. (N-4, N-5.)
+- **Raised library window.** On Wayland a click on the library window does not hide the open bar; the bar stays above it or the spec says why it cannot: it does (Linux limits: the library window can be raised over the bar, which stays open). (N-6.)
 - **Tab in the preset sheet.** Tab moves from the Name field to the next field of the Edit preset sheet on X11. (N-7.)
 - **Open position on Windows.** The bar opens at the pointer without moving by 5 px on its first resize. (Windows F-4.)
 - **Picker above the bar.** When the picker opens above the bar on Windows, the window rectangle does not jump to the top of the display; only the picker area changes. (Windows F-3.)
