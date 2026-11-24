@@ -210,7 +210,7 @@ pub struct AppModel {
     studio: Option<WindowHandle<Studio>>,
     /// The Studio window exists (Wayland: toasts are banners in it then).
     pub studio_open: bool,
-    toast_window: Option<WindowHandle<ToastHost>>,
+    pub(crate) toast_window: Option<WindowHandle<ToastHost>>,
     /// The stack height the toast window was last fitted to (measured from the painted cards), so
     /// a measurement that cannot be honoured (a pile taller than the display) does not loop.
     toast_fit: f32,

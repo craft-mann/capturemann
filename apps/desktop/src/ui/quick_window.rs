@@ -176,7 +176,7 @@ fn open_panel_at(app: &Entity<AppModel>, anchor: Anchor, at: Option<Rect>, cx: &
 
 /// The bar stays until the user closes it (QC-1 "Window behaviour"): it only steps aside for a
 /// run (a screenshot on Linux would show it) and comes back, where it was, once the capture, the
-/// recording or the Long Shot and the after-capture bar are over. Pressing the shortcut meanwhile
+/// recording or the Long Shot, the after-capture bar and the toast are over. Pressing the shortcut meanwhile
 /// opens it at once and ends the wait.
 fn return_when_idle(app: &Entity<AppModel>, cx: &mut App) {
     let app = app.clone();
@@ -191,6 +191,7 @@ fn return_when_idle(app: &Entity<AppModel>, cx: &mut App) {
                     return true; // the user opened it again
                 }
                 let busy = app.read(cx).capture_busy
+                    || app.read(cx).toast_window.is_some()
                     || crate::ui::long_shot::is_running(cx)
                     || crate::ui::recording::is_active(&app, cx)
                     || crate::ui::quick_after::is_open(cx);
