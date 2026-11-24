@@ -2875,9 +2875,6 @@ msgstr "Ảnh chụp cửa sổ"
 msgid "Screenshots, screen recording, the capture overlay, system audio"
 msgstr "Ảnh chụp màn hình, quay màn hình, lớp phủ chụp, âm thanh hệ thống"
 
-msgid "Search by title"
-msgstr "Tìm theo tiêu đề"
-
 msgid "Search captures"
 msgstr "Tìm bản chụp"
 
@@ -5121,10 +5118,6 @@ msgstr "Đã đăng"
 msgctxt "filter chip"
 msgid "Uploaded"
 msgstr "Đã tải lên"
-
-msgctxt "filter label"
-msgid "Show"
-msgstr "Hiện"
 
 msgctxt "folder dialog"
 msgid "Choose folder"
@@ -11390,10 +11383,6 @@ msgctxt "filter chip"
 msgid "Boards"
 msgstr "Bảng ảnh"
 
-msgctxt "filter chip"
-msgid "Click Guides"
-msgstr "Hướng dẫn thao tác"
-
 msgctxt "font weight"
 msgid "Bold"
 msgstr "Đậm"
@@ -12240,10 +12229,6 @@ msgstr "Lưu mẫu"
 msgctxt "button"
 msgid "Undo"
 msgstr "Hoàn tác"
-
-msgctxt "capture dock"
-msgid "Capture…"
-msgstr "Chụp…"
 
 msgctxt "capture dock"
 msgid "Quick Capture, shortcut {chord}"

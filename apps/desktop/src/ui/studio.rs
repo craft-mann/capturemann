@@ -337,7 +337,12 @@ impl Render for Studio {
             let m = self.app.read(cx);
             (
                 m.route.clone(),
-                m.counts,
+                // The amber dot on All captures follows the library's own "Needs attention" count
+                // once the library view has read it, so the dot and the chip never disagree.
+                crate::nav::NavCounts {
+                    attention: m.attention.or(m.counts.attention),
+                    ..m.counts
+                },
                 m.platform,
                 m.shortcuts.clone(),
                 m.library_route.clone(),

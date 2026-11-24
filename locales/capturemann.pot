@@ -5175,16 +5175,28 @@ msgstr ""
 msgid "Scrolling capture"
 msgstr ""
 
-msgid "Search by title"
+msgid "Search all captures"
+msgstr ""
+
+msgid "Search audio"
 msgstr ""
 
 msgid "Search captures"
+msgstr ""
+
+msgid "Search click guides"
 msgstr ""
 
 msgid "Search commands"
 msgstr ""
 
 msgid "Search commands…"
+msgstr ""
+
+msgid "Search recordings"
+msgstr ""
+
+msgid "Search screenshots"
 msgstr ""
 
 msgid "Search titles and what was said"
@@ -6903,6 +6915,9 @@ msgstr ""
 msgid "Using the system default until it is plugged in."
 msgstr ""
 
+msgid "Version {version}, open what’s new"
+msgstr ""
+
 msgid "Version, licence and credits."
 msgstr ""
 
@@ -7024,6 +7039,9 @@ msgid "What was recorded up to that moment is saved in your library."
 msgstr ""
 
 msgid "What you captured so far is kept."
+msgstr ""
+
+msgid "What’s new"
 msgstr ""
 
 #. FACT: owner review required (privacy)
@@ -7529,6 +7547,9 @@ msgid "permission denied"
 msgstr ""
 
 msgid "selected"
+msgstr ""
+
+msgid "something needs attention"
 msgstr ""
 
 msgid "stereo"
@@ -8510,6 +8531,18 @@ msgctxt "agent decision"
 msgid "timed out"
 msgstr ""
 
+msgctxt "agent state"
+msgid "Busy"
+msgstr ""
+
+msgctxt "agent state"
+msgid "Off"
+msgstr ""
+
+msgctxt "agent state"
+msgid "Ready"
+msgstr ""
+
 msgctxt "agent status"
 msgid "Offline"
 msgstr ""
@@ -9191,11 +9224,11 @@ msgid "Split"
 msgstr ""
 
 msgctxt "capture dock"
-msgid "Capture"
+msgid "Audio"
 msgstr ""
 
 msgctxt "capture dock"
-msgid "Capture…"
+msgid "Capture"
 msgstr ""
 
 msgctxt "capture dock"
@@ -9215,6 +9248,10 @@ msgid "Quick Capture, shortcut {chord}"
 msgstr ""
 
 msgctxt "capture dock"
+msgid "Quick Capture…"
+msgstr ""
+
+msgctxt "capture dock"
 msgid "Record audio"
 msgstr ""
 
@@ -9224,6 +9261,14 @@ msgstr ""
 
 msgctxt "capture dock"
 msgid "Region"
+msgstr ""
+
+msgctxt "capture dock"
+msgid "Stop"
+msgstr ""
+
+msgctxt "capture dock"
+msgid "Stop recording, {time}, shortcut {chord}"
 msgstr ""
 
 msgctxt "capture dock"
@@ -9699,10 +9744,6 @@ msgid "Boards"
 msgstr ""
 
 msgctxt "filter chip"
-msgid "Click Guides"
-msgstr ""
-
-msgctxt "filter chip"
 msgid "Imported"
 msgstr ""
 
@@ -9716,10 +9757,6 @@ msgstr ""
 
 msgctxt "filter chip"
 msgid "Uploaded"
-msgstr ""
-
-msgctxt "filter label"
-msgid "Show"
 msgstr ""
 
 msgctxt "find bar"
@@ -11388,6 +11425,10 @@ msgstr ""
 
 msgctxt "shortcut"
 msgid "Change"
+msgstr ""
+
+msgctxt "shortcut"
+msgid "Click Guide"
 msgstr ""
 
 msgctxt "shortcut"

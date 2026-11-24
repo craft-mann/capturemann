@@ -488,11 +488,11 @@ impl ExtraTile {
         }
     }
 
-    /// The chord setting, when the action has one (a Click Guide has no shortcut yet).
+    /// The chord setting, when the action has one.
     pub fn shortcut(self) -> Option<ShortcutAction> {
         match self {
             ExtraTile::LongShot => Some(ShortcutAction::LongShot),
-            ExtraTile::ClickGuide => None,
+            ExtraTile::ClickGuide => Some(ShortcutAction::ClickGuide),
         }
     }
 }
@@ -1228,9 +1228,10 @@ mod tests {
         assert_eq!(row[2].printed(), "\u{2325}\u{21E7}3");
         // Audio reads the live Start or stop audio recording chord.
         assert_eq!(row[5].printed(), "\u{2325}\u{21E7}V");
-        // Click Guide has no shortcut action yet: no chord is printed.
-        assert_eq!(D::ClickGuide.shortcut(), None);
-        assert_eq!(row[4].printed(), "");
+        // Long Shot and Click Guide have the default keys 4 and 5 (0.3.7).
+        assert_eq!(D::ClickGuide.shortcut(), Some(ShortcutAction::ClickGuide));
+        assert_eq!(row[3].printed(), "\u{2325}\u{21E7}4");
+        assert_eq!(row[4].printed(), "\u{2325}\u{21E7}5");
         // A rebinding shows at once.
         let chord = crate::shortcuts::Chord::parse("alt+shift+9").unwrap();
         let rebound = mac.with(ShortcutAction::CaptureWindow, chord);
