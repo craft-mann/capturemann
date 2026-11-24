@@ -782,7 +782,10 @@ mod tests {
     /// one (registered) or have it cleared again (released).
     #[test]
     fn an_unset_shortcut_registers_nothing_and_can_be_set_and_cleared() {
-        let map = ShortcutMap::defaults(Platform::Mac);
+        // Long Shot cleared by the user (a stored empty string) registers nothing.
+        let mut stored = serde_json::Map::new();
+        stored.insert("shortcuts.long_shot".into(), serde_json::json!(""));
+        let map = ShortcutMap::from_settings(&stored, Platform::Mac);
         let os = FakeOs::default();
         let (ids, status) = register_shortcuts(&os, &map);
         assert_eq!(ids.len(), ShortcutAction::ALL.len() - 1);
@@ -846,11 +849,6 @@ mod tests {
     fn default_chords_convert() {
         for p in [Platform::Mac, Platform::Windows] {
             for (a, c) in ShortcutMap::defaults(p).iter() {
-                // Long Shot has no default shortcut (CAP-6): nothing to convert.
-                if c.is_unset() {
-                    assert_eq!(a, ShortcutAction::LongShot);
-                    continue;
-                }
                 assert!(chord_to_hotkey(c).is_ok(), "{a:?}");
             }
         }

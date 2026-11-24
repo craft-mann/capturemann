@@ -611,7 +611,7 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             ),
             glyph: Glyph::ClickGuide,
             hint: Hint::Text(tr!("Click through a task, get the steps")),
-            shortcut: Vec::new(),
+            shortcut: key(ShortcutAction::ClickGuide),
             disabled: env.guide_off.clone(),
             verb: tr!("Start a guide"),
             options: Vec::new(),

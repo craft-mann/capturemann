@@ -143,7 +143,7 @@ impl SettingsView {
                                 // The desktop owns the keys: our defaults are only a wish.
                                 div().into_any_element()
                             } else {
-                                // No shortcut yet (Long Shot, CAP-6): "Not set" and a Set button.
+                                // A cleared shortcut: "Not set" and a Set button.
                                 if r.keycaps.is_empty() {
                                     div()
                                         .text_size(px(type_scale::CAPTION))

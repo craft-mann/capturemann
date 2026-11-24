@@ -25,6 +25,8 @@ CaptureMann" button).
 | ⌥⇧1 | Capture a region |
 | ⌥⇧2 | Capture a window |
 | ⌥⇧3 | Capture a display |
+| ⌥⇧4 | Long Shot (a scrolling page as one image) |
+| ⌥⇧5 | Start a Click Guide |
 | ⌥⇧A | Annotate the last capture |
 | ⌥⇧Space | Open the launcher (every action in one searchable list) |
 | ⌥⇧L | Open the library |
