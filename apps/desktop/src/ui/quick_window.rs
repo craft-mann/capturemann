@@ -19,7 +19,7 @@ use gpui::{
 };
 
 use crate::launcher::commands::CAPTURE_DELAY_MS;
-use crate::quick::place::{self, bar, panel_rect};
+use crate::quick::place::{self, bar};
 use crate::quick::presets::summary_text;
 use crate::quick::state::{
     controls, kind_icon, kind_key, panel_key, picker_step, seconds_badge, target_icon, target_key,
@@ -107,9 +107,6 @@ fn open_panel_at(app: &Entity<AppModel>, anchor: Anchor, at: Option<Rect>, cx: &
     // One row where the display is wide enough, else two (QC-1 "Size"), or the compact bar when
     // it was left collapsed; the window adds the strip for the tooltips.
     let (win_w, win_h) = place::window_size_view(visible.w, state.collapsed());
-    let pointer = crate::ui::launcher_window::pointer(cx)
-        .map(|p| (f64::from(f32::from(p.x)), f64::from(f32::from(p.y))));
-    let (px_, py_) = crate::quick::place::open_point(pointer, win_h, &visible);
     // From the tray the bar is on the icon where the system gives its position (macOS status
     // item, Windows notification area); where it does not (Linux) it opens near the pointer.
     let icon = (anchor == Anchor::Tray)
@@ -122,7 +119,7 @@ fn open_panel_at(app: &Entity<AppModel>, anchor: Anchor, at: Option<Rect>, cx: &
     let global = match (back, icon) {
         (Some(r), _) => r,
         (None, Some(icon)) => crate::quick::place::tray_rect(icon, win_w, win_h, &visible),
-        (None, None) => panel_rect((px_, py_), win_w, win_h, &visible),
+        (None, None) => place::top_centre(win_w, win_h, &visible),
     };
     cx.set_global(PreviousApp(crate::launcher::focus::frontmost_other_app()));
     let app2 = app.clone();

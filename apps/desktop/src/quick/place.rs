@@ -306,6 +306,12 @@ pub fn x11_pixels_to_points(p: (f64, f64), root_w: f64, display_w: f64) -> (f64,
     (p.0 / scale, p.1 / scale)
 }
 
+/// QC-1 "Opening": the bar's default place, the middle of the top of the display (on its visible
+/// part, under the menu bar), whatever the pointer does.
+pub fn top_centre(w: f64, h: f64, display: &Rect) -> Rect {
+    Rect::new(display.x + (display.w - w) / 2.0, display.y + EDGE, w, h)
+}
+
 /// QC-1 "Opening": where the panel's top edge centre goes. The pointer where the system tells it;
 /// else (Wayland gives no position to a client) the panel is centred on the display.
 pub fn open_point(pointer: Option<(f64, f64)>, panel_h: f64, display: &Rect) -> (f64, f64) {
@@ -350,6 +356,14 @@ pub fn tray_rect(icon: (f64, f64, f64, f64), w: f64, h: f64, display: &Rect) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_default_place_is_the_middle_of_the_top() {
+        let d = Rect::new(0.0, 25.0, 1440.0, 875.0);
+        let r = top_centre(867.0, 100.0, &d);
+        assert_eq!((r.x, r.y), (286.5, 25.0 + EDGE));
+        assert_eq!((r.w, r.h), (867.0, 100.0));
+    }
 
     #[test]
     fn the_bar_returns_only_after_a_quiet_stretch() {

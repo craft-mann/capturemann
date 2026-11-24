@@ -17,8 +17,9 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
 ## 1. Opening the bar (QC-1 "Opening")
 
 1. **Shortcut.** Press Option+Shift+C (macOS) or Ctrl+Alt+Shift+C (Windows, Linux). Expected: the panel
-   opens near the pointer, on the display that has it (move the pointer to a corner and press it again:
-   the panel follows the pointer; on Wayland, which gives no position, it opens centred on the display), and
+   opens at the middle of the top of the display that has the pointer (move the pointer to a corner and press
+   it again: the place does not change; move it to another display: the panel opens there; on Wayland, which
+   gives no position, it opens where the compositor puts a first window), and
    the keyboard goes to it (on X11, focus another window first: keys 1, 2, 3 must not reach it). Press the shortcut
    again: it closes. The Launcher shortcut (Option+Shift+Space) still opens the Launcher.
 2. **Tray.** Open the tray or menu-bar menu. Expected: **Quick Capture…** is the first item, then
@@ -27,7 +28,7 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
    icon has no position, it opens near the pointer (QC-1.AC11, AC12). While a recording runs, Stop is the first item and
    Quick Capture… follows the Record group.
 3. **Dock.** In the sidebar, under **Record…**, a neutral **Capture…** button with its keycap.
-   Click it: the panel opens near the pointer. The five dock tiles and the Long Shot and Click Guide
+   Click it: the panel opens at the middle of the top of the display. The five dock tiles and the Long Shot and Click Guide
    tiles work as before.
 4. **Launcher.** Open the Launcher, type "quick". Expected: a **Quick Capture** row with a Preview label
    and its keycap, in the Capture group. Press Enter: the panel opens.
