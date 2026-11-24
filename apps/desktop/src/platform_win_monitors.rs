@@ -374,6 +374,32 @@ pub fn make_click_through(h: HWND) -> bool {
     }
 }
 
+/// Lets the mouse through the whole window (`true`) or takes it back (`false`), for a window
+/// whose transparent part is under the pointer for a moment (the Quick Capture strip). Same
+/// style bits as [`make_click_through`], toggled: `WS_EX_LAYERED` is added once (with
+/// `SetLayeredWindowAttributes(255)` so the window is still drawn), `WS_EX_TRANSPARENT` follows
+/// `ignore`. Nothing happens when the style already is as asked.
+pub fn set_mouse_transparent(h: HWND, ignore: bool) {
+    use crate::recording::zorder::{WS_EX_LAYERED, WS_EX_TRANSPARENT};
+    // SAFETY: `h` is a live top-level window of this process, used from its own thread.
+    unsafe {
+        let old = GetWindowLongPtrW(h, GWL_EXSTYLE) as u32;
+        let transparent = old & WS_EX_TRANSPARENT != 0;
+        if transparent == ignore {
+            return;
+        }
+        let new = if ignore {
+            old | WS_EX_LAYERED | WS_EX_TRANSPARENT
+        } else {
+            old & !WS_EX_TRANSPARENT
+        };
+        SetWindowLongPtrW(h, GWL_EXSTYLE, new as isize);
+        if ignore {
+            let _ = SetLayeredWindowAttributes(h, Default::default(), 255, LWA_ALPHA);
+        }
+    }
+}
+
 /// Makes a window that takes clicks but never the focus: `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`
 /// (no Alt-Tab or taskbar entry either). Unlike [`make_click_through`] the mouse still reaches it.
 pub fn make_no_activate(h: HWND) -> bool {

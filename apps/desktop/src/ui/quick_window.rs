@@ -37,6 +37,8 @@ use crate::ui::text_field::{TextField, TextFieldEvent};
 
 /// How long the pointer or the keyboard focus rests on a control before its tooltip shows.
 pub const TIP_DELAY_MS: u64 = 400;
+/// How often the pointer is looked at to let clicks through the strip under the bar.
+const STRIP_POLL_MS: u64 = 50;
 
 /// Where the bar opens (QC-1 "Opening").
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,6 +226,8 @@ pub struct QuickPanel {
     movable: bool,
     /// A drag in progress on X11: the pointer and the window's corner (root pixels) at the press.
     x11_drag: Option<(f64, f64, i32, i32)>,
+    /// The window lets the mouse through right now (the pointer is over the strip under the bar).
+    ignoring: bool,
     /// The popover is open above the bar, and its height.
     upward: bool,
     pop_h: f64,
@@ -285,6 +289,20 @@ impl QuickPanel {
             },
         )
         .detach();
+        // The strip under the bar is transparent: while the pointer is over it, the window lets
+        // the mouse through (release 0.3.7, macOS K5).
+        cx.spawn_in(window, async move |this, cx| loop {
+            cx.background_executor()
+                .timer(Duration::from_millis(STRIP_POLL_MS))
+                .await;
+            if this
+                .update_in(cx, |this, window, _| this.strip_hit_test(window))
+                .is_err()
+            {
+                break;
+            }
+        })
+        .detach();
         QuickPanel {
             app,
             st,
@@ -297,6 +315,7 @@ impl QuickPanel {
             two_rows: place::two_rows(visible.w),
             movable: crate::platform_window::NativeWindow::for_frame(window).is_some(),
             x11_drag: None,
+            ignoring: false,
             upward: false,
             pop_h: 0.,
             ctl: None,
@@ -313,6 +332,29 @@ impl QuickPanel {
     /// The bar is drawn in two rows: a narrow display and the expanded bar.
     fn rows2(&self) -> bool {
         self.two_rows && !self.st.collapsed()
+    }
+
+    /// Lets the mouse through the window while the pointer is over the empty strip under the bar
+    /// and takes it back everywhere else (the bar, a popover, a drag, outside the window).
+    fn strip_hit_test(&mut self, window: &mut Window) {
+        let popover = !matches!(self.body, Body::Main) || self.menu.is_some() || self.pop_h > 0.;
+        let over = self.x11_drag.is_none()
+            && crate::platform_window::pointer_in_window(window).is_some_and(|p| {
+                let b = window.bounds().size;
+                place::over_strip(
+                    p,
+                    (
+                        f64::from(f32::from(b.width)),
+                        f64::from(f32::from(b.height)),
+                    ),
+                    self.bar_h(),
+                    popover,
+                )
+            });
+        if over != self.ignoring {
+            self.ignoring = over;
+            crate::platform_window::set_ignores_mouse(window, over);
+        }
     }
 
     fn bar_h(&self) -> f64 {

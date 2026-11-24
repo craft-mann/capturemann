@@ -151,6 +151,15 @@ pub fn bar_size_view(display_w: f64, collapsed: bool) -> (f64, f64) {
     }
 }
 
+/// Whether the pointer, at `(x, y)` in the window's own points, is over the empty strip under the
+/// bar at rest: inside the window, below the bar (`bar_h` high, at the top of the window) and
+/// with no popover open (the popover fills that room). Over the strip the window lets the mouse
+/// through, so a click meant for the window below reaches it (release 0.3.7, macOS K5).
+pub fn over_strip(pointer: (f64, f64), window: (f64, f64), bar_h: f64, popover_open: bool) -> bool {
+    let (x, y) = pointer;
+    !popover_open && x >= 0.0 && x < window.0 && y > bar_h && y < window.1
+}
+
 /// [`window_size`] of the bar as it is shown, expanded or collapsed.
 pub fn window_size_view(display_w: f64, collapsed: bool) -> (f64, f64) {
     let (w, h) = bar_size_view(display_w, collapsed);
@@ -321,6 +330,18 @@ pub fn tray_rect(icon: (f64, f64, f64, f64), w: f64, h: f64, display: &Rect) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_empty_strip_under_the_bar_lets_clicks_through() {
+        let win = (882.0, 101.0);
+        // On the bar, on the strip, outside the window, with a popover open.
+        assert!(!over_strip((100.0, 30.0), win, 60.0, false));
+        assert!(over_strip((100.0, 80.0), win, 60.0, false));
+        assert!(!over_strip((100.0, 120.0), win, 60.0, false));
+        assert!(!over_strip((-3.0, 80.0), win, 60.0, false));
+        assert!(!over_strip((900.0, 80.0), win, 60.0, false));
+        assert!(!over_strip((100.0, 80.0), win, 60.0, true));
+    }
 
     fn display() -> Rect {
         Rect::new(0.0, 0.0, 1440.0, 900.0)

@@ -173,6 +173,20 @@ pub fn set_ignores_mouse(window: &Window, ignore: bool) {
     imp::set_ignores_mouse(window, ignore);
 }
 
+/// The pointer in `window`'s own points (top-left corner of the window is 0,0); it may lie outside
+/// the window. macOS and Windows ask the system; X11 turns the root pixels into points with the
+/// window's scale. `None` on Wayland (a client cannot ask).
+pub fn pointer_in_window(window: &Window) -> Option<(f64, f64)> {
+    if let Some((mx, my)) = mouse_location() {
+        let (fx, fy, _, _) = frame(window)?;
+        return Some((mx - fx, my - fy));
+    }
+    let (px, py, _, _) = x11_pointer()?;
+    let (ox, oy) = x11_window_origin(window)?;
+    let scale = f64::from(window.scale_factor()).max(0.1);
+    Some(((px - f64::from(ox)) / scale, (py - f64::from(oy)) / scale))
+}
+
 /// The pointer in global points, top-left origin of the primary display.
 pub fn mouse_location() -> Option<(f64, f64)> {
     imp::mouse_location()
@@ -1055,6 +1069,37 @@ mod imp {
         Vec::new()
     }
 
+    #[cfg(windows)]
+    pub fn set_ignores_mouse(window: &Window, ignore: bool) {
+        if let Some(h) = crate::platform_win_monitors::hwnd(window) {
+            crate::platform_win_monitors::set_mouse_transparent(h, ignore);
+        }
+    }
+
+    /// X11: an empty input region makes the window invisible to the pointer (clicks go to the
+    /// window below); no region at all gives the window its whole rectangle back. Wayland: not
+    /// available to a client here.
+    #[cfg(target_os = "linux")]
+    pub fn set_ignores_mouse(window: &Window, ignore: bool) {
+        use x11rb::connection::Connection;
+        use x11rb::protocol::shape::{ConnectionExt as _, SK, SO};
+        use x11rb::protocol::xproto::ClipOrdering;
+        let Some(id) = super::x11_window_id(window) else {
+            return;
+        };
+        let Ok((conn, _)) = x11rb::connect(None) else {
+            return;
+        };
+        if ignore {
+            let _ =
+                conn.shape_rectangles(SO::SET, SK::INPUT, ClipOrdering::UNSORTED, id, 0, 0, &[]);
+        } else {
+            let _ = conn.shape_mask(SO::SET, SK::INPUT, id, 0, 0, x11rb::NONE);
+        }
+        let _ = conn.flush();
+    }
+
+    #[cfg(not(any(windows, target_os = "linux")))]
     pub fn set_ignores_mouse(_window: &Window, _ignore: bool) {}
 
     #[cfg(windows)]
