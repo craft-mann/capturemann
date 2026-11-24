@@ -29,6 +29,9 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 }
                 Some(ShortcutAction::AddMarker) => recording::add_marker_hotkey(app, cx),
                 Some(ShortcutAction::LongShot) => crate::ui::long_shot::start(app, cx),
+                // The same function as the sidebar tile (`Command::NewClickGuide`), so the
+                // availability rules are the tile's (GDE-1.AC20).
+                Some(ShortcutAction::ClickGuide) => crate::ui::guide_view::hud::start(app, cx),
                 Some(ShortcutAction::OpenQuickCapture) => crate::ui::quick_window::toggle(
                     app,
                     crate::ui::quick_window::Anchor::Pointer,

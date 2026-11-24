@@ -268,14 +268,16 @@ pub enum ShortcutAction {
     ToggleAudioRecording,
     /// Add a marker to the running recording at the HUD timer (VOC-1, Option+Shift+M).
     AddMarker,
-    /// Long Shot (CAP-6): a scrolling capture. **No default chord** (design S13: "Not set").
+    /// Long Shot (CAP-6): a scrolling capture (Option+Shift+4, CAP-6.AC14).
     LongShot,
+    /// Click Guide (GDE-1): starts a guide like the sidebar tile (Option+Shift+5, GDE-1.AC20).
+    ClickGuide,
     /// The Quick Capture panel (QC-1, Option+Shift+C).
     OpenQuickCapture,
 }
 
 impl ShortcutAction {
-    pub const ALL: [ShortcutAction; 14] = [
+    pub const ALL: [ShortcutAction; 15] = [
         ShortcutAction::CaptureRegion,
         ShortcutAction::CaptureWindow,
         ShortcutAction::CaptureDisplay,
@@ -289,6 +291,7 @@ impl ShortcutAction {
         ShortcutAction::ToggleAudioRecording,
         ShortcutAction::AddMarker,
         ShortcutAction::LongShot,
+        ShortcutAction::ClickGuide,
         ShortcutAction::OpenQuickCapture,
     ];
 
@@ -308,6 +311,7 @@ impl ShortcutAction {
             Self::ToggleAudioRecording => "shortcuts.toggle_audio_recording",
             Self::AddMarker => "shortcuts.add_marker",
             Self::LongShot => "shortcuts.long_shot",
+            Self::ClickGuide => "shortcuts.click_guide",
             Self::OpenQuickCapture => "shortcuts.open_quick_capture",
         }
     }
@@ -327,6 +331,7 @@ impl ShortcutAction {
             Self::ToggleAudioRecording => tr!("Start or stop audio recording"),
             Self::AddMarker => tr!("Add a marker"),
             Self::LongShot => tr!("Long Shot"),
+            Self::ClickGuide => tr!("Click Guide"),
             Self::OpenQuickCapture => tr!("Open Quick Capture"),
         }
     }
@@ -350,8 +355,8 @@ impl ShortcutAction {
             Self::AnnotateLast => "a",
             Self::ToggleAudioRecording => "v",
             Self::AddMarker => "m",
-            // No default: the chord is unset (see `default_chord`).
-            Self::LongShot => "",
+            Self::LongShot => "4",
+            Self::ClickGuide => "5",
             Self::OpenQuickCapture => "c",
         }
     }
@@ -501,9 +506,7 @@ mod tests {
     fn defaults_avoid_os_screenshot_keys() {
         for p in [Platform::Mac, Platform::Windows] {
             for (_, c) in ShortcutMap::defaults(p).iter() {
-                if c.is_unset() {
-                    continue; // Long Shot has no default
-                }
+                assert!(!c.is_unset());
                 assert!(c.alt && c.shift, "{c:?}");
                 assert!(!c.meta);
             }
@@ -535,33 +538,78 @@ mod tests {
         ));
     }
 
-    /// CAP-6 (design S13): Long Shot has no default hotkey; it reads "not set", is stored as an
-    /// empty string, never conflicts with another unset action, and can be set like any other.
+    /// CAP-6.AC14 / GDE-1.AC20 (decision of Nov 24, 2026, reversing design S13's "Not set"): Long
+    /// Shot is Option+Shift+4 and Click Guide Option+Shift+5 (Ctrl+Alt+Shift+4 and 5 elsewhere),
+    /// with no conflict among the defaults on any platform.
     #[test]
-    fn long_shot_has_no_default_shortcut() {
-        for p in [Platform::Mac, Platform::Windows, Platform::Linux] {
+    fn long_shot_and_click_guide_have_default_shortcuts() {
+        for (p, prefix) in [
+            (Platform::Mac, "alt+shift+"),
+            (Platform::Windows, "ctrl+alt+shift+"),
+            (Platform::Linux, "ctrl+alt+shift+"),
+        ] {
             let map = ShortcutMap::defaults(p);
-            let c = map.get(ShortcutAction::LongShot);
-            assert!(c.is_unset());
-            assert_eq!(c.to_setting(), "");
-            assert!(c.keycaps(p).is_empty());
+            assert_eq!(
+                map.get(ShortcutAction::LongShot).to_setting(),
+                format!("{prefix}4")
+            );
+            assert_eq!(
+                map.get(ShortcutAction::ClickGuide).to_setting(),
+                format!("{prefix}5")
+            );
             assert!(map.conflicts().is_empty());
             assert!(map.invalid.is_empty());
         }
-        // The stored empty string is "not set", not an invalid entry.
+        assert_eq!(ShortcutAction::LongShot.key(), "shortcuts.long_shot");
+        assert_eq!(ShortcutAction::ClickGuide.key(), "shortcuts.click_guide");
+        assert_eq!(
+            ShortcutMap::defaults(Platform::Mac)
+                .get(ShortcutAction::ClickGuide)
+                .keycaps(Platform::Mac),
+            ["\u{2325}", "\u{21E7}", "5"]
+        );
+    }
+
+    /// No stored value gets the default; a stored empty string stays cleared (not invalid); a
+    /// stored custom chord wins; a stored value that does not parse falls back to the default.
+    #[test]
+    fn stored_values_over_the_new_defaults() {
+        for a in [ShortcutAction::LongShot, ShortcutAction::ClickGuide] {
+            let p = Platform::Mac;
+            let fresh = ShortcutMap::from_settings(&Map::new(), p);
+            assert_eq!(fresh.get(a), a.default_chord(p));
+            assert!(!fresh.get(a).is_unset());
+            let mut s = Map::new();
+            s.insert(a.key().into(), json!(""));
+            let cleared = ShortcutMap::from_settings(&s, p);
+            assert!(cleared.get(a).is_unset());
+            assert!(cleared.invalid.is_empty());
+            assert!(cleared.conflicts().is_empty());
+            s.insert(a.key().into(), json!("alt+shift+x"));
+            let custom = ShortcutMap::from_settings(&s, p);
+            assert_eq!(custom.get(a).to_setting(), "alt+shift+x");
+            s.insert(a.key().into(), json!("bogus"));
+            let bad = ShortcutMap::from_settings(&s, p);
+            assert_eq!(bad.get(a), a.default_chord(p));
+            assert_eq!(bad.invalid.len(), 1);
+        }
+        // A cleared Long Shot frees its chord for another action and can be set again.
         let mut s = Map::new();
         s.insert("shortcuts.long_shot".into(), json!(""));
         let map = ShortcutMap::from_settings(&s, Platform::Mac);
-        assert!(map.get(ShortcutAction::LongShot).is_unset());
-        assert!(map.invalid.is_empty());
-        // Setting one: a chord of another action is refused, a free one is accepted.
         let taken = ShortcutAction::CaptureRegion.default_chord(Platform::Mac);
         assert!(map.check_rebind(ShortcutAction::LongShot, &taken).is_err());
-        let free = Chord::parse("alt+shift+x").unwrap();
-        assert!(map.check_rebind(ShortcutAction::LongShot, &free).is_ok());
-        let next = map.with(ShortcutAction::LongShot, free.clone());
-        assert_eq!(next.get(ShortcutAction::LongShot), free);
-        assert_eq!(ShortcutAction::LongShot.key(), "shortcuts.long_shot");
+        let ls = ShortcutAction::LongShot.default_chord(Platform::Mac);
+        assert!(map.check_rebind(ShortcutAction::ClickGuide, &ls).is_ok());
+        // The default of Long Shot is taken for the others while it is set.
+        let fresh = ShortcutMap::defaults(Platform::Mac);
+        assert_eq!(
+            fresh
+                .check_rebind(ShortcutAction::OpenLibrary, &ls)
+                .unwrap_err()
+                .with,
+            ShortcutAction::LongShot
+        );
     }
 
     /// DESIGN section 4: macOS shows symbols, Windows shows words.
@@ -737,9 +785,6 @@ mod tests {
                 format!("ctrl+alt+shift+{key}")
             );
         }
-        assert!(ShortcutMap::defaults(Platform::Mac)
-            .get(ShortcutAction::LongShot)
-            .is_unset());
     }
 
     /// CAP-2.AC2 / R4-12: a pressed combination becomes a chord; bare keys and odd keys are

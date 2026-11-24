@@ -21,7 +21,7 @@ use cm_i18n::tr;
 /// The settings keys of the Shortcuts page, in page order. Kept as a literal list on purpose: a
 /// test checks it against the keys the page reads ([`ShortcutAction::key`]).
 #[cfg(test)]
-pub const SHORTCUT_RESET_KEYS: [&str; 14] = [
+pub const SHORTCUT_RESET_KEYS: [&str; 15] = [
     "shortcuts.capture_region",
     "shortcuts.capture_window",
     "shortcuts.capture_display",
@@ -35,6 +35,7 @@ pub const SHORTCUT_RESET_KEYS: [&str; 14] = [
     "shortcuts.toggle_audio_recording",
     "shortcuts.add_marker",
     "shortcuts.long_shot",
+    "shortcuts.click_guide",
     "shortcuts.open_quick_capture",
 ];
 
