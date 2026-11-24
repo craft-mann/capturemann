@@ -1285,6 +1285,14 @@
       ]
     },
     {
+      "name": "square-dashed",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Studio sidebar: Mode row: Region (dashed square; Quick Capture keeps cm-capture-region)"
+      ]
+    },
+    {
       "name": "square-pen",
       "source": "lucide@1.60.0",
       "status": "new",

@@ -229,6 +229,8 @@ pub struct Studio {
     focus: FocusHandle,
     /// The rail's scroll position (0.3.6 P-6).
     rail_scroll: gpui::ScrollHandle,
+    /// The sidebar's Record… button (its timer ticks without redrawing the window).
+    record_button: Entity<crate::ui::sidebar::RecordButton>,
     _subs: Vec<Subscription>,
 }
 
@@ -268,6 +270,7 @@ impl Studio {
         let toast_host = cx.new(|cx| crate::ui::toast_window::ToastHost::new(app.clone(), cx));
         let rec_banner =
             cx.new(|cx| crate::ui::recording::banner::RecordingBanner::new(app.clone(), cx));
+        let record_button = cx.new(|cx| crate::ui::sidebar::RecordButton::new(app.clone(), cx));
         let app2 = app.clone();
         let app3 = app.clone();
         let rec_for_scrim = app.read(cx).rec.clone();
@@ -306,6 +309,7 @@ impl Studio {
             shown: None,
             focus,
             rail_scroll: gpui::ScrollHandle::new(),
+            record_button,
             _subs: subs,
         }
     }
@@ -365,6 +369,9 @@ impl Render for Studio {
                 audio_open,
                 dock,
                 rail_scroll: self.rail_scroll.clone(),
+                width: f32::from(window.viewport_size().width),
+                record: self.record_button.clone(),
+                version_dot: crate::ui::sidebar::version_unseen(&self.app, cx),
             },
             &self.app,
             &self.settings,

@@ -4,6 +4,7 @@ Studio sidebar,Screenshots,image,P1,18,image.svg is already registered but unuse
 Studio sidebar,Published,send,P1,18,same glyph as the Published empty state
 Studio sidebar,AI & Agents,sparkles,P1,18,
 Studio sidebar,Settings,settings,P1,18,
+Studio sidebar,Mode row: Region (dashed square; Quick Capture keeps cm-capture-region),square-dashed,P1,16,0.3.7 S037
 Studio sidebar,MCP card title (ready / offline),bot,P1,14,"agent blue when ready, mist when offline; keep the 8 px dot or replace it"
 Studio sidebar,Recordings hint: notice,bot,keep,16,
 Studio sidebar,Recordings hint: Open AI,sparkles,P2,14,

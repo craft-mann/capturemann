@@ -261,22 +261,29 @@ pub fn nav_row(
     nav_row_tinted(t, id, glyph, label, count, active, NavExtras::default())
 }
 
-/// The Agents & CLI row's status (board S14): the shape at the icon's bottom-right and the status
-/// words that follow the label in the accessible name.
-pub struct NavStatus {
-    pub mark: crate::agent_status::StatusMark,
+/// The state written after a nav row's label (Agents & CLI, SB-5): a dot, then the word in 11.5 px.
+pub struct NavState {
+    pub dot: Color,
+    pub word: String,
+    /// The word's colour.
+    pub text: Color,
+    /// The accessible name's tail ("MCP ready").
     pub aria: String,
 }
 
-/// What sets a nav row apart: an icon colour and a status shape.
+/// What sets a nav row apart: an icon colour, a state written after the label and the amber
+/// attention dot beside the count (All captures, SB-3).
 #[derive(Default)]
 pub struct NavExtras {
     pub tint: Option<Color>,
-    pub status: Option<NavStatus>,
+    pub state: Option<NavState>,
+    pub attention: bool,
 }
 
-/// [`nav_row`] with the icon in `tint` instead of the text colour (the Agents & CLI row shows
-/// the MCP status this way).
+/// The amber of the attention dot (design S037).
+pub const ATTENTION: Color = Color::rgb(0xF5B84A);
+
+/// [`nav_row`] with the extras of [`NavExtras`].
 pub fn nav_row_tinted(
     t: &Theme,
     id: impl Into<ElementId>,
@@ -286,17 +293,27 @@ pub fn nav_row_tinted(
     active: bool,
     extras: NavExtras,
 ) -> Stateful<Div> {
-    let NavExtras { tint, status } = extras;
+    let NavExtras {
+        tint,
+        state,
+        attention,
+    } = extras;
     let label: SharedString = label.into();
     let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
     let fg = if active { t.text } else { t.text_2 };
+    let aria = match (&state, attention) {
+        (Some(s), _) => format!("{label}, {}", s.aria),
+        (None, true) => format!(
+            "{}, {}",
+            nav_aria(&label, count),
+            cm_i18n::tr!("something needs attention")
+        ),
+        (None, false) => nav_aria(&label, count),
+    };
     div()
         .id(id)
         .role(Role::Button)
-        .aria_label(SharedString::from(match &status {
-            Some(s) => format!("{label}, {}", s.aria),
-            None => nav_aria(&label, count),
-        }))
+        .aria_label(SharedString::from(aria))
         .aria_toggled(if active {
             Toggled::True
         } else {
@@ -320,23 +337,40 @@ pub fn nav_row_tinted(
         })
         .when(!active, |d| d.hover(move |s| s.bg(hover)))
         .focus_visible(move |s| s.border_color(focus))
-        .child(
+        .child(icon(glyph, icon_size::NAV, tint.unwrap_or(fg)))
+        .child(div().flex_1().min_w(px(0.)).truncate().child(label))
+        .when(attention, |d| {
+            d.child(
+                div()
+                    .size(px(6.))
+                    .flex_none()
+                    .rounded(px(3.))
+                    .bg(rgba_of(ATTENTION)),
+            )
+        })
+        .children(state.map(|s| {
             div()
-                .relative()
                 .flex_none()
-                .child(icon(glyph, icon_size::NAV, tint.unwrap_or(fg)))
-                .children(
-                    status.map(|s| {
-                        status_badge(t, s.mark, if active { t.raised } else { t.sidebar })
-                    }),
-                ),
-        )
-        .child(div().flex_1().truncate().child(label))
+                .flex()
+                .items_center()
+                .gap(px(5.))
+                .text_size(px(11.5))
+                .text_color(rgba_of(s.text))
+                .child(
+                    div()
+                        .size(px(6.))
+                        .flex_none()
+                        .rounded(px(3.))
+                        .bg(rgba_of(s.dot)),
+                )
+                .child(SharedString::from(s.word))
+        }))
         .children(count.map(|n| {
             div()
                 .flex_none()
-                .text_size(px(type_scale::CAPTION))
+                .text_size(px(11.5))
                 .text_color(rgba_of(t.mist))
+                .mono()
                 .tnum()
                 .child(SharedString::from(n.to_string()))
         }))

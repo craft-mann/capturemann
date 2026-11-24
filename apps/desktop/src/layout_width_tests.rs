@@ -360,11 +360,8 @@ fn toast_specs() -> Vec<(&'static str, crate::toast::ToastSpec)> {
     ]
 }
 
-/// The room of a row-2 dock tile's label, px (see the case that names it).
-const DOCK_ROW2_ROOM: f32 = (crate::theme::scale::SIDEBAR_W - 24. - 2. - 16. - 6.) / 2. - 2. - 8.;
-
 fn cases() -> Vec<Case> {
-    use crate::nav::{DockAction, ExtraTile, NavItem};
+    use crate::nav::{DockAction, NavItem};
     use crate::ui::settings::model::SettingsSection;
     let ui = type_scale::UI;
     let cap = type_scale::CAPTION;
@@ -772,68 +769,101 @@ fn cases() -> Vec<Case> {
         )
         .texts(mcp_titles()),
     );
-    // Capture dock: 224 - 2 border - 16 padding = 206, three tiles 6 px apart, 1 px border.
-    let tile = (crate::theme::scale::SIDEBAR_W - 24. - 2. - 16. - 12.) / 3. - 2.;
-    v.push(
-        Case::new(
-            "Capture dock tile",
-            "(248 - 24 - 2 - 16 - 2*6) / 3 - 2 border",
-            tile,
-            12.,
-            400,
-            one,
-        )
-        .texts(
-            DockAction::TILES
-                .into_iter()
-                .map(|a| t(format!("DockAction::label({a:?})"), move || a.label())),
-        ),
-    );
-    // Capture dock row 2 (board S14): two tiles 6 px apart, 1 px border, 4 px side padding, the
-    // label on one line under a 16 px icon (an ellipsis cuts a longer one).
-    v.push(
-        Case::new(
-            "Capture dock tile, row 2 (Long Shot, Click Guide)",
-            "(248 - 24 - 2 - 16 - 6) / 2 - 2 border - 8 padding; two lines in a 54 px tile",
-            DOCK_ROW2_ROOM,
-            11.,
-            400,
-            Overflow::Lines(2),
-        )
-        .texts(
-            ExtraTile::ALL
-                .into_iter()
-                .map(|a| t(format!("ExtraTile::label({a:?})"), move || a.label())),
-        ),
-    );
-    // The Record row: border 2, padding 36, a 16 px icon and 8 px gaps (icon, label, spacer,
-    // keys), then the keycaps (min 20, padding 5, 2 px apart).
+    // The two dock buttons (0.3.7, SB-1): the dock is 224 wide less its 2 px border and 20 px
+    // padding = 202; a button has a 2 px border, 24 px padding, a 16 px icon, two 9 px gaps and
+    // the chord chip (11 px mono, 6 px padding each side). The label is cut with an ellipsis, so a
+    // translation must fit as it is.
     for (platform, name) in [(Platform::Mac, "macOS"), (Platform::Windows, "Windows")] {
-        let keys = ShortcutMap::defaults(platform)
+        for (action, what) in [
+            (ShortcutAction::OpenQuickCapture, "Quick Capture\u{2026}"),
+            (ShortcutAction::ToggleRecording, "Record\u{2026}"),
+        ] {
+            let keys = ShortcutMap::defaults(platform)
+                .get(action)
+                .keycaps(platform);
+            // The chip shows the whole chord up to three keys, else the last one.
+            let keys = crate::nav::tile_keys(&keys);
+            let keys_px = key_w(&keys.concat(), 11., 6., 0.);
+            let record = action == ShortcutAction::ToggleRecording;
+            v.push(
+                Case::new(
+                    if record {
+                        if platform == Platform::Mac {
+                            "Dock Record button (macOS chord)"
+                        } else {
+                            "Dock Record button (Windows chord)"
+                        }
+                    } else if platform == Platform::Mac {
+                        "Dock Quick Capture button (macOS chord)"
+                    } else {
+                        "Dock Quick Capture button (Windows chord)"
+                    },
+                    "202 - 2 border - 24 padding - 16 icon - 2*9 gaps - chip (6 px padding each side, 11 px mono)",
+                    202. - 2. - 24. - 16. - 18. - keys_px,
+                    ui,
+                    400,
+                    one,
+                )
+                .text(format!("{what} on {name}"), move || {
+                    if record {
+                        DockAction::Record.label()
+                    } else {
+                        crate::nav::quick_capture_label()
+                    }
+                }),
+            );
+        }
+    }
+    // While recording the Record button reads "Stop" and the timer (12.5 px mono, up to H:MM:SS)
+    // beside a 10 px square: 202 - 2 - 24 - 10 - 2*9 gaps - the chip (the same chord) - the timer.
+    {
+        let keys = ShortcutMap::defaults(Platform::Windows)
             .get(ShortcutAction::ToggleRecording)
-            .keycaps(platform);
-        // The Record row shows the same keys as the tiles: the whole chord up to three keys,
-        // else the last one.
+            .keycaps(Platform::Windows);
         let keys = crate::nav::tile_keys(&keys);
         let keys_px = key_w(&keys.concat(), 11., 6., 0.);
+        let timer_px = key_w("0:00:00", 12.5, 0., 0.);
         v.push(
             Case::new(
-                if platform == Platform::Mac {
-                    "Dock Record row (macOS chord)"
-                } else {
-                    "Dock Record row (Windows chord)"
-                },
-                "206 - 48 mic button - 2 - 20 padding - 16 icon - 3*4 gaps - chip (6 px padding each side, 11 px mono)",
-                206. - 48. - 2. - 20. - 16. - 12. - keys_px,
+                "Dock Stop button (Windows chord, H:MM:SS timer)",
+                "202 - 2 - 24 - 10 square - 3*9 gaps - chip - timer",
+                202. - 2. - 24. - 10. - 27. - keys_px - timer_px,
                 ui,
                 600,
                 one,
             )
-            .text(format!("Record row on {name}"), || {
-                DockAction::Record.label()
-            }),
+            .text("Stop", crate::nav::stop_label),
         );
     }
+    // The mode row's tooltip names are the words of the old tiles; the row has 6 cells of 32 px.
+    // Agents & CLI (SB-5): row 224 - 2 border - 20 padding, an 18 px icon and 10 px gaps, then
+    // the state: a 6 px dot, a 5 px gap and the word (11.5 px; 50 px holds "Sẵn sàng").
+    v.push(
+        Case::new(
+            "Agents & CLI row label",
+            "224 - 2 - 20 - 18 icon - 2*10 gaps - 6 dot - 5 gap - 50 state word",
+            224. - 2. - 20. - 18. - 20. - 6. - 5. - 50.,
+            ui,
+            400,
+            one,
+        )
+        .text("NavItem::Agents", || NavItem::Agents.label()),
+    );
+    v.push(
+        Case::new(
+            "Agent state word",
+            "the room reserved after the label",
+            50.,
+            11.5,
+            400,
+            one,
+        )
+        .texts([
+            t("Ready", || crate::nav::AgentTone::Ready.word()),
+            t("Off", || crate::nav::AgentTone::Off.word()),
+            t("Busy", || crate::nav::AgentTone::Busy.word()),
+        ]),
+    );
 
     // ---- recording editor ----------------------------------------------------------------------
     // Timeline label column: LABEL_W 100, a 14 px icon and an 8 px gap.
@@ -1887,31 +1917,22 @@ fn audio_sheet_height_estimates_hold_in_every_language() {
     }
 }
 
-/// Board S14: the two row-2 tile labels leave room for a label 40 percent longer than English, and
-/// Vietnamese fits as it is (the pseudo-locale of the report is about 30 percent).
+/// 0.3.7 SB-2: the chord printed under a mode (Geist Mono 8.5) fits the 32 px cell in every
+/// default and with a longer rebinding such as Option+Shift+F12; the tooltip names fit the 200 px
+/// tooltip on one line in English and Vietnamese.
 #[test]
-fn row_two_dock_tile_labels_have_room_for_forty_percent_more() {
-    for tile in crate::nav::ExtraTile::ALL {
-        let en = with_language(Lang::En, || tile.label());
-        let px = width(&en, Face::of(false, 400), 11.);
-        assert!(
-            px * 1.4 <= DOCK_ROW2_ROOM,
-            "{en:?}: {px:.0} px x 1.4 > {DOCK_ROW2_ROOM:.0} px"
-        );
-        let vi = with_language(Lang::Vi, || tile.label());
-        // Vietnamese may wrap onto two lines ("Hướng dẫn / theo thao tác"); 16 px icon, 3 px gap,
-        // two 11 px lines and the border fit the 54 px tile.
-        let vi_lines = lines(&vi, Face::of(false, 400), 11., DOCK_ROW2_ROOM);
-        assert!(
-            vi_lines.is_some_and(|n| n <= 2),
-            "{vi:?}: {vi_lines:?} lines"
-        );
+fn mode_row_chords_and_tooltip_names_fit() {
+    for platform in [Platform::Mac, Platform::Windows, Platform::Linux] {
+        for e in crate::nav::modes(&ShortcutMap::defaults(platform), platform) {
+            let px = key_w(&e.printed(), 8.5, 0., 0.);
+            assert!(px <= 32., "{platform:?} {:?}: {px:.1} px", e.mode);
+        }
     }
-    // The tile tooltips are 200 px wide with 12 px padding and a border: the name stays on one
-    // line in English and Vietnamese.
-    for tile in crate::nav::ExtraTile::ALL {
+    let px = key_w("\u{2325}\u{21E7}F12", 8.5, 0., 0.);
+    assert!(px <= 32., "{px:.1} px");
+    for mode in crate::nav::DockMode::ALL {
         for lang in [Lang::En, Lang::Vi] {
-            let name = with_language(lang, || tile.label());
+            let name = with_language(lang, || mode.tip_name());
             let px = width(&name, Face::of(false, 600), 12.5);
             assert!(px <= 200. - 24. - 2., "{name:?}: {px:.0} px");
         }
@@ -1938,31 +1959,4 @@ fn the_preview_label_fits_where_it_goes_in_every_language() {
             );
         }
     }
-    // 0.3.6 P-9, F5: in Vietnamese the label wraps to two lines and the tile is tall enough that
-    // its icon starts below the XS tag (the model and the measured text agree on two lines).
-    let vi_w = width(
-        &with_language(Lang::Vi, || crate::nav::ExtraTile::ClickGuide.label()),
-        Face::of(false, 400),
-        11.,
-    );
-    let tile_lines = crate::nav::tile_metrics::label_lines(vi_w);
-    assert_eq!(tile_lines, 2.0, "{vi_w:.0} px");
-    let h = crate::nav::tile_metrics::height(false, tile_lines);
-    let icon_top = (h
-        - (crate::nav::tile_metrics::ICON
-            + crate::nav::tile_metrics::GAP
-            + tile_lines * crate::nav::tile_metrics::LABEL_LINE))
-        / 2.;
-    assert!(
-        icon_top + crate::nav::tile_metrics::BORDER / 2.
-            >= crate::nav::tile_metrics::TAG_REACH + 1.0,
-        "{icon_top}"
-    );
-    // CG-11: the Vietnamese tile label wraps to at most two 13 px lines, which the tile has room for.
-    let vi = with_language(Lang::Vi, || crate::nav::ExtraTile::ClickGuide.label());
-    let n = lines(&vi, Face::of(false, 400), 11., DOCK_ROW2_ROOM).unwrap_or(99);
-    assert!(
-        n as f32 <= crate::nav::tile_metrics::LABEL_LINES,
-        "{vi:?}: {n} lines"
-    );
 }

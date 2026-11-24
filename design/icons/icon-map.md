@@ -14,6 +14,7 @@ Priority: **P1** = add now · P2 = leading icon on a text button · keep = alrea
 | Published | `send` | **P1** | 18 px | same glyph as the Published empty state |
 | AI & Agents | `sparkles` | **P1** | 18 px |  |
 | Settings | `settings` | **P1** | 18 px |  |
+| Mode row: Region (dashed square; Quick Capture keeps `cm-capture-region`) | `square-dashed` | **P1** | 16 px | 0.3.7 S037 |
 | MCP card title (ready / offline) | `bot` | **P1** | 14 px | agent blue when ready, mist when offline; keep the 8 px dot or replace it |
 | Recordings hint: notice | `bot` | keep | 16 px |  |
 | Recordings hint: Open AI | `sparkles` | P2 | 14 px |  |

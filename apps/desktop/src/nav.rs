@@ -37,14 +37,32 @@ pub struct NavCounts {
     pub audio: Option<usize>,
     /// Click Guides.
     pub guides: Option<usize>,
+    /// Captures whose publishes or uploads need a look (the library's "Needs attention" count):
+    /// the amber dot beside All captures shows when it is above 0 (SB-3).
+    pub attention: Option<usize>,
+}
+
+impl NavCounts {
+    /// Every capture: the four kinds added up once the two main kinds are known (an older daemon
+    /// has no Audio or Guides count: then 0). `None` while unknown, never a placeholder.
+    pub fn total(&self) -> Option<usize> {
+        self.recordings
+            .zip(self.screenshots)
+            .map(|(r, s)| r + s + self.audio.unwrap_or(0) + self.guides.unwrap_or(0))
+    }
+
+    /// Whether the amber dot beside All captures shows (SB-3).
+    pub fn needs_attention(&self) -> bool {
+        self.attention.is_some_and(|n| n > 0)
+    }
 }
 
 impl NavItem {
     pub const ALL: [NavItem; 8] = [
         NavItem::AllCaptures,
+        NavItem::Screenshots,
         NavItem::Recordings,
         NavItem::Audio,
-        NavItem::Screenshots,
         NavItem::Guides,
         NavItem::AiModels,
         NavItem::Agents,
@@ -52,11 +70,12 @@ impl NavItem {
     ];
 
     /// The LIBRARY group of the app sidebar.
+    /// The order is fixed (SB-3, S037): it never changes with the counts.
     pub const LIBRARY: [NavItem; 5] = [
         NavItem::AllCaptures,
+        NavItem::Screenshots,
         NavItem::Recordings,
         NavItem::Audio,
-        NavItem::Screenshots,
         NavItem::Guides,
     ];
 
@@ -135,10 +154,10 @@ impl NavItem {
         }
     }
 
-    /// The right-aligned count: the real library counts.
-    /// "All captures" shows none (the kinds are counted on their own rows).
+    /// The right-aligned count: the real library counts; All captures counts everything (SB-3).
     pub fn count(self, counts: &NavCounts) -> Option<usize> {
         match self {
+            NavItem::AllCaptures => counts.total(),
             NavItem::Recordings => counts.recordings,
             NavItem::Audio => counts.audio,
             NavItem::Guides => counts.guides,
@@ -208,10 +227,7 @@ pub fn library_filter(route: &Route) -> Option<Filter> {
 pub fn route_count(route: &Route, counts: &NavCounts) -> Option<usize> {
     match route {
         // Audio joins the sum when its count is known (an older daemon has none: then 0).
-        Route::Library => counts
-            .recordings
-            .zip(counts.screenshots)
-            .map(|(r, s)| r + s + counts.audio.unwrap_or(0) + counts.guides.unwrap_or(0)),
+        Route::Library => counts.total(),
         Route::Recordings => counts.recordings,
         Route::Audio => counts.audio,
         Route::Guides => counts.guides,
@@ -232,6 +248,9 @@ pub fn is_library_page(route: &Route) -> bool {
 // ---------------------------------------------------------------------------------------
 // Sidebar modes
 // ---------------------------------------------------------------------------------------
+
+/// Under this window width (logical px) the app sidebar is the 64 px icon rail (SB-7, S037).
+pub const NARROW_BELOW: f32 = 960.;
 
 /// The three faces of the one sidebar component (`design/redesign/CLAUDE.md`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -265,6 +284,15 @@ impl SidebarMode {
         }
     }
 
+    /// The mode at a window width (SB-7): under [`NARROW_BELOW`] the app sidebar becomes the icon
+    /// rail; the settings sidebar keeps its sections. A width of 0 (not measured yet) is not narrow.
+    pub fn for_width(route: &Route, width: f32) -> SidebarMode {
+        match SidebarMode::of_route(route) {
+            SidebarMode::App if width > 0. && width < NARROW_BELOW => SidebarMode::Rail,
+            m => m,
+        }
+    }
+
     pub fn width(self) -> f32 {
         match self {
             SidebarMode::Rail => crate::theme::scale::RAIL_W,
@@ -277,44 +305,31 @@ impl SidebarMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RailEntry {
     Brand,
+    /// Quick Capture…: the launcher; the modes are reached from it or by their shortcuts.
+    QuickCapture,
     Record,
-    Region,
-    /// The mic button: Record audio (VOC-1, Option-Shift-V).
-    RecordAudio,
-    /// The second-row dock tiles as rail buttons (S14): Long Shot, then Click Guide.
-    Extra(ExtraTile),
     Divider,
     Nav(NavItem),
     Spacer,
 }
 
-/// The rail from the top: brand mark, Record, Region, a divider, the seven destinations, then
-/// Settings at the bottom.
+/// The rail from the top, in the order of the full sidebar (SB-7): brand mark, Quick Capture…,
+/// Record…, a divider, the library and intelligence destinations, then Settings at the bottom.
 pub fn rail_layout() -> Vec<RailEntry> {
     let mut v = vec![
         RailEntry::Brand,
+        RailEntry::QuickCapture,
         RailEntry::Record,
-        RailEntry::Region,
-        RailEntry::RecordAudio,
         RailEntry::Divider,
-        RailEntry::Nav(NavItem::AllCaptures),
-        RailEntry::Nav(NavItem::Recordings),
-        RailEntry::Nav(NavItem::Audio),
-        RailEntry::Nav(NavItem::Screenshots),
-        RailEntry::Nav(NavItem::Guides),
-        RailEntry::Nav(NavItem::AiModels),
-        RailEntry::Nav(NavItem::Agents),
-        RailEntry::Spacer,
-        RailEntry::Nav(NavItem::Settings),
     ];
-    // The preview buttons sit after the capture buttons (design S24).
-    let at = v
-        .iter()
-        .position(|e| *e == RailEntry::Divider)
-        .unwrap_or(v.len());
-    for (i, tile) in ExtraTile::ALL.into_iter().enumerate() {
-        v.insert(at + i, RailEntry::Extra(tile));
-    }
+    v.extend(
+        NavItem::LIBRARY
+            .into_iter()
+            .chain(NavItem::INTELLIGENCE)
+            .map(RailEntry::Nav),
+    );
+    v.push(RailEntry::Spacer);
+    v.push(RailEntry::Nav(NavItem::Settings));
     v
 }
 
@@ -340,10 +355,6 @@ impl DockAction {
         DockAction::Display,
     ];
 
-    /// The three tiles under the Record button.
-    pub const TILES: [DockAction; 3] =
-        [DockAction::Region, DockAction::Window, DockAction::Display];
-
     pub fn label(self) -> String {
         match self {
             DockAction::Record => tr_ctx!("capture dock", "Record\u{2026}"),
@@ -357,7 +368,8 @@ impl DockAction {
     pub fn icon(self) -> &'static str {
         match self {
             DockAction::Record => "cm-record",
-            DockAction::Region => "cm-capture-region",
+            // A dashed square, so Region no longer shares an icon with Quick Capture (SB-2).
+            DockAction::Region => "square-dashed",
             DockAction::Window => "app-window",
             DockAction::Display => "monitor",
         }
@@ -588,67 +600,6 @@ pub fn tile_tip(tile: ExtraTile, state: &TileState, keys: &[String]) -> TileTip 
     }
 }
 
-/// Rows of a row-2 dock tile, px (CG-11, QA pass 7): the border, the 16 px icon, a 3 px gap and a
-/// label box of two 13 px lines (Vietnamese "Hướng dẫn thao tác" wraps to two), then with a chord
-/// a 3 px gap and the 15 px keycaps. The Preview tag is a corner tag and adds no row.
-pub mod tile_metrics {
-    pub const BORDER: f32 = 2.0;
-    pub const ICON: f32 = 16.0;
-    pub const GAP: f32 = 3.0;
-    pub const LABEL_LINE: f32 = 13.0;
-    pub const LABEL_LINES: f32 = 2.0;
-    pub const KEYCAPS: f32 = 15.0;
-    /// The tile's height without and with a chord (the board's 54 and 70 px).
-    pub const MIN_HEIGHT: f32 = 54.0;
-    pub const MIN_HEIGHT_KEYS: f32 = 70.0;
-
-    /// How far the Preview tag reaches into the tile from its top edge, px (the tag is 14 px high
-    /// and sits 9 px above the edge), and the gap kept between it and the icon.
-    pub const TAG_REACH: f32 = 5.0;
-    pub const TAG_GAP: f32 = 1.5;
-    /// Room for the label text inside a tile, px (the half row of the sidebar less the tile's
-    /// border, its padding and the dock's gaps).
-    pub const LABEL_ROOM: f32 =
-        (crate::theme::scale::SIDEBAR_W - 24. - 2. - 16. - 6.) / 2. - 2. - 8.;
-
-    /// Lines a label of `text_px` px (at 11 px) takes in a tile: one, or two where it wraps.
-    pub fn label_lines(text_px: f32) -> f32 {
-        if text_px > LABEL_ROOM {
-            LABEL_LINES
-        } else {
-            1.0
-        }
-    }
-
-    /// The height at which the icon of a tile whose label takes `lines` lines starts below the
-    /// Preview tag, with the content centred (0.3.6 P-9: the Vietnamese tile put the tag on the
-    /// icon).
-    pub fn clear_of_tag(lines: f32) -> f32 {
-        2.0 * (TAG_REACH + TAG_GAP - BORDER / 2.0) + ICON + GAP + lines * LABEL_LINE
-    }
-
-    /// What the rows need.
-    pub fn content(with_keys: bool) -> f32 {
-        let base = BORDER + ICON + GAP + LABEL_LINE * LABEL_LINES;
-        if with_keys {
-            base + GAP + KEYCAPS
-        } else {
-            base
-        }
-    }
-
-    /// The tile's height: the board's, never less than the rows need and never so low that the
-    /// icon meets the Preview tag. `lines` is the most label lines either tile of the row takes.
-    pub fn height(with_keys: bool, lines: f32) -> f32 {
-        let board = if with_keys {
-            MIN_HEIGHT_KEYS
-        } else {
-            MIN_HEIGHT
-        };
-        board.max(content(with_keys)).max(clear_of_tag(lines))
-    }
-}
-
 /// The accessible name of a tile: the label, "preview", the chord when there is one, and the
 /// state.
 pub fn tile_aria(tile: ExtraTile, state: &TileState, keys: &[String]) -> String {
@@ -674,6 +625,220 @@ pub fn tile_aria(tile: ExtraTile, state: &TileState, keys: &[String]) -> String 
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------
+// The capture block of 0.3.7 (S037): two buttons and one row of six modes
+// ---------------------------------------------------------------------------------------
+
+/// The label of the launcher button (SB-1; was "Capture…").
+pub fn quick_capture_label() -> String {
+    tr_ctx!("capture dock", "Quick Capture\u{2026}")
+}
+
+/// The Quick Capture button's accessible name: "<what>, shortcut <keys>".
+pub fn quick_capture_aria(keys: &[String]) -> String {
+    tr_ctx!(
+        "capture dock",
+        "Quick Capture, shortcut {chord}",
+        chord = tile_keys(keys).join("")
+    )
+}
+
+/// The Record button's text while a recording runs: "Stop" (the timer follows beside it).
+pub fn stop_label() -> String {
+    tr_ctx!("capture dock", "Stop")
+}
+
+/// One of the six modes of the row under the two buttons (SB-2): each starts what its old tile
+/// (or the mic button) started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DockMode {
+    Region,
+    Window,
+    Display,
+    LongShot,
+    ClickGuide,
+    Audio,
+}
+
+impl DockMode {
+    /// The row, left to right.
+    pub const ALL: [DockMode; 6] = [
+        DockMode::Region,
+        DockMode::Window,
+        DockMode::Display,
+        DockMode::LongShot,
+        DockMode::ClickGuide,
+        DockMode::Audio,
+    ];
+
+    /// The screenshot action behind Region, Window and Display.
+    pub fn dock_action(self) -> Option<DockAction> {
+        match self {
+            DockMode::Region => Some(DockAction::Region),
+            DockMode::Window => Some(DockAction::Window),
+            DockMode::Display => Some(DockAction::Display),
+            _ => None,
+        }
+    }
+
+    /// The preview tile behind Long Shot and Click Guide (their availability reasons, board S14).
+    pub fn extra(self) -> Option<ExtraTile> {
+        match self {
+            DockMode::LongShot => Some(ExtraTile::LongShot),
+            DockMode::ClickGuide => Some(ExtraTile::ClickGuide),
+            _ => None,
+        }
+    }
+
+    pub fn label(self) -> String {
+        match self {
+            DockMode::Audio => tr_ctx!("capture dock", "Audio"),
+            m => m
+                .dock_action()
+                .map(DockAction::label)
+                .or_else(|| m.extra().map(ExtraTile::label))
+                .unwrap_or_default(),
+        }
+    }
+
+    pub fn icon(self) -> &'static str {
+        match self {
+            // The library's own Audio icon (SB-2).
+            DockMode::Audio => NavItem::Audio.icon(),
+            m => m
+                .dock_action()
+                .map(DockAction::icon)
+                .or_else(|| m.extra().map(ExtraTile::icon))
+                .unwrap_or(""),
+        }
+    }
+
+    /// Element ids are the ones of the tiles and the mic button this row replaced.
+    pub fn id(self) -> &'static str {
+        match self {
+            DockMode::Audio => RECORD_AUDIO_ID,
+            m => m
+                .dock_action()
+                .map(DockAction::id)
+                .or_else(|| m.extra().map(ExtraTile::id))
+                .unwrap_or(""),
+        }
+    }
+
+    /// The shortcut whose live chord is printed under the icon. `None` where no shortcut action
+    /// exists yet: Click Guide, until `ShortcutAction::ClickGuide` is added (the one place to
+    /// switch is [`ExtraTile::shortcut`]).
+    pub fn shortcut(self) -> Option<ShortcutAction> {
+        match self {
+            DockMode::Audio => Some(ShortcutAction::ToggleAudioRecording),
+            m => m
+                .dock_action()
+                .map(DockAction::shortcut)
+                .or_else(|| m.extra().and_then(ExtraTile::shortcut)),
+        }
+    }
+
+    /// Long Shot and Click Guide are Preview features: a 5 px dot, the word in the tooltip.
+    pub fn is_preview(self) -> bool {
+        self.extra().is_some()
+    }
+
+    /// The tooltip's name (the words of the old tiles; the row itself has no room for them).
+    pub fn tip_name(self) -> String {
+        match self {
+            DockMode::Region => tr!("Capture region"),
+            DockMode::Window => tr!("Capture window"),
+            DockMode::Display => tr!("Capture display"),
+            DockMode::Audio => record_audio_label(),
+            m => m.label(),
+        }
+    }
+}
+
+/// One mode with the chord of its shortcut, read from the live map so a rebinding shows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModeEntry {
+    pub mode: DockMode,
+    /// One string per key; empty when the mode has no shortcut.
+    pub keys: Vec<String>,
+}
+
+impl ModeEntry {
+    /// The small text under the icon: the whole chord when it is three keys or fewer, else its
+    /// last key (the Windows chords have four); the tooltip carries the full chord.
+    pub fn printed(&self) -> String {
+        tile_keys(&self.keys).join("")
+    }
+}
+
+/// The six modes with their live chords.
+pub fn modes(map: &ShortcutMap, platform: Platform) -> Vec<ModeEntry> {
+    DockMode::ALL
+        .iter()
+        .map(|&mode| ModeEntry {
+            mode,
+            keys: mode
+                .shortcut()
+                .map(|a| map.get(a).keycaps(platform))
+                .unwrap_or_default(),
+        })
+        .collect()
+}
+
+/// The accessible name of a plain mode: the tooltip's name and the chord.
+pub fn mode_aria(mode: DockMode, keys: &[String]) -> String {
+    match mode {
+        DockMode::Audio => record_audio_aria(keys),
+        m => match m.dock_action() {
+            Some(a) => a.aria(keys),
+            None => tile_aria(
+                m.extra().expect("a mode is an action, a tile or audio"),
+                &TileState::Ready,
+                keys,
+            ),
+        },
+    }
+}
+
+/// The Agents & CLI state written after the label (SB-5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentTone {
+    /// Ready: a blue dot.
+    Ready,
+    /// Off: grey.
+    Off,
+    /// Busy: amber; another app holds the MCP socket, a click opens the fix.
+    Busy,
+}
+
+impl AgentTone {
+    pub fn of(status: &crate::agent_status::McpStatus) -> AgentTone {
+        use crate::agent_status::StatusMark;
+        match status.mark() {
+            StatusMark::Dot => AgentTone::Ready,
+            StatusMark::Ring => AgentTone::Off,
+            StatusMark::Bang => AgentTone::Busy,
+        }
+    }
+
+    pub fn word(self) -> String {
+        match self {
+            AgentTone::Ready => tr_ctx!("agent state", "Ready"),
+            AgentTone::Off => tr_ctx!("agent state", "Off"),
+            AgentTone::Busy => tr_ctx!("agent state", "Busy"),
+        }
+    }
+}
+
+/// Whether the dot beside the version shows (SB-6): the version whose notes were last opened
+/// differs from this one. A first run (nothing stored) is not an update.
+pub fn show_version_dot(seen: Option<&str>, current: &str) -> bool {
+    seen.is_some_and(|s| s != current)
+}
+
+/// App-internal setting that remembers the version whose notes were last opened.
+pub const KEY_LAST_SEEN_VERSION: &str = "ui.last_seen_version";
 
 /// Element id of the mic button (the dock and the rail).
 pub const RECORD_AUDIO_ID: &str = "rec-audio";
@@ -787,9 +952,9 @@ mod tests {
             labels,
             [
                 "All captures",
+                "Screenshots",
                 "Recordings",
                 "Audio",
-                "Screenshots",
                 "Click Guides",
                 "AI models",
                 "Agents & CLI",
@@ -801,9 +966,9 @@ mod tests {
             library,
             [
                 "All captures",
+                "Screenshots",
                 "Recordings",
                 "Audio",
-                "Screenshots",
                 "Click Guides"
             ]
         );
@@ -910,6 +1075,7 @@ mod tests {
             recordings: Some(0),
             audio: Some(5),
             guides: Some(2),
+            attention: Some(1),
         };
         assert_eq!(NavItem::Screenshots.count(&c), Some(138));
         assert_eq!(NavItem::Recordings.count(&c), Some(0));
@@ -917,7 +1083,9 @@ mod tests {
         assert_eq!(NavItem::Audio.count(&none), None);
         assert_eq!(NavItem::Guides.count(&c), Some(2));
         assert_eq!(NavItem::Guides.count(&none), None);
-        assert_eq!(NavItem::AllCaptures.count(&c), None);
+        // All captures counts everything (SB-3); unknown stays unknown.
+        assert_eq!(NavItem::AllCaptures.count(&c), Some(145));
+        assert_eq!(NavItem::AllCaptures.count(&none), None);
         assert_eq!(NavItem::AiModels.count(&c), None);
         assert_eq!(NavItem::Agents.count(&c), None);
         assert_eq!(NavItem::Settings.count(&c), None);
@@ -925,6 +1093,194 @@ mod tests {
         assert!(entries(&Route::Library, &none)
             .iter()
             .all(|e| e.count.is_none()));
+    }
+
+    /// SB-3: the amber dot shows only when something needs attention; unknown or 0 shows none.
+    #[test]
+    fn the_attention_dot_needs_a_count_above_zero() {
+        let mut c = NavCounts::default();
+        assert!(!c.needs_attention());
+        c.attention = Some(0);
+        assert!(!c.needs_attention());
+        c.attention = Some(1);
+        assert!(c.needs_attention());
+    }
+
+    /// SB-3: the types follow All captures in one fixed order, whatever the counts are.
+    #[test]
+    fn the_library_order_is_fixed() {
+        let order = |c: NavCounts| -> Vec<NavItem> {
+            library_entries(&Route::Library, &c)
+                .into_iter()
+                .map(|e| e.item)
+                .collect()
+        };
+        let want = [
+            NavItem::AllCaptures,
+            NavItem::Screenshots,
+            NavItem::Recordings,
+            NavItem::Audio,
+            NavItem::Guides,
+        ];
+        assert_eq!(NavItem::LIBRARY, want);
+        let counts = |s, r, a, g| NavCounts {
+            screenshots: Some(s),
+            recordings: Some(r),
+            audio: Some(a),
+            guides: Some(g),
+            attention: None,
+        };
+        for c in [
+            NavCounts::default(),
+            counts(273, 45, 29, 10),
+            counts(0, 99, 1, 500),
+            counts(5, 5, 5, 5),
+        ] {
+            assert_eq!(order(c), want);
+        }
+    }
+
+    /// SB-7: under 960 pt the app sidebar is the rail; the settings sidebar and the existing rail
+    /// pages do not change; an unmeasured width (0) is not narrow.
+    #[test]
+    fn under_960_the_app_sidebar_is_the_rail() {
+        use SidebarMode as M;
+        assert_eq!(NARROW_BELOW, 960.);
+        assert_eq!(M::for_width(&Route::Library, 1200.), M::App);
+        assert_eq!(M::for_width(&Route::Library, 960.), M::App);
+        assert_eq!(M::for_width(&Route::Library, 959.5), M::Rail);
+        assert_eq!(M::for_width(&Route::Agents, 800.), M::Rail);
+        assert_eq!(M::for_width(&Route::Library, 0.), M::App);
+        assert_eq!(M::for_width(&Route::Settings, 700.), M::Settings);
+        assert_eq!(M::for_width(&Route::Editor("c".into()), 1600.), M::Rail);
+    }
+
+    /// SB-7: the rail has the order of the full sidebar, Quick Capture and Record first.
+    #[test]
+    fn the_rail_follows_the_sidebar_order() {
+        let rail = rail_layout();
+        assert_eq!(
+            rail[..4],
+            [
+                RailEntry::Brand,
+                RailEntry::QuickCapture,
+                RailEntry::Record,
+                RailEntry::Divider
+            ]
+        );
+        let items: Vec<_> = rail
+            .iter()
+            .filter_map(|e| match e {
+                RailEntry::Nav(i) => Some(*i),
+                _ => None,
+            })
+            .collect();
+        let sidebar: Vec<_> = NavItem::LIBRARY
+            .into_iter()
+            .chain(NavItem::INTELLIGENCE)
+            .chain([NavItem::Settings])
+            .collect();
+        assert_eq!(items, sidebar);
+    }
+
+    /// SB-2: six modes in one row, each with its old action, id and live chord; Preview marks
+    /// Long Shot and Click Guide; Region has its own icon.
+    #[test]
+    fn the_mode_row_has_six_modes_with_live_chords() {
+        use DockMode as D;
+        assert_eq!(
+            D::ALL.map(D::label),
+            [
+                "Region",
+                "Window",
+                "Display",
+                "Long Shot",
+                "Click Guide",
+                "Audio"
+            ]
+        );
+        assert_eq!(
+            D::ALL.map(D::id),
+            [
+                "cap-region",
+                "cap-window",
+                "cap-display",
+                "cap-long-shot",
+                "cap-click-guide",
+                "rec-audio"
+            ]
+        );
+        assert_eq!(
+            D::ALL.map(D::is_preview),
+            [false, false, false, true, true, false]
+        );
+        assert_eq!(D::Region.icon(), "square-dashed");
+        assert_ne!(D::Region.icon(), "cm-capture-region");
+        assert_eq!(D::Audio.icon(), NavItem::Audio.icon());
+        let mac = ShortcutMap::defaults(Platform::Mac);
+        let row = modes(&mac, Platform::Mac);
+        assert_eq!(
+            row.iter().map(|e| e.mode).collect::<Vec<_>>(),
+            D::ALL.to_vec()
+        );
+        assert_eq!(row[0].printed(), "\u{2325}\u{21E7}1");
+        assert_eq!(row[1].printed(), "\u{2325}\u{21E7}2");
+        assert_eq!(row[2].printed(), "\u{2325}\u{21E7}3");
+        // Audio reads the live Start or stop audio recording chord.
+        assert_eq!(row[5].printed(), "\u{2325}\u{21E7}V");
+        // Click Guide has no shortcut action yet: no chord is printed.
+        assert_eq!(D::ClickGuide.shortcut(), None);
+        assert_eq!(row[4].printed(), "");
+        // A rebinding shows at once.
+        let chord = crate::shortcuts::Chord::parse("alt+shift+9").unwrap();
+        let rebound = mac.with(ShortcutAction::CaptureWindow, chord);
+        assert_eq!(
+            modes(&rebound, Platform::Mac)[1].printed(),
+            "\u{2325}\u{21E7}9"
+        );
+        // The Windows chords have four keys: the last one is printed, the tooltip has all.
+        let win = ShortcutMap::defaults(Platform::Windows);
+        let wrow = modes(&win, Platform::Windows);
+        assert_eq!(wrow[0].printed(), "1");
+        assert_eq!(wrow[0].keys, ["Ctrl", "Alt", "Shift", "1"]);
+    }
+
+    /// SB-1 and SB-5: the launcher's name, Agents & CLI's written states.
+    #[test]
+    fn the_launcher_name_and_the_agent_words() {
+        assert_eq!(quick_capture_label(), "Quick Capture\u{2026}");
+        assert_eq!(stop_label(), "Stop");
+        assert_eq!(
+            [AgentTone::Ready, AgentTone::Off, AgentTone::Busy].map(AgentTone::word),
+            ["Ready", "Off", "Busy"]
+        );
+        let ready = crate::agent_status::McpStatus {
+            state: crate::agent_status::McpState::Ready,
+            last_call: None,
+        };
+        assert_eq!(AgentTone::of(&ready), AgentTone::Ready);
+        let owned = crate::agent_status::McpStatus {
+            state: crate::agent_status::McpState::Offline(
+                crate::agent_status::OfflineReason::SocketOwned,
+            ),
+            last_call: None,
+        };
+        assert_eq!(AgentTone::of(&owned), AgentTone::Busy);
+        let off = crate::agent_status::McpStatus {
+            state: crate::agent_status::McpState::Offline(
+                crate::agent_status::OfflineReason::NoEndpoint,
+            ),
+            last_call: None,
+        };
+        assert_eq!(AgentTone::of(&off), AgentTone::Off);
+    }
+
+    /// SB-6: the dot shows after an update, not on a first run, and goes once the version is seen.
+    #[test]
+    fn the_version_dot_follows_the_last_seen_version() {
+        assert!(!show_version_dot(None, "0.3.7"));
+        assert!(!show_version_dot(Some("0.3.7"), "0.3.7"));
+        assert!(show_version_dot(Some("0.3.6"), "0.3.7"));
     }
 
     /// Every item and dock button has a label and an icon from the registry.
@@ -975,6 +1331,7 @@ mod tests {
             recordings: Some(24),
             audio: Some(6),
             guides: Some(1),
+            attention: None,
         };
         assert_eq!(route_count(&Route::Library, &c), Some(42));
         assert_eq!(route_count(&Route::Guides, &c), Some(1));
@@ -1061,9 +1418,9 @@ mod tests {
             nav,
             [
                 NavItem::AllCaptures,
+                NavItem::Screenshots,
                 NavItem::Recordings,
                 NavItem::Audio,
-                NavItem::Screenshots,
                 NavItem::Guides,
                 NavItem::AiModels,
                 NavItem::Agents,
@@ -1071,25 +1428,12 @@ mod tests {
             ]
         );
         let pos = |e: RailEntry| rail.iter().position(|x| *x == e).unwrap();
-        assert!(pos(RailEntry::Record) < pos(RailEntry::Region));
-        // The mic button sits with the capture buttons, above the divider (board UiSidebar).
-        assert!(pos(RailEntry::Region) < pos(RailEntry::RecordAudio));
-        assert!(pos(RailEntry::RecordAudio) < pos(RailEntry::Divider));
+        assert!(pos(RailEntry::QuickCapture) < pos(RailEntry::Record));
+        assert!(pos(RailEntry::Record) < pos(RailEntry::Divider));
         assert!(pos(RailEntry::Divider) < pos(RailEntry::Nav(NavItem::AllCaptures)));
         assert!(pos(RailEntry::Nav(NavItem::Agents)) < pos(RailEntry::Spacer));
         // Settings is pinned below the spacer.
         assert!(pos(RailEntry::Spacer) < pos(RailEntry::Nav(NavItem::Settings)));
-    }
-
-    #[test]
-    fn rail_has_the_two_extra_tiles_above_the_divider() {
-        let rail = rail_layout();
-        let pos = |e: RailEntry| rail.iter().position(|x| *x == e).unwrap();
-        let (l, g) = (
-            pos(RailEntry::Extra(ExtraTile::LongShot)),
-            pos(RailEntry::Extra(ExtraTile::ClickGuide)),
-        );
-        assert!(pos(RailEntry::RecordAudio) < l && l < g && g < pos(RailEntry::Divider));
     }
 
     fn facts() -> DockFacts {
@@ -1191,29 +1535,6 @@ mod tests {
         assert_eq!((off.line.as_str(), off.footer()), ("why", None));
     }
 
-    /// CG-11: the two label lines, the icon and the keycaps fit the tile in both rows.
-    #[test]
-    fn dock_tile_height_holds_two_label_lines_and_the_keycaps() {
-        use tile_metrics::*;
-        assert!(content(false) <= height(false, 2.0) && content(true) <= height(true, 2.0));
-        // One-line labels keep the board's heights.
-        assert_eq!((height(false, 1.0), height(true, 1.0)), (54.0, 70.0));
-    }
-
-    /// 0.3.6 P-9: a tile whose label wraps is taller, so its icon starts below the Preview tag.
-    #[test]
-    fn a_two_line_tile_leaves_the_icon_clear_of_the_tag() {
-        use tile_metrics::*;
-        let h = height(false, 2.0);
-        let icon_top = (h - (ICON + GAP + 2.0 * LABEL_LINE)) / 2.0;
-        assert!(
-            icon_top + BORDER / 2.0 >= TAG_REACH + TAG_GAP,
-            "icon at {icon_top}"
-        );
-        assert_eq!(label_lines(LABEL_ROOM + 1.0), 2.0);
-        assert_eq!(label_lines(LABEL_ROOM - 1.0), 1.0);
-    }
-
     #[test]
     fn s14_accessible_names_carry_the_state() {
         let guide = ExtraTile::ClickGuide;
@@ -1286,7 +1607,10 @@ mod tests {
         );
         assert_eq!(DockAction::Record.label(), "Record\u{2026}");
         assert_eq!(
-            DockAction::TILES.map(DockAction::label),
+            DockMode::ALL[..3]
+                .iter()
+                .map(|m| m.label())
+                .collect::<Vec<_>>(),
             ["Region", "Window", "Display"]
         );
     }

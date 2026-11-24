@@ -166,6 +166,14 @@ pub fn kind_counts(items: &[CaptureItem]) -> crate::nav::NavCounts {
         recordings: Some(n(Kind::Recording)),
         audio: Some(n(Kind::Audio)),
         guides: Some(n(Kind::Guide)),
+        // The amber dot of All captures (SB-3): the same test as the "Needs attention" chip,
+        // without the sign-in waits that only the view knows.
+        attention: Some(
+            items
+                .iter()
+                .filter(|i| crate::published::needs_attention(&i.publishes, false))
+                .count(),
+        ),
     }
 }
 
