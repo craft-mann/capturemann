@@ -626,9 +626,9 @@ mod tests {
         let menus = app_menus();
         assert_eq!(menus.len(), 1);
         assert_eq!(menus[0].name.as_ref(), "CaptureMann");
-        // Library, Long Shot, New Click Guide, Click Guide of a window, Import, Settings, a
-        // separator and Quit.
-        assert_eq!(menus[0].items.len(), 8);
+        // Quick Capture, Library, Long Shot, New Click Guide, Click Guide of a window, Import,
+        // Settings, a separator and Quit.
+        assert_eq!(menus[0].items.len(), 9);
     }
 }
 
