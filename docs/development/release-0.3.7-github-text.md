@@ -44,9 +44,9 @@ Reports are in `verification/` and all are **PARTIAL**. The overlay windows (bar
 
 | System | Result | Report |
 |---|---|---|
-| Windows 11 (lab build of `f25ab382`, no speaker engine) | <FILL: standard / full / hardware counts> | `L1-windows-0.3.7-lab-f25ab382-regression-*` |
-| macOS arm64 (dev bundle of `<FILL: sha>`) | <FILL> | `L1-macos-0.3.7-*` |
-| Linux x86_64 (ThinkPad, Ubuntu 24.04) | <FILL or "not run"> | `L1-linux-0.3.7-*` |
+| Windows 11 (lab build of `f25ab382`, no speaker engine, screen only) | standard 57 passed, 0 failed, 7 skipped of 64; full 66 / 0 / 14 of 80; hardware 66 / 0 / 22 of 88 | `L1-windows-0.3.7-lab-f25ab382-regression-*` |
+| macOS arm64 (dev bundle, screen locked overnight so desktop cases skipped; to be repeated on the DMG) | standard 43 / 0 / 21 of 64; full 44 / 0 / 36 of 80 | `L1-macos-0.3.7-regression-*` |
+| Linux x86_64 (ThinkPad, Ubuntu 24.04) | not run on the night of Nov 24 (the laptop did not come back from the switch to Ubuntu) | `L1-linux-0.3.7-*` |
 | <FILL: the final files per system: Windows CI package, macOS DMGs, Linux tarballs and .deb> | <FILL> | <FILL> |
 | Bar checks (Linux X11, Windows) | strip click-through, drag, return after a capture, default place | `QC-0.3.7-bugfix-checks-2026-11-22-claude.md` |
 
