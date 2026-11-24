@@ -1232,6 +1232,54 @@ fn cases() -> Vec<Case> {
             cm_i18n::tr_ctx!("window list", "Front to back").to_uppercase()
         }),
     );
+    // ---- Library header (S037) -----------------------------------------------------------------
+    // The search placeholder: a 300 px field (320 at most) minus 13 + 13 padding, 2 border, a 16 px
+    // icon and 8 gap, and the keycap on the right (Ctrl+F in mono 12, 7 + 7 padding, 2 border, about
+    // 64) with an 8 px gap. Cut by the field (`truncate`).
+    v.push(
+        Case::new(
+            "Library search placeholder",
+            "300 - 26 - 2 - 16 - 8 - 64 - 8",
+            300. - 26. - 2. - 16. - 8. - 64. - 8.,
+            13.,
+            400,
+            Overflow::Ellipsis,
+        )
+        .texts(
+            [
+                crate::library::Filter::All,
+                crate::library::Filter::Recordings,
+                crate::library::Filter::Screenshots,
+                crate::library::Filter::Audio,
+                crate::library::Filter::Guides,
+            ]
+            .into_iter()
+            .map(|f| {
+                t(format!("search_placeholder({f:?})"), move || {
+                    crate::library::search_placeholder(f)
+                })
+            }),
+        ),
+    );
+    // A status chip: 12 padding twice, 2 border, a 15 px icon, a 7 px gap, the label (13), a 7 px
+    // gap and a three digit count (about 24). The chips wrap, so each must fit alone in the 560 px
+    // of the narrowest main area.
+    v.push(
+        Case::new(
+            "Library filter chip",
+            "560 (chips wrap)",
+            560.,
+            13.,
+            400,
+            one,
+        )
+        .needed("widest chip with a three digit count", || {
+            crate::library::Chip::ALL
+                .iter()
+                .map(|c| width(&c.label(), Face::Regular, 13.) + 24. + 2. + 15. + 7. + 7. + 24.)
+                .fold(0., f32::max)
+        }),
+    );
     // Include chips wrap, so each must fit alone in 554: 10 + 15 icon + 8 gap + label (13) + 8 gap
     // + 13 icon + 12 padding + 2 border.
     v.push(

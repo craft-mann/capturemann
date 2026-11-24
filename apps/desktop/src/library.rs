@@ -169,6 +169,52 @@ pub fn kind_counts(items: &[CaptureItem]) -> crate::nav::NavCounts {
     }
 }
 
+/// The "Needs attention" rule (S037): shown only when its count is above 0; an active filter
+/// stays visible so it can be turned off.
+pub fn attention_chip_visible(count: Option<usize>, active: bool) -> bool {
+    active || count.is_some_and(|n| n > 0)
+}
+
+/// The search field's text for a type (S037): it names its scope.
+pub fn search_placeholder(page: Filter) -> String {
+    match page {
+        Filter::All => tr!("Search all captures"),
+        Filter::Recordings => tr!("Search recordings"),
+        Filter::Screenshots => tr!("Search screenshots"),
+        Filter::Audio => tr!("Search audio"),
+        Filter::Guides => tr!("Search click guides"),
+    }
+}
+
+/// The captures that have a publish, with whether one has a warning or a locked privacy.
+pub fn published_flags(items: &[CaptureItem]) -> Vec<(String, bool)> {
+    items
+        .iter()
+        .filter(|i| !i.publishes.is_empty())
+        .map(|i| {
+            (
+                i.id.clone(),
+                i.publishes.iter().any(|r| {
+                    !r.warnings.is_empty()
+                        || r.state == crate::published::PublishState::PrivacyLocked
+                }),
+            )
+        })
+        .collect()
+}
+
+/// How many captures need attention: the whole library's publishes (`(id, has a warning)`) and
+/// the captures whose upload waits for a sign-in.
+pub fn attention_count(
+    published: &[(String, bool)],
+    waiting: &std::collections::HashSet<String>,
+) -> usize {
+    published
+        .iter()
+        .filter(|(id, warned)| *warned || waiting.contains(id))
+        .count()
+}
+
 /// One row of `list_library`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaptureItem {
@@ -364,20 +410,19 @@ pub enum Chip {
     Published,
     /// Publishes with a warning, or an upload waiting for a sign-in (S22); filtered on this side.
     NeedsAttention,
-    /// Boards (BRD-1): screenshots made with "Make a board"; filtered on this side.
+    /// Boards (BRD-1): screenshots made with "Make a board"; filtered on this side. A view, not
+    /// a status: the last chip, after a divider (S037).
     Boards,
-    /// Click Guides (S11): only guides, on "All captures" (applied to the loaded page).
-    Guides,
 }
 
 impl Chip {
-    pub const ALL: [Chip; 6] = [
+    /// The bar's order (S037): Needs attention first, then the statuses, then the Boards view.
+    pub const ALL: [Chip; 5] = [
+        Chip::NeedsAttention,
         Chip::Imported,
         Chip::Uploaded,
         Chip::Published,
-        Chip::NeedsAttention,
         Chip::Boards,
-        Chip::Guides,
     ];
 
     pub fn label(self) -> String {
@@ -387,20 +432,19 @@ impl Chip {
             Chip::Published => tr_ctx!("filter chip", "Published"),
             Chip::NeedsAttention => tr_ctx!("filter chip", "Needs attention"),
             Chip::Boards => tr_ctx!("filter chip", "Boards"),
-            Chip::Guides => tr_ctx!("filter chip", "Click Guides"),
         }
     }
 
     /// Whether the chip means something on a page of this kind: a recording is the only thing
-    /// that is published (YouTube), a board is a screenshot, and a Click Guide has its own page.
+    /// that is published (YouTube) and a board is a screenshot. The statuses Imported and
+    /// Uploaded combine with every type (S037).
     pub fn applies_to(self, page: Filter) -> bool {
         match self {
-            Chip::Imported | Chip::Uploaded => page != Filter::Guides,
+            Chip::Imported | Chip::Uploaded => true,
             Chip::Published | Chip::NeedsAttention => {
                 matches!(page, Filter::All | Filter::Recordings)
             }
             Chip::Boards => matches!(page, Filter::All | Filter::Screenshots),
-            Chip::Guides => page == Filter::All,
         }
     }
 
@@ -412,7 +456,6 @@ impl Chip {
             Chip::Published => "Published",
             Chip::NeedsAttention => "NeedsAttention",
             Chip::Boards => "Boards",
-            Chip::Guides => "Guides",
         }
     }
 
@@ -422,10 +465,8 @@ impl Chip {
             Chip::Imported => "cm-import",
             Chip::Uploaded => "cloud-upload",
             Chip::Published => "send",
-            // The board draws this chip without an icon.
-            Chip::NeedsAttention => "",
+            Chip::NeedsAttention => "triangle-alert",
             Chip::Boards => "layout-panel-left",
-            Chip::Guides => "mouse-pointer-click",
         }
     }
 }
@@ -565,8 +606,6 @@ pub struct LibraryState {
     pub imported_only: bool,
     /// The "Boards" chip: only boards (applied to the loaded page, like Imported).
     pub boards_only: bool,
-    /// The "Click Guides" chip: only guides (applied to the loaded page).
-    pub guides_only: bool,
     /// The "Needs attention" chip: only captures whose publishes need a look (applied to the
     /// loaded page, S22).
     pub attention_only: bool,
@@ -596,7 +635,6 @@ impl LibraryState {
             remote: None,
             imported_only: false,
             boards_only: false,
-            guides_only: false,
             attention_only: false,
             waiting: std::collections::HashSet::new(),
             published_ids: None,
@@ -620,18 +658,22 @@ impl LibraryState {
         match chip {
             Chip::Imported => self.imported_only,
             Chip::Boards => self.boards_only,
-            Chip::Guides => self.guides_only,
             Chip::NeedsAttention => self.attention_only,
             Chip::Uploaded => self.remote == Some(RemoteFilter::Uploaded),
             Chip::Published => self.remote == Some(RemoteFilter::Published),
         }
     }
 
-    /// The chips the current page shows, in order.
+    /// The chips the current page shows, in order. "Needs attention" shows only while its count
+    /// is above 0 (or while it is on, so it can be turned off).
     pub fn page_chips(&self) -> Vec<Chip> {
         Chip::ALL
             .into_iter()
             .filter(|c| c.applies_to(self.filter))
+            .filter(|c| {
+                *c != Chip::NeedsAttention
+                    || attention_chip_visible(self.chip_count(*c), self.attention_only)
+            })
             .collect()
     }
 
@@ -653,9 +695,6 @@ impl LibraryState {
         }
         if !Chip::Boards.applies_to(page) {
             self.boards_only = false;
-        }
-        if !Chip::Guides.applies_to(page) {
-            self.guides_only = false;
         }
         if !Chip::NeedsAttention.applies_to(page) {
             self.attention_only = false;
@@ -722,7 +761,6 @@ impl LibraryState {
             .iter()
             .filter(|i| !self.imported_only || i.imported_from.is_some())
             .filter(|i| !self.boards_only || i.board.is_some())
-            .filter(|i| !self.guides_only || i.kind == Kind::Guide)
             .filter(|i| !self.attention_only || self.item_needs_attention(i))
             .cloned()
             .collect()
@@ -775,11 +813,6 @@ impl LibraryState {
                 self.selected = None;
                 return false;
             }
-            Chip::Guides => {
-                self.guides_only = !self.guides_only;
-                self.selected = None;
-                return false;
-            }
             Chip::NeedsAttention => {
                 self.attention_only = !self.attention_only;
                 self.selected = None;
@@ -812,9 +845,6 @@ impl LibraryState {
         if chip == Chip::Boards {
             return Some(self.items.iter().filter(|i| i.board.is_some()).count());
         }
-        if chip == Chip::Guides {
-            return Some(self.items.iter().filter(|i| i.kind == Kind::Guide).count());
-        }
         if chip == Chip::NeedsAttention {
             self.remote_counts?;
             return self.published_ids.as_ref().map(|v| {
@@ -825,7 +855,7 @@ impl LibraryState {
         }
         let (up, publ) = self.remote_counts?;
         match chip {
-            Chip::Imported | Chip::Boards | Chip::Guides | Chip::NeedsAttention => None,
+            Chip::Imported | Chip::Boards | Chip::NeedsAttention => None,
             Chip::Uploaded => Some(up),
             Chip::Published => Some(publ),
         }
@@ -842,21 +872,7 @@ impl LibraryState {
                     .filter(|i| !i.publishes.is_empty())
                     .count(),
             ));
-            self.published_ids = Some(
-                self.items
-                    .iter()
-                    .filter(|i| !i.publishes.is_empty())
-                    .map(|i| {
-                        (
-                            i.id.clone(),
-                            i.publishes.iter().any(|r| {
-                                !r.warnings.is_empty()
-                                    || r.state == crate::published::PublishState::PrivacyLocked
-                            }),
-                        )
-                    })
-                    .collect(),
-            );
+            self.published_ids = Some(published_flags(&self.items));
         }
     }
 
@@ -1207,12 +1223,11 @@ mod tests {
         assert_eq!(
             Chip::ALL,
             [
+                Chip::NeedsAttention,
                 Chip::Imported,
                 Chip::Uploaded,
                 Chip::Published,
-                Chip::NeedsAttention,
                 Chip::Boards,
-                Chip::Guides
             ]
         );
         assert!(!s.chip_active(Chip::Uploaded) && !s.chip_active(Chip::Published));
@@ -1241,30 +1256,125 @@ mod tests {
             s.filter = f;
             s.page_chips()
         };
-        assert_eq!(on(Filter::All), Chip::ALL.to_vec());
+        // "Needs attention" has no count yet, so it is not shown (S037).
         assert_eq!(
-            on(Filter::Recordings),
+            on(Filter::All),
             [
                 Chip::Imported,
                 Chip::Uploaded,
                 Chip::Published,
-                Chip::NeedsAttention
+                Chip::Boards
             ]
+        );
+        assert_eq!(
+            on(Filter::Recordings),
+            [Chip::Imported, Chip::Uploaded, Chip::Published]
         );
         assert_eq!(
             on(Filter::Screenshots),
             [Chip::Imported, Chip::Uploaded, Chip::Boards]
         );
         assert_eq!(on(Filter::Audio), [Chip::Imported, Chip::Uploaded]);
-        assert!(on(Filter::Guides).is_empty());
+        // The statuses combine with every type, Click Guides included (S037).
+        assert_eq!(on(Filter::Guides), [Chip::Imported, Chip::Uploaded]);
         let mut s = LibraryState::new(LibraryStatus::Ready);
         s.boards_only = true;
-        s.guides_only = true;
         s.remote = Some(RemoteFilter::Published);
         s.attention_only = true;
         s.filter = Filter::Audio;
         s.drop_inapplicable_chips();
-        assert!(!s.boards_only && !s.guides_only && s.remote.is_none() && !s.attention_only);
+        assert!(!s.boards_only && s.remote.is_none() && !s.attention_only);
+    }
+
+    /// S037: the status chips combine with the type of the sidebar. Uploaded and Published go to
+    /// the daemon with the page's kind; the chip bar holds no type.
+    #[test]
+    fn s037_status_combines_with_every_type() {
+        let kinds = [
+            (Filter::All, None),
+            (Filter::Recordings, Some("recording")),
+            (Filter::Screenshots, Some("screenshot")),
+            (Filter::Audio, Some("audio")),
+            (Filter::Guides, Some("guide")),
+        ];
+        for (page, kind) in kinds {
+            let mut s = LibraryState::new(LibraryStatus::Ready);
+            s.filter = page;
+            assert!(s.click_chip(Chip::Uploaded), "{page:?}");
+            assert_eq!(s.filter.daemon_kind(), kind);
+            assert_eq!(s.remote.map(RemoteFilter::daemon_status), Some("uploaded"));
+            // Imported is filtered here and keeps the type.
+            assert!(!s.click_chip(Chip::Imported));
+            assert!(s.chip_active(Chip::Imported) && s.chip_active(Chip::Uploaded));
+            assert_eq!(s.filter, page);
+            // Changing the type keeps the statuses that mean something there.
+            s.filter = Filter::Recordings;
+            s.drop_inapplicable_chips();
+            assert!(s.chip_active(Chip::Imported) && s.chip_active(Chip::Uploaded));
+        }
+        // Published stays on All captures and Recordings, as before.
+        for page in [Filter::Screenshots, Filter::Audio, Filter::Guides] {
+            assert!(!Chip::Published.applies_to(page), "{page:?}");
+        }
+        assert!(Chip::Published.applies_to(Filter::All));
+        assert!(Chip::Published.applies_to(Filter::Recordings));
+    }
+
+    /// S037: Needs attention comes first, and shows only while its count is above 0 (or while it
+    /// is on); Boards is the last chip, a view after the statuses.
+    #[test]
+    fn s037_needs_attention_is_first_and_hidden_at_zero() {
+        assert!(!attention_chip_visible(None, false));
+        assert!(!attention_chip_visible(Some(0), false));
+        assert!(attention_chip_visible(Some(1), false));
+        assert!(attention_chip_visible(Some(0), true), "on stays visible");
+        assert_eq!(Chip::ALL.first(), Some(&Chip::NeedsAttention));
+        assert_eq!(Chip::ALL.last(), Some(&Chip::Boards));
+        let mut s = LibraryState::new(LibraryStatus::Ready);
+        let t = s.begin_load();
+        s.finish_load(
+            t,
+            Ok(PageCollector {
+                skipped: 0,
+                cap: 500,
+                items: vec![published_item(
+                    "warned",
+                    "2026-10-22T10:00:00Z",
+                    Some("Captions not added"),
+                    5,
+                )],
+                truncated: false,
+            }),
+        );
+        s.update_remote_counts();
+        assert_eq!(
+            s.page_chips(),
+            [
+                Chip::NeedsAttention,
+                Chip::Imported,
+                Chip::Uploaded,
+                Chip::Published,
+                Chip::Boards
+            ]
+        );
+        let published = vec![("a".to_owned(), true), ("b".to_owned(), false)];
+        let none = std::collections::HashSet::new();
+        assert_eq!(attention_count(&published, &none), 1);
+        let waiting: std::collections::HashSet<String> = ["b".to_owned()].into();
+        assert_eq!(attention_count(&published, &waiting), 2);
+    }
+
+    /// S037: the search field names its scope.
+    #[test]
+    fn s037_search_placeholder_follows_the_type() {
+        assert_eq!(search_placeholder(Filter::All), "Search all captures");
+        assert_eq!(search_placeholder(Filter::Recordings), "Search recordings");
+        assert_eq!(
+            search_placeholder(Filter::Screenshots),
+            "Search screenshots"
+        );
+        assert_eq!(search_placeholder(Filter::Audio), "Search audio");
+        assert_eq!(search_placeholder(Filter::Guides), "Search click guides");
     }
 
     /// LIB-1: the chips show how many captures are uploaded and published, counted from an
