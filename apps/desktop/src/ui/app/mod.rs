@@ -166,6 +166,10 @@ pub struct AppModel {
     pub theme_override: Option<ThemePreference>,
     /// Real library counts for the sidebar, set by the library view after an unfiltered load.
     pub counts: NavCounts,
+    /// How many captures in the whole library need attention (a publish with a warning, or an
+    /// upload waiting for a sign-in), set by the library view; `None` until the library is
+    /// read. The sidebar draws its amber dot on All captures when this is above 0 (S037).
+    pub attention: Option<usize>,
     pub copy_after_capture: bool,
     /// The library folder change in progress (Settings, General; LIB-2).
     pub library_move: crate::library_move::Phase,
@@ -291,6 +295,7 @@ impl AppModel {
             language: crate::settings::language_from_settings(&settings),
             theme_override: None,
             counts: NavCounts::default(),
+            attention: None,
             copy_after_capture,
             library_move: crate::library_move::Phase::default(),
             import: Default::default(),

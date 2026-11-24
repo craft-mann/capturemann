@@ -119,6 +119,9 @@ pub struct LibraryView {
     multi: BTreeSet<String>,
     /// Captures whose upload or publish waits for a Google sign-in (B1): capture id -> job id.
     waiting: Arc<HashMap<String, String>>,
+    /// The whole library's captures that have a publish, with whether one has a warning, from
+    /// the last unfiltered read: the base of `AppModel::attention`.
+    lib_published: Vec<(String, bool)>,
     _subs: Vec<Subscription>,
 }
 
@@ -129,7 +132,12 @@ impl LibraryView {
         // The clear button shows only with text; the first Esc clears, the second leaves the field
         // (the Escaped handler below).
         let search = cx.new(|cx| {
-            TextField::new(tr!("Search captures"), tr!("Search by title"), cx).clearable()
+            TextField::new(
+                tr!("Search captures"),
+                crate::library::search_placeholder(Filter::All),
+                cx,
+            )
+            .clearable()
         });
         let thumbs = cx.new(|_| ThumbCache::new(backend.clone()));
         let audio = cx.new(|_| AudioCache::new(backend.clone()));
@@ -230,6 +238,7 @@ impl LibraryView {
             pending_invalidate: Vec::new(),
             multi: BTreeSet::new(),
             waiting: Arc::new(HashMap::new()),
+            lib_published: Vec::new(),
             _subs: subs,
         };
         view.reload(cx);
@@ -328,7 +337,7 @@ impl LibraryView {
     }
 
     /// Publishes the real per-kind totals to the sidebar after an unfiltered load.
-    fn publish_counts(&self, cx: &mut Context<Self>) {
+    fn publish_counts(&mut self, cx: &mut Context<Self>) {
         if !self.state.is_whole_library() {
             return;
         }
@@ -337,7 +346,23 @@ impl LibraryView {
         } else {
             NavCounts::default()
         };
+        if matches!(self.state.status, LibraryStatus::Ready) {
+            self.lib_published = crate::library::published_flags(self.state.items());
+            self.publish_attention(cx);
+        }
         self.set_counts(counts, cx);
+    }
+
+    /// Tells the app model how many captures of the whole library need attention.
+    fn publish_attention(&self, cx: &mut Context<Self>) {
+        let waiting: std::collections::HashSet<String> = self.waiting.keys().cloned().collect();
+        let n = crate::library::attention_count(&self.lib_published, &waiting);
+        self.app.update(cx, |m, cx| {
+            if m.attention != Some(n) {
+                m.attention = Some(n);
+                cx.notify();
+            }
+        });
     }
 
     fn set_counts(&self, counts: NavCounts, cx: &mut Context<Self>) {
@@ -371,6 +396,8 @@ impl LibraryView {
                 if generation != this.counts_gen {
                     return;
                 }
+                this.lib_published = crate::library::published_flags(&all.items);
+                this.publish_attention(cx);
                 this.set_counts(kind_counts(&all.items), cx);
             })
             .ok();
@@ -414,10 +441,7 @@ impl LibraryView {
         if self.state.click_chip(chip) {
             self.keep_scroll = false;
             self.reload(cx);
-        } else if matches!(
-            chip,
-            Chip::Imported | Chip::Boards | Chip::Guides | Chip::NeedsAttention
-        ) {
+        } else if matches!(chip, Chip::Imported | Chip::Boards | Chip::NeedsAttention) {
             // Filtered here: the page is already loaded.
             self.keep_scroll = false;
             self.sync_items(cx);
@@ -553,6 +577,7 @@ impl LibraryView {
                         this.waiting = Arc::new(map);
                         // The "Needs attention" chip counts and filters on these (S22).
                         this.state.set_waiting(this.waiting.keys());
+                        this.publish_attention(cx);
                         this.sync_items(cx);
                         cx.notify();
                     }
@@ -1836,7 +1861,33 @@ fn render_row(ctx: &RowCtx, ix: usize, cx: &mut gpui::App) -> AnyElement {
     }
 }
 
-/// An Uploaded or Published chip: a 32 px pill with a leading icon, the label and the live count
+/// The amber of "Needs attention" (design S037): #F5B84A, its text and its outline and fills.
+const ATTENTION: Color = Color::rgb(0xF5B84A);
+const ATTENTION_TEXT: Color = Color::rgb(0xF5D9A8);
+const ATTENTION_LINE: Color = Color::rgb_a(0xF5B84A, 45);
+const ATTENTION_BG: Color = Color::rgb_a(0xF5B84A, 7);
+const ATTENTION_BG_ON: Color = Color::rgb_a(0xF5B84A, 16);
+
+/// Whether a divider goes before the chip at `ix` (design S037): after "Needs attention" when
+/// statuses follow, and before the Boards view when something precedes it.
+pub fn chip_divider_before(chips: &[Chip], ix: usize) -> bool {
+    match chips.get(ix) {
+        Some(Chip::Boards) => ix > 0,
+        Some(_) => ix > 0 && chips[ix - 1] == Chip::NeedsAttention,
+        None => false,
+    }
+}
+
+/// The keycap on the search field (design S037): the chord that focuses it.
+pub fn search_hint() -> &'static str {
+    if crate::shortcuts::Platform::current() == crate::shortcuts::Platform::Mac {
+        "\u{2318}F"
+    } else {
+        "Ctrl+F"
+    }
+}
+
+/// A status or view chip: a 32 px pill with a leading icon, the label and the live count
 /// in mono. A toggle (the page reloads with that status), so it keeps the tab semantics it had.
 fn filter_chip(
     t: &Theme,
@@ -1845,7 +1896,15 @@ fn filter_chip(
     active: bool,
 ) -> gpui::Stateful<gpui::Div> {
     let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
-    let fg = if active { t.text } else { t.text_3 };
+    // "Needs attention" is amber and outlined (design S037); the others are neutral.
+    let amber = chip == Chip::NeedsAttention;
+    let fg = if amber {
+        ATTENTION_TEXT
+    } else if active {
+        t.text
+    } else {
+        t.text_3
+    };
     let aria = match count {
         Some(n) => tr!("{name}, {n}", name = chip.label(), n = n),
         None => chip.label(),
@@ -1865,14 +1924,33 @@ fn filter_chip(
         .gap(px(7.))
         .rounded(px(scale::RADIUS_PILL))
         .border_1()
-        .border_color(rgba_of(if active { t.text_3 } else { t.line }))
+        .border_color(rgba_of(if amber {
+            ATTENTION_LINE
+        } else if active {
+            t.text_3
+        } else {
+            t.line
+        }))
         .text_size(px(13.))
         .text_color(rgba_of(fg))
         .cursor_pointer()
-        .when(active, |d| d.bg(rgba_of(t.raised)))
-        .when(!active, |d| d.hover(move |s| s.bg(hover)))
+        .when(amber, |d| {
+            d.bg(rgba_of(if active {
+                ATTENTION_BG_ON
+            } else {
+                ATTENTION_BG
+            }))
+        })
+        .when(!amber && active, |d| d.bg(rgba_of(t.raised)))
+        .when(!active && !amber, |d| d.hover(move |s| s.bg(hover)))
         .focus_visible(move |s| s.border_color(focus))
-        .children((!chip.glyph().is_empty()).then(|| icon(chip.glyph(), icon_size::SMALL, fg)))
+        .children((!chip.glyph().is_empty()).then(|| {
+            icon(
+                chip.glyph(),
+                icon_size::SMALL,
+                if amber { ATTENTION } else { fg },
+            )
+        }))
         .child(chip.label())
         .children(count.map(|n| {
             div()
@@ -1945,9 +2023,6 @@ impl Render for LibraryView {
         if self.seen_lang != cm_i18n::epoch() {
             self.seen_lang = cm_i18n::epoch();
             self.rows_dirty = true;
-            self.search.update(cx, |s, cx| {
-                s.set_labels(tr!("Search captures"), tr!("Search by title"), cx)
-            });
             self.seen_search_route = None;
             self.rename_input.update(cx, |s, cx| {
                 s.set_labels(tr!("New title"), tr_ctx!("field", "Title"), cx)
@@ -1971,13 +2046,16 @@ impl Render for LibraryView {
         };
         if self.seen_search_route.as_ref() != Some(&route) {
             self.seen_search_route = Some(route.clone());
-            let hint = if route == Route::Audio {
+            // The placeholder names the type chosen in the sidebar (design S037).
+            let page = nav::library_filter(&route).unwrap_or(Filter::All);
+            let label = if route == Route::Audio {
                 tr!("Search titles and what was said")
             } else {
-                tr!("Search by title")
+                tr!("Search captures")
             };
+            let hint = crate::library::search_placeholder(page);
             self.search
-                .update(cx, |s, cx| s.set_labels(tr!("Search captures"), hint, cx));
+                .update(cx, |s, cx| s.set_labels(label, hint, cx));
         }
         let avail = (f32::from(window.viewport_size().width) - SIDEBAR_WIDTH - PAGE_PADDING * 2.)
             .max(CARD_FLOOR);
@@ -2103,10 +2181,23 @@ impl Render for LibraryView {
             )
             .child(
                 div()
+                    .relative()
                     .w(px(320.))
                     .max_w_full()
                     .flex_none()
-                    .child(self.search.clone()),
+                    .child(self.search.clone())
+                    // The chord, on the right while the field is empty (the clear button takes
+                    // the place when there is text). The field gets the click.
+                    .children(self.search.read(cx).text().is_empty().then(|| {
+                        div()
+                            .absolute()
+                            .right(px(10.))
+                            .top_0()
+                            .bottom_0()
+                            .flex()
+                            .items_center()
+                            .child(crate::ui::components::keycap(&t, search_hint()))
+                    })),
             )
             .child(crate::ui::import_cards::header_button(&t, &self.app))
             .children((route == Route::Audio).then(|| {
@@ -2125,14 +2216,29 @@ impl Render for LibraryView {
         // ---- toolbar: the chips and the sort bar -------------------------------------------
         let page_chips = self.state.page_chips();
         let has_chips = !page_chips.is_empty();
-        let chips = page_chips.into_iter().map(|c| {
+        // Needs attention, a divider, the statuses, a divider, then the Boards view (S037).
+        let mut chips: Vec<AnyElement> = Vec::new();
+        for (ix, c) in page_chips.iter().copied().enumerate() {
+            if chip_divider_before(&page_chips, ix) {
+                chips.push(
+                    div()
+                        .flex_none()
+                        .w(px(1.))
+                        .h(px(20.))
+                        .mx(px(4.))
+                        .bg(rgba_of(t.line))
+                        .into_any_element(),
+                );
+            }
             let v = view.clone();
-            filter_chip(&t, c, self.state.chip_count(c), self.state.chip_active(c)).on_click(
-                move |_, _, cx| {
-                    v.update(cx, |this, cx| this.click_chip(c, cx)).ok();
-                },
-            )
-        });
+            chips.push(
+                filter_chip(&t, c, self.state.chip_count(c), self.state.chip_active(c))
+                    .on_click(move |_, _, cx| {
+                        v.update(cx, |this, cx| this.click_chip(c, cx)).ok();
+                    })
+                    .into_any_element(),
+            );
+        }
         let sorts = self.state.offered_sorts().into_iter().map(|k| {
             let v = view.clone();
             sort_segment(&t, k, self.state.sort == k, self.state.descending).on_click(
@@ -2152,18 +2258,13 @@ impl Render for LibraryView {
             .border_color(rgba_of(t.border))
             .children(has_chips.then(|| {
                 div()
-                    .mr(px(2.))
-                    .text_size(px(type_scale::CAPTION))
-                    .text_color(rgba_of(t.faint))
-                    .child(tr_ctx!("filter label", "Show"))
-            }))
-            .children(has_chips.then(|| {
-                div()
                     .id("filters")
                     .role(Role::TabList)
                     .aria_label(tr!("Filter captures"))
                     .flex()
-                    .gap(px(10.))
+                    .flex_wrap()
+                    .items_center()
+                    .gap(px(8.))
                     .children(chips)
             }))
             .child(
@@ -3013,5 +3114,35 @@ mod rename_tests {
         assert!(!rename_allowed(" Demo ", "Demo"));
         assert!(rename_allowed("Demo 2", "Demo"));
         assert!(rename_allowed("demo", "Demo"));
+    }
+}
+
+#[cfg(test)]
+mod s037_header_tests {
+    use super::*;
+
+    /// A divider follows "Needs attention" and goes before Boards (design S037).
+    #[test]
+    fn dividers_follow_needs_attention_and_precede_boards() {
+        let all = [
+            Chip::NeedsAttention,
+            Chip::Imported,
+            Chip::Uploaded,
+            Chip::Published,
+            Chip::Boards,
+        ];
+        let at: Vec<bool> = (0..all.len())
+            .map(|i| chip_divider_before(&all, i))
+            .collect();
+        assert_eq!(at, [false, true, false, false, true]);
+        // Without "Needs attention" only the Boards divider is left.
+        let few = [Chip::Imported, Chip::Uploaded];
+        assert!(!chip_divider_before(&few, 0) && !chip_divider_before(&few, 1));
+        assert!(!chip_divider_before(&[Chip::Boards], 0));
+    }
+
+    #[test]
+    fn the_search_chord_is_a_platform_key() {
+        assert!(matches!(search_hint(), "\u{2318}F" | "Ctrl+F"));
     }
 }
