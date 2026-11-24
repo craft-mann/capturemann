@@ -215,6 +215,11 @@ pub fn display_for(cx: &App, area: &Rect) -> Option<(DisplayId, Rect)> {
     pick_display(&rects, area).map(|i| all[i])
 }
 
+/// The display that holds the global point `(x, y)`, if any.
+pub fn display_at(cx: &App, x: f64, y: f64) -> Option<(DisplayId, Rect)> {
+    displays(cx).into_iter().find(|(_, r)| r.contains(x, y))
+}
+
 /// The display holding the pointer, else the primary one.
 pub fn pointer_display(cx: &App) -> Option<(DisplayId, Rect)> {
     let all = displays(cx);

@@ -32,7 +32,7 @@ use crate::ui::app::{self, AppModel};
 use crate::ui::components::{icon, logo};
 use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
 use crate::ui::preview_label::{label as preview_label, PreviewFeature, Size};
-use crate::ui::recording::{panel_options, pointer_display, visible_part};
+use crate::ui::recording::{display_at, panel_options, pointer_display, visible_part};
 use crate::ui::text_field::{TextField, TextFieldEvent};
 
 /// How long the pointer or the keyboard focus rests on a control before its tooltip shows.
@@ -96,7 +96,11 @@ fn open_panel_at(app: &Entity<AppModel>, anchor: Anchor, at: Option<Rect>, cx: &
         (m.quick.panel.clone(), m.backend.clone())
     };
     let _ = backend;
-    let Some(display) = pointer_display(cx) else {
+    // Coming back, the bar is on the display it was on, not the one under the pointer.
+    let Some(display) = at
+        .and_then(|r| display_at(cx, r.x + 1.0, r.y + 1.0))
+        .or_else(|| pointer_display(cx))
+    else {
         return;
     };
     let visible = visible_part(&display.1);
@@ -408,6 +412,24 @@ impl QuickPanel {
         }
     }
 
+    /// Where the window is now: the system moves it when the user drags its background (macOS,
+    /// Windows), and on X11 the app moves it, so `home` can be stale.
+    fn where_now(&self, window: &Window) -> Rect {
+        if let Some((x, y, _, _)) = crate::platform_window::frame(window) {
+            return Rect::new(x, y, self.home.w, self.home.h);
+        }
+        if let Some((x, y)) = crate::platform_window::x11_window_origin(window) {
+            let scale = f64::from(window.scale_factor()).max(0.1);
+            return Rect::new(
+                f64::from(x) / scale,
+                f64::from(y) / scale,
+                self.home.w,
+                self.home.h,
+            );
+        }
+        self.home
+    }
+
     fn bar_h(&self) -> f64 {
         if self.rows2() {
             place::TWO_ROW_H
@@ -553,7 +575,7 @@ impl QuickPanel {
         let run = self.st.run();
         let preset = self.st.preset.as_ref().map(|p| p.name.clone());
         self.changed(cx);
-        cx.set_global(LastHome(Some(self.home)));
+        cx.set_global(LastHome(Some(self.where_now(window))));
         dismiss(window, cx, true);
         let app = self.app.clone();
         // The bar is gone by then: the wait runs on the app, not on the closed window.
