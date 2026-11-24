@@ -31,3 +31,4 @@ L2|src/ui/library_view.rs|SharedString::from(tr!("Upload waiting for sign-in")) 
 L2|src/ui/library_view.rs|tr!("Reconnect")  # menu item, the menu is as wide as its widest item
 L2|src/ui/library_view.rs|tr!("Cancel upload")  # menu item, the menu is as wide as its widest item
 L2|src/ui/recording/details.rs|SharedString::from(state.text)  # one-line status in a content-sized row
+L2|src/ui/sidebar.rs|SharedString::from(env!("CARGO_PKG_VERSION"))  # the version number is not translated and is a few characters long
