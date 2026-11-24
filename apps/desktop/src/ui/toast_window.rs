@@ -275,6 +275,10 @@ impl Render for ToastHost {
                     .relative()
                     .flex()
                     .flex_col()
+                    // Never shrunk to the window: the canvas below must report the height the cards
+                    // really need, so a long message grows the window instead of being cut off at
+                    // the end (0.3.7, the FFmpeg message on Windows).
+                    .flex_none()
                     .children(toasts.iter().map(|toast| toast_view(&t, toast, &self.app)))
                     .child(
                         canvas(
