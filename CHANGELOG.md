@@ -5,6 +5,27 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.3.7] - Unreleased
+
+Bug fixes and stabilisation, plus the sidebar cleanup (plan `specs/plans/release-0.3.7-plan.md`). No new capability; 90 MCP tools as in 0.3.6.
+
+### Changed
+- **Sidebar cleanup (SB-1 to SB-7).** Two calm buttons, Quick Capture… (⌥⇧C) and Record… (⌥⇧R, red only while recording); one row of six modes with the key printed under each icon (Region ⌥⇧1, Window ⌥⇧2, Display ⌥⇧3, Long Shot ⌥⇧4, Click Guide ⌥⇧5, Audio ⌥⇧V; Ctrl+Alt+Shift elsewhere) and a dot on Preview features; the library lists All captures with its count, then Screenshots, Recordings, Audio and Click Guides in a fixed order; the filter bar holds statuses only, Needs attention first and amber (shown only when above 0, with a matching dot on All captures), and Boards as a view; Agents & CLI shows Ready, Off or Busy; the version is quiet text with a dot after an update; under 960 pt the sidebar is an icon rail with tooltips. **New default shortcuts:** Long Shot ⌥⇧4 and Click Guide ⌥⇧5 (a cleared field stays cleared).
+- **Quick Capture bar stays until you close it.** After a capture, a recording or a Long Shot started from it, the bar steps aside and comes back at the same place on the same display: 0.2 s after a screenshot, 1.5 s after the last activity of a recording or Long Shot (QC-1.AC26). It first opens at the middle of the top of the display. **Quick Capture…** is the first item of the macOS app menu. On Video and Audio the Record button takes the room the kind leaves over.
+- The FFmpeg-missing message names the right fix per system: Homebrew on macOS, the package manager on Linux, nothing to install on Windows (also in Vietnamese).
+
+### Fixed
+- Quick Capture: the empty strip under the bar lets clicks through to the window below (macOS, Windows, X11); the bar can be dragged on X11; Tab and Shift+Tab move between the fields of the preset sheet; the bar opens without a 5 px shift on Windows and the picker no longer makes the window jump; closing the bar and opening the recording bar write no error lines; the Boards intro card closes with its sheet.
+- A long toast message grows its window instead of being cut off at the end.
+- Long Shot on Windows no longer joins frames that do not overlap on repeating bars (rows were left out in Edge).
+- The ambiguous-window error lists no titles of other applications' windows beyond what is needed to choose by id.
+- The Windows package's licence list is always the Windows crate set (it names its set in a `Crate set:` line; the Windows package build fails instead of falling back to the macOS list).
+- `cm-regress`: `desktop.second_launch` no longer kills or hides real instances, `desktop.hotkey_overlay` skips when another program holds the shortcut, `ai.transcribe` follows `--timeout-scale`.
+
+### Known limits
+- Transcripts: over audio that holds only room noise a made-up sentence can still pass the guard (D4); the measured rule the plan asked for was not built, so the limit stays.
+- Wayland: the bar opens at the top-left; Linux cannot keep the bar out of a capture another program starts.
+
 ## [0.3.6] - 2026-11-22
 
 ### Added
