@@ -52,6 +52,10 @@ pub enum Anchor {
 struct PanelSlot(Option<WindowHandle<QuickPanel>>);
 impl Global for PanelSlot {}
 
+/// Where the bar was when a run started from it: the bar comes back there once the run is over.
+struct LastHome(Option<Rect>);
+impl Global for LastHome {}
+
 /// The app that was frontmost when the bar opened (macOS), to hand focus back to.
 struct PreviousApp(Option<i32>);
 impl Global for PreviousApp {}
@@ -80,6 +84,12 @@ pub fn toggle(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
 }
 
 pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
+    open_panel_at(app, anchor, None, cx);
+}
+
+/// [`open_panel`], or with `at` (the bar's old top-left corner) where the bar comes back after a
+/// run: the same place when it is still on the display under the pointer.
+fn open_panel_at(app: &Entity<AppModel>, anchor: Anchor, at: Option<Rect>, cx: &mut App) {
     crate::ui::quick_flow::refresh_presets(app, cx);
     let (state, backend) = {
         let m = app.read(cx);
@@ -102,9 +112,13 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
         .then(|| app.read(cx).tray.as_ref().and_then(|t| t.icon_frame()))
         .flatten()
         .filter(|(ix, iy, _, _)| visible_contains(&display.1, *ix, *iy));
-    let global = match icon {
-        Some(icon) => crate::quick::place::tray_rect(icon, win_w, win_h, &visible),
-        None => panel_rect((px_, py_), win_w, win_h, &visible),
+    let back = at
+        .filter(|r| visible.contains(r.x, r.y))
+        .map(|r| place::toggled_home(&r, (win_w, win_h), &visible, true));
+    let global = match (back, icon) {
+        (Some(r), _) => r,
+        (None, Some(icon)) => crate::quick::place::tray_rect(icon, win_w, win_h, &visible),
+        (None, None) => panel_rect((px_, py_), win_w, win_h, &visible),
     };
     cx.set_global(PreviousApp(crate::launcher::focus::frontmost_other_app()));
     let app2 = app.clone();
@@ -158,6 +172,42 @@ pub fn open_panel(app: &Entity<AppModel>, anchor: Anchor, cx: &mut App) {
             cx,
         ),
     }
+}
+
+/// The bar stays until the user closes it (QC-1 "Window behaviour"): it only steps aside for a
+/// run (a screenshot on Linux would show it) and comes back, where it was, once the capture, the
+/// recording or the Long Shot and the after-capture bar are over. Pressing the shortcut meanwhile
+/// opens it at once and ends the wait.
+fn return_when_idle(app: &Entity<AppModel>, cx: &mut App) {
+    let app = app.clone();
+    cx.spawn(async move |cx| {
+        let mut calm = 0u32;
+        for _ in 0..place::RETURN_MAX_POLLS {
+            cx.background_executor()
+                .timer(Duration::from_millis(place::RETURN_POLL_MS))
+                .await;
+            let stop = cx.update(|cx| {
+                if cx.try_global::<PanelSlot>().is_some_and(|s| s.0.is_some()) {
+                    return true; // the user opened it again
+                }
+                let busy = app.read(cx).capture_busy
+                    || crate::ui::long_shot::is_running(cx)
+                    || crate::ui::recording::is_active(&app, cx)
+                    || crate::ui::quick_after::is_open(cx);
+                calm = place::calm_step(calm, busy);
+                if calm >= place::RETURN_CALM_POLLS {
+                    let at = cx.try_global::<LastHome>().and_then(|h| h.0);
+                    open_panel_at(&app, Anchor::Pointer, at, cx);
+                    return true;
+                }
+                false
+            });
+            if stop {
+                return;
+            }
+        }
+    })
+    .detach();
 }
 
 fn visible_contains(display: &crate::recording::geometry::Rect, x: f64, y: f64) -> bool {
@@ -502,6 +552,7 @@ impl QuickPanel {
         let run = self.st.run();
         let preset = self.st.preset.as_ref().map(|p| p.name.clone());
         self.changed(cx);
+        cx.set_global(LastHome(Some(self.home)));
         dismiss(window, cx, true);
         let app = self.app.clone();
         // The bar is gone by then: the wait runs on the app, not on the closed window.
@@ -510,7 +561,10 @@ impl QuickPanel {
                 cx.background_executor()
                     .timer(Duration::from_millis(CAPTURE_DELAY_MS))
                     .await;
-                cx.update(|cx| crate::ui::quick_flow::execute(&app, run, preset, cx));
+                cx.update(|cx| {
+                    crate::ui::quick_flow::execute(&app, run, preset, cx);
+                    return_when_idle(&app, cx);
+                });
             })
             .detach();
         });

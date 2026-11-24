@@ -37,6 +37,10 @@ presets file: `CAPTUREMANN_CONFIG_DIR=/tmp/qc-config CAPTUREMANN_LIBRARY=/tmp/qc
    the app itself holds it as a global shortcut (QC-1.AC15; the recorder must show the refusal, not open the Launcher).
 6b. **Hotkey taken.** With another app holding Option+Shift+C: Settings > Shortcuts shows "Couldn't
    register: used by another app" on that row, and the tray item still opens the panel.
+5. **The bar comes back (AC26).** Open the bar, choose Display and press Enter. Expected: the bar steps
+   aside, the capture is taken (the bar is not in it), and about 1.5 s after the after-capture bar closes (or the
+   toast is gone) the bar is open again at the same place with the same choices. Repeat with Region and Esc in the
+   area picker, with a Video run (the bar returns after Stop) and with Long Shot. Press Esc on the bar itself: it stays closed.
 
 ## 2. The bar (QC-1, QC-4)
 

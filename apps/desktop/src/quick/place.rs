@@ -160,6 +160,23 @@ pub fn over_strip(pointer: (f64, f64), window: (f64, f64), bar_h: f64, popover_o
     !popover_open && x >= 0.0 && x < window.0 && y > bar_h && y < window.1
 }
 
+/// How often the hidden bar looks whether the run it started is over, in milliseconds.
+pub const RETURN_POLL_MS: u64 = 250;
+/// Quiet polls in a row (1.5 s) before the bar comes back: the gaps between a pick and the start
+/// of a recording are shorter than that.
+pub const RETURN_CALM_POLLS: u32 = 6;
+/// Give up after about eight hours (a long recording); the bar then stays closed.
+pub const RETURN_MAX_POLLS: u32 = 8 * 3600 * 4;
+
+/// The count of quiet polls after one more look: any busy look starts it again.
+pub fn calm_step(calm: u32, busy: bool) -> u32 {
+    if busy {
+        0
+    } else {
+        calm + 1
+    }
+}
+
 /// [`window_size`] of the bar as it is shown, expanded or collapsed.
 pub fn window_size_view(display_w: f64, collapsed: bool) -> (f64, f64) {
     let (w, h) = bar_size_view(display_w, collapsed);
@@ -330,6 +347,17 @@ pub fn tray_rect(icon: (f64, f64, f64, f64), w: f64, h: f64, display: &Rect) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_bar_returns_only_after_a_quiet_stretch() {
+        let mut calm = 0;
+        for busy in [false, false, true, false, false, false, false, false, false] {
+            calm = calm_step(calm, busy);
+        }
+        assert_eq!(calm, 6, "a busy look starts the count again");
+        assert!(calm >= RETURN_CALM_POLLS);
+        assert_eq!(calm_step(5, true), 0);
+    }
 
     #[test]
     fn only_the_empty_strip_under_the_bar_lets_clicks_through() {

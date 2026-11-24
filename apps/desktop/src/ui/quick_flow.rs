@@ -133,12 +133,15 @@ fn video(app: &Entity<AppModel>, v: VideoRun, cx: &mut App) {
             } else {
                 CaptureMode::Region
             };
+            // The pick is a capture in progress: the hidden bar waits for it (QC-1).
+            app.update(cx, |m, _| m.capture_busy = true);
             cx.spawn(async move |cx| {
                 let b = backend.clone();
                 let picked = backend
                     .rt
                     .spawn(async move { b.overlay.pick(mode).await })
                     .await;
+                cx.update(|cx| app2.update(cx, |m, _| m.capture_busy = false));
                 cx.update(|cx| match picked {
                     Ok(Ok(Some(p))) => start_video(&app2, &v, p.target(), cx),
                     Ok(Ok(None)) => {}

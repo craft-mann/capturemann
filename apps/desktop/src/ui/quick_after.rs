@@ -205,6 +205,11 @@ fn open_at(
     }
 }
 
+/// Whether the after-capture bar is open.
+pub fn is_open(cx: &App) -> bool {
+    cx.try_global::<Slot>().is_some_and(|s| s.0.is_some())
+}
+
 /// Closes the bar if one is open.
 pub fn close(cx: &mut App) {
     if let Some(h) = cx.try_global::<Slot>().and_then(|s| s.0) {
