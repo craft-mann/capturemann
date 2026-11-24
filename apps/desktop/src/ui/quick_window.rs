@@ -1290,12 +1290,15 @@ impl QuickPanel {
             .tab_stop(true)
             .relative()
             .h(px(bar::CELL_H as f32))
-            .w(px(bar::ACTION_W as f32))
+            // At least its own width; it takes what the kind leaves over (Video has no Long Shot
+            // target, Audio no target at all), so the bar has no empty gap before the toggle.
+            .min_w(px(bar::ACTION_W as f32))
             .ml(px(bar::ACTION_ML as f32))
             .pl(px(12.))
             .pr(px(8.))
             .flex()
-            .flex_none()
+            .flex_grow(1.)
+            .flex_shrink_0()
             .items_center()
             .gap(px(8.))
             .rounded(px(12.))
