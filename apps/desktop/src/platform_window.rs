@@ -1090,13 +1090,16 @@ mod imp {
         let Ok((conn, _)) = x11rb::connect(None) else {
             return;
         };
-        if ignore {
-            let _ =
-                conn.shape_rectangles(SO::SET, SK::INPUT, ClipOrdering::UNSORTED, id, 0, 0, &[]);
+        // `check` waits for the server's answer, so the request is processed (and an error shows)
+        // before the connection closes.
+        let r = if ignore {
+            conn.shape_rectangles(SO::SET, SK::INPUT, ClipOrdering::UNSORTED, id, 0, 0, &[])
+                .map(|c| c.check())
         } else {
-            let _ = conn.shape_mask(SO::SET, SK::INPUT, id, 0, 0, x11rb::NONE);
-        }
-        let _ = conn.flush();
+            conn.shape_mask(SO::SET, SK::INPUT, id, 0, 0, x11rb::NONE)
+                .map(|c| c.check())
+        };
+        log::debug!("x11 input shape of window {id} (ignore {ignore}): {r:?}");
     }
 
     #[cfg(not(any(windows, target_os = "linux")))]
