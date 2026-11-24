@@ -161,12 +161,15 @@ pub fn over_strip(pointer: (f64, f64), window: (f64, f64), bar_h: f64, popover_o
 }
 
 /// How often the hidden bar looks whether the run it started is over, in milliseconds.
-pub const RETURN_POLL_MS: u64 = 250;
-/// Quiet polls in a row (1.5 s) before the bar comes back: the gaps between a pick and the start
-/// of a recording are shorter than that.
-pub const RETURN_CALM_POLLS: u32 = 6;
+pub const RETURN_POLL_MS: u64 = 100;
+/// Quiet polls in a row (0.2 s) before the bar comes back after a screenshot: it is back as soon
+/// as the capture is over.
+pub const RETURN_CALM_SHOT: u32 = 2;
+/// Quiet polls in a row (1.5 s) after a recording starts from the bar: the gap between the pick
+/// and the start of the recording is shorter than that, and the bar must not flash in it.
+pub const RETURN_CALM_RUN: u32 = 15;
 /// Give up after about eight hours (a long recording); the bar then stays closed.
-pub const RETURN_MAX_POLLS: u32 = 8 * 3600 * 4;
+pub const RETURN_MAX_POLLS: u32 = 8 * 3600 * 10;
 
 /// The count of quiet polls after one more look: any busy look starts it again.
 pub fn calm_step(calm: u32, busy: bool) -> u32 {
@@ -355,7 +358,7 @@ mod tests {
             calm = calm_step(calm, busy);
         }
         assert_eq!(calm, 6, "a busy look starts the count again");
-        assert!(calm >= RETURN_CALM_POLLS);
+        assert!(calm >= RETURN_CALM_SHOT && RETURN_CALM_SHOT < RETURN_CALM_RUN);
         assert_eq!(calm_step(5, true), 0);
     }
 

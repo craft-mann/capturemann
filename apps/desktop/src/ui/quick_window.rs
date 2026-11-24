@@ -180,9 +180,9 @@ fn open_panel_at(app: &Entity<AppModel>, anchor: Anchor, at: Option<Rect>, cx: &
 
 /// The bar stays until the user closes it (QC-1 "Window behaviour"): it only steps aside for a
 /// run (a screenshot on Linux would show it) and comes back, where it was, once the capture, the
-/// recording or the Long Shot, the after-capture bar and the toast are over. Pressing the shortcut meanwhile
+/// recording or the Long Shot is over (at once for a screenshot). Pressing the shortcut meanwhile
 /// opens it at once and ends the wait.
-fn return_when_idle(app: &Entity<AppModel>, cx: &mut App) {
+fn return_when_idle(app: &Entity<AppModel>, quiet: u32, cx: &mut App) {
     let app = app.clone();
     cx.spawn(async move |cx| {
         let mut calm = 0u32;
@@ -195,12 +195,10 @@ fn return_when_idle(app: &Entity<AppModel>, cx: &mut App) {
                     return true; // the user opened it again
                 }
                 let busy = app.read(cx).capture_busy
-                    || app.read(cx).toast_window.is_some()
                     || crate::ui::long_shot::is_running(cx)
-                    || crate::ui::recording::is_active(&app, cx)
-                    || crate::ui::quick_after::is_open(cx);
+                    || crate::ui::recording::is_active(&app, cx);
                 calm = place::calm_step(calm, busy);
-                if calm >= place::RETURN_CALM_POLLS {
+                if calm >= quiet {
                     let at = cx.try_global::<LastHome>().and_then(|h| h.0);
                     open_panel_at(&app, Anchor::Pointer, at, cx);
                     return true;
@@ -585,8 +583,16 @@ impl QuickPanel {
                     .timer(Duration::from_millis(CAPTURE_DELAY_MS))
                     .await;
                 cx.update(|cx| {
+                    let quiet = match &run {
+                        crate::quick::run::Run::Shot(r)
+                            if r.target != cm_core::preset::PresetTarget::LongShot =>
+                        {
+                            place::RETURN_CALM_SHOT
+                        }
+                        _ => place::RETURN_CALM_RUN,
+                    };
                     crate::ui::quick_flow::execute(&app, run, preset, cx);
-                    return_when_idle(&app, cx);
+                    return_when_idle(&app, quiet, cx);
                 });
             })
             .detach();
