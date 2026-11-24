@@ -63,6 +63,7 @@ actions!(
         NewClickGuide,
         NewClickGuideWindow,
         LongShotAction,
+        QuickCaptureAction,
         ImportMedia,
         QuitApp,
         CloseWindow,
@@ -107,6 +108,7 @@ pub fn bind_keys(cx: &mut App) {
 /// The entries of the app menu, in order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppMenuEntry {
+    QuickCapture,
     Library,
     LongShot,
     NewClickGuide,
@@ -119,6 +121,7 @@ pub enum AppMenuEntry {
 
 pub fn app_menu_plan() -> Vec<AppMenuEntry> {
     vec![
+        AppMenuEntry::QuickCapture,
         AppMenuEntry::Library,
         AppMenuEntry::LongShot,
         AppMenuEntry::NewClickGuide,
@@ -133,6 +136,9 @@ pub fn app_menu_plan() -> Vec<AppMenuEntry> {
 /// The menu bar in the current UI language. Rebuilt by `app::apply_language` on a language switch
 pub fn app_menus() -> Vec<Menu> {
     let items = app_menu_plan().into_iter().map(|e| match e {
+        AppMenuEntry::QuickCapture => {
+            MenuItem::action(tr!("Quick Capture\u{2026}"), QuickCaptureAction)
+        }
         AppMenuEntry::Library => MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
         // Native menus cannot draw the pill: the item text carries " (Preview)" (design S24).
         AppMenuEntry::LongShot => MenuItem::action(
@@ -183,6 +189,11 @@ pub fn install_app_actions(cx: &mut App) {
     cx.on_action(|_: &NewClickGuideWindow, cx| {
         if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
             app::handle_command(&app, Command::NewClickGuideWindow, cx);
+        }
+    });
+    cx.on_action(|_: &QuickCaptureAction, cx| {
+        if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
+            crate::ui::quick_window::toggle(&app, crate::ui::quick_window::Anchor::Pointer, cx);
         }
     });
     cx.on_action(|_: &LongShotAction, cx| {
@@ -618,5 +629,17 @@ mod tests {
         // Library, Long Shot, New Click Guide, Click Guide of a window, Import, Settings, a
         // separator and Quit.
         assert_eq!(menus[0].items.len(), 8);
+    }
+}
+
+#[cfg(test)]
+mod app_menu_tests {
+    use super::*;
+
+    #[test]
+    fn quick_capture_is_the_first_item_of_the_app_menu() {
+        let plan = app_menu_plan();
+        assert_eq!(plan[0], AppMenuEntry::QuickCapture);
+        assert_eq!(plan.last(), Some(&AppMenuEntry::Quit));
     }
 }
