@@ -38,7 +38,7 @@ Specs: `specs/features/05-audio.md`, `15-voice.md` (VOC-1, VOC-2), `07-ai.md` (A
 
 ### A5. The live-mode hardware gate
 
-- The 20-minute live-mode check runs on macOS (Apple Silicon and an Intel Mac), Windows (the ThinkPad) and Linux (X11 and Wayland), measuring CPU, memory, dropped live pieces and the time from Stop to the final transcript. Reports are stored. No user-facing change in 0.3.8; it unblocks 0.4.0 C1. (Intel Mac hardware: the maintainer provides it, otherwise the report says it was not run.)
+- The 20-minute live-mode check runs on macOS (Apple Silicon and an Intel Mac), Windows (the ThinkPad) and Linux (X11 and Wayland), measuring CPU, memory, dropped live pieces and the time from Stop to the final transcript. Reports are stored. No user-facing change in 0.3.8; it unblocks 0.4.0 C1. There is no Intel Mac in the lab (maintainer, Nov 25, 2026): the Intel Mac run is not done until the maintainer says one is available. It is a known limit named in the release text, and Intel Mac problems are fixed from user feedback.
 
 ### A6. The audio editor redesign (design page "0.3.8 Audio", boards A038)
 
@@ -59,7 +59,6 @@ Specs: `15-voice.md` (VOC-2), `07-ai.md`; the design page is the reference for l
 
 - **A2 data:** a yes for AMI excerpts and synthetic far-field FLEURS mixes, and a 5-minute hand-corrected stretch of a real Vietnamese meeting for a private check, kept out of the repository.
 - **A1 and the last-word check:** consent for real recordings on the lab computers.
-- **A5:** an Intel Mac for the live check.
 
 ## 3. Fixes
 
@@ -106,7 +105,7 @@ The "Known open items after 0.3.7" of `docs/development/release-day-0.3.7.md`, o
 
 ## 5. Not in 0.3.8
 
-Everything in section 4, new features beyond audio, and the 0.3.7 "Not run" list that needs a system the lab does not have: Windows 10, SmartScreen, a second monitor, mixed DPI, NVIDIA and AMD encoders, KDE.
+Everything in section 4, new features beyond audio, and the 0.3.7 "Not run" list that needs a system the lab does not have: Intel Mac hardware (a known limit until the maintainer says a machine is available; fixed from user feedback), Windows 10, SmartScreen, a second monitor, mixed DPI, NVIDIA and AMD encoders, KDE.
 
 ## 6. Order of work and exit
 
