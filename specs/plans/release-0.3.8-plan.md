@@ -1,53 +1,99 @@
-# Release 0.3.8 (plan)
+# Release 0.3.8: long audio made safe and measured (plan)
 
-Status: **draft, written Nov 25, 2026 after the release of 0.3.7, for the maintainer's review.** Scope proposed: the open items left by 0.3.7 (section 2, Fixes) and the regression-suite and release-process findings of the 0.3.7 public check; section 1 (Changes) is empty until the maintainer sets it. An item that adds a capability the specs do not already promise belongs in section 1 and needs the maintainer's word. Every item states the end state and names where it was found. Reports are in `verification/` (`*-0.3.7-*`). Order of work is at the end.
+Status: **draft, written Nov 25, 2026 after the release of 0.3.7, for the maintainer's review.** The maintainer's direction of the same day: 0.3.8 to 0.4.0 focus on the audio module, features and UI/UX. The roadmap is `audio-roadmap-0.3.8-0.4.0.md` (proposal, repo root, not yet committed): **0.3.8** makes long audio safe and measured (this plan), **0.3.9** makes it faster and cleaner (section 4), **0.4.0** adds the live and meeting features (section 4). Everything in 0.3.8 is a precondition of the later two: without flat memory and a quality gate their changes cannot be judged. Every item states the end state and names where it was found; numbers marked *target* need a stored report before the release text may use them. Reports are in `verification/` (`*-0.3.7-*`). Order of work is at the end.
 
-## 1. Changes
+## 1. Audio module (roadmap section 3)
 
-None decided. The maintainer sets this section at review. Backlog that could go here (not committed): in-app update (Velopack spikes done, `specs/plans/release-0.3.3-plan.md`), windowed audio, WebP and HEIC image import, a headless daemon on macOS, Click Guide on Linux.
+Specs: `specs/features/05-audio.md`, `15-voice.md` (VOC-1, VOC-2), `07-ai.md` (AI-1, AI-8). Each item becomes acceptance criteria there before it is built.
 
-## 2. Fixes
+### A1. Flat memory for long audio ("windowed audio", carried since 0.3.2)
+
+- Transcribing and finding speakers decode the audio by window, never the whole file: at most one piece plus its margin (300 s, plus or minus 20 s) is held, and the piece cutter finds the quietest 100 ms from a small level index built in one streaming pass.
+- Speakers always run by window (`speaker_engine/windowed.rs`, today used over 20 minutes), whatever the length, with the voice-print linking that keeps "Speaker 2" the same in hour 1 and hour 3. The whole-file run stays only as a measured comparison.
+- The transcript and the speaker job never run at full size together: they run in sequence or share one decoded window.
+- Windows are stitched without changes at the seams: no repeated or dropped word at a boundary and no speaker split in two at a boundary (the window overlap is raised, not the clustering threshold retuned; the 0.2.7 review measured 17 % to 36 % whole-versus-windowed disagreement as a stitching problem).
+- Cancel works at any point and frees the memory at once.
+- *Target:* a peak under 3 GB for a 4-hour recording with speakers on a 16 GB computer, with WER and DER within 0.5 points of today's on the existing long-audio reports (the 0.3.2 figure to beat is 11.7 GB for the 4 h 14 min Vietnamese meeting; the transcript alone was 4.3 GB). The benchmark is re-run with speakers on and its report stored.
+- A long job shows its stage, percent, time left and memory in use, with a Cancel that works; partial results stay visible while it runs.
+
+### A2. An audio quality gate in `cm-regress`
+
+- Public, reproducible sets, with licences checked before use: English (the held-out clips already used from PriMock57, CC BY 4.0, plus AMI meeting excerpts, CC BY 4.0); Vietnamese (FLEURS vi_vn, CC BY 4.0, made far-field with room impulse responses, room noise and overlapping speakers, a synthetic mix as the review brief asked); hallucination probes (room-only clips, muted stretches and music beds, expected result no words).
+- Reported per release and per system: WER, DER, the speaker-count error, words invented per hour of non-speech, time against real time, and peak memory. The reports go to `verification/benchmarks/`.
+- The gate fails when a number is worse than the last release by more than a set margin, per language, so a change that helps English cannot silently hurt Vietnamese (the 0.2.7 speaker retune did).
+- The maintainer's real meetings stay private: the gate reads a local folder of reference transcripts when one exists and never stores its content.
+- The first run gives the first Vietnamese DER and the speaker-count error on the Vietnamese meeting (7 to 8 found for 6); these are measured in 0.3.8 and improved in 0.3.9.
+
+### A3. One hallucination rule for every language (closes D4)
+
+- Signals already computed are combined: the Silero speech share (`silero.rs`), the level against the room floor, Whisper's no-speech probability, average log-probability and words per second. Room-only audio has no speech reference, so the Silero share is the reference: a line over a stretch where Silero finds less than X % speech and the level is within Y dB of the floor is dropped or written as `[noise]`. X and Y are measured on the A2 probes and written into `specs/features/07-ai.md` with their numbers.
+- The Vietnamese-only limit of the AC12 rule is removed once A2 shows English loses no real words (*target:* no more than 0.2 % of real words removed), on English and one more language.
+- No phrase lists and no rule fitted to one recording (project rule). The known limit stays in the release text if no rule passes.
+
+### A4. Spec and status hygiene
+
+- AUD-1, AUD-2, AUD-3 and AUD-6 state the Windows and Linux facts as shipped (WASAPI process loopback, PipeWire, the 0.2.8 and 0.3.0 hardware runs); VOC-3 moves from Draft to a real spec (0.4.0, C1).
+- "Windowed audio" is defined in the spec (A1), so the item stops being carried over without a definition.
+- `specs/features/09-library.md` describes the 0.3.7 sidebar and filter bar (SB-1 to SB-7 of `release-0.3.7-plan.md`).
+
+### A5. The live-mode hardware gate
+
+- The 20-minute live-mode check runs on macOS (Apple Silicon and an Intel Mac), Windows (the ThinkPad) and Linux (X11 and Wayland), measuring CPU, memory, dropped live pieces and the time from Stop to the final transcript. Reports are stored. No user-facing change in 0.3.8; it unblocks 0.4.0 C1. (Intel Mac hardware: the maintainer provides it, otherwise the report says it was not run.)
+
+## 2. Needs from the maintainer
+
+- **A2 data:** a yes for AMI excerpts and synthetic far-field FLEURS mixes, and a 5-minute hand-corrected stretch of a real Vietnamese meeting for a private check, kept out of the repository.
+- **A1 and the last-word check:** consent for real recordings on the lab computers.
+- **A5:** an Intel Mac for the live check.
+
+## 3. Fixes
 
 The "Known open items after 0.3.7" of `docs/development/release-day-0.3.7.md`, one item each, then the findings of the public check.
 
-### 2a. Transcripts
+### 3a. Transcripts
 
-- **Invented words over room-only noise (D4).** A 9-second Vietnamese clip that holds only room noise (about -60 dBFS) no longer gets an invented sign-off. The guard has a measured rule for audio that has no speech reference; the rule is written into `specs/features/07-ai.md` with its numbers and is adopted only if it loses no quiet real speech on the silence and quiet-speech sets (`silence_probe`, `quiet_silence`, `outro_guard`). The measurements, which were not run in 0.3.7, run first. Until then the known limit stays in the release text. (0.3.6 D4.)
+- **Invented words over room-only noise (D4).** Closed by A3 (section 1).
 - **The last word of a piece.** The check that every word has an end after its start runs on a long real recording on all three systems, and any piece that fails it is fixed in the engine. It needs the maintainer's consent for a real recording. (0.3.5 G3.)
 
-### 2b. Quick Capture
+### 3b. Quick Capture
 
 - **Wayland placement.** On a Wayland session the bar opens centred on the display and the after-capture bar under the captured area wherever the portal or the compositor allows it; where nothing can place them the spec says where they open (today the top-left on GNOME, Linux limits and AC12). Checked on GNOME Wayland on the ThinkPad. (0.3.7 not done; Linux QA N-3.)
 
-### 2c. Windows
+### 3c. Windows
 
 - **Long Shot first step.** The first scroll step of Long Shot on Windows is not lost. The scroll-back that recovers it stays. (Windows F-9.)
 - **Edge second tab (P-3).** A maximised Edge window with a second tab no longer ends Long Shot after 2 frames. It is tried again with the traces kept (`refused-NN.txt`, `trace.txt`); if it does not reproduce, the item is closed with the traces named in the report. (P-3, not reproduced in 0.3.7.)
 
-### 2d. Library and the daemon
+### 3d. Library and the daemon
 
 - **`list_library` kind `guide` with status.** `list_library` with kind `guide` and a status filter returns the same captures in the daemon, the MCP tool and the CLI as the library page shows for Click Guides with that status chip; a test covers the three. (Open since 0.3.7.)
 - **Docs.** `specs/features/09-library.md` describes the 0.3.7 sidebar and filter bar (SB-1 to SB-7 of `release-0.3.7-plan.md`): two buttons, one row of six modes, the fixed library order, Needs attention first and amber, Agents & CLI state, the icon rail under 960 pt.
 
-### 2e. Translations
+### 3e. Translations
 
 - **Vietnamese.** The 16 strings still untranslated (3660 of 3676 translated, `cargo run -p cm-i18n -- coverage`) are translated, and the draft strings (375) are listed for the maintainer's review. `cm-i18n check` passes.
 
-### 2f. The regression suite (`cm-regress`)
+### 3f. The regression suite (`cm-regress`)
 
 - **`installer.silent` baseline.** The Start-menu check compares the entries after the uninstall with the entries before the install and flags only entries that appeared with the install. A shortcut that existed before the run (a lab dev install's `CaptureMann (dev).lnk`) is never reported as left behind. (Windows public check, Nov 25, 2026: the case failed on that shortcut and passed once it was moved away.)
 - **Screen Recording not granted (macOS).** When the package under test has no Screen Recording permission, the cases that need it skip with a message naming the permission, instead of failing with `permission_missing`, and the report header says so. (macOS public check, Nov 25, 2026: 9 failures on an app copy in `/tmp`.)
 
-### 2g. Release process and packaging
+### 3g. Release process and packaging
 
 - **APT listing.** `apt list -a capturemann` on an amd64 computer does not list arm64 rows, or `linux-apt.md` says why it does (the sources file names both architectures). (0.3.6 QA, cosmetic.)
 - **winget.** The pull requests 472327, 477195 and 483031 are open and no 0.3.7 pull request exists. This is an account matter; the state is recorded in the release text and the README once the moderators answer.
 - **Public check on the DMGs.** The macOS regression of the release is run on the notarized DMG's app copy with a Screen Recording grant, as in 0.3.6; a `brew install` test runs in a throwaway location. (0.3.7 not run.)
 
-## 3. Not in 0.3.8
+## 4. After 0.3.8 (roadmap sections 4 and 5; not in this release)
 
-New features (section 1 backlog), and the 0.3.7 "Not run" list that needs hardware or a system the lab does not have: Intel Mac, Windows 10, SmartScreen, a second monitor, mixed DPI, NVIDIA and AMD encoders, KDE.
+**0.3.9, faster and cleaner audio:** GPU Whisper on Windows and Linux through Vulkan with a processor fallback, a setting that shows the device and a switch to force the processor, and flash attention and a quantised Turbo measured on the A2 set (B1); echo removal from the microphone track using the system track as the reference, as a post-process that leaves the masters alone (B2); compact FLAC masters after Stop (B3); speaker turns aligned to words and clustering with an estimated speaker count, adopted only where it wins on the A2 gate for both English and Vietnamese (B4); voice clean-up on export (B5).
 
-## 4. Order of work and exit
+**0.4.0, meetings and live:** live transcript as Preview (C1), recording one app's audio (C2), noticing when a meeting starts (C3), remembered voices as opt-in biometric data (C4), asking the library (C5), a slot for the CraftMann Vietnamese meeting model (C6).
 
-The D4 measurements (2a) start first because they decide whether a rule is built. The library and daemon item (2d), the translations (2e), the suite fixes (2f) and the docs run in parallel on disjoint files; Wayland (2b) needs the ThinkPad on Ubuntu with a Wayland session, and the Windows items (2c) need it on Windows. During development only fmt, clippy and the tests of the touched crates run. After development the maintainer tries the build by hand; every item is fixed or answered with a line in the release text. Then the full gate runs once on the final tree (fmt, clippy, tests, `cargo deny`, Trivy), the Windows package workflow, the Linux and macOS builds, and `cm-regress` on the final files of each system, stored in `verification/`.
+## 5. Not in 0.3.8
+
+Everything in section 4, new features beyond audio, and the 0.3.7 "Not run" list that needs a system the lab does not have: Windows 10, SmartScreen, a second monitor, mixed DPI, NVIDIA and AMD encoders, KDE.
+
+## 6. Order of work and exit
+
+A2 starts first: it produces the baseline every other item is measured against. A1 follows, then A3 (its X and Y come from A2's probes). The fixes of section 3, A4 and A5 run in parallel on disjoint files; the Windows items (3c) and A5's Windows run need the ThinkPad on Windows, Wayland (3b) and A5's Linux run need it on Ubuntu. During development only fmt, clippy and the tests of the touched crates run. After development the maintainer tries the build by hand; every item is fixed or answered with a line in the release text. Then the full gate runs once on the final tree (fmt, clippy, tests, `cargo deny`, Trivy), the Windows package workflow, the Linux and macOS builds, and `cm-regress` on the final files of each system, stored in `verification/`.
