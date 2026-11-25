@@ -79,10 +79,10 @@ Sample content only. Most pictures are from Windows 11; the app looks the same o
 
 |  |  |
 | --- | --- |
-| ![The 0.3.7 library: Quick Capture, Record and six capture modes in the sidebar](docs/images/windows/windows-library-0.3.7.webp) | ![The 0.3.7 recording editor: preview, speed panel, Screen, Webcam and Mic tracks](docs/images/windows/windows-editor-0.3.7.webp) |
-| ![Meeting minutes beside the transcript](docs/images/meeting-report.webp) | ![Auto-redact finds personal data before you share](docs/images/windows/windows-auto-redact.webp) |
-| ![The Record sheet: display, window or region, webcam, microphone, system audio](docs/images/windows/windows-record-sheet.webp) | ![The window picker](docs/images/windows/windows-window-picker.webp) |
-| ![Local AI models](docs/images/windows/windows-ai-models.webp) | ![A transcript labelled with its speakers](docs/images/windows/windows-editor-transcript-speakers.webp) |
+| ![The 0.3.7 library: Quick Capture, Record and six capture modes in the sidebar](docs/images/windows/windows-library-0.3.7.webp) | ![The recording editor: preview, speed panel, Screen, Webcam and Mic tracks](docs/images/windows/windows-editor-0.3.7.webp) |
+| ![Presets: one pick, or one shortcut, runs the whole setup](docs/images/windows/windows-presets-0.3.7.webp) | ![Global shortcuts for every capture mode](docs/images/windows/windows-shortcuts-0.3.7.webp) |
+| ![Local AI models: everything runs on this computer](docs/images/windows/windows-ai-models-0.3.7.webp) | ![Meeting minutes beside the transcript](docs/images/meeting-report.webp) |
+| ![Auto-redact finds personal data before you share](docs/images/windows/windows-auto-redact.webp) | ![A transcript labelled with its speakers](docs/images/windows/windows-editor-transcript-speakers.webp) |
 
 ## Long recordings: how they are transcribed, and what it costs
 
