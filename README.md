@@ -32,11 +32,6 @@ through MCP and a CLI.
 <a href="https://www.craftmann.app/capturemann/download/"><b>Download CaptureMann</b></a> for macOS, Windows and Linux
 </p>
 
-<p align="center">
-  <img alt="The CaptureMann 0.3.7 library on Windows: Quick Capture and Record buttons, one row of six capture modes with their keys, the library list and the captures (sample recordings)" src="docs/images/windows/windows-library-0.3.7.webp" width="440">
-  <img alt="The CaptureMann 0.3.7 recording editor on Windows: preview with the webcam bubble, speed panel and the Screen, Webcam and Mic tracks (sample recording)" src="docs/images/windows/windows-editor-0.3.7.webp" width="440">
-</p>
-
 ## Features
 
 ✓ works, — not available. Notes in brackets name the limit. Current versions and downloads are on the
@@ -77,6 +72,17 @@ bring your own Google credentials. Actions of a recording that start, publish or
 <p align="center">
   <img alt="A meeting-minutes report beside the transcript: summary, attendees, decisions and action items, each with a button that plays the moment it was said, and a waveform that marks where the items come from (sample data)" src="docs/images/meeting-report.webp" width="900">
 </p>
+
+## Screenshots
+
+Sample content only. Most pictures are from Windows 11; the app looks the same on macOS and Linux.
+
+|  |  |
+| --- | --- |
+| ![The 0.3.7 library: Quick Capture, Record and six capture modes in the sidebar](docs/images/windows/windows-library-0.3.7.webp) | ![The 0.3.7 recording editor: preview, speed panel, Screen, Webcam and Mic tracks](docs/images/windows/windows-editor-0.3.7.webp) |
+| ![Meeting minutes beside the transcript](docs/images/meeting-report.webp) | ![Auto-redact finds personal data before you share](docs/images/windows/windows-auto-redact.webp) |
+| ![The Record sheet: display, window or region, webcam, microphone, system audio](docs/images/windows/windows-record-sheet.webp) | ![The window picker](docs/images/windows/windows-window-picker.webp) |
+| ![Local AI models](docs/images/windows/windows-ai-models.webp) | ![A transcript labelled with its speakers](docs/images/windows/windows-editor-transcript-speakers.webp) |
 
 ## Long recordings: how they are transcribed, and what it costs
 
