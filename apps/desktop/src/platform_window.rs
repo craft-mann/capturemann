@@ -417,7 +417,6 @@ pub fn x11_window_origin(window: &Window) -> Option<(i32, i32)> {
 pub fn x11_move_to(window: &Window, x: i32, y: i32) {
     #[cfg(target_os = "linux")]
     {
-        use x11rb::connection::Connection;
         use x11rb::protocol::xproto::{ConfigureWindowAux, ConnectionExt};
         let Some(id) = x11_window_id(window) else {
             return;
@@ -1081,7 +1080,6 @@ mod imp {
     /// available to a client here.
     #[cfg(target_os = "linux")]
     pub fn set_ignores_mouse(window: &Window, ignore: bool) {
-        use x11rb::connection::Connection;
         use x11rb::protocol::shape::{ConnectionExt as _, SK, SO};
         use x11rb::protocol::xproto::ClipOrdering;
         let Some(id) = super::x11_window_id(window) else {
