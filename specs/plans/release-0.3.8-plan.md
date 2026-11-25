@@ -67,7 +67,6 @@ The "Known open items after 0.3.7" of `docs/development/release-day-0.3.7.md`, o
 ### 3d. Library and the daemon
 
 - **`list_library` kind `guide` with status.** `list_library` with kind `guide` and a status filter returns the same captures in the daemon, the MCP tool and the CLI as the library page shows for Click Guides with that status chip; a test covers the three. (Open since 0.3.7.)
-- **Docs.** `specs/features/09-library.md` describes the 0.3.7 sidebar and filter bar (SB-1 to SB-7 of `release-0.3.7-plan.md`): two buttons, one row of six modes, the fixed library order, Needs attention first and amber, Agents & CLI state, the icon rail under 960 pt.
 
 ### 3e. Translations
 
