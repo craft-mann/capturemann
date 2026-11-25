@@ -38,7 +38,7 @@ Specs: `specs/features/05-audio.md`, `15-voice.md` (VOC-1, VOC-2), `07-ai.md` (A
 
 ### A5. The live-mode hardware gate
 
-- The 20-minute live-mode check runs on macOS (Apple Silicon and an Intel Mac), Windows (the ThinkPad) and Linux (X11 and Wayland), measuring CPU, memory, dropped live pieces and the time from Stop to the final transcript. Reports are stored. No user-facing change in 0.3.8; it unblocks 0.4.0 C1. There is no Intel Mac in the lab (maintainer, Nov 25, 2026): the Intel Mac run is not done until the maintainer says one is available. It is a known limit named in the release text, and Intel Mac problems are fixed from user feedback.
+- The 20-minute live-mode check runs on macOS (Apple Silicon), Windows (the ThinkPad) and Linux (X11 and Wayland), measuring CPU, memory, dropped live pieces and the time from Stop to the final transcript. Reports are stored. No user-facing change in 0.3.8; it unblocks 0.4.0 C1. There is no Intel Mac in the lab (maintainer, Nov 25, 2026): the Intel Mac run is not done until the maintainer says one is available. It is a known limit named in the release text, and Intel Mac problems are fixed from user feedback.
 
 ### A6. The audio editor redesign (design page "0.3.8 Audio", boards A038)
 
