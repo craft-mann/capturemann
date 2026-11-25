@@ -33,7 +33,7 @@ Written on Nov 24, 2026 (night before the planned release) from `specs/plans/rel
 
 - **Transcripts.** Over audio that holds only room noise, a made-up sentence can still pass the check; the measured rule planned for this is not in 0.3.7. Look at transcripts of very quiet recordings.
 - **Quick Capture on Linux.** On a Wayland session the bar opens at the top-left because a program cannot place itself there; Linux has no way to keep the bar out of a capture another program starts.
-- **Shortcuts.** ⌥⇧4 and ⌥⇧5 may already be taken by another program or a system shortcut on your Mac; change them in Settings if so. <FILL: result of the macOS collision check, or "not checked">
+- **Shortcuts.** ⌥⇧4 and ⌥⇧5 may already be taken by another program or a system shortcut on your Mac; change them in Settings if so. On the maintainer's Mac (Nov 25, 2026, reported by the maintainer, no stored report) ⌥⇧4 started Long Shot and ⌥⇧5 started Click Guide.
 - **Long Shot on Windows** can lose its first scroll step and then recovers.
 - **Preview features:** Quick Capture, Long Shot, Click Guide and Boards.
 - Windows files are not code-signed (SmartScreen will warn). They are the GitHub "Windows package" workflow's files and include the speaker engine.
