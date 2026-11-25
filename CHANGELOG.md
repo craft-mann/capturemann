@@ -5,7 +5,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
-## [0.3.7] - Unreleased
+## [0.3.7] - 2026-11-25
 
 Bug fixes and stabilisation, plus the sidebar cleanup (plan `specs/plans/release-0.3.7-plan.md`). No new capability; 90 MCP tools as in 0.3.6.
 

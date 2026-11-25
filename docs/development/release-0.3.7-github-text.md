@@ -2,7 +2,7 @@
 
 Written on Nov 24, 2026 (night before the planned release) from `specs/plans/release-0.3.7-plan.md`, `CHANGELOG.md` and the reports `verification/*0.3.7*`. **Nothing here is final until the regression on the final files exists.** Every `<FILL: ...>` is a fact that only exists on the release day. Never write "passed" or "verified" without a stored report in `verification/` (CLAUDE.md wording rule); what the maintainer saw is written "reported by the maintainer". Steps: `release-day-0.3.7.md`.
 
-- **Tag:** `v0.3.7` on the commit that holds the release docs, directly above the code commit `<FILL: code commit>` (never reuse a tag). **Title:** `CaptureMann 0.3.7: bug fixes and a tidier sidebar`.
+- **Tag:** `v0.3.7` on the commit that holds the release docs, directly above `85c015cb` (docs, reports and the changelog only; never reuse a tag). **Title:** `CaptureMann 0.3.7: bug fixes and a tidier sidebar`.
 - **Type:** draft first; full release or pre-release is the maintainer's call.
 - **Files to attach:** as 0.3.6: `capturemann-0.3.7-windows-x64-setup.exe` and `.zip`, `CaptureMann-v0.3.7-macos-<arch>.dmg` (arm64 and x86_64), the `.sha256` files and `SHA256SUMS.txt`, the four Linux files with their `.minisig`. Check with `scripts/check-release-assets.sh 0.3.7 <folder>`.
 - **Headline numbers:** 90 MCP tools (unchanged); Windows files unsigned; macOS DMGs signed, notarized and stapled by the maintainer.
@@ -40,6 +40,8 @@ Written on Nov 24, 2026 (night before the planned release) from `specs/plans/rel
 
 ## What was checked
 
+**Which commit built what:** the Windows and Linux files are of `cc1f281c`, the macOS DMGs of the code of `10465fe2` (built by the maintainer); `85c015cb` (the pushed head) only removes two unused imports that Linux clippy rejected. The tag `v0.3.7` sits on the docs commit above it.
+
 Reports are in `verification/` and all are **PARTIAL**. The overlay windows (bars, HUD, picker, toasts, dialogs) cannot be captured by the test tools: they were read through window rectangles, input and the accessibility tree.
 
 | System | Result | Report |
@@ -47,7 +49,10 @@ Reports are in `verification/` and all are **PARTIAL**. The overlay windows (bar
 | Windows 11 (lab build of `f25ab382`, no speaker engine, screen only) | standard 57 passed, 0 failed, 7 skipped of 64; full 66 / 0 / 14 of 80; hardware 66 / 0 / 22 of 88 | `L1-windows-0.3.7-lab-f25ab382-regression-*` |
 | macOS arm64 (dev bundle, screen locked overnight so desktop cases skipped; to be repeated on the DMG) | standard 43 / 0 / 21 of 64; full 44 / 0 / 36 of 80 | `L1-macos-0.3.7-regression-*` |
 | Linux x86_64 (ThinkPad, Ubuntu 24.04) | X11, lab build of `0c3a3ac9`: standard 56 passed, 0 failed, 8 skipped of 64; full 58 / 5 / 17 of 80 (the 5 are screen-recording cases that failed because the GNOME screen was locked during the run: "Session creation inhibited"; to be rerun unlocked); `.deb` install passed | `L1-linux-0.3.7-regression-*-x11-lab-0c3a3ac9-*` |
-| <FILL: the final files per system: Windows CI package, macOS DMGs, Linux tarballs and .deb> | <FILL> | <FILL> |
+| Windows 11, the final files (GitHub package of `cc1f281c`, installed) | standard 57 / 0 / 7 of 64; full 65 / 0 / 15 of 80; hardware 65 / 0 / 23 of 88 | `L1-windows-0.3.7-regression-*-ci-cc1f281c-installed-*` |
+| Linux x86_64 final files (`cc1f281c`, X11, `.deb` install) | standard 57 / 0 / 7; full 65 / 0 / 15 | `L1-linux-0.3.7-cc1f281c-regression-*`, `QA-0.3.7-linux-final-files-cc1f281c-*` |
+| Linux aarch64 final files (`cc1f281c`, headless VM) | standard 42 / 0 / 22; full 44 / 0 / 36; `.deb` install 1 / 0 | `L1-linux-aarch64-0.3.7-cc1f281c-regression-*` |
+| macOS DMGs (arm64, x86_64) | signature and notarization checked (stapled, Gatekeeper accepted); `cm-regress` not run on the DMGs | none |
 | Maintainer's hand checks (reported, no stored report) | the bar on macOS, the toast message and Ctrl+Alt+Shift+C on Windows, ⌥⇧4 and ⌥⇧5 on macOS | none |
 | Bar checks (Linux X11, Windows) | strip click-through, drag, return after a capture, default place | `QC-0.3.7-bugfix-checks-2026-11-22-claude.md` |
 

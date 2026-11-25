@@ -1,6 +1,6 @@
 # Release 0.3.7: bug fixes and stabilisation (plan)
 
-Status: **draft, written Nov 22, 2026 after the release of 0.3.6; scope set by the maintainer the same day: no new features, only bug fixes and stabilisation.** An item that adds a capability the specs do not already promise does not belong here. The plan states final requirements only; each item names where it was found. Reports are in `verification/` (`*-0.3.6-*`). The order of work is at the end.
+Status: **released Nov 25, 2026 (what was not done: the D4 measurements and the long-recording last-word check, see `release-day-0.3.7.md`); originally a draft, written Nov 22, 2026 after the release of 0.3.6; scope set by the maintainer the same day: no new features, only bug fixes and stabilisation.** An item that adds a capability the specs do not already promise does not belong here. The plan states final requirements only; each item names where it was found. Reports are in `verification/` (`*-0.3.6-*`). The order of work is at the end.
 
 ## 1. Quick Capture
 
