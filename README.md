@@ -18,7 +18,7 @@ through MCP and a CLI.
 <p align="center">
 <a href="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml/badge.svg"></a>
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
-<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.3.6" src="https://img.shields.io/badge/version-0.3.6-blue"></a>
+<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.3.7" src="https://img.shields.io/badge/version-0.3.7-blue"></a>
 <img alt="macOS 13+: Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-13%2B%20%7C%20Apple%20Silicon%20%26%20Intel-lightgrey?logo=apple&logoColor=white">
 <img alt="Windows 11 x64, unsigned" src="https://img.shields.io/badge/Windows-11%20x64%20%7C%20unsigned-0078D4?logo=windows&logoColor=white">
 <img alt="Linux: Ubuntu 24.04+ x86_64 and aarch64" src="https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B%20%7C%20x86__64%20%26%20aarch64-E95420?logo=linux&logoColor=white">
@@ -30,6 +30,11 @@ through MCP and a CLI.
 
 <p align="center">
 <a href="https://www.craftmann.app/capturemann/download/"><b>Download CaptureMann</b></a> for macOS, Windows and Linux
+</p>
+
+<p align="center">
+  <img alt="The CaptureMann 0.3.7 library on Windows: Quick Capture and Record buttons, one row of six capture modes with their keys, the library list and the captures (sample recordings)" src="docs/images/windows/windows-library-0.3.7.webp" width="440">
+  <img alt="The CaptureMann 0.3.7 recording editor on Windows: preview with the webcam bubble, speed panel and the Screen, Webcam and Mic tracks (sample recording)" src="docs/images/windows/windows-editor-0.3.7.webp" width="440">
 </p>
 
 ## Features
