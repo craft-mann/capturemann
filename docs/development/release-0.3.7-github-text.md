@@ -48,6 +48,7 @@ Reports are in `verification/` and all are **PARTIAL**. The overlay windows (bar
 | macOS arm64 (dev bundle, screen locked overnight so desktop cases skipped; to be repeated on the DMG) | standard 43 / 0 / 21 of 64; full 44 / 0 / 36 of 80 | `L1-macos-0.3.7-regression-*` |
 | Linux x86_64 (ThinkPad, Ubuntu 24.04) | X11, lab build of `0c3a3ac9`: standard 56 passed, 0 failed, 8 skipped of 64; full 58 / 5 / 17 of 80 (the 5 are screen-recording cases that failed because the GNOME screen was locked during the run: "Session creation inhibited"; to be rerun unlocked); `.deb` install passed | `L1-linux-0.3.7-regression-*-x11-lab-0c3a3ac9-*` |
 | <FILL: the final files per system: Windows CI package, macOS DMGs, Linux tarballs and .deb> | <FILL> | <FILL> |
+| Maintainer's hand checks (reported, no stored report) | the bar on macOS, the toast message and Ctrl+Alt+Shift+C on Windows, ⌥⇧4 and ⌥⇧5 on macOS | none |
 | Bar checks (Linux X11, Windows) | strip click-through, drag, return after a capture, default place | `QC-0.3.7-bugfix-checks-2026-11-22-claude.md` |
 
 **Not run:** Intel Mac hardware, Windows 10, SmartScreen, a second monitor, mixed-DPI monitors, NVIDIA and AMD encoders, KDE, Wayland checks of the new bar behaviour, the sidebar's narrow rail on a real narrow window, bar returns after Region, Video, Audio and Long Shot on every system.
