@@ -17,6 +17,9 @@ Silent install exit 0, `capturemann --version` 0.3.7. `cm-regress --installed`, 
 ## Linux x86_64 (ThinkPad, Ubuntu 24.04, X11)
 `apt update` pulled the new `InRelease` and `Packages` from release `apt`; `apt install capturemann` installed 0.3.7 (`ii capturemann 0.3.7 amd64`); `apt list -a` shows 0.3.0 to 0.3.7; the cached `.deb` has the same sha256 as the release file. `cm-regress` on `/opt/capturemann/lib/capturemann`, `--allow screen`: standard 57/0 (7 skipped), full 64/0 (16 skipped). Reports `L1-linux-0.3.7-regression-{standard,full}-x11-public-apt-*`.
 
+## Linux x86_64 on Wayland (ThinkPad, GNOME 46, session set to Wayland through AccountsService and a reboot)
+`cm-regress` on the APT-installed package, `--allow screen`: standard 55 passed, 0 failed, 9 skipped; full 61 passed, 0 failed, 19 skipped (window cases skip on Wayland, as the suite states). Reports `L1-linux-0.3.7-regression-{standard,full}-wayland-public-apt-wayland-*`. The laptop was put back on X11 afterwards. Not seen by eye: the Quick Capture bar's placement on Wayland (the spec says top-left on GNOME).
+
 ## Linux aarch64 (QEMU VM, headless, Ubuntu 24.04)
 Downloaded from the public URLs: tarball and `.deb` equal `SHA256SUMS.txt` (the `.deb` `25997e06...cf91e`, also the copy apt cached); minisign verified both. `apt update` pulled the new index, `apt install capturemann` installed 0.3.7 (`ii capturemann 0.3.7 arm64`). `cm-regress` (binary built Nov 25 from the 0.3.7 tree) on `/opt/capturemann/lib/capturemann`: standard 42 passed, 0 failed, 22 skipped; full 43 passed, 0 failed, 37 skipped (every desktop-session case skipped: headless). Reports `L1-linux-aarch64-0.3.7-public-apt-regression-{standard,full}-*`.
 
@@ -24,4 +27,4 @@ Downloaded from the public URLs: tarball and `.deb` equal `SHA256SUMS.txt` (the 
 Made in the aarch64 VM (0.3.0 to 0.3.7, flat layout), checked on the Mac: `InRelease` and `Release.gpg` verify with the published keyring (key 516CCD4F...EF557D), `Packages`, `.gz`, `.xz` hashes equal `Release`, every `.deb` hash is in `Packages`; uploaded to release `apt` (25 assets, still a pre-release); the public `InRelease` and `Packages` are byte-identical to the local ones.
 
 ## Not run
-Intel Mac, a `brew install` run by me (the maintainer's own upgrade was checked instead), the aarch64 desktop session, Wayland, Windows 10, SmartScreen, second monitor, the full macOS tier.
+Intel Mac, a `brew install` run by me (the maintainer's own upgrade was checked instead), the aarch64 desktop session, Windows 10, SmartScreen, second monitor, the full macOS tier.
